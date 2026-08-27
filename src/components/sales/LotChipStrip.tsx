@@ -67,6 +67,12 @@ export interface LotChipData {
    */
   valueUsd?: number
   paidUsd?: number
+  /**
+   * valueUsd đã CHỐT hay chỉ TẠM TÍNH. Số tạm tính = net/1000 × đơn giá, mà net_weight_kg
+   * bị ghi đè mỗi lần gán container → con số đổi SAU khi hoá đơn đã phát. Hiện nó như số
+   * chốt là mời người dùng đối chiếu công nợ với một con số biết tự đổi.
+   */
+  valueLocked?: boolean
   /** `lot_status` trái chứng cứ giao → chấm đỏ góc trên. */
   mismatch?: boolean
 }
@@ -88,13 +94,16 @@ export function mergeLotAxes(
   }
   for (const m of money || []) {
     const e = byLot.get(m.lotNo)
-    if (e) { e.valueUsd = m.valueUsd; e.paidUsd = m.paidUsd; e.mismatch = mismatchOf(m.lotStatus, e) }
+    if (e) {
+      e.valueUsd = m.valueUsd; e.paidUsd = m.paidUsd; e.valueLocked = m.valueLocked
+      e.mismatch = mismatchOf(m.lotStatus, e)
+    }
     // Lô CHỈ có ở phía tiền (đã chốt trong sales_order_lots nhưng chưa gán container):
     // vẫn phải hiện, nếu không thì thu tiền xong lô đó biến mất khỏi dải.
     else byLot.set(m.lotNo, {
       lotNo: m.lotNo,
       contsDelivered: 0, contsTotal: 0, netKgDelivered: 0, netKgTotal: 0,
-      valueUsd: m.valueUsd, paidUsd: m.paidUsd,
+      valueUsd: m.valueUsd, paidUsd: m.paidUsd, valueLocked: m.valueLocked,
     })
   }
   return [...byLot.values()].sort((a, b) => a.lotNo - b.lotNo)
@@ -153,6 +162,11 @@ function LotChip({ d, size }: { d: LotChipData; size: LotChipSize }) {
           <div style={{ fontWeight: 700, marginBottom: 2 }}>Lô {d.lotNo}</div>
           <div>📦 Giao <b>{shipTxt}</b></div>
           <div>💵 Thu <b>{moneyTxt}</b></div>
+          {known && value > 0 && !d.valueLocked && (
+            <div style={{ color: '#8a5a05' }}>
+              Trị giá <b>tạm tính</b> theo cân hiện tại — chưa chốt, sẽ đổi nếu gán lại container.
+            </div>
+          )}
           {over && <div style={{ color: OVER, fontWeight: 600 }}>⚠ Đã thu VƯỢT trị giá lô</div>}
           {d.mismatch && (
             <div style={{ color: MISMATCH, marginTop: 4 }}>

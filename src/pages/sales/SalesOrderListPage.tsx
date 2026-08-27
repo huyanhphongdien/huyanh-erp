@@ -540,9 +540,16 @@ const SalesOrderListPage = () => {
   const handleExportSelected = async () => {
     if (selectedOrders.length === 0) return
     try {
-      const prog = await dispatchService.getLotProgressForOrders(selectedOrders.map((o) => o.id))
+      // ⚠ Lấy CẢ HAI trục. Thiếu lotPay thì cột "Thu (lô)" trong file trống trong khi
+      // màn hình có số — file Excel và màn hình nói khác nhau.
+      const ids = selectedOrders.map((o) => o.id)
+      const [prog, pay] = await Promise.all([
+        dispatchService.getLotProgressForOrders(ids),
+        // Trục tiền hỏng thì mất MỘT cột; để nó ném ra là mất CẢ file.
+        salesOrderPaymentService.getLotPaymentForOrders(ids).catch(() => ({})),
+      ])
       await exportSalesOrdersExcel({
-        orders: selectedOrders, lotProgress: prog, filterDesc, scopeLabel: 'Đơn đã chọn',
+        orders: selectedOrders, lotProgress: prog, lotPay: pay, filterDesc, scopeLabel: 'Đơn đã chọn',
       })
       message.success(`Đã xuất ${selectedOrders.length} đơn`)
     } catch (e: any) {
@@ -582,9 +589,14 @@ const SalesOrderListPage = () => {
       if (all.length < grand) {
         message.warning(`Chỉ xuất ${all.length}/${grand} đơn (giới hạn ${CAP}) — thu hẹp bộ lọc để xuất đủ`)
       }
-      const prog = await dispatchService.getLotProgressForOrders(all.map((o) => o.id))
+      // Cả hai trục, giống chỗ xuất đơn đã chọn — hai chỗ phải sửa cùng lúc.
+      const allIds = all.map((o) => o.id)
+      const [prog, pay] = await Promise.all([
+        dispatchService.getLotProgressForOrders(allIds),
+        salesOrderPaymentService.getLotPaymentForOrders(allIds).catch(() => ({})),   // mất 1 cột còn hơn mất cả file
+      ])
       await exportSalesOrdersExcel({
-        orders: all, lotProgress: prog, filterDesc, scopeLabel: 'Tất cả theo bộ lọc',
+        orders: all, lotProgress: prog, lotPay: pay, filterDesc, scopeLabel: 'Tất cả theo bộ lọc',
       })
       message.success(`Đã xuất ${all.length} đơn`)
     } catch (e: any) {

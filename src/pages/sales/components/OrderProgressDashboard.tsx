@@ -22,6 +22,9 @@ import {
 } from '../../../services/sales/salesContractWorkflowService'
 import { DEFAULT_BANK, amountToWords, type ContractFormData } from '../../../services/sales/contractGeneratorService'
 import OrderFilesWidget from './OrderFilesWidget'
+import LotProgressTable from '../../../components/sales/LotProgressTable'
+
+
 
 const PRIMARY = '#1B4D3E'
 
@@ -44,6 +47,9 @@ interface Props {
   /** Callback khi user click 1 folder trong Files Widget → switch tab.
    * subType (tuỳ chọn, chỉ áp dụng cho tab 'contract') để scroll tới đúng nhóm HĐ. */
   onNavigateTab?: (tabKey: string, subType?: 'sent_to_customer' | 'ha_signed' | 'final_signed') => void
+  // Tiến độ theo lô KHÔNG đi qua đây: <LotProgressTable> tự nạp bằng useOrderLotAxes.
+  // Bản trước nhận qua prop và route /sales/orders/:orderId quên truyền — bảng im lặng
+  // khẳng định "chưa chia lô" cho 9 đơn có lô thật. Xem đầu useOrderLotAxes.ts.
 }
 
 export default function OrderProgressDashboard({ order, onChanged, onNavigateTab }: Props) {
@@ -188,6 +194,13 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
 
       {/* ═══ 0. FILES WIDGET (6 folder dùng chung — nổi bật trên cùng) ═══ */}
       <OrderFilesWidget salesOrderId={order.id} onNavigateTab={onNavigateTab} />
+
+      {/* ═══ 0b. TIẾN ĐỘ TỪNG LÔ ═══
+          Đây là tab DUY NHẤT có nhiệm vụ trả lời "đơn này tới đâu rồi", nhưng trước
+          27/08/2026 nó không có lấy một chữ "lô". Nửa GIAO nằm ở tab Đóng gói, nửa TIỀN
+          nằm cuối tab Tài chính — cách nhau ba tab, không ai ghép được.
+          Bảng này ghép hai nửa lại, ngay khối đầu tiên. */}
+      <LotProgressTable order={order} />
 
       {/* ═══ 1. SLA ALERT ═══ */}
       {slaOver !== null && (

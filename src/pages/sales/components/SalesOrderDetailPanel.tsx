@@ -134,6 +134,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       } catch {
         setHasWorkflow(false)
       }
+      // Tiến độ theo lô KHÔNG nạp ở đây: <LotProgressTable> tự nạp bằng useOrderLotAxes,
+      // khoá theo order.updated_at nên lưu xong / realtime bắn về là nó tự làm mới.
     } catch {
       message.error('Không thể tải thông tin đơn hàng')
     } finally {

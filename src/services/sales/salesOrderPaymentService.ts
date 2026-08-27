@@ -195,6 +195,13 @@ export interface LotMoneyRow {
   status: LotPayStatus | 'unknown'
   /** sales_order_lots.status — số NHẬP TAY, chỉ để đối chiếu với chứng cứ giao. */
   lotStatus?: string | null
+  /**
+   * true  = valueUsd là trị giá ĐÃ CHỐT (sales_order_lots.value_usd).
+   * false = số TẠM TÍNH (net/1000 × đơn giá) — sẽ ĐỔI mỗi lần gán lại container.
+   * Không phân biệt hai thứ này là màn hình hiện số tạm tính như thể đã chốt —
+   * đúng lỗi vừa vá ở Sổ lô 27/08/2026, đừng lặp lại ở màn khác.
+   */
+  valueLocked: boolean
 }
 
 /** Tiền theo lô của MỘT đơn — kết quả batch cho danh sách / Kanban. */
@@ -501,6 +508,7 @@ export const salesOrderPaymentService = {
           valueUsd: round2(v),
           paidUsd: paid,
           status: !v ? 'unknown' : isPaid ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
+          valueLocked: chot > 0,
           lotStatus: lotStatusMap[oid]?.get(lotNo) ?? null,
         })
       }

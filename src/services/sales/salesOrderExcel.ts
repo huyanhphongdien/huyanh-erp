@@ -9,6 +9,7 @@
 
 import type ExcelJSType from 'exceljs'
 import { deliveredTons, remainingTons, type LotProgress } from '../logistics/dispatchService'
+import type { OrderLotMoney } from './salesOrderPaymentService'
 import { ORDER_STATUS_LABELS, soDisplayCode, type SalesOrder } from './salesTypes'
 
 const BRAND = 'FF1B4D3E'
@@ -29,6 +30,12 @@ const DONE_STATUSES = new Set(['delivered', 'invoiced', 'paid'])
 export interface SalesOrderExportOpts {
   orders: SalesOrder[]
   lotProgress: Record<string, LotProgress>
+  /**
+   * Tiền theo lô. Không truyền thì hai cột lô trong file để TRỐNG — thà trống còn hơn
+   * ghi 0/0, vì 0/0 đọc ra là "có lô nhưng chưa thu lô nào".
+   * ⚠ Phải truyền ở CẢ HAI chỗ xuất, nếu không file Excel nói khác màn hình.
+   */
+  lotPay?: Record<string, OrderLotMoney>
   /** Mô tả bộ lọc đang áp (in lên đầu file để biết đây là báo cáo gì). */
   filterDesc: string
   /** Nhãn nguồn dữ liệu: "Đơn đã chọn" hoặc "Tất cả theo bộ lọc". */
@@ -49,7 +56,7 @@ const toDate = (v: any): Date | null => {
 }
 
 export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promise<void> {
-  const { orders, lotProgress, filterDesc, scopeLabel } = opts
+  const { orders, lotProgress, lotPay, filterDesc, scopeLabel } = opts
   const ExcelJS = (await import('exceljs')).default
   const { saveAs } = await import('file-saver')
 
@@ -57,7 +64,7 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
   wb.creator = 'Huy Anh ERP'
   wb.created = new Date()
 
-  const COLS = 21
+  const COLS = 23
   const ws = wb.addWorksheet('Đơn hàng bán', {
     pageSetup: {
       paperSize: 8 as ExcelJSType.PaperSize, // A3
@@ -98,6 +105,10 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
     'SL (tấn)', 'Đã giao (T)', 'Còn thiếu (T)',
     'Đơn giá USD', 'Thành tiền USD', 'Đặt cọc', 'CK', 'NH CK', 'Còn lại (USD)',
     'Hạn giao', 'Sẵn hàng', 'Ngân hàng', 'Số BKG', 'ETD', 'Tiền về', 'Trạng thái',
+    // ⚠ HAI CỘT LÔ ĐẶT Ở CUỐI, KHÔNG chèn giữa. File này khoá cứng chỉ số định dạng
+    // ([6,7,8] số, [9,10,11,12,14] tiền, [15,16,19,20] ngày) và khoá tổng theo 6/7/8/10 —
+    // chèn một cột vào giữa là lệch TOÀN BỘ mà không có gì báo lỗi.
+    'Giao (lô)', 'Thu (lô)',
   ]
   headers.forEach((h, i) => {
     const c = ws.getRow(HDR).getCell(i + 1)
@@ -109,13 +120,14 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
   })
   ws.getRow(HDR).height = 26
 
-  const widths = [5, 14, 30, 12, 12, 10, 11, 12, 11, 14, 12, 10, 12, 14, 11, 11, 15, 14, 11, 11, 13]
+  const widths = [5, 14, 30, 12, 12, 10, 11, 12, 11, 14, 12, 10, 12, 14, 11, 11, 15, 14, 11, 11, 13, 11, 11]
   widths.forEach((w, i) => { ws.getColumn(i + 1).width = w })
 
   // ── Dòng dữ liệu ──
   let estimatedAny = false
   orders.forEach((o, idx) => {
     const p = lotProgress[o.id]
+    const money = lotPay?.[o.id]
     const cancelled = o.status === 'cancelled'
     const d = cancelled ? { tons: 0, estimated: false } : deliveredTons(o.quantity_tons, p, o.status)
     const rem = cancelled ? 0 : remainingTons(o.quantity_tons, p, o.status)
@@ -147,6 +159,16 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
       toDate(o.etd),
       toDate((o as any).payment_received_date),
       ORDER_STATUS_LABELS[o.status as keyof typeof ORDER_STATUS_LABELS] || o.status,
+      // Hai cột LÔ — dạng CHỮ "2/4", không phải số, để Excel không tự tính tổng lên chúng.
+      // Đơn chưa chia lô để trống chứ không ghi 0/0: 0/0 đọc ra là "có lô nhưng chưa giao
+      // lô nào", sai hẳn nghĩa.
+      // Hậu tố "+N cont" là BẮT BUỘC: mẫu số chỉ đếm lô ĐÃ GÁN container, nên đơn mới
+      // gán 5/20 cont vẫn ra "1/1" — đọc thành "giao xong". Màn hình có ⚠ đỏ cạnh dải
+      // chip; file này rời khỏi hệ thống, không có gì cãi lại ngoài chính chuỗi text.
+      p && p.lotsTotal > 0
+        ? `${p.lotsDelivered}/${p.lotsTotal}${p.contsNoLot > 0 ? ` +${p.contsNoLot} cont` : ''}`
+        : '',
+      money && money.lotsTotal > 0 ? `${money.lotsPaid}/${money.lotsTotal}` : '',
     ]
     vals.forEach((v, i) => {
       const c = row.getCell(i + 1)
@@ -215,6 +237,9 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
     ['Đơn đã hủy', 'Vẫn liệt kê nhưng KHÔNG tính vào dòng TỔNG (hủy không phải nợ hàng).'],
     ['Bộ lọc Grade', 'Lọc theo Grade ở cấp ĐƠN; SL là tấn CẢ ĐƠN → đơn có nhiều loại hàng sẽ gồm cả tấn loại khác.'],
     ['Hàng thương mại', 'Bốc ở nhà máy ngoài, không qua trạm cân → phải bấm "Đánh dấu ĐÃ GIAO (bốc ngoài)" ở Lệnh điều động thì mới trừ vào Còn thiếu.'],
+    ['Giao (lô)', 'Số lô đã giao ĐỦ container / số lô đã gán container. Ô TRỐNG = đơn chưa chia lô (khác "0/2" là có lô nhưng chưa giao lô nào).'],
+    ['+N cont (cột Giao)', 'Còn N container CHƯA gán lô — phần hàng đó KHÔNG nằm trong phân số bên trái. "1/1 +15 cont" nghĩa là lô đã gán thì giao xong, nhưng còn 15 container chưa chia lô.'],
+    ['Thu (lô)', 'Số lô đã thu đủ tiền / tổng số lô. Mẫu số này gồm cả lô đã chốt trị giá nhưng chưa gán container, nên có thể LỚN HƠN mẫu số cột "Giao (lô)".'],
   ]
   if (estimatedAny) {
     notes.push(['~ (ước lượng)', 'Có container đã giao nhưng chưa nhập KL → Đã giao được ước lượng theo KL trung bình các container đã có KL.'])

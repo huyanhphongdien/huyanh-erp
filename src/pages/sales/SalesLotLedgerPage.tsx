@@ -624,7 +624,12 @@ export default function SalesLotLedgerPage() {
           summary={(rows) => {
             // 11 cột: 0 HĐ · 1 Lô · 2 Giao hàng · 3 Ghi chú · 4 KL chốt · 5 Trị giá
             //         6 Đã thu · 7 Còn nợ · 8 Thu tiền · 9 Chứng từ · 10 (nút)
-            const v = rows.reduce((s, r) => s + (r.value_usd || 0), 0)
+            // Mẫu số HIỆU DỤNG (chốt → nếu chưa chốt thì tạm tính), y hệt mẫu số mà
+            // remaining_usd của view đang dùng. Chỉ cộng value_usd thì lô chưa chốt vào
+            // "còn nợ" mà không vào "trị giá" → Σ còn nợ vượt Σ trị giá. Đúng bất biến
+            // mà migration p7 đã phải vá một lần.
+            const v = rows.reduce((s, r) => s + (r.value_usd ?? r.value_est_usd ?? 0), 0)
+            const vEstimated = rows.some((r) => r.value_usd == null && (r.value_est_usd ?? 0) > 0)
             const p = rows.reduce((s, r) => s + r.paid_usd, 0)
             const rm = rows.reduce((s, r) => s + r.remaining_usd, 0)
             const kgD = rows.reduce((s, r) => s + r.net_kg_delivered, 0)
@@ -645,7 +650,14 @@ export default function SalesLotLedgerPage() {
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={3} />
                   <Table.Summary.Cell index={4} />
-                  <Table.Summary.Cell index={5} align="right">{fmtUSD(v)}</Table.Summary.Cell>
+                  <Table.Summary.Cell index={5} align="right">
+                    {fmtUSD(v)}
+                    {vEstimated && (
+                      <Tooltip title="Có lô chưa chốt trị giá — tổng này gồm cả số tạm tính (net/1000 × đơn giá) và sẽ đổi nếu gán lại container.">
+                        <span style={{ color: '#8a5a05', cursor: 'help' }}> ~</span>
+                      </Tooltip>
+                    )}
+                  </Table.Summary.Cell>
                   <Table.Summary.Cell index={6} align="right">
                     <span style={{ color: '#15803d' }}>{fmtUSD(p)}</span>
                   </Table.Summary.Cell>
@@ -708,10 +720,14 @@ export default function SalesLotLedgerPage() {
             </div>
             <div>
               <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Trị giá lô (USD)</div>
+              {/* min 0,01 chứ KHÔNG phải 0: value_usd = 0 không phải NULL, nên view
+                  COALESCE ra 0 → "chưa kết luận được", còn phía TS lại rơi về số tạm tính
+                  và dám kết luận "đã thu đủ" — hai bên nói khác nhau về cùng một lô.
+                  Chốt bằng 0 là vô nghĩa; muốn bỏ chốt thì xoá, đừng nhập 0. */}
               <InputNumber
                 autoFocus
                 style={{ width: '100%' }}
-                min={0}
+                min={0.01}
                 step={100}
                 value={priceValue ?? priceTarget.value_est_usd ?? undefined}
                 onChange={(v) => setPriceValue(v as number | null)}

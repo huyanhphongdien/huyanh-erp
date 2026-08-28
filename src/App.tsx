@@ -213,6 +213,8 @@ const ProductionDashboardPage = lazy(() => import('./pages/wms/production/Produc
 const ProductionOutputPage = lazy(() => import('./pages/wms/production/ProductionOutputPage'));
 const ProductionFacilitiesPage = lazy(() => import('./pages/wms/production/ProductionFacilitiesPage'));
 const ProductionSpecsPage = lazy(() => import('./pages/wms/production/ProductionSpecsPage'));
+const ShiftBookListPage = lazy(() => import('./pages/wms/production/ShiftBookListPage'));
+const ShiftBookEntryPage = lazy(() => import('./pages/wms/production/ShiftBookEntryPage'));
 const BlendListPage = lazy(() => import('./pages/wms/blending/BlendListPage'));
 const BlendCreatePage = lazy(() => import('./pages/wms/blending/BlendCreatePage'));
 const BlendDetailPage = lazy(() => import('./pages/wms/blending/BlendDetailPage'));
@@ -563,6 +565,13 @@ function App() {
                 <Route path="production/:id/output" element={<ProductionOutputPage />} />
                 <Route path="production/facilities" element={<ProductionFacilitiesPage />} />
                 <Route path="production/specs" element={<ProductionSpecsPage />} />
+                {/* M3: Sổ ca ép bành — biểu mẫu CL.BMQT.SX.04.06.
+                    Đặt TRƯỚC "production/:id" cho dễ đọc; React Router v6 vẫn ưu tiên
+                    đoạn tĩnh hơn đoạn động nên thứ tự khai báo không quyết định, nhưng
+                    người đọc file này thì có. */}
+                <Route path="production/shift-book" element={<ShiftBookListPage />} />
+                <Route path="production/shift-book/new" element={<ShiftBookEntryPage />} />
+                <Route path="production/shift-book/:id" element={<ShiftBookEntryPage />} />
                 {/* P9: Blending */}
                 <Route path="blending" element={<BlendListPage />} />
                 <Route path="blending/new" element={<BlendCreatePage />} />

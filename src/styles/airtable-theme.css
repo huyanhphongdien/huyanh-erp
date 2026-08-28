@@ -346,3 +346,9 @@ nav a {
 .ant-select-selector {
   transition: all 0.2s ease !important;
 }
+
+/* ── Sổ ca ép bành: dòng chưa gõ số thì lùi lại ────────────────────────────
+   Tờ giấy có 24 dòng nhưng một ca chỉ điền vài dòng. Làm mờ dòng trống để mắt
+   người ghi bám ngay vào dòng đang có số, thay vì quét cả bảng mỗi lần nhìn. */
+.ha-dong-trong td { color: rgba(0, 0, 0, 0.38); }
+.ha-dong-trong:hover td { color: inherit; }

@@ -138,14 +138,28 @@ export const rubberGradeService = {
     return { loss_kg, loss_percent }
   },
 
-  /** Tính số bành (33.33 kg/bành) */
-  calculateBaleCount(weightKg: number): number {
-    return Math.floor(weightKg / 33.33)
+  /**
+   * Số bành từ kilogam. CỠ BÀNH PHẢI TRUYỀN VÀO — nó là thuộc tính của MÃ HÀNG
+   * (`materials.weight_per_unit`), không phải hằng số của nhà máy.
+   *
+   * ⚠ Trước 28/08/2026 hàm này gõ cứng 33,33 kg cho mọi mã. Danh mục thật có ít nhất
+   *   bốn cỡ: 35 · 33,33 · 30 · 111,1111 — và 35 kg mới là cỡ phổ biến nhất.
+   *   Với 35 kg/bành, 19.600 kg là 560 bành; công thức cũ trả 588. Sai 28 bành một ca.
+   *   Hai hàm này khi đó chưa có nơi nào gọi, nên đây là gỡ bẫy chứ không phải vá lỗi
+   *   đang chạy — nhưng đừng dựng lại mặc định 33,33 dưới bất kỳ hình thức nào.
+   *
+   * Trả null khi chưa biết cỡ bành. "Chưa biết" khác hẳn 0, và 0 ở đây là nói dối
+   * rằng lô hàng không có bành nào.
+   */
+  calculateBaleCount(weightKg: number, kgPerBale: number | null | undefined): number | null {
+    if (!kgPerBale || kgPerBale <= 0) return null
+    return Math.floor(weightKg / kgPerBale)
   },
 
-  /** Tính trọng lượng từ số bành */
-  calculateWeightFromBales(baleCount: number): number {
-    return Math.round(baleCount * 33.33 * 100) / 100
+  /** Kilogam từ số bành. Cùng lý do trên: cỡ bành phải truyền vào. */
+  calculateWeightFromBales(baleCount: number, kgPerBale: number | null | undefined): number | null {
+    if (!kgPerBale || kgPerBale <= 0) return null
+    return Math.round(baleCount * kgPerBale * 100) / 100
   },
 
   // --------------------------------------------------------------------------

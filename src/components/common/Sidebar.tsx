@@ -398,6 +398,21 @@ const getMenuGroups = (
     ],
   },
 
+
+  // ============================================================
+  // ★ SỔ CA SẢN XUẤT — M3, số hoá biểu mẫu giấy CL.BMQT.SX.04.06
+  // ⚠ CỐ Ý KHÔNG KHOÁ QUYỀN. Sổ này có BA người ký: sản xuất giao, QC xác nhận,
+  //   thủ kho nhận. Không ai trong ba người đó là BGĐ, nên đặt vào nhóm KHO (WMS)
+  //   (executiveOnly) là giấu sổ khỏi đúng những người phải dùng nó.
+  // ============================================================
+  {
+    title: 'SỔ CA SẢN XUẤT',
+    icon: <ClipboardList size={18} />,
+    collapsible: true,
+    items: [
+      { path: '/wms/production/shift-book', label: 'Sổ ca ép bành', icon: <ClipboardList size={18} /> },
+    ],
+  },
   // ★ KHO (WMS) — Phase B consolidation: 10 → 8 items, inline tabs trong /wms, /wms/qc, /wms/reports, /wms/config
   // ============================================================
   {

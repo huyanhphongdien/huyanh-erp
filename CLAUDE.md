@@ -83,9 +83,15 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
   `dispatchService.getDeliveryStatus` chỉ select lại, không tự tính. Đừng gõ lại luật ở
   chỗ khác; hằng `DELIVERED_CONTAINER_STATUSES` giờ chỉ còn là đường lùi khi không hỏi
   được view, và cố ý HẸP hơn (đoán thiếu thì báo chưa giao, đừng báo đã giao).
-  ⚠ Luật gồm vế `d.status <> 'draft'`: dòng lệnh điều động **nháp vẫn có
-  `actual_weight_kg`**, bỏ vế đó là 8 container trên lệnh nháp bị tính là đã giao
-  (SO-2026-0091 lô 1 từng hiện 5/5 trong khi thật ra 3/5).
+  ⚠ Luật loại CẢ HAI: `d.status NOT IN ('draft','cancelled')`.
+  · **nháp** — dòng lệnh điều động nháp VẪN có `actual_weight_kg`, bỏ vế đó là 8 container
+    trên lệnh nháp bị tính là đã giao (SO-2026-0091 lô 1 từng hiện 5/5 trong khi thật ra 3/5).
+  · **đã huỷ** — thêm 29/08/2026. `dispatch_orders.status` cho phép 5 giá trị, và huỷ lệnh là
+    một cú bấm trên `DispatchDetailPage`; `setStatus` chỉ đổi cột status, không xoá dòng lệnh
+    cũng không xoá `dispatch_date`. Chỉ viết `<> 'draft'` là lệnh ĐÃ HUỶ vẫn làm container
+    thành `delivered` và vẫn cấp mốc tuổi nợ cho A/R. Lúc sửa, DB có 0 dòng `cancelled` nên
+    không con số nào đổi — đó là lý do lỗi sống sót lâu, không phải bằng chứng luật đúng.
+  Migration: `wms_m4_p2_lenh_huy_khong_phai_hang_da_di.sql`.
 - Migrations: `docs/migrations/sales_lots_p{1,2,3}_*.sql` — chạy theo thứ tự (đã áp production 26/08/2026).
 
 ## Công nợ phải thu (A/R)

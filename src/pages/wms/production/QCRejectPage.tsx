@@ -222,8 +222,9 @@ export default function QCRejectPage() {
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         <Col xs={12} md={6}>
           <Card size="small">
-            <Text type="secondary" style={{ fontSize: 12 }}>CHỜ XỬ LÝ</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>CHỜ KẾT QUẢ LAB</Text>
             <div><Text strong style={{ fontSize: 24, color: soCXL > 0 ? '#d48806' : undefined }}>{soCXL}</Text> <Text type="secondary">lô</Text></div>
+            <Text type="secondary" style={{ fontSize: 12 }}>chưa phân loại được</Text>
           </Card>
         </Col>
         <Col xs={12} md={6}>
@@ -287,7 +288,7 @@ export default function QCRejectPage() {
                 ),
               },
               { title: 'Đã loại', dataIndex: 'soLanLoai', width: 90, align: 'right' as const },
-              { title: 'Chờ xử lý', dataIndex: 'soLanChoXuLy', width: 100, align: 'right' as const },
+              { title: 'Chờ lab', dataIndex: 'soLanChoXuLy', width: 90, align: 'right' as const },
               {
                 title: 'Po', width: 120, align: 'right' as const,
                 render: (_: unknown, r: QCTheoLo) => dai(r.poThapNhat, r.poCaoNhat) || <Text type="secondary">—</Text>,

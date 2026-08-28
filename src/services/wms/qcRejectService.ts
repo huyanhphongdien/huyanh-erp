@@ -27,11 +27,17 @@ import { supabase } from '../../lib/supabase'
 // TYPES
 // ============================================================================
 
-/** Hai giá trị của cột "Tình trạng" — MỘT trường, không phải hai ô tick. */
+/**
+ * Hai giá trị của cột "Tình trạng" — MỘT trường, không phải hai ô tick.
+ *
+ * ⚠ CXL ("chờ xử lý") KHÔNG có nghĩa "đã biết hỏng, đang chờ đem đi xử lý". Chủ doanh nghiệp
+ *   xác nhận 29/08/2026: đó là **trạng thái CHƯA PHÂN LOẠI — QC chưa có kết quả test từ
+ *   phòng lab**. Một lô CXL có thể hoá ra vẫn đạt. Đừng đếm CXL như hàng hỏng.
+ */
 export type QCTinhTrang = 'CXL' | 'LOAI'
 
 export const TINH_TRANG_LABEL: Record<QCTinhTrang, string> = {
-  CXL: 'Chờ xử lý',
+  CXL: 'Chờ kết quả lab',
   LOAI: 'Loại',
 }
 

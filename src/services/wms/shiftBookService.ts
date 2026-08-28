@@ -113,6 +113,11 @@ export interface ShiftBook {
   submittedAt: string | null
   qcConfirmedAt: string | null
   receivedAt: string | null
+  /** Tên ba người đã ký. Cột `*_by` đã được ghi từ đầu nhưng trước 28/08/2026 không câu
+   *  select nào đọc lên — bản in vì thế chỉ có ngày giờ, ô ký trống. */
+  nguoiGiao: string | null
+  nguoiQc: string | null
+  nguoiNhan: string | null
   createdAt: string
 }
 
@@ -144,6 +149,32 @@ export interface ShiftLineInput {
  * là tổng của PHẦN TÍNH ĐƯỢC, chưa đầy đủ. Màn hình phải nói ra, không được hiện nó
  * như một con số trọn vẹn.
  */
+/**
+ * Người đang đăng nhập được ký bước nào.
+ *
+ * ⚠ ĐỪNG tính lại luật này trong TypeScript. Nó được viết đúng MỘT lần, trong hàm SQL
+ *   `fn_shift_book_duoc_ky` (`wms_m3_p5_luat_ky_so_ca.sql`), và cùng một hàm đó vừa
+ *   chặn ở trigger vừa trả lời cho màn hình. Chép luật sang đây là dựng lại đúng cái bẫy
+ *   `isFinanceUser` / `fn_is_finance_user` — hai bản chép tay của một luật, đến mức
+ *   chú thích trong code phải dặn nhau "phải KHỚP".
+ *
+ * Màn hình chỉ ẩn nút cho đỡ bấm nhầm; chốt thật nằm ở trigger dưới DB.
+ */
+export interface QuyenKy {
+  submit: boolean
+  qc_confirm: boolean
+  receive: boolean
+  cancel: boolean
+  /** true = nhà máy chưa chỉ định ai làm thủ kho ⇒ bước nhận đang mở cho mọi người. */
+  chua_chi_dinh_thu_kho: boolean
+}
+
+/** Khi không hỏi được DB: đóng hết, trừ việc ghi. Đoán thiếu thì chặn, đừng cho qua. */
+export const QUYEN_DONG: QuyenKy = {
+  submit: true, qc_confirm: false, receive: false, cancel: false,
+  chua_chi_dinh_thu_kho: false,
+}
+
 export interface TonKho {
   tonBanh: number
   tonKg: number
@@ -169,6 +200,16 @@ export interface ShiftTotals {
  * Dùng để tách "tổng sản lượng" với "sản lượng đạt" — xem ghi chú ở `computeTotals`.
  */
 export const MA_HANG_KHONG_DAT = ['DKL', 'LOI'] as const
+
+/**
+ * Phiếu đang ở trạng thái này thì bước TIẾP THEO là ai ký. Dùng để lọc "Chờ tôi" và
+ * để biết nút nào là nút của người đang xem.
+ */
+export const BUOC_DANG_CHO: Partial<Record<ShiftBookStatus, keyof QuyenKy>> = {
+  draft: 'submit',
+  submitted: 'qc_confirm',
+  qc_confirmed: 'receive',
+}
 
 // ============================================================================
 // HELPERS
@@ -268,11 +309,22 @@ export const shiftBookService = {
     }))
   },
 
+  /**
+   * Hỏi DB xem người đang đăng nhập được ký bước nào. Đọc CHÍNH hàm mà trigger dùng.
+   */
+  async getQuyen(facilityId?: string): Promise<QuyenKy> {
+    const { data, error } = await supabase.rpc('fn_shift_book_quyen', {
+      p_facility_id: facilityId ?? null,
+    })
+    if (error) throw error
+    return (data ?? QUYEN_DONG) as QuyenKy
+  },
+
   /** Danh sách phiếu ca, mới nhất trước. */
   async listReports(opts?: { facilityId?: string; limit?: number }): Promise<ShiftBook[]> {
     let q = supabase
       .from('shift_production_reports')
-      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, ca:shifts!shift_id(code, name, start_time), facility:facilities!facility_id(name)')
+      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, submitted_by, qc_confirmed_by, received_by, ca:shifts!shift_id(code, name, start_time), nguoi_giao:employees!submitted_by(full_name), nguoi_qc:employees!qc_confirmed_by(full_name), nguoi_nhan:employees!received_by(full_name), facility:facilities!facility_id(name)')
       // ⚠ ĐỪNG sắp xếp phụ theo `shift` hay `shift_id`. Cột `shift` đã ngừng ghi nên
       //   luôn NULL — ORDER BY trên nó không sắp gì cả mà cũng chẳng báo lỗi (đúng lỗi này
       //   đã lọt qua một lượt kiểm hôm 28/08); còn `shift_id` là uuid, thứ tự của nó
@@ -295,7 +347,7 @@ export const shiftBookService = {
   async getReport(id: string): Promise<{ report: ShiftBook; lines: ShiftLine[] }> {
     const { data: r, error: rErr } = await supabase
       .from('shift_production_reports')
-      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, ca:shifts!shift_id(code, name, start_time), facility:facilities!facility_id(name)')
+      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, submitted_by, qc_confirmed_by, received_by, ca:shifts!shift_id(code, name, start_time), nguoi_giao:employees!submitted_by(full_name), nguoi_qc:employees!qc_confirmed_by(full_name), nguoi_nhan:employees!received_by(full_name), facility:facilities!facility_id(name)')
       .eq('id', id)
       .single()
     if (rErr) throw rErr
@@ -315,7 +367,7 @@ export const shiftBookService = {
   async findReport(facilityId: string, reportDate: string, shiftId: string): Promise<ShiftBook | null> {
     const { data, error } = await supabase
       .from('shift_production_reports')
-      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, ca:shifts!shift_id(code, name, start_time)')
+      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, submitted_by, qc_confirmed_by, received_by, ca:shifts!shift_id(code, name, start_time), nguoi_giao:employees!submitted_by(full_name), nguoi_qc:employees!qc_confirmed_by(full_name), nguoi_nhan:employees!received_by(full_name)')
       .eq('facility_id', facilityId)
       .eq('report_date', reportDate)
       .eq('shift_id', shiftId)
@@ -497,6 +549,10 @@ function mapReport(r: Record<string, unknown>): ShiftBook {
   const f = Array.isArray(r.facility) ? r.facility[0] : r.facility
   const ca = (Array.isArray(r.ca) ? r.ca[0] : r.ca) as
     { code?: string; name?: string; start_time?: string } | null | undefined
+  const ten = (v: unknown): string | null => {
+    const o = (Array.isArray(v) ? v[0] : v) as { full_name?: string } | null | undefined
+    return o?.full_name ?? null
+  }
   return {
     id: String(r.id),
     facilityId: (r.facility_id as string) ?? null,
@@ -517,6 +573,9 @@ function mapReport(r: Record<string, unknown>): ShiftBook {
     submittedAt: (r.submitted_at as string) ?? null,
     qcConfirmedAt: (r.qc_confirmed_at as string) ?? null,
     receivedAt: (r.received_at as string) ?? null,
+    nguoiGiao: ten(r.nguoi_giao),
+    nguoiQc: ten(r.nguoi_qc),
+    nguoiNhan: ten(r.nguoi_nhan),
     createdAt: String(r.created_at ?? ''),
   }
 }

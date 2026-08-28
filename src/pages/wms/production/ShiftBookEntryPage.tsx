@@ -27,11 +27,11 @@ import {
 } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, SendOutlined, CheckCircleOutlined,
-  InboxOutlined, WarningOutlined, StopOutlined,
+  InboxOutlined, WarningOutlined, StopOutlined, PrinterOutlined,
 } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import {
-  shiftBookService, computeTotals, kgCuaDong, type TonKho,
+  shiftBookService, computeTotals, kgCuaDong, QUYEN_DONG, type TonKho, type QuyenKy,
   SHIFT_STATUS_LABEL, SHIFT_STATUS_COLOR, MA_HANG_KHONG_DAT,
   type ShiftMaterial, type ShiftBook, type ShiftLine, type ShiftLineInput,
 } from '../../../services/wms/shiftBookService'
@@ -86,6 +86,7 @@ export default function ShiftBookEntryPage() {
   const [materials, setMaterials] = useState<ShiftMaterial[]>([])
   const [facilities, setFacilities] = useState<Facility[]>([])
   const [shifts, setShifts] = useState<Shift[]>([])
+  const [quyen, setQuyen] = useState<QuyenKy>(QUYEN_DONG)
   const [report, setReport] = useState<ShiftBook | null>(null)
   const [balance, setBalance] = useState<Record<string, TonKho>>({})
 
@@ -165,6 +166,18 @@ export default function ShiftBookEntryPage() {
     })()
     return () => { huy = true }
   }, [id, materials.length])
+
+  // ── Người đang đăng nhập được ký bước nào ─────────────────────────
+  useEffect(() => {
+    if (!facilityId) return
+    let huy = false
+    shiftBookService.getQuyen(facilityId)
+      .then((q) => { if (!huy) setQuyen(q) })
+      // Không hỏi được thì giữ QUYEN_DONG: ẩn nút ký, vẫn ghi số được. Chốt thật nằm
+      // ở trigger dưới DB, nên ẩn nhầm chỉ phiền chứ không làm sai dữ liệu.
+      .catch(() => { if (!huy) setQuyen(QUYEN_DONG) })
+    return () => { huy = true }
+  }, [facilityId])
 
   // ── Tồn đầu kỳ theo nhà máy ───────────────────────────────────────────────
   useEffect(() => {
@@ -585,30 +598,42 @@ export default function ShiftBookEntryPage() {
           </Col>
           <Col>
             <Space wrap>
+              {report && (
+                <Button
+                  icon={<PrinterOutlined />}
+                  onClick={() => navigate(`/wms/production/shift-book/${report.id}/print`)}
+                >
+                  In phiếu
+                </Button>
+              )}
               {!daKhoa && (
                 <Button icon={<SaveOutlined />} loading={saving} onClick={() => luu()}>
                   Lưu nháp
                 </Button>
               )}
-              {(!report || report.status === 'draft') && (
+              {(!report || report.status === 'draft') && quyen.submit && (
                 <Button type="primary" icon={<SendOutlined />} loading={saving}
                   onClick={() => chuyenBuoc('submit', 'Sản xuất giao hàng')}>
                   Giao cho QC
                 </Button>
               )}
-              {report?.status === 'submitted' && (
+              {report?.status === 'submitted' && (quyen.qc_confirm ? (
                 <Button type="primary" icon={<CheckCircleOutlined />}
                   onClick={() => chuyenBuoc('qc_confirm', 'QC xác nhận chất lượng')}>
                   QC xác nhận
                 </Button>
-              )}
-              {report?.status === 'qc_confirmed' && (
+              ) : (
+                <Text type="secondary" style={{ fontSize: 12 }}>Chờ Phòng QC xác nhận</Text>
+              ))}
+              {report?.status === 'qc_confirmed' && (quyen.receive ? (
                 <Button type="primary" icon={<InboxOutlined />}
                   onClick={() => chuyenBuoc('receive', 'Thủ kho nhận vào kho')}>
                   Thủ kho nhận
                 </Button>
-              )}
-              {report && report.status !== 'received' && report.status !== 'cancelled' && (
+              ) : (
+                <Text type="secondary" style={{ fontSize: 12 }}>Chờ thủ kho nhận</Text>
+              ))}
+              {report && report.status !== 'received' && report.status !== 'cancelled' && quyen.cancel && (
                 <Button danger icon={<StopOutlined />} onClick={() => {
                   let lyDo = ''
                   Modal.confirm({

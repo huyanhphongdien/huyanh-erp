@@ -15,14 +15,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Card, Table, Button, Space, Typography, Tag, Select, Row, Col, Empty, Spin, Tooltip, message,
+  Card, Table, Button, Space, Typography, Tag, Select, Row, Col, Empty, Spin, Tooltip, Switch, Alert, message,
 } from 'antd'
-import { PlusOutlined, ReloadOutlined, InboxOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, InboxOutlined, PrinterOutlined } from '@ant-design/icons'
 
 import dayjs from 'dayjs'
 import {
-  shiftBookService, SHIFT_STATUS_LABEL, SHIFT_STATUS_COLOR,
-  type ShiftBook, type ShiftBookStatus, type TonKho,
+  shiftBookService, SHIFT_STATUS_LABEL, SHIFT_STATUS_COLOR, BUOC_DANG_CHO, QUYEN_DONG,
+  type ShiftBook, type ShiftBookStatus, type TonKho, type QuyenKy,
 } from '../../../services/wms/shiftBookService'
 import { facilityService, type Facility } from '../../../services/wms/facilityService'
 
@@ -47,6 +47,8 @@ export default function ShiftBookListPage() {
   const [facilityId, setFacilityId] = useState<string | undefined>()
   const [reports, setReports] = useState<ShiftBook[]>([])
   const [ton, setTon] = useState<Record<string, TonKho>>({})
+  const [quyen, setQuyen] = useState<QuyenKy>(QUYEN_DONG)
+  const [choToi, setChoToi] = useState(false)
 
   useEffect(() => {
     facilityService.getAllActive()
@@ -58,12 +60,14 @@ export default function ShiftBookListPage() {
     if (!facilityId) return
     setLoading(true)
     try {
-      const [rs, b] = await Promise.all([
+      const [rs, b, q] = await Promise.all([
         shiftBookService.listReports({ facilityId, limit: 60 }),
         shiftBookService.getBalance(facilityId),
+        shiftBookService.getQuyen(facilityId).catch(() => QUYEN_DONG),
       ])
       setReports(rs)
       setTon(b)
+      setQuyen(q)
     } catch (e) {
       message.error('Không đọc được sổ ca: ' + (e as Error).message)
     } finally {
@@ -87,6 +91,20 @@ export default function ShiftBookListPage() {
     () => reports.filter((r) => r.status === 'submitted' || r.status === 'qc_confirmed').length,
     [reports],
   )
+
+  /**
+   * Phiếu đang chờ CHÍNH người đang đăng nhập: bước kế tiếp của nó là bước mình được ký.
+   * Luật "được ký" hỏi thẳng DB (`fn_shift_book_quyen`), không tính lại ở đây.
+   */
+  const cuaToi = useMemo(
+    () => reports.filter((r) => {
+      const buoc = BUOC_DANG_CHO[r.status]
+      return buoc ? quyen[buoc] === true : false
+    }),
+    [reports, quyen],
+  )
+
+  const hienThi = choToi ? cuaToi : reports
 
   const cols = [
     {
@@ -192,6 +210,13 @@ export default function ShiftBookListPage() {
               options={facilities.map((f) => ({ value: f.id, label: f.name }))}
             />
             <Button icon={<ReloadOutlined />} onClick={() => void nap()} />
+            {/* Tờ trống để ghi tay — nhà máy chạy song song giấy + phần mềm một tháng. */}
+            <Button
+              icon={<PrinterOutlined />}
+              onClick={() => navigate('/wms/production/shift-book/new/print?blank=1')}
+            >
+              In tờ trống
+            </Button>
             <Button
               type="primary" icon={<PlusOutlined />}
               onClick={() => navigate(`/wms/production/shift-book/new?facility=${facilityId ?? ''}`)}
@@ -201,6 +226,14 @@ export default function ShiftBookListPage() {
           </Space>
         </Col>
       </Row>
+
+      {quyen.chua_chi_dinh_thu_kho && (
+        <Alert
+          type="info" showIcon style={{ marginBottom: 12 }}
+          message="Chưa chỉ định thủ kho"
+          description="Bước “Thủ kho nhận” — bước duy nhất làm tồn kho thay đổi — hiện mở cho mọi người. Chỉ định người nhận kho để khoá lại."
+        />
+      )}
 
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         <Col xs={12} md={8}>
@@ -221,6 +254,12 @@ export default function ShiftBookListPage() {
               <Text type="secondary"> phiếu</Text>
             </div>
             <Text type="secondary">đã giao nhưng chưa vào kho</Text>
+            <div style={{ marginTop: 6 }}>
+              <Switch size="small" checked={choToi} onChange={setChoToi} />
+              <Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>
+                chỉ hiện phiếu chờ tôi ({cuaToi.length})
+              </Text>
+            </div>
           </Card>
         </Col>
         <Col xs={24} md={8}>
@@ -240,11 +279,13 @@ export default function ShiftBookListPage() {
       <Card size="small" style={{ marginBottom: 12 }}>
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center' }}><Spin /></div>
-        ) : reports.length === 0 ? (
-          <Empty description="Chưa có phiếu ca nào — bấm “Ghi sổ ca” để bắt đầu" />
+        ) : hienThi.length === 0 ? (
+          <Empty description={choToi
+            ? 'Không có phiếu nào đang chờ bạn'
+            : 'Chưa có phiếu ca nào — bấm “Ghi sổ ca” để bắt đầu'} />
         ) : (
           <Table<ShiftBook>
-            rowKey="id" dataSource={reports} columns={cols}
+            rowKey="id" dataSource={hienThi} columns={cols}
             size="small" pagination={{ pageSize: 20, showSizeChanger: false }}
             scroll={{ x: 840 }}
           />

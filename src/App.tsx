@@ -215,6 +215,7 @@ const ProductionFacilitiesPage = lazy(() => import('./pages/wms/production/Produ
 const ProductionSpecsPage = lazy(() => import('./pages/wms/production/ProductionSpecsPage'));
 const ShiftBookListPage = lazy(() => import('./pages/wms/production/ShiftBookListPage'));
 const ShiftBookEntryPage = lazy(() => import('./pages/wms/production/ShiftBookEntryPage'));
+const ShiftBookPrintPage = lazy(() => import('./pages/wms/production/ShiftBookPrintPage'));
 const BlendListPage = lazy(() => import('./pages/wms/blending/BlendListPage'));
 const BlendCreatePage = lazy(() => import('./pages/wms/blending/BlendCreatePage'));
 const BlendDetailPage = lazy(() => import('./pages/wms/blending/BlendDetailPage'));
@@ -571,6 +572,9 @@ function App() {
                     người đọc file này thì có. */}
                 <Route path="production/shift-book" element={<ShiftBookListPage />} />
                 <Route path="production/shift-book/new" element={<ShiftBookEntryPage />} />
+                {/* Bản in đặt TRƯỚC ":id" cho dễ đọc; React Router v6 ưu tiên đoạn tĩnh
+                    nên thứ tự khai báo không quyết định, nhưng người đọc file thì có. */}
+                <Route path="production/shift-book/:id/print" element={<ShiftBookPrintPage />} />
                 <Route path="production/shift-book/:id" element={<ShiftBookEntryPage />} />
                 {/* P9: Blending */}
                 <Route path="blending" element={<BlendListPage />} />

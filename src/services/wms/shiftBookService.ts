@@ -175,6 +175,18 @@ export const QUYEN_DONG: QuyenKy = {
   chua_chi_dinh_thu_kho: false,
 }
 
+/** Một người được chỉ định nhận hàng vào kho. */
+export interface ThuKho {
+  id: string
+  employeeId: string
+  /** null = nhận được ở MỌI nhà máy. */
+  facilityId: string | null
+  hoTen: string
+  email: string | null
+  ghiChu: string | null
+  capLuc: string
+}
+
 export interface TonKho {
   tonBanh: number
   tonKg: number
@@ -318,6 +330,60 @@ export const shiftBookService = {
     })
     if (error) throw error
     return (data ?? QUYEN_DONG) as QuyenKy
+  },
+
+  /**
+   * Ai đang được chỉ định làm thủ kho ở nhà máy này.
+   *
+   * ⚠ Bảng `shift_book_thu_kho` sinh ra cùng luật ký (p5) nhưng đến 29/08/2026 KHÔNG có màn
+   *   hình nào đọc/ghi nó — tức cổng đã dựng mà không có tay nắm, và bước làm đổi tồn kho cứ
+   *   thế mở cho mọi người. Ba hàm dưới đây là tay nắm đó.
+   */
+  async listThuKho(facilityId?: string): Promise<ThuKho[]> {
+    let q = supabase
+      .from('shift_book_thu_kho')
+      .select('id, employee_id, facility_id, notes, granted_at, nguoi:employees!employee_id(full_name, email)')
+      .eq('is_active', true)
+      .order('granted_at', { ascending: false })
+    // facility_id NULL = nhận được ở mọi nhà máy, nên luôn phải lọt qua bộ lọc theo nhà máy.
+    if (facilityId) q = q.or(`facility_id.is.null,facility_id.eq.${facilityId}`)
+    const { data, error } = await q
+    if (error) throw error
+    return (data || []).map((r: Record<string, unknown>) => {
+      const ng = (Array.isArray(r.nguoi) ? r.nguoi[0] : r.nguoi) as
+        { full_name?: string; email?: string } | null | undefined
+      return {
+        id: String(r.id),
+        employeeId: String(r.employee_id),
+        facilityId: (r.facility_id as string) ?? null,
+        hoTen: ng?.full_name ?? '(không rõ)',
+        email: ng?.email ?? null,
+        ghiChu: (r.notes as string) ?? null,
+        capLuc: String(r.granted_at ?? ''),
+      }
+    })
+  },
+
+  /** Chỉ định một người làm thủ kho. RLS chỉ cho BGĐ (level ≤ 3) ghi. */
+  async themThuKho(employeeId: string, facilityId: string | null, ghiChu?: string): Promise<void> {
+    const { error } = await supabase.from('shift_book_thu_kho').insert({
+      employee_id: employeeId,
+      facility_id: facilityId,
+      notes: ghiChu ?? null,
+    })
+    if (error) throw error
+  },
+
+  /**
+   * Thu quyền. KHÔNG xoá dòng — giữ lại `revoked_at` để sau này còn biết ai từng nhận kho
+   * trong giai đoạn nào. Cùng lý do phiếu ca đã nhận thì khoá chứ không sửa đè.
+   */
+  async thuQuyenThuKho(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('shift_book_thu_kho')
+      .update({ is_active: false, revoked_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) throw error
   },
 
   /** Danh sách phiếu ca, mới nhất trước. */

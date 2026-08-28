@@ -17,7 +17,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Card, Table, Button, Space, Typography, Tag, Select, Row, Col, Empty, Spin, Tooltip, Switch, Alert, message,
 } from 'antd'
-import { PlusOutlined, ReloadOutlined, InboxOutlined, PrinterOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, InboxOutlined, PrinterOutlined, TeamOutlined } from '@ant-design/icons'
 
 import dayjs from 'dayjs'
 import {
@@ -25,6 +25,7 @@ import {
   type ShiftBook, type ShiftBookStatus, type TonKho, type QuyenKy,
 } from '../../../services/wms/shiftBookService'
 import { facilityService, type Facility } from '../../../services/wms/facilityService'
+import ChiDinhThuKhoModal from '../../../components/wms/ChiDinhThuKhoModal'
 
 const { Title, Text } = Typography
 
@@ -49,6 +50,7 @@ export default function ShiftBookListPage() {
   const [ton, setTon] = useState<Record<string, TonKho>>({})
   const [quyen, setQuyen] = useState<QuyenKy>(QUYEN_DONG)
   const [choToi, setChoToi] = useState(false)
+  const [moChiDinh, setMoChiDinh] = useState(false)
 
   useEffect(() => {
     facilityService.getAllActive()
@@ -210,6 +212,7 @@ export default function ShiftBookListPage() {
               options={facilities.map((f) => ({ value: f.id, label: f.name }))}
             />
             <Button icon={<ReloadOutlined />} onClick={() => void nap()} />
+            <Button icon={<TeamOutlined />} onClick={() => setMoChiDinh(true)}>Thủ kho</Button>
             {/* Tờ trống để ghi tay — nhà máy chạy song song giấy + phần mềm một tháng. */}
             <Button
               icon={<PrinterOutlined />}
@@ -232,6 +235,7 @@ export default function ShiftBookListPage() {
           type="info" showIcon style={{ marginBottom: 12 }}
           message="Chưa chỉ định thủ kho"
           description="Bước “Thủ kho nhận” — bước duy nhất làm tồn kho thay đổi — hiện mở cho mọi người. Chỉ định người nhận kho để khoá lại."
+          action={<Button size="small" onClick={() => setMoChiDinh(true)}>Chỉ định</Button>}
         />
       )}
 
@@ -291,6 +295,14 @@ export default function ShiftBookListPage() {
           />
         )}
       </Card>
+
+      <ChiDinhThuKhoModal
+        open={moChiDinh}
+        onClose={() => setMoChiDinh(false)}
+        facilityId={facilityId}
+        facilityName={facilities.find((f) => f.id === facilityId)?.name}
+        onChanged={() => void nap()}
+      />
 
       <Card
         size="small"

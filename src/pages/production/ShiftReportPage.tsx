@@ -13,6 +13,12 @@ import AdvancedDataTable, { type ColumnDef } from '../../components/common/Advan
 const { Text } = Typography
 const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—'
 
+// ⚠ TRANG CŨ, không có mục menu nào trỏ tới. Nó đọc chung bảng `shift_production_reports`
+//   với Sổ ca ép bành (/wms/production/shift-book).
+//   Từ 28/08/2026 ca thật nằm ở cột `shift_id` trỏ vào danh mục ca dùng chung; cột chuỗi
+//   `shift` đã ngừng ghi nên luôn NULL với mọi phiếu do Sổ ca tạo. Bảng ánh xạ dưới đây
+//   chỉ còn dùng được cho dữ liệu cũ — mà bảng chưa từng có dòng nào.
+//   Giữ ở đây chỉ để trang không in ra chữ "Ca null"; nên gỡ hẳn trang này.
 const SHIFT_LABELS: Record<string, string> = { '1': 'Ca 1 (6-14h)', '2': 'Ca 2 (14-22h)', '3': 'Ca 3 (22-6h)' }
 
 export default function ShiftReportPage() {
@@ -36,7 +42,7 @@ export default function ShiftReportPage() {
       render: (v) => formatDate(v) },
     { key: 'shift', title: 'Ca', dataIndex: 'shift', width: 120,
       filterType: 'select', filterOptions: [{ value: '1', label: 'Ca 1' }, { value: '2', label: 'Ca 2' }, { value: '3', label: 'Ca 3' }],
-      render: (v) => <Tag>{SHIFT_LABELS[v] || `Ca ${v}`}</Tag> },
+      render: (v) => <Tag>{v ? (SHIFT_LABELS[v] || `Ca ${v}`) : '—'}</Tag> },
     { key: 'team', title: 'Tổ', dataIndex: 'team', width: 60, align: 'center',
       render: (v) => v ? <Tag color="blue">{v}</Tag> : '—' },
     { key: 'actual_output_kg', title: 'Sản lượng (kg)', dataIndex: 'actual_output_kg', width: 120, align: 'right', sortable: true,

@@ -14,7 +14,7 @@
 //   Dòng chưa gõ gì thì mờ đi và không lưu. Dòng vừa gõ thì sáng lên.
 //   Enter nhảy xuống đúng ô cùng cột của dòng dưới — người ghi không rời bàn phím.
 //
-// ⚠ Ô kg KHÔNG cho gõ, trừ mã CHÈN (biểu mẫu chưa bao giờ ghi cỡ bành cho nó).
+// ⚠ Ô kg KHÔNG cho gõ, trừ những mã chưa có cỡ bành trong danh mục.
 //   Mở ô kg ra cho mọi dòng là tạo nguồn sự thật thứ hai cho một con số máy đã tính đúng,
 //   và từ đó sổ kho với phiếu khoán sẽ lệch nhau mà không ai biết vì sao.
 // ============================================================================
@@ -31,23 +31,36 @@ import {
 } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import {
-  shiftBookService, computeTotals, kgCuaDong,
+  shiftBookService, computeTotals, kgCuaDong, type TonKho,
   SHIFT_STATUS_LABEL, SHIFT_STATUS_COLOR, MA_HANG_KHONG_DAT,
   type ShiftMaterial, type ShiftBook, type ShiftLine, type ShiftLineInput,
 } from '../../../services/wms/shiftBookService'
 import { facilityService, type Facility } from '../../../services/wms/facilityService'
+import { shiftService, type Shift } from '../../../services/shiftService'
 import { useAuthStore } from '../../../stores/authStore'
 
 const { Title, Text } = Typography
 
-/** Ca trên biểu mẫu giấy: 1 = ngày, 2 = đêm. Giờ mặc định lấy theo thực tế nhà máy. */
-const CA = [
-  { value: '1', label: 'Ca 1 — ngày', from: '06:00', to: '18:00' },
-  { value: '2', label: 'Ca 2 — đêm', from: '18:00', to: '06:00' },
-]
+/**
+ * Ca lấy từ DANH MỤC CA DÙNG CHUNG (bảng `shifts`) — cùng danh mục mà chấm công và
+ * phân ca đang dùng, 7.096 dòng phân ca và 756 dòng chấm công tháng 8 đều trỏ vào nó.
+ *
+ * ⚠ Trước 28/08/2026 màn hình này gõ cứng hai ca "1 = ngày 06–18h, 2 = đêm 18–06h".
+ *   Đó là danh mục ca thứ hai do phần mềm tự bịa, và nó đã mâu thuẫn thật với
+ *   `ShiftReportPage.tsx:16` (nơi '1' nghĩa là ca ngắn 06–14h) — cùng một cột, hai
+ *   nghĩa trái nhau, không ai báo lỗi. Tờ giấy 27/8 lại ghi ca chạy "đến 22h", một ca
+ *   mà hai-ca-mười-hai-tiếng không diễn đạt nổi.
+ *   Đừng gõ lại danh mục ca ở đây dưới bất kỳ hình thức nào.
+ *
+ * ⚠ KHÔNG lọc bớt ca theo `shift_category`. Bản đầu của màn này chỉ cho chọn ca
+ *   'short'/'long' vì tôi cho rằng "xưởng ép bành không chạy giờ hành chính" — nhưng
+ *   dữ liệu nói ngược: Phòng Quản lý sản xuất có 1.152 dòng phân ca thì 100% là
+ *   ADMIN_PROD 07:00–17:00. Lọc bỏ nó là lại tự quyết hộ nhà máy, đúng lỗi vừa gỡ.
+ *   Ai làm ca nào thì người ghi chọn ca đó; danh mục có gì thì hiện nấy.
+ */
 
-/** Tổ ghi bằng TÊN MÀU trên sổ thật ('Vàng', 'Đen'...) chứ không phải số. */
-const TO_GOI_Y = ['Vàng', 'Đen', 'Xanh', 'Đỏ']
+/** '06:00:00' → '06:00'. Danh mục lưu kiểu TIME, người đọc chỉ cần giờ phút. */
+const gioNgan = (t: string | null | undefined): string => (t ? t.slice(0, 5) : '')
 
 interface OWork {
   nhapBanh: number
@@ -72,14 +85,16 @@ export default function ShiftBookEntryPage() {
   const [saving, setSaving] = useState(false)
   const [materials, setMaterials] = useState<ShiftMaterial[]>([])
   const [facilities, setFacilities] = useState<Facility[]>([])
+  const [shifts, setShifts] = useState<Shift[]>([])
   const [report, setReport] = useState<ShiftBook | null>(null)
-  const [balance, setBalance] = useState<Record<string, { tonBanh: number; tonKg: number }>>({})
+  const [balance, setBalance] = useState<Record<string, TonKho>>({})
 
   // Đầu phiếu
   const [facilityId, setFacilityId] = useState<string | undefined>(sp.get('facility') || undefined)
   const [ngay, setNgay] = useState<Dayjs>(sp.get('date') ? dayjs(sp.get('date')) : dayjs())
-  const [ca, setCa] = useState<string>(sp.get('shift') || '1')
-  const [to, setTo] = useState<string>('')
+  // KHÔNG đặt sẵn một ca mặc định: chưa ai xác nhận xưởng ép bành chạy ca dài hay ca
+  // ngắn, và gõ cứng một mặc định là dựng lại đúng cái sai vừa gỡ.
+  const [shiftId, setShiftId] = useState<string | undefined>(sp.get('shift') || undefined)
   const [soNguoi, setSoNguoi] = useState<number | null>(null)
   const [suCo, setSuCo] = useState<string>('')
 
@@ -96,16 +111,18 @@ export default function ShiftBookEntryPage() {
     let huy = false
     ;(async () => {
       try {
-        const [ms, fs] = await Promise.all([
+        const [ms, fs, ss] = await Promise.all([
           shiftBookService.listMaterials(),
           facilityService.getAllActive(),
+          shiftService.getAllActive(),
         ])
         if (huy) return
         setMaterials(ms)
         setFacilities(fs)
+        setShifts([...ss].sort((a, b) => a.start_time.localeCompare(b.start_time)))
         setFacilityId((cur) => cur ?? fs[0]?.id)
       } catch (e) {
-        message.error('Không đọc được danh mục hàng: ' + (e as Error).message)
+        message.error('Không đọc được danh mục: ' + (e as Error).message)
       } finally {
         if (!huy) setLoading(false)
       }
@@ -125,8 +142,7 @@ export default function ShiftBookEntryPage() {
         setReport(r)
         setFacilityId(r.facilityId ?? undefined)
         setNgay(dayjs(r.reportDate))
-        setCa(r.shift)
-        setTo(r.team ?? '')
+        setShiftId(r.shiftId)
         setSoNguoi(r.headcount)
         setSuCo(r.incidents ?? '')
         const map: Record<string, OWork> = {}
@@ -163,9 +179,9 @@ export default function ShiftBookEntryPage() {
   // ── Nếu đang tạo mới mà ca đó ĐÃ CÓ phiếu → mở đúng phiếu đó, đừng tạo trùng ──
   useEffect(() => {
     if (id && id !== 'new') return
-    if (!facilityId || !ca) return
+    if (!facilityId || !shiftId) return
     let huy = false
-    shiftBookService.findReport(facilityId, ngay.format('YYYY-MM-DD'), ca)
+    shiftBookService.findReport(facilityId, ngay.format('YYYY-MM-DD'), shiftId)
       .then((r) => {
         if (huy || !r) return
         message.info(`Ca này đã có phiếu (${SHIFT_STATUS_LABEL[r.status]}) — mở phiếu đang có.`)
@@ -173,7 +189,7 @@ export default function ShiftBookEntryPage() {
       })
       .catch(() => { /* im lặng: không tìm được thì cứ cho tạo mới */ })
     return () => { huy = true }
-  }, [id, facilityId, ca, ngay, navigate])
+  }, [id, facilityId, shiftId, ngay, navigate])
 
   // ── Dòng để tính tổng ─────────────────────────────────────────────────────
   const lines: ShiftLine[] = useMemo(() => materials.map((m) => {
@@ -208,6 +224,19 @@ export default function ShiftBookEntryPage() {
     setDirty(true)
   }
 
+  /**
+   * Tồn ĐẦU ca — tức tồn trước khi tính phiếu đang mở.
+   *
+   * ⚠ `v_shift_stock_balance` chỉ cộng phiếu `received`. Khi phiếu này CHƯA được thủ kho
+   *   nhận thì nó chưa nằm trong đó, lấy thẳng là đúng. Nhưng khi phiếu ĐÃ nhận rồi (mở
+   *   lại để xem), số của chính nó đã nằm trong tồn — cộng thêm một lần nữa ở cột "Tồn
+   *   cuối" là đếm hai lần. Ca 27/8 sẽ hiện 1.120 bành thay vì 560.
+   */
+  const tonDau = (r: ShiftLine): number => {
+    const ton = balance[r.materialId]?.tonBanh ?? 0
+    return report?.status === 'received' ? ton - r.nhapBanh + r.xuatBanh : ton
+  }
+
   // Enter = xuống đúng ô cùng cột của dòng dưới. Người ghi không phải rời bàn phím,
   // và không phải bấm chuột 24 lần cho một ca chỉ có 3 con số.
   const bangRef = useRef<HTMLDivElement>(null)
@@ -219,17 +248,18 @@ export default function ShiftBookEntryPage() {
   // ── Lưu ───────────────────────────────────────────────────────────────────
   const luu = async (imLang = false): Promise<string | null> => {
     if (!facilityId) { message.warning('Chọn nhà máy trước'); return null }
+    if (!shiftId) { message.warning('Chọn ca làm việc trước'); return null }
     setSaving(true)
     try {
       let rid = report?.id
       if (!rid) {
+        // ⚠ KHÔNG gửi shiftFrom/shiftTo ở đây. Giờ chuẩn của ca đã nằm trong danh mục;
+        //   chép sang bảng sổ là hôm nào nhà máy đổi giờ ca thì mọi phiếu cũ vẫn giữ giờ cũ
+        //   mà không ai biết. Hai cột đó chỉ để ghi NGOẠI LỆ khi ca chạy lệch giờ.
         const moi = await shiftBookService.createReport({
           facilityId,
           reportDate: ngay.format('YYYY-MM-DD'),
-          shift: ca,
-          team: to || null,
-          shiftFrom: CA.find((c) => c.value === ca)?.from ?? null,
-          shiftTo: CA.find((c) => c.value === ca)?.to ?? null,
+          shiftId,
           headcount: soNguoi,
           incidents: suCo || null,
         })
@@ -238,7 +268,7 @@ export default function ShiftBookEntryPage() {
         navigate(`/wms/production/shift-book/${moi.id}`, { replace: true })
       } else {
         await shiftBookService.updateReport(rid, {
-          team: to || null, headcount: soNguoi, incidents: suCo || null,
+          headcount: soNguoi, incidents: suCo || null,
         })
       }
 
@@ -306,7 +336,7 @@ export default function ShiftBookEntryPage() {
             <Text strong={r.nhapBanh > 0 || r.xuatBanh > 0} style={{ fontSize: 13 }}>{v}</Text>
             {koDat && <Tag color="red" style={{ marginInlineEnd: 0 }}>không đạt</Tag>}
             {r.phaiNhapKgTay && (
-              <Tooltip title="Mã này chưa có cỡ bành trong danh mục — phải nhập kg tay">
+              <Tooltip title="Chưa có cỡ bành trong danh mục nên máy không quy ra kg được — nhập kg tay">
                 <WarningOutlined style={{ color: '#faad14' }} />
               </Tooltip>
             )}
@@ -315,10 +345,10 @@ export default function ShiftBookEntryPage() {
       },
     },
     {
-      title: <Tooltip title="Tồn cuối của các ca trước đã được thủ kho nhận">Tồn đầu</Tooltip>,
+      title: <Tooltip title="Tồn của các phiếu đã được thủ kho nhận, chưa tính phiếu này">Tồn đầu</Tooltip>,
       width: 90, align: 'right' as const,
       render: (_: unknown, r: ShiftLine) => (
-        <Text type="secondary">{fmt(balance[r.materialId]?.tonBanh ?? 0)}</Text>
+        <Text type="secondary">{fmt(tonDau(r))}</Text>
       ),
     },
     {
@@ -354,7 +384,7 @@ export default function ShiftBookEntryPage() {
       title: <Tooltip title="Tồn đầu + nhập − xuất. Máy tính, không gõ.">Tồn cuối</Tooltip>,
       width: 90, align: 'right' as const,
       render: (_: unknown, r: ShiftLine) => {
-        const t = (balance[r.materialId]?.tonBanh ?? 0) + r.nhapBanh - r.xuatBanh
+        const t = tonDau(r) + r.nhapBanh - r.xuatBanh
         return <Text strong={r.nhapBanh > 0 || r.xuatBanh > 0}>{fmt(t)}</Text>
       },
     },
@@ -363,12 +393,24 @@ export default function ShiftBookEntryPage() {
       width: 130, align: 'right' as const,
       render: (_: unknown, r: ShiftLine) => {
         if (r.phaiNhapKgTay) {
+          // ⚠ Phải có CẢ HAI ô. Bản đầu chỉ mở ô kg NHẬP: ai gõ số bành vào cột XUẤT của
+          //   một mã chưa có cỡ bành thì computeTotals dựng cờ thiếu kg, nút "Giao cho QC"
+          //   chặn lại, mà trên màn hình không có ô nào để gỡ ra — phiếu kẹt vĩnh viễn.
           return (
-            <InputNumber
-              min={0} step={1} disabled={daKhoa} placeholder="nhập kg"
-              value={r.nhapKgManual} onChange={(v) => dat(r.materialId, { nhapKgManual: v === null ? null : Number(v) })}
-              style={{ width: '100%', borderColor: '#faad14' }}
-            />
+            <Space.Compact style={{ width: '100%' }}>
+              <InputNumber
+                min={0} step={1} disabled={daKhoa} placeholder="kg nhập"
+                value={r.nhapKgManual}
+                onChange={(v) => dat(r.materialId, { nhapKgManual: v === null ? null : Number(v) })}
+                style={{ width: '50%', borderColor: '#faad14' }}
+              />
+              <InputNumber
+                min={0} step={1} disabled={daKhoa} placeholder="kg xuất"
+                value={r.xuatKgManual}
+                onChange={(v) => dat(r.materialId, { xuatKgManual: v === null ? null : Number(v) })}
+                style={{ width: '50%', borderColor: '#faad14' }}
+              />
+            </Space.Compact>
           )
         }
         return r.nhapBanh > 0
@@ -383,6 +425,23 @@ export default function ShiftBookEntryPage() {
   }
 
   const nhaMay = facilities.find((f) => f.id === facilityId)
+
+  // Danh sách ca cho ô chọn. Nếu phiếu đang mở dùng một ca đã bị TẮT trong danh mục
+  // thì ca đó không còn trong `shifts` — mà antd khi không tìm được option khớp sẽ in
+  // NGUYÊN uuid ra ô. Ghép thêm một option từ tên ca mà chính phiếu đã mang theo.
+  const optionsCa = (() => {
+    const opts = shifts.map((s) => ({
+      value: s.id,
+      label: `${s.name} (${gioNgan(s.start_time)}–${gioNgan(s.end_time)})`,
+    }))
+    if (report?.shiftId && !opts.some((o) => o.value === report.shiftId)) {
+      opts.unshift({
+        value: report.shiftId,
+        label: `${report.shiftName ?? report.shiftCode ?? 'Ca cũ'} (không còn trong danh mục)`,
+      })
+    }
+    return opts
+  })()
 
   return (
     <div style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}>
@@ -412,33 +471,20 @@ export default function ShiftBookEntryPage() {
               format="DD/MM/YYYY" allowClear={false} style={{ width: '100%' }}
             />
           </Col>
-          <Col xs={12} md={5}>
-            <Text type="secondary" style={{ fontSize: 12 }}>Ca</Text>
+          <Col xs={24} md={7}>
+            <Text type="secondary" style={{ fontSize: 12 }}>Ca làm việc</Text>
             <Select
-              value={ca} onChange={setCa} disabled={!!report}
-              style={{ width: '100%' }} options={CA}
-            />
-          </Col>
-          <Col xs={12} md={4}>
-            <Text type="secondary" style={{ fontSize: 12 }}>Tổ</Text>
-            <Select
-              value={to || undefined} onChange={setTo} disabled={daKhoa}
-              placeholder="Vàng / Đen" style={{ width: '100%' }} allowClear
-              options={TO_GOI_Y.map((t) => ({ value: t, label: t }))}
+              value={shiftId} onChange={setShiftId} disabled={!!report}
+              placeholder="Chọn ca" style={{ width: '100%' }}
+              options={optionsCa}
             />
           </Col>
           <Col xs={12} md={3}>
-            <Text type="secondary" style={{ fontSize: 12 }}>Số người</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>Số công nhân</Text>
             <InputNumber
               min={0} value={soNguoi} onChange={(v) => { setSoNguoi(v === null ? null : Number(v)); setDirty(true) }}
               disabled={daKhoa} style={{ width: '100%' }}
             />
-          </Col>
-          <Col xs={24} md={3}>
-            <Text type="secondary" style={{ fontSize: 12 }}>Giờ</Text>
-            <div style={{ paddingTop: 5 }}>
-              <Text>{CA.find((c) => c.value === ca)?.from}–{CA.find((c) => c.value === ca)?.to}</Text>
-            </div>
           </Col>
         </Row>
       </Card>

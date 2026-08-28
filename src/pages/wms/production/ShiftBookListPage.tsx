@@ -15,13 +15,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Card, Table, Button, Space, Typography, Tag, Select, Row, Col, Empty, Spin, message,
+  Card, Table, Button, Space, Typography, Tag, Select, Row, Col, Empty, Spin, Tooltip, message,
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, InboxOutlined } from '@ant-design/icons'
+
 import dayjs from 'dayjs'
 import {
   shiftBookService, SHIFT_STATUS_LABEL, SHIFT_STATUS_COLOR,
-  type ShiftBook, type ShiftBookStatus,
+  type ShiftBook, type ShiftBookStatus, type TonKho,
 } from '../../../services/wms/shiftBookService'
 import { facilityService, type Facility } from '../../../services/wms/facilityService'
 
@@ -45,7 +46,7 @@ export default function ShiftBookListPage() {
   const [facilities, setFacilities] = useState<Facility[]>([])
   const [facilityId, setFacilityId] = useState<string | undefined>()
   const [reports, setReports] = useState<ShiftBook[]>([])
-  const [ton, setTon] = useState<Record<string, { tonBanh: number; tonKg: number }>>({})
+  const [ton, setTon] = useState<Record<string, TonKho>>({})
 
   useEffect(() => {
     facilityService.getAllActive()
@@ -73,9 +74,13 @@ export default function ShiftBookListPage() {
   useEffect(() => { void nap() }, [facilityId])
 
   const tonTong = useMemo(() => {
-    let banh = 0, kg = 0
-    for (const v of Object.values(ton)) { banh += v.tonBanh; kg += v.tonKg }
-    return { banh, kg }
+    let banh = 0, kg = 0, thieu = 0
+    for (const v of Object.values(ton)) {
+      banh += v.tonBanh; kg += v.tonKg
+      if (v.thieuKg) thieu += v.soDongThieuKg
+    }
+    // `thieu` > 0 nghĩa là tổng kg này mới là tổng của phần TÍNH ĐƯỢC. Phải nói ra.
+    return { banh, kg, thieu }
   }, [ton])
 
   const dangKet = useMemo(
@@ -89,10 +94,13 @@ export default function ShiftBookListPage() {
       render: (v: string) => <Text strong>{dayjs(v).format('DD/MM/YYYY')}</Text>,
     },
     {
-      title: 'Ca', dataIndex: 'shift', width: 70,
-      render: (v: string) => <Tag>{v === '1' ? 'Ngày' : v === '2' ? 'Đêm' : v}</Tag>,
+      // Tên ca lấy thẳng từ danh mục dùng chung. Không gõ lại nghĩa của ca ở đây —
+      // đó từng là chỗ thứ ba định nghĩa ca, và nó mâu thuẫn với hai chỗ kia.
+      title: 'Ca', dataIndex: 'shiftName', width: 150,
+      render: (v: string | null, r: ShiftBook) => v
+        ? <Tag>{v}</Tag>
+        : <Text type="secondary">{r.shiftCode ?? '—'}</Text>,
     },
-    { title: 'Tổ', dataIndex: 'team', width: 80, render: (v: string | null) => v ?? <Text type="secondary">—</Text> },
     {
       title: 'Trạng thái', dataIndex: 'status', width: 150,
       render: (v: ShiftBookStatus) => <Tag color={SHIFT_STATUS_COLOR[v]}>{SHIFT_STATUS_LABEL[v]}</Tag>,
@@ -133,12 +141,21 @@ export default function ShiftBookListPage() {
       render: (v: number) => <Text strong>{fmt(v)}</Text>,
     },
     {
-      title: 'Tồn (kg)', dataIndex: 'tonKg', width: 130, align: 'right' as const,
-      render: (v: number) => <Text style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(v, 2)}</Text>,
+      title: 'Tồn (kg)', dataIndex: 'tonKg', width: 170, align: 'right' as const,
+      render: (v: number, r: { thieuKg: boolean }) => (
+        <Space size={4}>
+          <Text style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(v, 2)}</Text>
+          {r.thieuKg && (
+            <Tooltip title="Có dòng chưa quy ra kg được — số này mới là phần tính được, chưa đủ">
+              <Text type="warning">chưa đủ</Text>
+            </Tooltip>
+          )}
+        </Space>
+      ),
     },
   ]
 
-  const [tonRows, setTonRows] = useState<Array<{ code: string; name: string; tonBanh: number; tonKg: number }>>([])
+  const [tonRows, setTonRows] = useState<Array<{ code: string; name: string; tonBanh: number; tonKg: number; thieuKg: boolean }>>([])
   useEffect(() => {
     if (!facilityId) return
     // Đọc lại view tồn kèm tên hàng để bảng tồn không phải tra ngược danh mục.
@@ -150,7 +167,7 @@ export default function ShiftBookListPage() {
             .map(([mid, v]) => ({
               code: byId.get(mid)?.code ?? '?',
               name: byId.get(mid)?.name ?? '(không còn trong danh mục)',
-              tonBanh: v.tonBanh, tonKg: v.tonKg,
+              tonBanh: v.tonBanh, tonKg: v.tonKg, thieuKg: v.thieuKg,
             }))
             .filter((r) => r.tonBanh !== 0 || r.tonKg !== 0)
             .sort((a, b) => b.tonBanh - a.tonBanh),
@@ -190,7 +207,10 @@ export default function ShiftBookListPage() {
           <Card size="small">
             <Text type="secondary" style={{ fontSize: 12 }}>TỒN THÀNH PHẨM</Text>
             <div><Text strong style={{ fontSize: 24 }}>{fmt(tonTong.banh)}</Text> <Text type="secondary">bành</Text></div>
-            <Text type="secondary">{fmt(tonTong.kg, 2)} kg · chỉ tính phiếu thủ kho đã nhận</Text>
+            <Text type="secondary">
+              {fmt(tonTong.kg, 2)} kg · chỉ tính phiếu thủ kho đã nhận
+              {tonTong.thieu > 0 && ` · ${tonTong.thieu} dòng chưa quy ra kg được`}
+            </Text>
           </Card>
         </Col>
         <Col xs={12} md={8}>
@@ -210,7 +230,7 @@ export default function ShiftBookListPage() {
               <Text strong style={{ fontSize: 18 }}>
                 {reports[0] ? dayjs(reports[0].reportDate).format('DD/MM') : '—'}
               </Text>
-              {reports[0] && <Text type="secondary"> ca {reports[0].shift}</Text>}
+              {reports[0]?.shiftName && <Text type="secondary"> · {reports[0].shiftName}</Text>}
             </div>
             <Text type="secondary">{reports[0] ? SHIFT_STATUS_LABEL[reports[0].status] : 'chưa có phiếu nào'}</Text>
           </Card>

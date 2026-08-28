@@ -48,10 +48,24 @@ export const shiftReportService = {
     const quality = total > 0 ? Math.round(passed / total * 100) : 0
     const oee = Math.round(availability * performance * quality / 10000)
 
+    // ⚠ Bảng này giờ bắt buộc có `shift_id` trỏ vào danh mục ca dùng chung
+    //   (`wms_m3_p3_so_ca_dung_danh_muc_ca.sql`, 28/08/2026). Cột chuỗi `shift` cũ đã
+    //   ngừng dùng vì hai nơi trong code từng hiểu nó khác nhau. Trang này tự khai ở
+    //   ShiftReportPage.tsx:16 rằng '1'=6-14h, '2'=14-22h, '3'=22-6h — đúng bằng
+    //   SHORT_1/2/3 trong danh mục, nên tra thẳng ra id là khớp nghĩa, không phải đoán.
+    const { data: ca, error: caErr } = await supabase
+      .from('shifts')
+      .select('id')
+      .eq('code', `SHORT_${data.shift}`)
+      .maybeSingle()
+    if (caErr) throw caErr
+    if (!ca) throw new Error(`Không có ca SHORT_${data.shift} trong danh mục ca`)
+
     const { data: created, error } = await supabase
       .from('shift_production_reports')
       .insert({
         ...data,
+        shift_id: ca.id,
         yield_percent: plannedOutput > 0 ? Math.round(actualOutput / plannedOutput * 1000) / 10 : null,
         qc_pass_rate: total > 0 ? Math.round(passed / total * 1000) / 10 : null,
         oee_availability: availability,

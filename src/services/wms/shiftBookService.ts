@@ -12,12 +12,20 @@
 //     Tờ giấy có 24 dòng × 6 ô = 144 ô, nhưng thông tin THẬT SỰ MỚI của ca 27/8/2026 chỉ là
 //     ba con số: 118 · 10 · 432. Người ghi hiện mất 10–15 phút cộng trừ tay cột tồn.
 //     Nếu màn hình bắt gõ lại 144 ô cho "đầy đủ" thì tuần thứ ba sẽ có người bỏ.
-//     Ngoại lệ DUY NHẤT: mã CHÈN chưa ai xác nhận cỡ bành ⇒ phải nhập kg tay.
+//     Ngoại lệ: mã nào chưa có cỡ bành trong danh mục thì máy chịu, phải nhập kg tay.
 //
 //  2. BA CHỮ KÝ, VÀ CHỈ CHỮ KÝ THỨ BA MỚI ĐỘNG VÀO TỒN KHO.
 //     BÊN GIAO (sản xuất) → GIÁM SÁT CHẤT LƯỢNG (QS) → BÊN NHẬN (Thủ kho).
 //     Đây là kiểm soát nhà máy đã có từ 2019, không phải phát minh của phần mềm.
 //     `v_shift_stock_balance` chỉ cộng phiếu `status='received'`.
+//
+// VỀ DÒNG "CHÈN" TRÊN BIỂU MẪU: chủ doanh nghiệp xác nhận 28/08/2026 rằng CHÈN là HÀNH
+//   ĐỘNG phối trộn — "hàng không đạt đem ra chèn, hoặc mua hàng thành phẩm về chèn vào" —
+//   chứ không phải một mặt hàng. Nên "một bành chèn nặng bao nhiêu kg" là câu hỏi không có
+//   nghĩa, và kết quả của việc chèn thì đã có mã thật (5 mã MIX trong danh mục).
+//   ⇒ Cơ chế nhập kg tay bên dưới KHÔNG phải chữa cháy riêng cho CHÈN như chú thích cũ
+//   viết. Nó là quy tắc chung. Mô hình dữ liệu của CHÈN còn chờ nhà máy trả lời — xem
+//   mục CÒN NỢ trong `docs/migrations/wms_m3_p3_so_ca_dung_danh_muc_ca.sql`.
 //
 // ⚠ ĐỪNG dùng `rubberGradeService.calculateBaleCount/calculateWeightFromBales` cho việc này:
 //   hai hàm đó gõ cứng 33,33 kg trong khi cỡ bành nằm ở `materials.weight_per_unit` và
@@ -58,7 +66,7 @@ export interface ShiftMaterial {
   sku: string | null
   name: string
   unit: string | null
-  /** kg mỗi bành. NULL = chưa ai xác nhận (chỉ mã CHÈN) ⇒ bắt nhập kg tay. */
+  /** kg mỗi bành. NULL = danh mục chưa có cỡ bành cho mã này ⇒ bắt nhập kg tay. */
   weightPerUnit: number | null
   sortOrder: number
 }
@@ -76,7 +84,7 @@ export interface ShiftLine {
   xuatBanh: number
   nhapKg: number | null
   xuatKg: number | null
-  /** true = máy không tính được kg, người phải nhập tay. Đúng một mã: CHÈN. */
+  /** true = mã chưa có cỡ bành trong danh mục ⇒ máy không tính được kg, người phải nhập tay. */
   phaiNhapKgTay: boolean
   nhapKgManual?: number | null
   xuatKgManual?: number | null
@@ -88,7 +96,12 @@ export interface ShiftBook {
   facilityId: string | null
   facilityName?: string | null
   reportDate: string
-  shift: string
+  shiftId: string
+  /** Mã + tên ca lấy từ danh mục dùng chung; chỉ để hiển thị. */
+  shiftCode?: string | null
+  shiftName?: string | null
+  /** Giờ bắt đầu ca ('HH:MM:SS'), dùng để xếp thứ tự phiếu trong cùng một ngày. */
+  shiftStart?: string | null
   team: string | null
   shiftFrom: string | null
   shiftTo: string | null
@@ -106,7 +119,7 @@ export interface ShiftBook {
 export interface ShiftBookInput {
   facilityId: string
   reportDate: string
-  shift: string
+  shiftId: string
   team?: string | null
   shiftFrom?: string | null
   shiftTo?: string | null
@@ -120,10 +133,22 @@ export interface ShiftLineInput {
   materialId: string
   nhapBanh: number
   xuatBanh?: number
-  /** CHỈ truyền cho mã không có weight_per_unit (CHÈN). Truyền ở mã khác là tạo nguồn sự thật thứ hai. */
+  /** CHỈ truyền cho mã không có weight_per_unit. Truyền ở mã khác là tạo nguồn sự thật thứ hai. */
   nhapKgManual?: number | null
   xuatKgManual?: number | null
   note?: string | null
+}
+
+/**
+ * Tồn của một mã. `thieuKg` = trong tổng này có dòng máy không tính nổi kg ⇒ `tonKg`
+ * là tổng của PHẦN TÍNH ĐƯỢC, chưa đầy đủ. Màn hình phải nói ra, không được hiện nó
+ * như một con số trọn vẹn.
+ */
+export interface TonKho {
+  tonBanh: number
+  tonKg: number
+  thieuKg: boolean
+  soDongThieuKg: number
 }
 
 export interface ShiftTotals {
@@ -247,20 +272,30 @@ export const shiftBookService = {
   async listReports(opts?: { facilityId?: string; limit?: number }): Promise<ShiftBook[]> {
     let q = supabase
       .from('shift_production_reports')
-      .select('id, facility_id, report_date, shift, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, facility:facilities!facility_id(name)')
+      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, ca:shifts!shift_id(code, name, start_time), facility:facilities!facility_id(name)')
+      // ⚠ ĐỪNG sắp xếp phụ theo `shift` hay `shift_id`. Cột `shift` đã ngừng ghi nên
+      //   luôn NULL — ORDER BY trên nó không sắp gì cả mà cũng chẳng báo lỗi (đúng lỗi này
+      //   đã lọt qua một lượt kiểm hôm 28/08); còn `shift_id` là uuid, thứ tự của nó
+      //   ngẫu nhiên so với thứ tự ca trong ngày. Ở đây chỉ cần một thứ tự XÁC ĐỊNH.
       .order('report_date', { ascending: false })
-      .order('shift', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(opts?.limit ?? 100)
     if (opts?.facilityId) q = q.eq('facility_id', opts.facilityId)
     const { data, error } = await q
     if (error) throw error
-    return (data || []).map(mapReport)
+
+    // Trong cùng một ngày: ca muộn đứng trước. Người mở trang buổi sáng hỏi "ca đêm qua
+    // đã ghi chưa" — câu trả lời phải ở dòng đầu, không phải nằm lẫn đâu đó phía dưới.
+    return (data || []).map(mapReport).sort((a, b) => {
+      if (a.reportDate !== b.reportDate) return a.reportDate < b.reportDate ? 1 : -1
+      return (b.shiftStart ?? '').localeCompare(a.shiftStart ?? '')
+    })
   },
 
   async getReport(id: string): Promise<{ report: ShiftBook; lines: ShiftLine[] }> {
     const { data: r, error: rErr } = await supabase
       .from('shift_production_reports')
-      .select('id, facility_id, report_date, shift, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, facility:facilities!facility_id(name)')
+      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, ca:shifts!shift_id(code, name, start_time), facility:facilities!facility_id(name)')
       .eq('id', id)
       .single()
     if (rErr) throw rErr
@@ -277,13 +312,13 @@ export const shiftBookService = {
   },
 
   /** Tìm phiếu của một ca — để màn hình mở lại đúng phiếu đang làm dở thay vì tạo trùng. */
-  async findReport(facilityId: string, reportDate: string, shift: string): Promise<ShiftBook | null> {
+  async findReport(facilityId: string, reportDate: string, shiftId: string): Promise<ShiftBook | null> {
     const { data, error } = await supabase
       .from('shift_production_reports')
-      .select('id, facility_id, report_date, shift, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at')
+      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, ca:shifts!shift_id(code, name, start_time)')
       .eq('facility_id', facilityId)
       .eq('report_date', reportDate)
-      .eq('shift', shift)
+      .eq('shift_id', shiftId)
       .neq('status', 'cancelled')
       .maybeSingle()
     if (error) throw error
@@ -296,7 +331,7 @@ export const shiftBookService = {
       .insert({
         facility_id: input.facilityId,
         report_date: input.reportDate,
-        shift: input.shift,
+        shift_id: input.shiftId,
         team: input.team ?? null,
         shift_from: input.shiftFrom ?? null,
         shift_to: input.shiftTo ?? null,
@@ -433,15 +468,20 @@ export const shiftBookService = {
    * Dùng để hiện cột "tồn ca trước" trên màn hình nhập — người ghi không phải lật tờ ca trước
    * rồi cộng trừ tay 24 dòng như hiện nay.
    */
-  async getBalance(facilityId: string): Promise<Record<string, { tonBanh: number; tonKg: number }>> {
+  async getBalance(facilityId: string): Promise<Record<string, TonKho>> {
     const { data, error } = await supabase
       .from('v_shift_stock_balance')
-      .select('material_id, ton_banh, ton_kg')
+      .select('material_id, ton_banh, ton_kg, thieu_kg, so_dong_thieu_kg')
       .eq('facility_id', facilityId)
     if (error) throw error
-    const out: Record<string, { tonBanh: number; tonKg: number }> = {}
+    const out: Record<string, TonKho> = {}
     for (const r of (data || []) as Array<Record<string, unknown>>) {
-      out[String(r.material_id)] = { tonBanh: num(r.ton_banh), tonKg: num(r.ton_kg) }
+      out[String(r.material_id)] = {
+        tonBanh: num(r.ton_banh),
+        tonKg: num(r.ton_kg),
+        thieuKg: Boolean(r.thieu_kg),
+        soDongThieuKg: num(r.so_dong_thieu_kg),
+      }
     }
     return out
   },
@@ -452,13 +492,20 @@ export const shiftBookService = {
 // ============================================================================
 
 function mapReport(r: Record<string, unknown>): ShiftBook {
+  // PostgREST trả quan hệ nhúng có thể là object hoặc mảng một phần tử tuỳ hình dạng
+  // quan hệ nó suy ra được — phải chịu cả hai, nếu không tên ca sẽ im lặng biến mất.
   const f = Array.isArray(r.facility) ? r.facility[0] : r.facility
+  const ca = (Array.isArray(r.ca) ? r.ca[0] : r.ca) as
+    { code?: string; name?: string; start_time?: string } | null | undefined
   return {
     id: String(r.id),
     facilityId: (r.facility_id as string) ?? null,
     facilityName: (f as { name?: string } | null)?.name ?? null,
     reportDate: String(r.report_date ?? ''),
-    shift: String(r.shift ?? ''),
+    shiftId: String(r.shift_id ?? ''),
+    shiftCode: ca?.code ?? null,
+    shiftName: ca?.name ?? null,
+    shiftStart: ca?.start_time ?? null,
     team: (r.team as string) ?? null,
     shiftFrom: (r.shift_from as string) ?? null,
     shiftTo: (r.shift_to as string) ?? null,

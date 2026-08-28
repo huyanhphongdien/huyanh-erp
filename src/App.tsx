@@ -217,6 +217,7 @@ const ShiftBookListPage = lazy(() => import('./pages/wms/production/ShiftBookLis
 const ShiftBookEntryPage = lazy(() => import('./pages/wms/production/ShiftBookEntryPage'));
 const ShiftBookPrintPage = lazy(() => import('./pages/wms/production/ShiftBookPrintPage'));
 const QCRejectPage = lazy(() => import('./pages/wms/production/QCRejectPage'));
+const XuatKhoDoiChieuPage = lazy(() => import('./pages/wms/production/XuatKhoDoiChieuPage'));
 const BlendListPage = lazy(() => import('./pages/wms/blending/BlendListPage'));
 const BlendCreatePage = lazy(() => import('./pages/wms/blending/BlendCreatePage'));
 const BlendDetailPage = lazy(() => import('./pages/wms/blending/BlendDetailPage'));
@@ -580,6 +581,8 @@ function App() {
                 {/* M6: Sổ QC hàng không đạt. CỐ Ý không đặt dưới /wms/qc — nhóm menu
                     KHO (WMS) có cờ executiveOnly nên 12 người Phòng QC không vào được. */}
                 <Route path="production/qc-reject" element={<QCRejectPage />} />
+                {/* M4: đối chiếu xuất kho. CHỈ ĐỌC — không trừ kho, xem wms_m4_p1. */}
+                <Route path="production/xuat-kho" element={<XuatKhoDoiChieuPage />} />
                 {/* P9: Blending */}
                 <Route path="blending" element={<BlendListPage />} />
                 <Route path="blending/new" element={<BlendCreatePage />} />

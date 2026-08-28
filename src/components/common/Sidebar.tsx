@@ -412,6 +412,7 @@ const getMenuGroups = (
     items: [
       { path: '/wms/production/shift-book', label: 'Sổ ca ép bành', icon: <ClipboardList size={18} /> },
       { path: '/wms/production/qc-reject', label: 'Sổ hàng không đạt', icon: <FlaskConical size={18} /> },
+      { path: '/wms/production/xuat-kho', label: 'Đối chiếu xuất kho', icon: <PackageMinus size={18} /> },
     ],
   },
   // ★ KHO (WMS) — Phase B consolidation: 10 → 8 items, inline tabs trong /wms, /wms/qc, /wms/reports, /wms/config

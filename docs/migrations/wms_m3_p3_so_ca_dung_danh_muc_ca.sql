@@ -184,8 +184,13 @@ GRANT SELECT ON public.v_shift_stock_balance TO authenticated;
 --    "Ca làm việc" của SỔ THEO DÕI LÔ — sổ khác. Màn hình đã bỏ ô Tổ; cột `team`
 --    giữ nguyên trong bảng nhưng không ghi nữa, chờ nhà máy xác nhận Vàng/Đen là
 --    tên KÍP hay là cách gọi ca.
--- 3. Trang cũ /wms/production/shift-reports và /wms/production/oee ghi thẳng vào
---    bảng này, không qua ba chữ ký, không có facility_id. Đã vá để cũng ghi
---    shift_id, nhưng không có mục menu nào trỏ tới và 5 cột oee_* chưa từng có
---    giá trị ⇒ nên gỡ hẳn, chờ quyết định.
+-- 3. Trang cũ `/production/shift-reports` và `/production/oee` đọc chung bảng này.
+--    ⚠ ĐÍNH CHÍNH 29/08/2026: bản đầu của chú thích này viết chúng "ghi thẳng vào bảng,
+--    không qua ba chữ ký" — SAI. Cả hai trang CHỈ ĐỌC. Đường ghi duy nhất là
+--    `shiftReportService.create()`, và hàm đó KHÔNG CÓ NƠI NÀO GỌI — mã chết.
+--    ⇒ Không có đường nào vòng qua ba chữ ký. Mức khẩn thấp hơn tưởng.
+--    Vẫn nên gỡ, nhưng vì là mã chết và vì chúng đọc cột `shift` hai nghĩa, chứ không
+--    phải vì đang ghi đè sổ. Bản vá thêm `shift_id` vào `create()` cũng vì thế là bản vá
+--    không bao giờ chạy.
+--    (Đường dẫn thật KHÔNG có tiền tố /wms — xem App.tsx, chúng nằm ngoài <Route path="wms">.)
 -- ============================================================================

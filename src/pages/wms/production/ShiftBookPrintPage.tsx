@@ -34,7 +34,7 @@ import { ArrowLeft, Printer } from 'lucide-react'
 import logoImg from '../../../assets/logo.png'
 import {
   shiftBookService, computeTotals,
-  type ShiftBook, type ShiftLine, type ShiftMaterial,
+  type ShiftBook, type ShiftLine, type ShiftMaterial, type TonKho,
 } from '../../../services/wms/shiftBookService'
 
 const bd = '1px solid #000'
@@ -61,6 +61,7 @@ export default function ShiftBookPrintPage() {
   const [report, setReport] = useState<ShiftBook | null>(null)
   const [lines, setLines] = useState<ShiftLine[]>([])
   const [materials, setMaterials] = useState<ShiftMaterial[]>([])
+  const [balance, setBalance] = useState<Record<string, TonKho>>({})
 
   useEffect(() => {
     let huy = false
@@ -76,6 +77,10 @@ export default function ShiftBookPrintPage() {
           if (huy) return
           setReport(r)
           setLines(ls)
+          if (r.facilityId) {
+            const b = await shiftBookService.getBalance(r.facilityId)
+            if (!huy) setBalance(b)
+          }
         }
       } catch {
         /* không đọc được thì vẫn in được tờ trống */
@@ -124,11 +129,11 @@ export default function ShiftBookPrintPage() {
 
       <div className="no-print bg-gray-200 min-h-[calc(100vh-56px)] py-6 px-4 flex justify-center">
         <div className="bg-white shadow-md" style={{ width: '210mm', minHeight: '297mm', padding: '12mm' }}>
-          <Sheet report={report} lines={lines} materials={materials} blank={blank} />
+          <Sheet report={report} lines={lines} materials={materials} balance={balance} blank={blank} />
         </div>
       </div>
       <div className="print-only">
-        <Sheet report={report} lines={lines} materials={materials} blank={blank} />
+        <Sheet report={report} lines={lines} materials={materials} balance={balance} blank={blank} />
       </div>
 
       <style>{`
@@ -161,14 +166,36 @@ export default function ShiftBookPrintPage() {
 
 // ============================================================================
 
-function Sheet({ report, lines, materials, blank }: {
+function Sheet({ report, lines, materials, balance, blank }: {
   report: ShiftBook | null
   lines: ShiftLine[]
   materials: ShiftMaterial[]
+  balance: Record<string, TonKho>
   blank: boolean
 }) {
   const byId = new Map(lines.map((l) => [l.materialId, l]))
   const tong = computeTotals(lines)
+
+  /**
+   * Tồn CUỐI ca. Trên tờ giấy thật đây là cột được viết tay nhiều nhất (13/17 dòng của
+   * tờ 27/8) — bỏ trống thì bản in không thay được tờ giấy.
+   *
+   * ⚠ `v_shift_stock_balance` chỉ cộng phiếu `received`. Phiếu này đã được nhận thì số
+   *   của nó ĐÃ nằm trong đó; chưa nhận thì phải cộng thêm vào. Cộng nhầm một lần nữa là
+   *   in ra tờ giấy có số gấp đôi, và tờ đó có ba chữ ký.
+   * ⚠ Không đọc được tồn thì để TRỐNG, không in 0 — 0 là một lời khẳng định, trống thì không.
+   */
+  const daNhan = report?.status === 'received'
+  const tonCuoi = (m: ShiftMaterial, l: ShiftLine | undefined) => {
+    const b = balance[m.id]
+    if (!b) return null
+    return daNhan
+      ? { banh: b.tonBanh, kg: b.tonKg }
+      : { banh: b.tonBanh + (l?.nhapBanh ?? 0) - (l?.xuatBanh ?? 0),
+          kg: b.tonKg + (l?.nhapKg ?? 0) - (l?.xuatKg ?? 0) }
+  }
+  const fmtTon = (v: number | null | undefined, d = 0) =>
+    v === null || v === undefined ? '' : fmt(v, d)
 
   // Bề rộng cột chép theo tỉ lệ của file Excel gốc. Cột tên hàng gộp A+B.
   const W = ['26.8%', '8.1%', '11.4%', '8.1%', '11.4%', '8.1%', '11.4%', '14.7%']
@@ -212,7 +239,12 @@ function Sheet({ report, lines, materials, blank }: {
           {/* ⚠ Ô này là ô CHỮ, không phải số: tờ 27/8 ghi "18CN + 2CN Đ Lưới". */}
           <span style={{ flex: 1.2 }}>
             Số công nhân: <Dots v={blank ? '' : (report?.headcount != null ? String(report.headcount) : '')} w={80} />
-            {' '}Khối lượng: <Dots v={blank ? '' : fmt(tong.nhapKg, 2)} w={90} />
+            {/* ⚠ CỐ Ý ĐỂ TRỐNG. Trên tờ 27/8 ô này người ta KHÔNG điền, và chưa ai xác
+                nhận nó nghĩa là "tổng kg nhập trong ca" hay thứ khác (khối lượng nguyên
+                liệu xúc vào lò?). Tự điền một con số vào chứng từ sắp có ba chữ ký, dựa
+                trên một giả định chưa hỏi, là đúng loại sai mà cả module này sinh ra để
+                tránh. Người ghi vẫn viết tay được vào dòng chấm. */}
+            {' '}Khối lượng: <Dots v="" w={90} />
           </span>
         </div>
       </div>
@@ -247,8 +279,8 @@ function Sheet({ report, lines, materials, blank }: {
                 <Td>{blank || !l ? '' : fmt(l.nhapKg, 2)}</Td>
                 <Td>{blank || !l ? '' : fmt(l.xuatBanh)}</Td>
                 <Td>{blank || !l ? '' : fmt(l.xuatKg, 2)}</Td>
-                <Td />
-                <Td />
+                <Td>{blank ? '' : fmtTon(tonCuoi(m, l)?.banh)}</Td>
+                <Td>{blank ? '' : fmtTon(tonCuoi(m, l)?.kg, 2)}</Td>
                 <Td align="left">{blank || !l ? '' : (l.note ?? '')}</Td>
               </tr>
             )

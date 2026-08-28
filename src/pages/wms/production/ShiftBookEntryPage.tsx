@@ -219,14 +219,21 @@ export default function ShiftBookEntryPage() {
   }), [materials, o])
 
   const tong = useMemo(() => computeTotals(lines), [lines])
+
+  /** Dòng "có số" — dùng chung cho bộ đếm và bộ lọc, để hai chỗ không lệch nhau. */
+  const coSo = (l: ShiftLine): boolean =>
+    l.nhapBanh > 0 || l.xuatBanh > 0 || l.nhapKgManual != null || l.xuatKgManual != null
   const soDongCoSo = useMemo(
-    () => lines.filter((l) => l.nhapBanh > 0 || l.xuatBanh > 0 || l.nhapKgManual != null).length,
+    // ⚠ Phải xét CẢ HAI ô kg gõ tay. Bỏ sót `xuatKgManual` thì dòng chỉ có kg XUẤT
+    //   (chỉ mã CHÈN mới rơi vào cảnh này) biến mất khỏi bảng khi bật "chỉ hiện dòng có
+    //   số", và đếm thiếu ở thẻ "SỐ DÒNG CÓ SỐ" — người ghi tưởng mình chưa nhập.
+    () => lines.filter(coSo).length,
     [lines],
   )
 
   const hienThi = useMemo(
     () => (chiHienDongCoSo
-      ? lines.filter((l) => l.nhapBanh > 0 || l.xuatBanh > 0 || l.nhapKgManual != null)
+      ? lines.filter(coSo)
       : lines),
     [lines, chiHienDongCoSo],
   )
@@ -661,6 +668,11 @@ export default function ShiftBookEntryPage() {
         {report?.status === 'received' && (
           <Text type="secondary" style={{ fontSize: 12 }}>
             Đã vào kho, phiếu khoá. Sai thì lập phiếu điều chỉnh, không sửa đè.
+          </Text>
+        )}
+        {quyen.chua_chi_dinh_thu_kho && report?.status === 'qc_confirmed' && (
+          <Text type="warning" style={{ fontSize: 12 }}>
+            Chưa chỉ định ai làm thủ kho — bước nhận hàng đang mở cho mọi người.
           </Text>
         )}
         {nhaMay && <Text type="secondary" style={{ fontSize: 12, marginLeft: 12 }}>{nhaMay.name}</Text>}

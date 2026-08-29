@@ -36,6 +36,7 @@ import {
   type ShiftMaterial, type ShiftBook, type ShiftLine, type ShiftLineInput,
 } from '../../../services/wms/shiftBookService'
 import { facilityService, type Facility } from '../../../services/wms/facilityService'
+import { xuatKhoDoiChieuService, type XuatTheoLoai } from '../../../services/wms/xuatKhoDoiChieuService'
 import { shiftService, type Shift } from '../../../services/shiftService'
 import { useAuthStore } from '../../../stores/authStore'
 
@@ -87,6 +88,8 @@ export default function ShiftBookEntryPage() {
   const [facilities, setFacilities] = useState<Facility[]>([])
   const [shifts, setShifts] = useState<Shift[]>([])
   const [quyen, setQuyen] = useState<QuyenKy>(QUYEN_DONG)
+  /** Hàng rời nhà máy theo lệnh điều xe TRONG NGÀY của phiếu này. */
+  const [lenhXe, setLenhXe] = useState<XuatTheoLoai[]>([])
   const [report, setReport] = useState<ShiftBook | null>(null)
   const [balance, setBalance] = useState<Record<string, TonKho>>({})
 
@@ -178,6 +181,24 @@ export default function ShiftBookEntryPage() {
       .catch(() => { if (!huy) setQuyen(QUYEN_DONG) })
     return () => { huy = true }
   }, [facilityId])
+
+  // ── Hàng rời nhà máy hôm đó, theo lệnh điều xe ────────────────────────────
+  //
+  // Người ghi sổ KHÔNG tự nghĩ ra số xuất — họ CHÉP từ chuyến xe. Tờ 27/8 ghi 1.296 bành ở
+  // cột xuất và chép số container xuống phần chân, đúng bằng lệnh LDD-2608-028 hôm đó.
+  // Nên phần mềm đưa sẵn con số ra đây thay vì bắt gõ lại từ đầu.
+  //
+  // ⚠ Phần mềm CỐ Ý KHÔNG tự điền. Hai chuyện dữ liệu không quyết được, chỉ người biết:
+  //   · lượng xuất của một NGÀY thuộc CA nào (lệnh điều xe chỉ có ngày, không có giờ);
+  //   · "SVR_10" trên lệnh là mã nào trong bốn mã SWG/ATC/JK/STD của danh mục.
+  //   Người ghi nhìn hàng thật nên biết cả hai. Máy đoán hộ là đoán vào chỗ sai được.
+  useEffect(() => {
+    let huy = false
+    xuatKhoDoiChieuService.getChiTietNgay(ngay.format('YYYY-MM-DD'))
+      .then((r) => { if (!huy) setLenhXe(r) })
+      .catch(() => { if (!huy) setLenhXe([]) })
+    return () => { huy = true }
+  }, [ngay])
 
   // ── Tồn đầu kỳ theo nhà máy ───────────────────────────────────────────────
   useEffect(() => {
@@ -552,6 +573,40 @@ export default function ShiftBookEntryPage() {
           message="Còn dòng chưa tính được kg"
           description="Mã có dấu ⚠ chưa có cỡ bành trong danh mục. Nhập kg tay cho dòng đó, hoặc báo QC bổ sung cỡ bành vào danh mục."
         />
+      )}
+
+      {/* ── Hàng đã rời nhà máy hôm nay, theo lệnh điều xe ───────────────────
+          Chỉ GỢI Ý. Bấm một dòng là chọn mã hàng để điền vào cột XUẤT — người chọn,
+          không phải máy. Xem chú thích ở effect nạp lenhXe. */}
+      {lenhXe.length > 0 && !daKhoa && (
+        <Card size="small" style={{ marginBottom: 12 }} styles={{ body: { padding: '8px 12px' } }}>
+          <Space direction="vertical" size={6} style={{ width: '100%' }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Hôm nay có hàng rời nhà máy theo lệnh điều xe — bấm để điền vào cột XUẤT
+            </Text>
+            <Space wrap size={8}>
+              {lenhXe.map((l) => (
+                <Space key={l.loaiHang} size={4}>
+                  <Tag color="blue" style={{ marginInlineEnd: 0 }}>
+                    {l.loaiHang} · {fmt(l.soBanh)} bành · {l.soContainer} cont
+                  </Tag>
+                  <Select
+                    size="small" style={{ minWidth: 190 }} placeholder="điền vào mã…"
+                    value={undefined}
+                    onChange={(mid: string) => {
+                      const m = materials.find((x) => x.id === mid)
+                      dat(mid, { xuatBanh: ((o[mid]?.xuatBanh) ?? 0) + l.soBanh })
+                      message.success(`Đã cộng ${fmt(l.soBanh)} bành vào cột xuất của ${m?.name ?? ''}`)
+                    }}
+                    options={materials
+                      .filter((m) => m.weightPerUnit !== null)
+                      .map((m) => ({ value: m.id, label: m.name }))}
+                  />
+                </Space>
+              ))}
+            </Space>
+          </Space>
+        </Card>
       )}
 
       {/* ── Bảng 24 dòng, đúng thứ tự tờ giấy ─────────────────────────────── */}

@@ -21,18 +21,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Card, Table, Button, Space, Typography, Tag, Select, Row, Col, Empty, Spin,
-  Modal, Form, Input, InputNumber, DatePicker, Segmented, AutoComplete, Popconfirm, message,
+  Modal, Form, Input, InputNumber, DatePicker, Segmented, AutoComplete, Popconfirm, Alert, message,
 } from 'antd'
-import { PlusOutlined, ReloadOutlined, WarningOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, WarningOutlined, DeleteOutlined, EditOutlined, RetweetOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import {
-  qcRejectService, TINH_TRANG_LABEL, TINH_TRANG_COLOR,
-  type QCReject, type QCTinhTrang, type QCTheoLo,
+  qcRejectService, TINH_TRANG_LABEL, TINH_TRANG_COLOR, CACH_XU_LY_GOI_Y,
+  type QCReject, type QCTinhTrang, type QCTheoLo, type VongTaiChe,
 } from '../../../services/wms/qcRejectService'
 import { facilityService, type Facility } from '../../../services/wms/facilityService'
 import { useAuthStore } from '../../../stores/authStore'
 
 const { Title, Text } = Typography
+
+const fmt = (n: number) => n.toLocaleString('vi-VN')
 
 /** '25.0 – 29.5' hoặc '30' hoặc '' — hiện đúng cái sổ ghi, không bịa thêm số. */
 const dai = (min: number | null, max: number | null): string => {
@@ -49,6 +51,7 @@ export default function QCRejectPage() {
   const [rows, setRows] = useState<QCReject[]>([])
   const [theoLo, setTheoLo] = useState<QCTheoLo[]>([])
   const [goiYMa, setGoiYMa] = useState<string[]>([])
+  const [vong, setVong] = useState<VongTaiChe[]>([])
 
   const [moForm, setMoForm] = useState(false)
   const [dangSua, setDangSua] = useState<QCReject | null>(null)
@@ -64,14 +67,16 @@ export default function QCRejectPage() {
     if (!facilityId) return
     setLoading(true)
     try {
-      const [rs, tl, gy] = await Promise.all([
+      const [rs, tl, gy, vg] = await Promise.all([
         qcRejectService.list({ facilityId, limit: 300 }),
         qcRejectService.getTheoLo(facilityId),
         qcRejectService.goiYMaNguyenLieu().catch(() => []),
+        qcRejectService.getVongTaiChe(facilityId).catch(() => []),
       ])
       setRows(rs)
       setTheoLo(tl)
       setGoiYMa(gy)
+      setVong(vg)
     } catch (e) {
       message.error('Không đọc được sổ: ' + (e as Error).message)
     } finally {
@@ -84,6 +89,19 @@ export default function QCRejectPage() {
   // Kế thừa dấu nháy lặp do VIEW làm (`v_qc_reject_log`), không tính lại ở đây —
   // xem chú thích trong qcRejectService. Trang chỉ hiển thị.
   const hienThi = rows
+
+  /**
+   * Vòng tái chế cộng trên kỳ đang xem.
+   * ⚠ `coTaiChe` = trong kỳ CÓ đem hàng lỗi đi xử lý ⇒ con số "đạt làm ra" đã lẫn hàng
+   *   chạy lại. Tờ giấy không tách được nguồn, nên KHÔNG chia tỉ lệ ở đây — chỉ nói ra.
+   */
+  const vongTong = useMemo(() => vong.reduce((a, v) => ({
+    khongDat: a.khongDat + v.khongDatLamRaBanh,
+    demXuLy: a.demXuLy + v.khongDatDemXuLyBanh,
+    dat: a.dat + v.datLamRaBanh,
+    tong: a.tong + v.tongNhapBanh,
+    coTaiChe: a.coTaiChe || v.coTaiCheTrongKy,
+  }), { khongDat: 0, demXuLy: 0, dat: 0, tong: 0, coTaiChe: false }), [vong])
 
   const soLoai = useMemo(() => rows.filter((r) => r.tinhTrang === 'LOAI').length, [rows])
   const soCXL = useMemo(() => rows.filter((r) => r.tinhTrang === 'CXL').length, [rows])
@@ -176,7 +194,7 @@ export default function QCRejectPage() {
     },
     { title: 'Ghi chú', dataIndex: 'ghiChu', width: 150 },
     {
-      title: 'Tình trạng xử lý', dataIndex: 'tinhTrangXuLy', width: 130,
+      title: 'Cách xử lý', dataIndex: 'tinhTrangXuLy', width: 150,
       render: (v: string | null) => v ?? <Text type="secondary">—</Text>,
     },
     {
@@ -250,6 +268,62 @@ export default function QCRejectPage() {
           </Card>
         </Col>
       </Row>
+
+      {vongTong.tong > 0 && (
+        <Card
+          size="small" style={{ marginBottom: 12 }}
+          title={<Space><RetweetOutlined /><span>Vòng tái chế</span></Space>}
+          extra={<Text type="secondary" style={{ fontSize: 12 }}>từ sổ ca ép bành</Text>}
+        >
+          <Row gutter={[16, 8]}>
+            <Col xs={12} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>HÀNG KHÔNG ĐẠT LÀM RA</Text>
+              <div>
+                <Text strong style={{ fontSize: 20, color: '#cf1322' }}>{fmt(vongTong.khongDat)}</Text>
+                <Text type="secondary"> bành</Text>
+              </div>
+              {vongTong.tong > 0 && (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {Math.round((vongTong.khongDat / vongTong.tong) * 1000) / 10}% tổng nhập
+                </Text>
+              )}
+            </Col>
+            <Col xs={12} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>ĐÃ ĐEM ĐI XỬ LÝ</Text>
+              <div>
+                <Text strong style={{ fontSize: 20 }}>{fmt(vongTong.demXuLy)}</Text>
+                <Text type="secondary"> bành</Text>
+              </div>
+              <Text type="secondary" style={{ fontSize: 12 }}>trộn hoặc chạy lò lại</Text>
+            </Col>
+            <Col xs={12} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>HÀNG ĐẠT LÀM RA</Text>
+              <div>
+                <Text strong style={{ fontSize: 20 }}>{fmt(vongTong.dat)}</Text>
+                <Text type="secondary"> bành</Text>
+              </div>
+            </Col>
+            <Col xs={24} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>TỔNG NHẬP</Text>
+              <div>
+                <Text strong style={{ fontSize: 20 }}>{fmt(vongTong.tong)}</Text>
+                <Text type="secondary"> bành</Text>
+              </div>
+              <Text type="secondary" style={{ fontSize: 12 }}>gồm cả hàng không đạt</Text>
+            </Col>
+          </Row>
+          {/* ⚠ Không tính hiệu suất tái chế ở đây. Tờ giấy ghi "xuất 432 lỗi" và "nhập 400
+              tốt" nhưng không ghi 400 đó từ 432 kia — ca vừa chạy nguyên liệu mới vừa chạy
+              hàng tái chế thì không tách được. Nói ra, đừng đoán. */}
+          {vongTong.coTaiChe && (
+            <Alert
+              type="info" showIcon style={{ marginTop: 10 }}
+              message="Kỳ này có đem hàng lỗi đi xử lý"
+              description="Số “hàng đạt làm ra” ở trên vì vậy gồm cả bành chạy lại, không phải toàn hàng từ nguyên liệu mới. Biểu mẫu hiện không ghi phần nào từ đâu nên không tách được."
+            />
+          )}
+        </Card>
+      )}
 
       <Card size="small" style={{ marginBottom: 12 }}>
         {loading ? (
@@ -379,8 +453,15 @@ export default function QCRejectPage() {
           </Row>
 
           {/* KHÔNG bắt buộc — trên giấy trống 13/13 dòng. */}
-          <Form.Item name="tinhTrangXuLy" label="Tình trạng xử lý" tooltip="Để trống nếu chưa xử lý">
-            <Input placeholder="(để trống nếu chưa xử lý)" />
+          {/* QC là người quyết đường xử lý sau khi có kết quả lab (chủ xác nhận 29/08/2026).
+              Gợi ý 4 cách nhưng VẪN cho gõ tự do — mới đọc được một trang sổ, chưa ai biết
+              đủ tập giá trị thật. */}
+          <Form.Item name="tinhTrangXuLy" label="Cách xử lý" tooltip="QC quyết sau khi có kết quả lab. Để trống nếu chưa quyết.">
+            <AutoComplete
+              options={CACH_XU_LY_GOI_Y.map((v) => ({ value: v }))}
+              placeholder="(để trống nếu chưa quyết)"
+              filterOption={(nhap, opt) => String(opt?.value ?? '').toLowerCase().includes(nhap.toLowerCase())}
+            />
           </Form.Item>
         </Form>
       </Modal>

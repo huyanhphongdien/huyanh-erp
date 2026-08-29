@@ -76,6 +76,36 @@ export interface QCReject {
 /** Ô nhập: KHÔNG có `maNguyenLieuHieuLuc` — đó là giá trị view suy ra, không ai gõ. */
 export type QCRejectInput = Omit<QCReject, 'id' | 'createdAt' | 'maNguyenLieuHieuLuc'>
 
+/**
+ * Ba đường xử lý hàng không đạt, theo lời chủ doanh nghiệp 29/08/2026:
+ * Po thấp → CẢ HAI đường (trộn / chạy lò lại), tuỳ lô. DKL → xử lý kim loại TRƯỚC, rồi mới
+ * vào một trong hai đường đó. **QC là người quyết**, sau khi có kết quả lab.
+ *
+ * ⚠ Đây là GỢI Ý, không phải ràng buộc. Cột `tinh_trang_xu_ly` vẫn là chữ tự do: mới đọc
+ *   được MỘT trang sổ và trang đó trống 13/13 dòng, nên chưa ai biết đủ tập giá trị thật.
+ *   Ràng buộc bây giờ là ép nhà máy chọn trong một danh sách tôi đoán ra.
+ */
+export const CACH_XU_LY_GOI_Y = [
+  'Phối trộn vào lô tốt',
+  'Chạy lò lại',
+  'Xử lý kim loại rồi chạy lại',
+  'Xử lý kim loại rồi phối trộn',
+] as const
+
+/** Vòng tái chế trong một ngày ở một nhà máy. */
+export interface VongTaiChe {
+  ngay: string
+  loiLamRaBanh: number
+  dklLamRaBanh: number
+  khongDatLamRaBanh: number
+  khongDatDemXuLyBanh: number
+  datLamRaBanh: number
+  tongNhapBanh: number
+  tyLeKhongDatPc: number | null
+  /** true = sản lượng "đạt" ngày đó CÓ lẫn hàng chạy lại, tờ giấy không tách được nguồn. */
+  coTaiCheTrongKy: boolean
+}
+
 /** Một lô bãi và số lần nó sinh ra hàng không đạt. */
 export interface QCTheoLo {
   maNguyenLieu: string
@@ -176,6 +206,37 @@ export const qcRejectService = {
       poCaoNhat: numOrNull(r.po_cao_nhat),
       lanDau: String(r.lan_dau ?? ''),
       lanGanNhat: String(r.lan_gan_nhat ?? ''),
+    }))
+  },
+
+  /**
+   * Vòng tái chế: hàng không đạt làm ra, đem đi xử lý, và hàng đạt làm ra — theo ngày.
+   *
+   * ⚠ ĐỪNG tính hiệu suất tái chế từ mấy con số này. Tờ giấy ghi "xuất 432 LOI" và ghi
+   *   "nhập 400 STD" nhưng KHÔNG ghi rằng 400 đó từ 432 kia — ca nào vừa chạy nguyên liệu
+   *   mới vừa chạy hàng tái chế thì không tách được. Cờ `coTaiCheTrongKy` bật là để nói
+   *   ra điều đó, không phải để bỏ qua.
+   */
+  async getVongTaiChe(facilityId?: string, tuNgay?: string): Promise<VongTaiChe[]> {
+    let q = supabase
+      .from('v_vong_tai_che')
+      .select('*')
+      .order('ngay', { ascending: false })
+      .limit(180)
+    if (facilityId) q = q.eq('facility_id', facilityId)
+    if (tuNgay) q = q.gte('ngay', tuNgay)
+    const { data, error } = await q
+    if (error) throw error
+    return (data || []).map((r: Record<string, unknown>) => ({
+      ngay: String(r.ngay ?? ''),
+      loiLamRaBanh: num(r.loi_lam_ra_banh),
+      dklLamRaBanh: num(r.dkl_lam_ra_banh),
+      khongDatLamRaBanh: num(r.khong_dat_lam_ra_banh),
+      khongDatDemXuLyBanh: num(r.khong_dat_dem_xu_ly_banh),
+      datLamRaBanh: num(r.dat_lam_ra_banh),
+      tongNhapBanh: num(r.tong_nhap_banh),
+      tyLeKhongDatPc: numOrNull(r.ty_le_khong_dat_pc),
+      coTaiCheTrongKy: Boolean(r.co_tai_che_trong_ky),
     }))
   },
 

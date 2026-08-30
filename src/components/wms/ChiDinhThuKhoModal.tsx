@@ -21,6 +21,7 @@ import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { shiftBookService, type ThuKho } from '../../services/wms/shiftBookService'
 import { employeeService } from '../../services/employeeService'
+import { useAuthStore } from '../../stores/authStore'
 
 const { Text } = Typography
 
@@ -36,6 +37,7 @@ interface Props {
 interface NhanVien { id: string; hoTen: string; email: string | null }
 
 export default function ChiDinhThuKhoModal({ open, onClose, facilityId, facilityName, onChanged }: Props) {
+  const user = useAuthStore((s) => s.user)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [ds, setDs] = useState<ThuKho[]>([])
@@ -72,7 +74,8 @@ export default function ChiDinhThuKhoModal({ open, onClose, facilityId, facility
     if (!chon) { message.warning('Chọn người trước'); return }
     setSaving(true)
     try {
-      await shiftBookService.themThuKho(chon, moiNhaMay ? null : (facilityId ?? null), ghiChu || undefined)
+      await shiftBookService.themThuKho(
+        chon, moiNhaMay ? null : (facilityId ?? null), ghiChu || undefined, user?.employee_id ?? null)
       message.success('Đã chỉ định')
       setChon(undefined); setGhiChu('')
       await nap()

@@ -100,6 +100,8 @@ export default function XuatKhoDoiChieuPage() {
         : (
           <Space direction="vertical" size={0} style={{ alignItems: 'flex-end' }}>
             <Text strong>{fmt(v)} bành</Text>
+            {/* kg của sổ ca: trước đây nạp lên rồi không bao giờ hiện. */}
+            <Text type="secondary" style={{ fontSize: 12 }}>{fmt(r.kgTheoSoCa, 2)} kg</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
               {r.soPhieuCa} phiếu{r.soPhieuDaNhan < r.soPhieuCa ? ` · ${r.soPhieuDaNhan} đã nhận` : ''}
             </Text>
@@ -225,6 +227,14 @@ export default function XuatKhoDoiChieuPage() {
                       { title: 'Container', dataIndex: 'soContainer', width: 95, align: 'right' as const },
                       { title: 'Bành', dataIndex: 'soBanh', width: 90, align: 'right' as const, render: (v: number) => fmt(v) },
                       { title: 'Kg định mức', dataIndex: 'kgDinhMuc', width: 120, align: 'right' as const, render: (v: number) => fmt(v, 2) },
+                      {
+                        // Số cân thật: trước đây nạp lên rồi không hiện. Nó KHÁC định mức
+                        // (27/8: định mức 45.360, cân thật 45.180) nên đáng để nhìn.
+                        title: 'Kg cân thật', dataIndex: 'kgCanThat', width: 120, align: 'right' as const,
+                        render: (v: number | null) => v === null || v === 0
+                          ? <Text type="secondary">—</Text>
+                          : <Text>{fmt(v, 2)}</Text>,
+                      },
                       {
                         title: 'Kg/bành', dataIndex: 'kgMoiBanh', width: 110, align: 'right' as const,
                         render: (v: number | null, x: XuatTheoLoai) => v === null

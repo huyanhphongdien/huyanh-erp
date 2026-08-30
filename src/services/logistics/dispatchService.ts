@@ -953,6 +953,24 @@ async function listFetchReport(params: { date_from?: string; date_to?: string } 
  * Trả về số dòng vừa đánh dấu.
  */
 async function markWeighed(orderId: string): Promise<number> {
+  // ⚠ CHẶN CỬA HẬU. Hàm này đặt `sales_order_containers.status='shipped'`, mà nhánh ĐẦU
+  //   của `v_sales_order_container_delivery` coi 'shipped' là 'delivered' VÔ ĐIỀU KIỆN —
+  //   tức nó đi vòng qua đúng luật `status NOT IN ('draft','cancelled')` mà
+  //   `wms_m4_p2` dựng lên ở hai nhánh còn lại.
+  //   Nút "Đánh dấu đã cân" trên DispatchDetailPage hiện ra với MỌI lệnh, kể cả nháp và
+  //   đã huỷ (điều kiện duy nhất là còn dòng thiếu actual_weight_kg). Đã đo: 7 lệnh nháp
+  //   đang chạm tới 10 container. Bấm một cái là container chưa hề điều động thành
+  //   "đã giao", và A/R nhận một khoản nợ không có mốc ngày.
+  const { data: don } = await supabase
+    .from('dispatch_orders').select('status').eq('id', orderId).single()
+  const tt = (don as { status?: string } | null)?.status
+  if (tt === 'draft' || tt === 'cancelled') {
+    throw new Error(
+      tt === 'draft'
+        ? 'Lệnh còn là nháp — phát hành lệnh trước rồi mới đánh dấu đã cân.'
+        : 'Lệnh đã huỷ — hàng chưa bao giờ rời nhà máy, không đánh dấu đã cân được.')
+  }
+
   const { data: rows } = await supabase
     .from('dispatch_order_lines')
     .select('id, weight_kg, seal_no, actual_weight_kg, sales_order_container_id')

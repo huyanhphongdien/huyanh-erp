@@ -124,7 +124,10 @@ export default function ShiftBookEntryPage() {
         setMaterials(ms)
         setFacilities(fs)
         setShifts([...ss].sort((a, b) => a.start_time.localeCompare(b.start_time)))
-        setFacilityId((cur) => cur ?? fs[0]?.id)
+        // ⚠ ĐỪNG lấy fs[0]. `facilityService.getAllActive` sắp theo TÊN, nên phần tử đầu
+        //   là "Lào" chứ không phải Phong Điền — sổ ca mở ra mặc định sai nhà máy, và ô
+        //   chọn nhà máy KHOÁ LẠI ngay sau khi lưu phiếu đầu tiên.
+        setFacilityId((cur) => cur ?? fs.find((f) => f.code === 'PD')?.id ?? fs[0]?.id)
       } catch (e) {
         message.error('Không đọc được danh mục: ' + (e as Error).message)
       } finally {
@@ -339,9 +342,12 @@ export default function ShiftBookEntryPage() {
   const chuyenBuoc = async (buoc: 'submit' | 'qc_confirm' | 'receive', nhan: string) => {
     const rid = dirty || !report ? await luu(true) : report.id
     if (!rid) return
-    if (buoc === 'submit') {
-      if (soDongCoSo === 0) { message.warning('Chưa có dòng nào có số — không gửi được phiếu rỗng'); return }
-      if (tong.thieuKg) { message.warning('Còn dòng chưa tính được kg. Nhập kg cho dòng có dấu ⚠ rồi gửi.'); return }
+    // ⚠ Chốt phải đặt ở CẢ 'submit' LẪN 'receive'. Phiếu vẫn sửa được số tới tận
+    //   qc_confirmed, nên kiểm lúc gửi rồi thôi là để hở đúng bước làm ĐỔI TỒN KHO:
+    //   ai đó thêm một dòng thiếu kg sau khi QC đã ký thì nó đi thẳng vào tồn.
+    if (buoc === 'submit' || buoc === 'receive') {
+      if (soDongCoSo === 0) { message.warning('Chưa có dòng nào có số — phiếu rỗng'); return }
+      if (tong.thieuKg) { message.warning('Còn dòng chưa tính được kg. Nhập kg cho dòng có dấu ⚠ rồi tiếp.'); return }
     }
     Modal.confirm({
       title: nhan,
@@ -354,6 +360,13 @@ export default function ShiftBookEntryPage() {
           await shiftBookService.advance(rid, buoc, user?.employee_id ?? null)
           const { report: r } = await shiftBookService.getReport(rid)
           setReport(r)
+          // ⚠ Phải nạp lại TỒN. Bước 'receive' vừa đưa phiếu này vào v_shift_stock_balance,
+          //   nên `balance` đang giữ số CŨ (chưa có phiếu này) trong khi `tonDau` lại bắt
+          //   đầu trừ phần của phiếu — cột Tồn đầu hiện số ÂM. Effect nạp balance chỉ phụ
+          //   thuộc facilityId nên không tự chạy lại.
+          if (facilityId) {
+            shiftBookService.getBalance(facilityId).then(setBalance).catch(() => {})
+          }
           message.success(nhan + ' — xong')
         } catch (e) {
           message.error((e as Error).message)

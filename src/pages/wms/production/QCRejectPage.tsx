@@ -59,7 +59,7 @@ export default function QCRejectPage() {
 
   useEffect(() => {
     facilityService.getAllActive()
-      .then((fs) => { setFacilities(fs); setFacilityId((c) => c ?? fs[0]?.id) })
+      .then((fs) => { setFacilities(fs); setFacilityId((c) => c ?? fs.find((f) => f.code === 'PD')?.id ?? fs[0]?.id) })
       .catch((e) => message.error('Không đọc được danh sách nhà máy: ' + (e as Error).message))
   }, [])
 

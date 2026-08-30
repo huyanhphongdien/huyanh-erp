@@ -365,11 +365,16 @@ export const shiftBookService = {
   },
 
   /** Chỉ định một người làm thủ kho. RLS chỉ cho BGĐ (level ≤ 3) ghi. */
-  async themThuKho(employeeId: string, facilityId: string | null, ghiChu?: string): Promise<void> {
+  async themThuKho(
+    employeeId: string, facilityId: string | null, ghiChu?: string, grantedBy?: string | null,
+  ): Promise<void> {
     const { error } = await supabase.from('shift_book_thu_kho').insert({
       employee_id: employeeId,
       facility_id: facilityId,
       notes: ghiChu ?? null,
+      // Cột dấu vết "ai đã cấp quyền nhận kho" — bỏ trống thì sau này không truy được
+      // ai mở cổng cho ai, đúng thứ mà bảng cấp quyền sinh ra để giữ.
+      granted_by: grantedBy ?? null,
     })
     if (error) throw error
   },

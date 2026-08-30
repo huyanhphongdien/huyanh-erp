@@ -54,7 +54,9 @@ export default function ShiftBookListPage() {
 
   useEffect(() => {
     facilityService.getAllActive()
-      .then((fs) => { setFacilities(fs); setFacilityId((c) => c ?? fs[0]?.id) })
+      // Mặc định Phong Điền (HQ), không phải phần tử đầu — danh sách sắp theo tên nên
+      // phần tử đầu là "Lào". Xem chú thích cùng việc ở ShiftBookEntryPage.
+      .then((fs) => { setFacilities(fs); setFacilityId((c) => c ?? fs.find((f) => f.code === 'PD')?.id ?? fs[0]?.id) })
       .catch((e) => message.error('Không đọc được danh sách nhà máy: ' + (e as Error).message))
   }, [])
 

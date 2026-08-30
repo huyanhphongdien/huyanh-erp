@@ -105,9 +105,7 @@ const QRCheckInPage = lazy(() => import('./features/attendance/QRCheckInPage'));
 // ★ Production MES (QLSX)
 const ProductionStepTrackerPage = lazy(() => import('./pages/production/ProductionStepTrackerPage'));
 const DowntimeLogPage = lazy(() => import('./pages/production/DowntimeLogPage'));
-const ShiftReportPage = lazy(() => import('./pages/production/ShiftReportPage'));
 const ProductionLiveBoard = lazy(() => import('./pages/production/ProductionLiveBoard'));
-const OEEDashboardPage = lazy(() => import('./pages/production/OEEDashboardPage'));
 const SOPListPage = lazy(() => import('./pages/production/SOPListPage'));
 const SOPTrainingPage = lazy(() => import('./pages/production/SOPTrainingPage'));
 const SafetySignsPage = lazy(() => import('./pages/production/SafetySignsPage'));
@@ -684,9 +682,7 @@ function App() {
               {/* Production MES (QLSX) */}
               <Route path="production/steps/:orderId" element={<Suspense fallback={<LoadingSpinner />}><ProductionStepTrackerPage /></Suspense>} />
               <Route path="production/downtimes" element={<Suspense fallback={<LoadingSpinner />}><DowntimeLogPage /></Suspense>} />
-              <Route path="production/shift-reports" element={<Suspense fallback={<LoadingSpinner />}><ShiftReportPage /></Suspense>} />
               <Route path="production/live" element={<Suspense fallback={<LoadingSpinner />}><ProductionLiveBoard /></Suspense>} />
-              <Route path="production/oee" element={<Suspense fallback={<LoadingSpinner />}><OEEDashboardPage /></Suspense>} />
               <Route path="production/sop" element={<Suspense fallback={<LoadingSpinner />}><SOPListPage /></Suspense>} />
               <Route path="production/training" element={<Suspense fallback={<LoadingSpinner />}><SOPTrainingPage /></Suspense>} />
               <Route path="production/safety-signs" element={<Suspense fallback={<LoadingSpinner />}><SafetySignsPage /></Suspense>} />

@@ -48,7 +48,7 @@ const { Title, Text } = Typography
  *
  * ⚠ Trước 28/08/2026 màn hình này gõ cứng hai ca "1 = ngày 06–18h, 2 = đêm 18–06h".
  *   Đó là danh mục ca thứ hai do phần mềm tự bịa, và nó đã mâu thuẫn thật với
- *   `ShiftReportPage.tsx:16` (nơi '1' nghĩa là ca ngắn 06–14h) — cùng một cột, hai
+ *   trang cũ `/production/shift-reports` (nơi '1' nghĩa là ca ngắn 06–14h) — cùng một cột, hai
  *   nghĩa trái nhau, không ai báo lỗi. Tờ giấy 27/8 lại ghi ca chạy "đến 22h", một ca
  *   mà hai-ca-mười-hai-tiếng không diễn đạt nổi.
  *   Đừng gõ lại danh mục ca ở đây dưới bất kỳ hình thức nào.

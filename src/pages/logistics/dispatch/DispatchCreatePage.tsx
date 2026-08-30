@@ -15,7 +15,7 @@ import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined, ImportOu
 import dayjs from 'dayjs'
 import { fleetService, VEHICLE_KIND_LABELS, type FleetVehicle, type FleetDriver } from '../../../services/logistics/fleetService'
 import {
-  dispatchService, TRIP_TYPE_LABELS, isContainerTrip,
+  dispatchService, getGradeDangDung, TRIP_TYPE_LABELS, isContainerTrip,
   type TripType, type DispatchLineInput, type SalesOrderOption,
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
@@ -63,7 +63,9 @@ const PICKUP_PRESETS = [
   'Nhà máy Cao su Hương Khê',
   'Nhà máy Cao su Nam Đông',
 ].map(v => ({ value: v }))
-const GRADE_PRESETS = ['SVR 10', 'SVR 3L', 'SVR L', 'SVR 5', 'SVR 20', 'SVR CV50', 'SVR CV60', 'RSS 1', 'RSS 3', 'Latex 60'].map(v => ({ value: v }))
+// ⚠ Danh sách loại hàng giờ đọc từ DB (`getGradeDangDung`) — xem chú thích ở hàm đó.
+//   Mảng dưới đây chỉ là đường lùi khi chưa nạp xong hoặc không hỏi được DB.
+const GRADE_FALLBACK = ['SVR_10', 'SVR_3L', 'RSS_3', 'RSS_1'].map(v => ({ value: v }))
 const acFilter = (input: string, opt?: { value: string }) => (opt?.value || '').toLowerCase().includes(input.toLowerCase())
 
 // Nhãn 1 xe trong dropdown: biển số · tài xế mặc định · tải/ghế.
@@ -78,6 +80,15 @@ export default function DispatchCreatePage() {
   const { id } = useParams()
   const isEdit = !!id
   const user = useAuthStore(s => s.user)
+
+  // Loại hàng: lấy các cách viết ĐANG DÙNG THẬT để người sau chọn lại, thay vì gõ ra
+  // cách viết thứ mười một. Xem chú thích ở dispatchService.getGradeDangDung.
+  const [gradeOpts, setGradeOpts] = useState<{ value: string }[]>(GRADE_FALLBACK)
+  useEffect(() => {
+    getGradeDangDung()
+      .then(gs => { if (gs.length) setGradeOpts(gs.map(v => ({ value: v }))) })
+      .catch(() => { /* giữ đường lùi */ })
+  }, [])
   const [form] = Form.useForm()
 
   const [tractors, setTractors] = useState<FleetVehicle[]>([])
@@ -393,7 +404,7 @@ export default function DispatchCreatePage() {
       ) },
       lot: { title: 'Lô hàng', key: 'lot', width: 130, render: (_: any, r: LineRow) => <Input value={r.lot_code || ''} onChange={e => patchLine(r._key, { lot_code: e.target.value })} /> },
       grade: { title: isPort ? 'Loại hàng' : 'Nội dung / hàng hóa', key: 'grade', width: 180, render: (_: any, r: LineRow) => (
-        <AutoComplete value={r.grade || ''} style={{ width: '100%' }} options={GRADE_PRESETS}
+        <AutoComplete value={r.grade || ''} style={{ width: '100%' }} options={gradeOpts}
           placeholder={isPort ? 'SVR 10 / Mủ tờ…' : 'Đón khách / Mủ tờ / Vật tư…'} filterOption={acFilter as any}
           onChange={v => patchLine(r._key, { grade: v })} />
       ) },

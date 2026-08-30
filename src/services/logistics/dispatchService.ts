@@ -1156,6 +1156,33 @@ function normalizeLine(row: any): DispatchLine {
 // EXPORT
 // ============================================================================
 
+/**
+ * Các cách viết loại hàng ĐANG ĐƯỢC DÙNG THẬT, xếp theo tần suất.
+ *
+ * ⚠ Trước 29/08/2026 danh sách này gõ cứng trong `DispatchCreatePage` và dùng DẤU CÁCH
+ *   ('SVR 10') trong khi dữ liệu thật dùng GẠCH DƯỚI ('SVR_10', 87 dòng). Lệch đó đẻ ra
+ *   đúng một dòng gõ 'SVR 10' — cùng mặt hàng, hai cách viết, và bảng đối chiếu xuất kho
+ *   tách nó thành hai loại.
+ *
+ * ⚠ CỐ Ý đọc từ DB chứ không gõ cứng: nó tự cập nhật, và luôn đưa ra cách viết ĐÃ TỒN TẠI
+ *   để người sau chọn lại thay vì đẻ ra cách thứ mười một.
+ * ⚠ CỐ Ý vẫn để AutoComplete (gõ tự do được), KHÔNG ép thành Select: các chuỗi dài kiểu
+ *   "MIXTURES OF NATURAL RUBBER SVR10 AND SBR1502 (97.5%…)" là MÔ TẢ HÀNG HOÁ in lên
+ *   Commercial Invoice, và hàng mới thì phải gõ được.
+ */
+export async function getGradeDangDung(): Promise<string[]> {
+  const [a, b] = await Promise.all([
+    supabase.from('dispatch_order_lines').select('grade').not('grade', 'is', null).limit(1000),
+    supabase.from('sales_orders').select('grade').not('grade', 'is', null).limit(1000),
+  ])
+  const dem = new Map<string, number>()
+  for (const r of [...(a.data || []), ...(b.data || [])] as Array<{ grade: string }>) {
+    const g = (r.grade || '').trim()
+    if (g) dem.set(g, (dem.get(g) ?? 0) + 1)
+  }
+  return [...dem.entries()].sort((x, y) => y[1] - x[1]).map(([g]) => g)
+}
+
 export const dispatchService = {
   generateCode,
   list,

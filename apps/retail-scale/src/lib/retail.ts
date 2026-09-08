@@ -17,6 +17,15 @@ export const RETAIL_RUBBER_TYPES = [
   { value: 'mu_nuoc', label: 'Mủ nước', icon: '💧' },
 ] as const
 
+/** Loại mủ HIỆN trên màn chọn (Segmented) của app cân lẻ. Điểm cân gần như 100% là MỦ TẠP
+ *  nên chỉ hiện mủ tạp cho gọn, tránh thao tác viên bấm nhầm loại → sai giá. Muốn mở lại loại
+ *  khác (mủ đông/chén/nước): chỉ cần THÊM value vào SHOWN_RUBBER_TYPE_VALUES.
+ *  RETAIL_RUBBER_TYPES (đủ 4 loại) VẪN giữ để rubberLabel() đọc đúng nhãn phiếu cũ. */
+const SHOWN_RUBBER_TYPE_VALUES: readonly string[] = ['mu_tap']
+export const RETAIL_RUBBER_TYPES_VISIBLE = RETAIL_RUBBER_TYPES.filter(
+  r => SHOWN_RUBBER_TYPE_VALUES.includes(r.value),
+)
+
 export type RetailRubberType = (typeof RETAIL_RUBBER_TYPES)[number]['value']
 
 export function rubberLabel(v: string | null | undefined): string {

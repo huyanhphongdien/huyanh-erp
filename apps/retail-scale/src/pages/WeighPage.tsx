@@ -22,7 +22,7 @@ import { useCurrentFacility } from '@/stores/facilityStore'
 import { useScale } from '@/scale/ScaleProvider'
 import { useStableWeight } from '@/hooks/useStableWeight'
 import {
-  CONTAINER_TYPES, RETAIL_RUBBER_TYPES, computeAmount, fmtKg, fmtVnd, priceUnitFor,
+  CONTAINER_TYPES, RETAIL_RUBBER_TYPES_VISIBLE, computeAmount, fmtKg, fmtVnd, priceUnitFor,
   readVietnameseNumber, rubberLabel,
 } from '@/lib/retail'
 import { createRetailTicket, type RetailLot } from '@/services/retailTicketService'
@@ -533,21 +533,31 @@ export default function WeighPage() {
           <Card size="small" title="2 · Loại mủ & đơn giá" style={{ borderRadius: 12 }}>
             <Row gutter={12} align="bottom">
               <Col xs={24} md={11}>
-                <Segmented
-                  block
-                  size="large"
-                  value={rubberType}
-                  // Đổi loại mủ PHẢI xoá cả giá lẫn gợi ý giá của loại cũ. Effect gợi ý chỉ
-                  // điền khi giá đang trống, nên giữ lại giá cũ là in sai tiền cho khách;
-                  // giữ lại priceHint thì nút "dùng" lại điền đúng con số sai đó.
-                  onChange={v => {
-                    setRubberType(String(v))
-                    setDrc(null)
-                    setUnitPrice(null)
-                    setPriceHint(null)
-                  }}
-                  options={RETAIL_RUBBER_TYPES.map(r => ({ label: `${r.icon} ${r.label}`, value: r.value }))}
-                />
+                {RETAIL_RUBBER_TYPES_VISIBLE.length > 1 ? (
+                  <Segmented
+                    block
+                    size="large"
+                    value={rubberType}
+                    // Đổi loại mủ PHẢI xoá cả giá lẫn gợi ý giá của loại cũ. Effect gợi ý chỉ
+                    // điền khi giá đang trống, nên giữ lại giá cũ là in sai tiền cho khách;
+                    // giữ lại priceHint thì nút "dùng" lại điền đúng con số sai đó.
+                    onChange={v => {
+                      setRubberType(String(v))
+                      setDrc(null)
+                      setUnitPrice(null)
+                      setPriceHint(null)
+                    }}
+                    options={RETAIL_RUBBER_TYPES_VISIBLE.map(r => ({ label: `${r.icon} ${r.label}`, value: r.value }))}
+                  />
+                ) : (
+                  // Chỉ 1 loại mủ (mủ tạp) → khỏi Segmented 1 nút, hiện nhãn tĩnh cho gọn.
+                  <div style={{
+                    padding: '10px 16px', background: '#F0FDF4', border: '1px solid #BBF7D0',
+                    borderRadius: 8, fontWeight: 700, fontSize: 18, textAlign: 'center',
+                  }}>
+                    {rubberLabel(rubberType)}
+                  </div>
+                )}
               </Col>
               <Col xs={12} md={6}>
                 <Text type="secondary" style={{ fontSize: 12 }}>

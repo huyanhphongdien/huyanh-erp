@@ -1,9 +1,20 @@
 # App con "Cân mủ lẻ" — thiết kế & trạng thái
 
-> Cập nhật: 2026-08-21 · Trạng thái: **code xong · migration ĐÃ CHẠY · smoke test PASS · chờ build + pilot**
+> Cập nhật: 2026-09-08 · Trạng thái: **ĐÃ DEPLOY** (Vercel `huyanh-retail-scale`, live `huyanh-retail-scale.vercel.app`) · chờ gắn domain `canle` + pilot.
 > Phạm vi: hộ tiểu điền / khách vãng lai chở **mủ tạp** tới bán trực tiếp tại nhà máy,
 > cân trên **cân bàn/cân sàn RS232**, **không bắt buộc CCCD**, in **phiếu nhiệt 80mm**,
 > chi tiền qua **Đề nghị thanh toán** như các luồng mua mủ khác. **Không** gắn dữ liệu EUDR.
+>
+> **🔴 CẬP NHẬT 2026-09-08 — quy trình CHỜ DRC + trả mủ KHÔ (owner chốt, khác bản đầu):**
+> Quy trình thật: **cân → chờ cán bộ đo DRC → nhập DRC + đơn giá → in**. Nhiều hộ chờ song song.
+> - Tiền = **kg tươi × DRC% × đơn giá** (`price_unit='dry'`), KHÔNG phải kg tươi. `priceUnitFor`
+>   trả `'dry'`. ERP `paymentRequestService` bill theo `price_unit`+`qc_actual_drc` của phiếu → số in = số chi.
+> - Trạng thái mới **`pending_drc`** (migration `retail_scale_p4_pending_drc_status.sql`): phiếu
+>   cân xong nằm chờ — CHƯA in, CHƯA vào Đề nghị thanh toán (ERP chỉ gom `completed`).
+> - `createPendingTicket` (lúc cân) + `finalizeTicket` (lúc chốt DRC). Màn mới `/finalize/:id`;
+>   Trang chủ có khối "⏳ Chờ DRC". Chỉ hiện loại **Mủ tạp** (`RETAIL_RUBBER_TYPES_VISIBLE`).
+> - Đầu cân thật: **KELI XK3118T1 (có RS232)** → chỉ cần mua **cáp USB→RS232 FTDI**.
+> - Commit: `a005d24e`.
 
 ---
 
@@ -65,8 +76,10 @@ mà gần như không phải viết downstream mới.
 
 ### 1.4 Giá & công thức tiền
 
-- **Mủ tạp = giá theo kg TƯƠI** (`price_unit='wet'`, không nhân DRC). Quy tắc gốc của hệ thống:
-  `mu_nuoc` → giá khô, mọi loại còn lại → giá tươi.
+- **🔴 Mủ tạp lẻ = giá theo kg KHÔ** (`price_unit='dry'`): tiền = kg tươi × DRC% × đơn giá
+  (owner chốt 2026-09-08 — ĐẢO bản đầu "kg tươi, không DRC"). `priceUnitFor` trong `retail.ts`
+  trả `'dry'`. ERP đọc `price_unit`+`qc_actual_drc` trên phiếu nên số chi khớp số in. DRC do
+  phòng lab đo, thao tác viên nhập ở màn Chốt DRC.
 - Nguồn giá gợi ý: bảng giá ngày ERP → giá gõ gần nhất trên máy đó → để trống.
   *(Bảng `b2b.daily_price_list` hiện đang rỗng — app vẫn chạy bình thường, thao tác viên nhập giá.)*
 - Giá cuối cùng ghi vào `weighbridge_tickets.unit_price`; kế toán thấy lại đúng số đó ở Đề nghị

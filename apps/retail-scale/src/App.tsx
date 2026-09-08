@@ -4,6 +4,7 @@ import { ScaleProvider } from '@/scale/ScaleProvider'
 import LoginPage from '@/pages/LoginPage'
 import HomePage from '@/pages/HomePage'
 import WeighPage from '@/pages/WeighPage'
+import FinalizePage from '@/pages/FinalizePage'
 import PrintPage from '@/pages/PrintPage'
 import SettingsPage from '@/pages/SettingsPage'
 
@@ -33,6 +34,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <WeighPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/finalize/:ticketId"
+            element={
+              <ProtectedRoute>
+                <FinalizePage />
               </ProtectedRoute>
             }
           />

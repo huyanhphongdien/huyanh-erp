@@ -46,8 +46,13 @@ export const CONTAINER_TYPES = ['Bao', 'Rổ', 'Thùng', 'Xô', 'Đổ đống']
  *   loại mủ (kể cả mủ tạp), lệch ~2.5 lần so với luồng chi tiền thật. Đó là bug của
  *   flow walk-in cũ, không phải chuẩn.
  */
-export function priceUnitFor(rubberType: string | null | undefined): 'wet' | 'dry' {
-  return rubberType === 'mu_nuoc' ? 'dry' : 'wet'
+export function priceUnitFor(_rubberType: string | null | undefined): 'wet' | 'dry' {
+  // 🔴 App CÂN MỦ LẺ: MỌI phiếu đều CHỜ DRC rồi mới chốt (owner chốt 2026-09-08) → LUÔN trả
+  // theo mủ KHÔ: tiền = kg tươi × DRC% × đơn giá. ERP (paymentRequestService.billableWeight)
+  // đọc THẲNG price_unit + qc_actual_drc lưu trên phiếu, nên số kế toán chi KHỚP số app in.
+  // (Trước đây hàm trả 'wet' cho mủ tạp — SAI với quy trình thật của điểm cân lẻ: họ đo DRC
+  //  cho từng hộ rồi trả theo mủ khô.)
+  return 'dry'
 }
 
 /** KL tính tiền. Bản sao 1:1 của billableWeight() trong paymentRequestService.ts. */

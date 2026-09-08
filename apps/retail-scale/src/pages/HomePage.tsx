@@ -19,7 +19,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useCurrentFacility } from '@/stores/facilityStore'
 import { useScale } from '@/scale/ScaleProvider'
 import { fmtKg, fmtVnd, rubberLabel } from '@/lib/retail'
-import { cancelTicket, listTickets, type RetailTicket } from '@/services/retailTicketService'
+import { cancelTicket, listPendingDrc, listTickets, type RetailTicket } from '@/services/retailTicketService'
 
 const { Text, Title } = Typography
 const PRIMARY = '#1B4D3E'
@@ -34,18 +34,24 @@ export default function HomePage() {
   const [date, setDate] = useState(dayjs())
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<RetailTicket[]>([])
+  const [pending, setPending] = useState<RetailTicket[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listTickets({
-        facility_id: facility?.id ?? null,
-        date: date.format('YYYY-MM-DD'),
-        search,
-        includeCancelled: true,
-      })
+      const [data, pend] = await Promise.all([
+        listTickets({
+          facility_id: facility?.id ?? null,
+          date: date.format('YYYY-MM-DD'),
+          search,
+          includeCancelled: true,
+        }),
+        // Chờ DRC: KHÔNG lọc ngày — phiếu cân hôm qua nay mới có DRC vẫn phải hiện.
+        listPendingDrc(facility?.id ?? null),
+      ])
       setRows(data)
+      setPending(pend)
     } catch (e) {
       message.error((e as Error).message || 'Không tải được danh sách')
     } finally {
@@ -56,9 +62,11 @@ export default function HomePage() {
   useEffect(() => { load() }, [load])
 
   const live = rows.filter(t => t.status !== 'cancelled')
+  const completedRows = live.filter(t => t.status === 'completed')
   const totalKg = Math.round(live.reduce((s, t) => s + (Number(t.net_weight) || 0), 0) * 100) / 100
-  const totalAmount = live.reduce((s, t) => s + (Number(t.estimated_value) || 0), 0)
-  const waiting = live.filter(t => !t.payment_request_id).length
+  const totalAmount = completedRows.reduce((s, t) => s + (Number(t.estimated_value) || 0), 0)
+  // Bảng dưới chỉ hiện phiếu ĐÃ chốt / đã huỷ; phiếu chờ DRC nằm ở khối "Chờ DRC" phía trên.
+  const tableRows = rows.filter(t => t.status !== 'pending_drc')
 
   function askCancel(t: RetailTicket) {
     let reason = ''
@@ -209,10 +217,44 @@ export default function HomePage() {
             </Col>
             <Col xs={12} sm={6}>
               <Card size="small" style={{ borderRadius: 12, textAlign: 'center' }}>
-                <Statistic title="Chờ kế toán chi" value={waiting} valueStyle={{ fontWeight: 700, color: '#CA8A04' }} />
+                <Statistic title="⏳ Chờ DRC" value={pending.length} valueStyle={{ fontWeight: 700, color: '#CA8A04' }} />
               </Card>
             </Col>
           </Row>
+
+          {/* HÀNG ĐỢI CHỜ DRC — nổi bật lên đầu vì có hộ đang chờ kết quả để nhận tiền */}
+          {pending.length > 0 && (
+            <Card
+              size="small"
+              style={{ borderRadius: 12, border: '2px solid #F59E0B', background: '#FFFBEB' }}
+              title={<Text strong style={{ color: '#B45309' }}>⏳ Chờ DRC — {pending.length} phiếu</Text>}
+              styles={{ body: { padding: 8 } }}
+            >
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                {pending.map(t => (
+                  <div
+                    key={t.id}
+                    onClick={() => navigate(`/finalize/${t.id}`)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+                      background: '#fff', borderRadius: 8, padding: '10px 14px', border: '1px solid #FDE68A',
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <Text strong>{t.supplier_name || '—'}</Text>
+                      <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
+                        {t.code} · {new Date(t.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    </div>
+                    <Text strong style={{ ...MONO, color: '#15803D' }}>{fmtKg(t.net_weight)} kg</Text>
+                    <Button type="primary" size="small" style={{ background: '#F59E0B', borderColor: '#F59E0B' }}>
+                      Nhập DRC →
+                    </Button>
+                  </div>
+                ))}
+              </Space>
+            </Card>
+          )}
 
           <Card
             hoverable
@@ -226,7 +268,7 @@ export default function HomePage() {
               </div>
               <div>
                 <Text strong style={{ fontSize: 17, display: 'block' }}>Cân khách mới</Text>
-                <Text type="secondary">Nhập tên khách → chọn loại mủ → cân từng bao → in phiếu</Text>
+                <Text type="secondary">Nhập tên khách → cân từng bao → lưu chờ DRC (in sau khi có DRC)</Text>
               </div>
             </Space>
           </Card>
@@ -237,8 +279,8 @@ export default function HomePage() {
             styles={{ body: { padding: 0 } }}
             title={
               <Space wrap>
-                <Text strong>Phiếu ngày {date.format('DD/MM/YYYY')}</Text>
-                <Tag>{rows.length} phiếu</Tag>
+                <Text strong>Phiếu đã chốt ngày {date.format('DD/MM/YYYY')}</Text>
+                <Tag>{tableRows.length} phiếu</Tag>
               </Space>
             }
             extra={
@@ -257,13 +299,13 @@ export default function HomePage() {
           >
             <Table
               columns={columns}
-              dataSource={rows}
+              dataSource={tableRows}
               rowKey="id"
               loading={loading}
               size="middle"
               pagination={{ pageSize: 20, showTotal: t => `${t} phiếu` }}
               scroll={{ x: 980 }}
-              locale={{ emptyText: <Empty description="Chưa có phiếu mủ lẻ nào trong ngày" /> }}
+              locale={{ emptyText: <Empty description="Chưa có phiếu đã chốt trong ngày" /> }}
             />
           </Card>
         </Space>

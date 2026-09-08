@@ -22,11 +22,9 @@ import { useCurrentFacility } from '@/stores/facilityStore'
 import { useScale } from '@/scale/ScaleProvider'
 import { useStableWeight } from '@/hooks/useStableWeight'
 import {
-  CONTAINER_TYPES, RETAIL_RUBBER_TYPES_VISIBLE, computeAmount, fmtKg, fmtVnd, priceUnitFor,
-  readVietnameseNumber, rubberLabel,
+  CONTAINER_TYPES, RETAIL_RUBBER_TYPES_VISIBLE, fmtKg, rubberLabel,
 } from '@/lib/retail'
-import { createRetailTicket, type RetailLot } from '@/services/retailTicketService'
-import { rememberPrice, suggestPrice, type PriceSuggestion } from '@/services/retailPriceService'
+import { createPendingTicket, type RetailLot } from '@/services/retailTicketService'
 import {
   filterRecentCustomers, loadRecentCustomers, searchPartners,
   type PartnerOption, type RecentCustomer,
@@ -59,11 +57,8 @@ export default function WeighPage() {
   const [recentAll, setRecentAll] = useState<RecentCustomer[]>([])
   const [partnerHits, setPartnerHits] = useState<PartnerOption[]>([])
 
-  // ─── Hàng + giá ───
+  // ─── Hàng (giá + DRC nhập ở bước CHỐT DRC, không phải ở đây) ───
   const [rubberType, setRubberType] = useState<string>('mu_tap')
-  const [unitPrice, setUnitPrice] = useState<number | null>(null)
-  const [priceHint, setPriceHint] = useState<PriceSuggestion | null>(null)
-  const [drc, setDrc] = useState<number | null>(null)
 
   // ─── Cân ───
   const [lots, setLots] = useState<RetailLot[]>([])
@@ -76,20 +71,6 @@ export default function WeighPage() {
   const [saving, setSaving] = useState(false)
   /** Mã phiếu đã tạo trên DB nhưng KHÔNG huỷ được — khoá màn hình, cấm lưu lại. */
   const [lockedTicketCode, setLockedTicketCode] = useState<string | null>(null)
-
-  const priceUnit = priceUnitFor(rubberType)
-
-  // Gợi ý giá mỗi khi đổi loại mủ (giá ngày → giá gõ lần trước → để trống).
-  useEffect(() => {
-    let alive = true
-    suggestPrice(rubberType).then(s => {
-      if (!alive) return
-      setPriceHint(s)
-      // Chỉ tự điền khi thao tác viên CHƯA gõ giá — không đè lên số họ vừa nhập.
-      setUnitPrice(prev => (prev == null ? (s?.price ?? null) : prev))
-    })
-    return () => { alive = false }
-  }, [rubberType])
 
   // Gợi ý khách: (a) khách ĐÃ TỪNG bán mủ lẻ ở đây, (b) đối tác có sẵn trong danh bạ ERP.
   // Chọn (b) sẽ gắn partner_id ⇒ chứng từ chi của kế toán tự có số tài khoản ngân hàng.
@@ -133,11 +114,6 @@ export default function WeighPage() {
     [lots],
   )
   const tareTotal = Math.round((grossTotal - netTotal) * 100) / 100
-
-  const money = useMemo(
-    () => computeAmount({ netKg: netTotal, rubberType, unitPrice: unitPrice || 0, drc }),
-    [netTotal, rubberType, unitPrice, drc],
-  )
 
   // ─── Thêm bao ───
   /** @returns true nếu ĐÃ thêm bao. Caller dùng để biết có nên xoá ô nhập / hạ cờ về-0 không. */
@@ -266,30 +242,21 @@ export default function WeighPage() {
         `(thực ${fmtKg(l.net_kg)} kg) — sửa lại trước khi lưu`,
       )
     }
-    if (!(unitPrice && unitPrice > 0)) return message.warning('Chưa nhập đơn giá')
-    if (priceUnit === 'dry' && !(drc && drc > 0)) {
-      return message.warning('Mủ nước tính theo kg khô — phải nhập DRC %')
-    }
-
-    // Chốt lại loại mủ + số tiền trước bước KHÔNG THỂ HOÀN TÁC (in phiếu, trả tiền).
-    // Chọn nhầm loại mủ là lỗi đắt nhất ở trạm cân — app cân xe đã phải sửa bằng SQL.
+    // Chốt lại loại mủ trước khi lưu. DRC + đơn giá + thành tiền nhập ở bước CHỐT DRC.
     Modal.confirm({
-      title: 'Xác nhận phiếu mủ lẻ',
+      title: 'Lưu phiếu — chờ DRC',
       width: 460,
       content: (
         <div style={{ fontSize: 15, lineHeight: 1.9 }}>
           <div>Khách: <b>{customerName.trim()}</b></div>
           <div>Loại mủ: <b>{rubberLabel(rubberType)}</b></div>
           <div>Số bao: <b>{lots.length}</b> · Tổng: <b>{fmtKg(netTotal)} kg</b></div>
-          <div>Đơn giá: <b>{fmtVnd(unitPrice || 0)}/kg {priceUnit === 'dry' ? 'khô' : 'tươi'}</b></div>
-          {priceUnit === 'dry' && <div>DRC: <b>{money.drc}%</b> → KL khô <b>{fmtKg(money.billableKg)} kg</b></div>}
-          <div style={{ marginTop: 8, fontSize: 20, color: PRIMARY }}>
-            Thành tiền: <b>{fmtVnd(money.rounded)}</b>
+          <div style={{ marginTop: 8, color: '#CA8A04' }}>
+            → Phiếu vào <b>Danh sách chờ DRC</b>. Khi có kết quả DRC, mở lại nhập DRC + đơn giá rồi in.
           </div>
-          <div style={{ fontSize: 12, color: '#888' }}>{readVietnameseNumber(money.rounded)}</div>
         </div>
       ),
-      okText: 'Lưu & In phiếu',
+      okText: 'Lưu — chờ DRC',
       cancelText: 'Xem lại',
       okButtonProps: { style: { background: PRIMARY, borderColor: PRIMARY } },
       onOk: doSave,
@@ -302,7 +269,7 @@ export default function WeighPage() {
     savingRef.current = true
     setSaving(true)
     try {
-      const ticket = await createRetailTicket({
+      const ticket = await createPendingTicket({
         facility_id: facility?.id ?? null,
         facility_code: facility?.code ?? null,
         customer_name: customerName,
@@ -310,19 +277,15 @@ export default function WeighPage() {
         partner_id: partnerId,
         vehicle_plate: vehiclePlate || null,
         rubber_type: rubberType,
-        unit_price: unitPrice || 0,
-        drc_percent: drc,
         lots,
         notes: notes || null,
         operator_id: operator?.id ?? null,
       })
-      rememberPrice(rubberType, unitPrice || 0)
       try { localStorage.setItem(DEFAULT_TARE_KEY, String(defaultTare)) } catch { /* ignore */ }
-      message.success(`Đã lưu ${ticket.code}`)
-      // Xoá dòng cân trước khi điều hướng → cảnh báo beforeunload không bật nhầm sau khi
-      // phiếu ĐÃ lưu thành công.
+      message.success(`Đã lưu ${ticket.code} — vào danh sách chờ DRC`)
+      // Xoá dòng cân trước khi điều hướng → cảnh báo beforeunload không bật nhầm sau khi lưu.
       setLots([])
-      navigate(`/print/${ticket.id}?auto=1`, { replace: true })
+      navigate('/', { replace: true })
     } catch (e) {
       const err = e as Error & { fatalTicketCode?: string }
       message.error(err.message || 'Lưu phiếu thất bại', 8)
@@ -538,15 +501,8 @@ export default function WeighPage() {
                     block
                     size="large"
                     value={rubberType}
-                    // Đổi loại mủ PHẢI xoá cả giá lẫn gợi ý giá của loại cũ. Effect gợi ý chỉ
-                    // điền khi giá đang trống, nên giữ lại giá cũ là in sai tiền cho khách;
-                    // giữ lại priceHint thì nút "dùng" lại điền đúng con số sai đó.
-                    onChange={v => {
-                      setRubberType(String(v))
-                      setDrc(null)
-                      setUnitPrice(null)
-                      setPriceHint(null)
-                    }}
+                    // Giá + DRC nhập ở bước Chốt DRC, không còn ở màn cân → chỉ đổi loại mủ.
+                    onChange={v => setRubberType(String(v))}
                     options={RETAIL_RUBBER_TYPES_VISIBLE.map(r => ({ label: `${r.icon} ${r.label}`, value: r.value }))}
                   />
                 ) : (
@@ -560,51 +516,6 @@ export default function WeighPage() {
                 )}
               </Col>
               <Col xs={12} md={6}>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  Đơn giá (₫/kg {priceUnit === 'dry' ? 'khô' : 'tươi'})
-                </Text>
-                <InputNumber<number>
-                  value={unitPrice ?? undefined}
-                  onChange={v => setUnitPrice(v ?? null)}
-                  min={0}
-                  step={500}
-                  size="large"
-                  style={{ width: '100%', ...MONO }}
-                  formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                  parser={v => Number(String(v).replace(/\D/g, '')) || 0}
-                />
-                {priceHint && (
-                  <Text type="secondary" style={{ fontSize: 11 }}>
-                    {priceHint.label}: {fmtVnd(priceHint.price)}
-                    {unitPrice !== priceHint.price && (
-                      <Button
-                        type="link" size="small" style={{ padding: '0 4px' }}
-                        onClick={() => setUnitPrice(priceHint.price)}
-                      >
-                        dùng
-                      </Button>
-                    )}
-                  </Text>
-                )}
-              </Col>
-              {priceUnit === 'dry' && (
-                <Col xs={12} md={4}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>DRC (%)</Text>
-                  <InputNumber
-                    value={drc ?? undefined}
-                    onChange={v => setDrc(v ?? null)}
-                    min={0}
-                    max={100}
-                    step={0.5}
-                    /* qc_actual_drc là numeric(5,2) — chặn ngay tại ô nhập để số hiển thị,
-                       số tính tiền và số lưu DB luôn là một. */
-                    precision={2}
-                    size="large"
-                    style={{ width: '100%', ...MONO }}
-                  />
-                </Col>
-              )}
-              <Col xs={24} md={3}>
                 <Text type="secondary" style={{ fontSize: 12 }}>Bì mặc định/bao (kg)</Text>
                 <InputNumber
                   value={defaultTare}
@@ -615,13 +526,13 @@ export default function WeighPage() {
                   style={{ width: '100%', ...MONO }}
                 />
               </Col>
+              <Col xs={24} md={7}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+                  🧪 <b>DRC + đơn giá nhập ở bước sau.</b> Cân xong bấm “Lưu — chờ DRC”; có kết
+                  quả DRC rồi mở lại phiếu để chốt + in. Tiền = kg khô (net × DRC) × đơn giá.
+                </Text>
+              </Col>
             </Row>
-            {priceUnit === 'wet' && (
-              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
-                {rubberLabel(rubberType)} tính theo <b>kg tươi</b> — không nhân DRC (đúng như
-                cách kế toán tính ở Đề nghị thanh toán).
-              </Text>
-            )}
           </Card>
 
           {/* 3. CÂN */}
@@ -740,7 +651,7 @@ export default function WeighPage() {
             </Row>
           </Card>
 
-          {/* 4. TIỀN + LƯU */}
+          {/* 4. TỔNG KG + LƯU (tiền tính ở bước Chốt DRC) */}
           <Card
             size="small"
             style={{ borderRadius: 12, borderColor: PRIMARY, borderWidth: 2 }}
@@ -748,21 +659,12 @@ export default function WeighPage() {
             <Row gutter={16} align="middle">
               <Col xs={24} md={16}>
                 <Space direction="vertical" size={2}>
-                  <Text type="secondary">
-                    {fmtKg(netTotal)} kg
-                    {/* Mủ nước LUÔN tính theo kg khô — chưa nhập DRC thì phải nói vậy, đừng
-                        ghi "tươi" trong khi số tiền bên dưới đang là 0 ₫. */}
-                    {priceUnit === 'dry'
-                      ? (money.drc ? ` × ${money.drc}% = ${fmtKg(money.billableKg)} kg khô` : ' — chưa nhập DRC')
-                      : ' tươi'}
-                    {' × '}{fmtVnd(unitPrice || 0)}/kg
-                  </Text>
+                  <Text type="secondary">Tổng khối lượng ({lots.length} bao)</Text>
                   <Title level={2} style={{ margin: 0, color: PRIMARY }}>
-                    {fmtVnd(money.rounded)}
+                    {fmtKg(netTotal)} kg
                   </Title>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    {readVietnameseNumber(money.rounded)}
-                    {money.exact !== money.rounded && ` · (chính xác ${fmtVnd(money.exact)}, đã làm tròn nghìn)`}
+                    Thành tiền tính ở bước <b>Chốt DRC</b> (kg khô = net × DRC, rồi × đơn giá).
                   </Text>
                 </Space>
               </Col>
@@ -776,15 +678,14 @@ export default function WeighPage() {
                     !facility ||
                     !lots.length ||
                     !customerName.trim() ||
-                    !(unitPrice && unitPrice > 0) ||
                     lots.some(l => !(l.net_kg > 0))
                   }
                   style={{ height: 60, fontSize: 19, background: PRIMARY, borderColor: PRIMARY }}
                 >
-                  LƯU & IN PHIẾU
+                  LƯU — CHỜ DRC
                 </Button>
                 <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6, textAlign: 'center' }}>
-                  Tiền do kế toán chi qua Đề nghị thanh toán trên ERP
+                  Phiếu vào danh sách chờ DRC — chưa in, chưa tính tiền
                 </Text>
               </Col>
             </Row>

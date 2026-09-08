@@ -1,24 +1,25 @@
 // ============================================================================
-// RETAIL TICKET SERVICE — tạo/đọc/huỷ phiếu CÂN MỦ LẺ
+// RETAIL TICKET SERVICE — tạo/đọc/chốt/huỷ phiếu CÂN MỦ LẺ
 // File: apps/retail-scale/src/services/retailTicketService.ts
 //
-// MÔ HÌNH DỮ LIỆU (đã kiểm chứng trên DB thật 2026-08-21):
-//   • Phiếu     = 1 row `weighbridge_tickets` với ticket_type='retail', status='completed'
-//   • Từng bao  = N row `weighbridge_ticket_lots` (bảng này đã mở quyền cho role anon)
+// QUY TRÌNH (owner chốt 2026-09-08): cân xong → CHỜ cán bộ đo DRC → có kết quả → nhập
+// DRC + đơn giá → in phiếu. Nhiều hộ có thể chờ song song.
 //
-// VÌ SAO KHÔNG DÙNG weighbridgeService.create():
-//   Hàm đó thiết kế cho CÂN 2 LẦN (weighing_gross → weighing_tare → complete), insert 9 cột
-//   rồi phải UPDATE thêm 5-7 lần. Cân mủ lẻ là CÂN 1 LẦN, đã biết hết số liệu ngay khi bấm
-//   Lưu ⇒ insert MỘT PHÁT đủ cột, không để phiếu ở trạng thái nửa vời nếu update sau lỗi.
+// MÔ HÌNH DỮ LIỆU:
+//   • Phiếu    = 1 row `weighbridge_tickets`, ticket_type='retail', has_items=false.
+//       - status='pending_drc'  → đã cân, CHỜ DRC (chưa giá/tiền, chưa in, KHÔNG lọt Đề
+//         nghị thanh toán vì ERP chỉ gom status='completed').
+//       - status='completed'    → đã nhập DRC + giá → có thành tiền → in + vào chi tiền.
+//   • Từng bao = N row `weighbridge_ticket_lots` (bảng đã mở quyền cho role anon).
 //
-// BA THỨ TUYỆT ĐỐI KHÔNG ĐƯỢC ĐỔI (mỗi thứ đều có trigger/luồng tiền phía sau):
-//   1. has_items = false → trigger trg_ticket_allocate_on_weigh KHÔNG chạy. Nếu bật true,
-//      trigger sẽ GHI ĐÈ khối lượng từng dòng theo tỷ lệ prorata và xoá mất số cân thật.
-//   2. net_weight = Σ net_kg các bao (đã trừ bì). Đề nghị thanh toán đọc net_weight của
-//      HEADER, không cộng từ bảng con — ghi thiếu là kế toán chi 0 đồng.
-//   3. facility_id + rubber_type + price_unit + unit_price PHẢI có đủ. Màn gom Đề nghị
-//      thanh toán bắt buộc chọn nhà máy; thiếu facility_id thì phiếu vĩnh viễn không gom
-//      được (đúng lỗi mà intakeWalkinService đang mắc).
+// TIỀN = kg tươi × DRC% × đơn giá (price_unit='dry'). ERP (paymentRequestService.
+// billableWeight) đọc THẲNG price_unit + qc_actual_drc trên phiếu → số chi KHỚP số in.
+//
+// BA THỨ TUYỆT ĐỐI KHÔNG ĐƯỢC ĐỔI (mỗi thứ có trigger/luồng tiền phía sau):
+//   1. has_items = false → trigger trg_ticket_allocate_on_weigh KHÔNG chạy (bật true là
+//      nó ghi đè khối lượng từng dòng theo prorata, xoá mất số cân thật).
+//   2. net_weight = Σ net_kg các bao — Đề nghị thanh toán đọc net_weight của HEADER.
+//   3. facility_id + rubber_type + price_unit PHẢI có đủ — thiếu là phiếu không gom được.
 // ============================================================================
 
 import { supabase } from '@erp/lib/supabase'
@@ -33,7 +34,8 @@ export interface RetailLot {
   note?: string | null
 }
 
-export interface CreateRetailTicketInput {
+/** Dữ liệu lúc CÂN (chưa có DRC/giá — nhập ở bước chốt). */
+export interface CreatePendingTicketInput {
   facility_id: string | null
   facility_code: string | null
   /** Tên khách lẻ — KHÔNG bắt buộc CCCD. Ghi vào supplier_name (kế toán lấy làm người nhận tiền). */
@@ -43,11 +45,15 @@ export interface CreateRetailTicketInput {
   partner_id?: string | null
   vehicle_plate?: string | null
   rubber_type: string
-  unit_price: number
-  /** Chỉ dùng cho mủ nước (price_unit='dry'). Mủ tạp để null. */
-  drc_percent?: number | null
   lots: RetailLot[]
   notes?: string | null
+  operator_id?: string | null
+}
+
+/** Dữ liệu lúc CHỐT DRC (sau khi lab báo kết quả). */
+export interface FinalizeTicketInput {
+  drc: number
+  unit_price: number
   operator_id?: string | null
 }
 
@@ -103,7 +109,7 @@ const TICKET_COLS = `
  * Cố ý dùng prefix RIÊNG, không dùng CX- của cân xe: generateCode của cân xe đếm bằng
  * SELECT-max-rồi-+1 (không có sequence), 2 app cùng đếm trên 1 prefix là đụng mã.
  *
- * Vẫn còn race nếu 2 bàn cân lẻ bấm Lưu trong cùng mili-giây → có retry ở createTicket().
+ * Vẫn còn race nếu 2 bàn cân lẻ bấm Lưu trong cùng mili-giây → có retry ở createPendingTicket().
  */
 async function generateCode(facilityCode?: string | null): Promise<string> {
   const now = new Date()
@@ -134,19 +140,19 @@ function sum(nums: number[]): number {
 }
 
 /**
- * Tạo phiếu mủ lẻ hoàn chỉnh: 1 ticket + N dòng bao, trả về phiếu đã lưu.
- * Nếu insert dòng bao lỗi → XOÁ phiếu vừa tạo (rollback tay, Supabase client không có
- * transaction) để không để lại phiếu 0 bao trong queue chi tiền.
+ * Tạo phiếu mủ lẻ Ở TRẠNG THÁI CHỜ DRC (status='pending_drc'): đã cân xong các bao nhưng
+ * CHƯA có DRC/đơn giá/thành tiền → CHƯA in, CHƯA lọt vào Đề nghị thanh toán (ERP chỉ gom
+ * status='completed'). Cán bộ đo DRC xong → gọi finalizeTicket() để chốt.
+ *
+ * 1 ticket + N dòng bao. Rollback tay nếu insert dòng bao lỗi (Supabase không có transaction).
  */
-export async function createRetailTicket(input: CreateRetailTicketInput): Promise<RetailTicket> {
+export async function createPendingTicket(input: CreatePendingTicketInput): Promise<RetailTicket> {
   if (!input.customer_name?.trim()) throw new Error('Chưa nhập tên khách')
   if (!input.lots.length) throw new Error('Chưa cân bao nào')
-  if (!(input.unit_price > 0)) throw new Error('Chưa nhập đơn giá')
 
   // ⚠ CHẶN CỨNG: phiếu KHÔNG có facility_id sẽ VĨNH VIỄN không gom được vào Đề nghị thanh
   // toán — màn gom bắt buộc chọn nhà máy và lọc `.eq('facility_id', ...)`, mà `=` không bao
-  // giờ khớp NULL. Khách cầm phiếu mà không ai chi được tiền, chỉ sửa được bằng UPDATE tay.
-  // Thà không lưu được và báo lỗi ngay còn hơn in ra một tờ phiếu chết.
+  // giờ khớp NULL. Thà không lưu được và báo lỗi ngay còn hơn tạo một phiếu chết.
   if (!input.facility_id) {
     throw new Error(
       'Chưa xác định được nhà máy — KHÔNG lưu phiếu (phiếu thiếu nhà máy sẽ không gom được ' +
@@ -166,17 +172,6 @@ export async function createRetailTicket(input: CreateRetailTicketInput): Promis
 
   const grossTotal = sum(input.lots.map(l => l.gross_kg))
   const tareTotal = sum(input.lots.map(l => l.tare_kg))
-  const priceUnit = priceUnitFor(input.rubber_type)
-  // qc_actual_drc là numeric(5,2) — DB sẽ cắt còn 2 số lẻ. Cắt SỚM ở đây để tiền in cho
-  // khách bằng đúng tiền kế toán tính lại từ DRC đã lưu.
-  const drc = priceUnit === 'dry' ? normalizeDrc(input.drc_percent) : null
-  const { rounded } = computeAmount({
-    netKg: netTotal,
-    rubberType: input.rubber_type,
-    unitPrice: input.unit_price,
-    drc,
-  })
-
   const nowIso = new Date().toISOString()
   const name = input.customer_name.trim()
 
@@ -189,35 +184,34 @@ export async function createRetailTicket(input: CreateRetailTicketInput): Promis
       .insert({
         code,
         ticket_type: 'retail',
-        status: 'completed',
+        status: 'pending_drc',   // ⏳ CHỜ DRC — ERP chỉ gom 'completed' nên chưa lọt vào chi tiền
         source_type: 'retail',
         facility_id: input.facility_id,
         // vehicle_plate NOT NULL trên DB → luôn có giá trị, mặc định 'XE MÁY'.
-        // .slice SAU .toUpperCase: toUpperCase có thể làm chuỗi dài ra (ß → SS).
         vehicle_plate: (input.vehicle_plate?.trim() || DEFAULT_VEHICLE).toUpperCase().slice(0, 20),
-        // Ghi tên khách vào CẢ driver_name lẫn supplier_name: các màn hình cũ của ERP
-        // hiển thị driver_name, còn Đề nghị thanh toán lấy supplier_name làm người nhận tiền.
+        // Ghi tên khách vào CẢ driver_name lẫn supplier_name: màn cũ ERP hiện driver_name,
+        // còn Đề nghị thanh toán lấy supplier_name làm người nhận tiền.
         driver_name: name,
         driver_phone: input.customer_phone?.trim() || null,
         supplier_name: name,
         partner_id: input.partner_id || null,
         rubber_type: input.rubber_type,
-        price_unit: priceUnit,
-        unit_price: input.unit_price,
-        qc_actual_drc: drc,
+        price_unit: priceUnitFor(input.rubber_type),   // 'dry' — trả theo mủ khô
+        unit_price: 0,                 // nhập ở bước chốt DRC
+        qc_actual_drc: null,           // nhập ở bước chốt DRC
         gross_weight: grossTotal,
         tare_weight: tareTotal,
         net_weight: netTotal,
         actual_net_weight: netTotal,
         deduction_kg: 0,
-        estimated_value: rounded,
-        has_items: false,        // ⚠ xem ghi chú đầu file — đổi thành true là mất số cân thật
+        estimated_value: 0,            // tính ở bước chốt DRC
+        has_items: false,             // ⚠ xem ghi chú đầu file — đổi thành true là mất số cân thật
         allocation_mode: 'by_share',
         notes: input.notes?.trim() || null,
         created_by: input.operator_id || null,
         gross_weighed_by: input.operator_id || null,
         gross_weighed_at: nowIso,
-        completed_at: nowIso,
+        completed_at: null,           // CHƯA hoàn tất
       })
       .select(TICKET_COLS)
       .single()
@@ -228,13 +222,8 @@ export async function createRetailTicket(input: CreateRetailTicketInput): Promis
         await replaceLots(ticket.id, input.rubber_type, input.lots)
       } catch (lotErr) {
         // ROLLBACK TAY (Supabase client không có transaction).
-        //
-        // ⚠ supabase-js KHÔNG throw khi delete lỗi — nó trả { error }. Nếu bỏ qua kết quả,
-        // app sẽ KHẲNG ĐỊNH SAI là "đã huỷ phiếu" trong khi row vẫn nằm đó với đủ
-        // net_weight + unit_price + estimated_value và payment_request_id = NULL, tức đủ điều
-        // kiện lọt vào queue chi tiền. Thao tác viên bấm Lưu lại → phiếu thứ hai → CHI 2 LẦN.
-        // Phải kiểm CẢ error LẪN số dòng thực sự bị xoá (RLS siết lại có thể khớp 0 dòng mà
-        // vẫn trả 200/error=null).
+        // ⚠ supabase-js KHÔNG throw khi delete lỗi — nó trả { error }. Phải kiểm CẢ error LẪN
+        // số dòng thực sự bị xoá (RLS siết lại có thể khớp 0 dòng mà vẫn trả 200/error=null).
         const { data: gone, error: delErr } = await supabase
           .from('weighbridge_tickets')
           .delete()
@@ -247,8 +236,7 @@ export async function createRetailTicket(input: CreateRetailTicketInput): Promis
           )
         }
 
-        // Xoá không được → hạ status xuống 'cancelled'. Đây mới là biện pháp chặn tiền:
-        // listAvailableTickets lọc status='completed' nên phiếu cancelled biến khỏi queue chi.
+        // Xoá không được → hạ status xuống 'cancelled' (biến khỏi mọi queue).
         const { data: cancelled } = await supabase
           .from('weighbridge_tickets')
           .update({ status: 'cancelled', notes: 'TỰ HUỶ: lưu chi tiết bao thất bại' })
@@ -261,13 +249,12 @@ export async function createRetailTicket(input: CreateRetailTicketInput): Promis
           )
         }
 
-        // Không xoá được, cũng không huỷ được → phiếu "ma" còn nguyên tiền trong DB.
-        // Gắn `fatalTicketCode` để UI KHOÁ nút Lưu: bấm lại là sinh phiếu thứ hai và kế
-        // toán chi 2 lần cho một xe mủ. Đây là nhánh duy nhất KHÔNG được phép thử lại.
+        // Không xoá được, cũng không huỷ được → phiếu "ma" còn nguyên trong DB. Gắn
+        // fatalTicketCode để UI KHOÁ nút Lưu (phiếu chờ chưa có tiền nên rủi ro thấp hơn phiếu
+        // completed, nhưng vẫn không cho bấm lại kẻo sinh phiếu thứ hai).
         const fatal = new Error(
           `⚠ Phiếu ${ticket.code} ĐÃ TẠO nhưng chưa huỷ được. ĐỪNG bấm Lưu lại — ` +
-          `báo kế toán loại phiếu ${ticket.code} khỏi Đề nghị thanh toán. ` +
-          `(Lỗi gốc: ${(lotErr as Error).message})`,
+          `báo kỹ thuật gỡ phiếu ${ticket.code}. (Lỗi gốc: ${(lotErr as Error).message})`,
         ) as Error & { fatalTicketCode?: string }
         fatal.fatalTicketCode = ticket.code
         throw fatal
@@ -285,9 +272,56 @@ export async function createRetailTicket(input: CreateRetailTicketInput): Promis
 }
 
 /**
+ * CHỐT DRC + đơn giá cho phiếu đang chờ → tính tiền → chuyển 'completed' (mới in + vào chi tiền).
+ * Guard nằm TRONG câu UPDATE (.eq('status','pending_drc')) để không chốt trùng khi 2 màn cùng mở.
+ */
+export async function finalizeTicket(id: string, input: FinalizeTicketInput): Promise<RetailTicket> {
+  if (!(input.unit_price > 0)) throw new Error('Chưa nhập đơn giá')
+
+  const t = await getTicket(id)
+  if (!t) throw new Error('Không tìm thấy phiếu')
+  if (t.status === 'completed') throw new Error('Phiếu đã chốt DRC + in rồi')
+  if (t.status === 'cancelled') throw new Error('Phiếu đã huỷ')
+  if (t.status !== 'pending_drc') throw new Error(`Phiếu không ở trạng thái chờ DRC (đang: ${t.status})`)
+
+  const priceUnit = priceUnitFor(t.rubber_type)          // 'dry'
+  const drc = priceUnit === 'dry' ? normalizeDrc(input.drc) : null
+  if (priceUnit === 'dry' && !(drc && drc > 0)) throw new Error('Phải nhập DRC % (lớn hơn 0)')
+
+  const net = Number(t.net_weight) || 0
+  const { rounded } = computeAmount({
+    netKg: net,
+    rubberType: t.rubber_type,
+    unitPrice: input.unit_price,
+    drc,
+  })
+
+  const nowIso = new Date().toISOString()
+  const { data: updated, error } = await supabase
+    .from('weighbridge_tickets')
+    .update({
+      status: 'completed',
+      price_unit: priceUnit,
+      unit_price: input.unit_price,
+      qc_actual_drc: drc,
+      qc_drc_source: 'manual',
+      estimated_value: rounded,
+      completed_at: nowIso,
+    })
+    .eq('id', id)
+    .eq('status', 'pending_drc')
+    .is('payment_request_id', null)
+    .select(TICKET_COLS)
+
+  if (error) throw error
+  if (!updated || updated.length === 0) {
+    throw new Error('Không chốt được: phiếu vừa bị chốt/huỷ ở nơi khác. Bấm Tải lại để xem trạng thái mới.')
+  }
+  return updated[0] as unknown as RetailTicket
+}
+
+/**
  * Ghi lại toàn bộ dòng bao của 1 phiếu (xoá hết rồi insert lại).
- * Dùng đúng pattern của app cân xe với weighbridge_ticket_lots — tránh phải đối chiếu
- * từng dòng và tránh lệch sort_order khi khách bỏ bớt bao.
  */
 export async function replaceLots(ticketId: string, rubberType: string, lots: RetailLot[]): Promise<void> {
   const { error: delErr } = await supabase
@@ -345,9 +379,8 @@ export interface ListParams {
 }
 
 /**
- * Danh sách phiếu mủ lẻ.
- * ⚠ Lọc ngày theo mốc GIỜ VN (+07:00). Dùng chuỗi ngày trần như ERP đang làm sẽ để lọt
- * phiếu cân sáng sớm — mà mủ lẻ chủ yếu cân sáng sớm.
+ * Danh sách phiếu mủ lẻ trong 1 ngày.
+ * ⚠ Lọc ngày theo mốc GIỜ VN (+07:00) — mủ lẻ chủ yếu cân sáng sớm.
  */
 export async function listTickets(params: ListParams = {}): Promise<RetailTicket[]> {
   let q = supabase
@@ -380,9 +413,26 @@ export async function listTickets(params: ListParams = {}): Promise<RetailTicket
 }
 
 /**
- * Huỷ phiếu. KHÔNG xoá — giữ dấu vết để đối chiếu cuối ngày.
- * Chặn cứng nếu phiếu đã được gom vào Đề nghị thanh toán: lúc đó tiền đã vào quy trình chi,
- * huỷ ở đây sẽ làm chứng từ kế toán trỏ vào phiếu ma.
+ * Phiếu ĐANG CHỜ DRC — KHÔNG lọc ngày: phiếu cân hôm qua mà nay mới có DRC vẫn phải hiện,
+ * đừng để mắc kẹt ngoài danh sách. Sắp cũ → mới để hộ chờ lâu nhất lên đầu.
+ */
+export async function listPendingDrc(facilityId?: string | null): Promise<RetailTicket[]> {
+  let q = supabase
+    .from('weighbridge_tickets')
+    .select(TICKET_COLS)
+    .eq('ticket_type', 'retail')
+    .eq('status', 'pending_drc')
+    .order('created_at', { ascending: true })
+    .limit(200)
+  if (facilityId) q = q.eq('facility_id', facilityId)
+  const { data, error } = await q
+  if (error) throw error
+  return (data || []) as unknown as RetailTicket[]
+}
+
+/**
+ * Huỷ phiếu. KHÔNG xoá — giữ dấu vết để đối chiếu cuối ngày. Huỷ được cả phiếu chờ DRC lẫn
+ * phiếu completed CHƯA vào Đề nghị thanh toán. Đã vào ĐNTT thì chặn.
  */
 export async function cancelTicket(id: string, reason: string, operatorId?: string | null): Promise<void> {
   if (!reason?.trim()) throw new Error('Phải nhập lý do huỷ')
@@ -396,11 +446,9 @@ export async function cancelTicket(id: string, reason: string, operatorId?: stri
 
   const stamp = `[HUỶ ${new Date().toLocaleString('vi-VN')}${operatorId ? ` bởi ${operatorId}` : ''}] ${reason.trim()}`
 
-  // Guard PHẢI nằm trong chính câu UPDATE, không chỉ ở lần đọc phía trên: giữa lúc đọc và
-  // lúc ghi còn cả một hộp thoại nhập lý do (vài chục giây) — thừa sức để kế toán gom phiếu
-  // này vào Đề nghị thanh toán. Huỷ trúng phiếu đã gom = chứng từ chi trỏ vào phiếu ma.
-  // `.select('id')` để phân biệt "đã cập nhật" với "khớp 0 dòng" — không có nó thì UPDATE
-  // trượt vẫn báo thành công.
+  // Guard PHẢI nằm trong chính câu UPDATE: giữa lúc đọc và lúc ghi còn cả hộp thoại nhập lý do
+  // (vài chục giây) — thừa sức để kế toán gom phiếu này vào Đề nghị thanh toán. Cho phép huỷ
+  // cả 'completed' lẫn 'pending_drc'. `.select('id')` để phân biệt "đã cập nhật" với "0 dòng".
   const { data: updated, error } = await supabase
     .from('weighbridge_tickets')
     .update({
@@ -408,7 +456,7 @@ export async function cancelTicket(id: string, reason: string, operatorId?: stri
       notes: t.notes ? `${t.notes}\n${stamp}` : stamp,
     })
     .eq('id', id)
-    .eq('status', 'completed')
+    .in('status', ['completed', 'pending_drc'])
     .is('payment_request_id', null)
     .select('id')
 
@@ -422,10 +470,12 @@ export async function cancelTicket(id: string, reason: string, operatorId?: stri
 }
 
 export default {
-  createRetailTicket,
+  createPendingTicket,
+  finalizeTicket,
   replaceLots,
   getTicket,
   getLots,
   listTickets,
+  listPendingDrc,
   cancelTicket,
 }

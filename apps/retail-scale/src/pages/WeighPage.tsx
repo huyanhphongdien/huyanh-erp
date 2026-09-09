@@ -34,14 +34,6 @@ const { Text, Title } = Typography
 const PRIMARY = '#1B4D3E'
 const MONO: React.CSSProperties = { fontFamily: "Consolas, 'Courier New', monospace" }
 
-/** Bì mặc định mỗi bao — nhớ theo máy trạm, vì mỗi điểm cân dùng loại bao khác nhau. */
-const DEFAULT_TARE_KEY = 'rs_default_tare'
-
-function readDefaultTare(): number {
-  const n = Number(localStorage.getItem(DEFAULT_TARE_KEY))
-  return Number.isFinite(n) && n >= 0 ? n : 0
-}
-
 export default function WeighPage() {
   const navigate = useNavigate()
   const operator = useAuthStore(s => s.operator)
@@ -62,7 +54,6 @@ export default function WeighPage() {
 
   // ─── Cân ───
   const [lots, setLots] = useState<RetailLot[]>([])
-  const [defaultTare, setDefaultTare] = useState<number>(readDefaultTare)
   const [containerType, setContainerType] = useState<string>('Bao')
   const [manualGross, setManualGross] = useState<number | null>(null)
 
@@ -104,16 +95,11 @@ export default function WeighPage() {
     return () => { alive = false; clearTimeout(t) }
   }, [customerName])
 
-  // ─── Tổng ───
+  // ─── Tổng (mua cả bì → net = số cân) ───
   const netTotal = useMemo(
     () => Math.round(lots.reduce((s, l) => s + l.net_kg, 0) * 100) / 100,
     [lots],
   )
-  const grossTotal = useMemo(
-    () => Math.round(lots.reduce((s, l) => s + l.gross_kg, 0) * 100) / 100,
-    [lots],
-  )
-  const tareTotal = Math.round((grossTotal - netTotal) * 100) / 100
 
   // ─── Thêm bao ───
   /** @returns true nếu ĐÃ thêm bao. Caller dùng để biết có nên xoá ô nhập / hạ cờ về-0 không. */
@@ -122,24 +108,10 @@ export default function WeighPage() {
       message.warning('Số cân phải lớn hơn 0')
       return false
     }
-    // Kiểm bằng CHÍNH defaultTare (không kẹp trước rồi mới báo) — nếu kẹp trước, câu cảnh báo
-    // in ra hai con số bằng nhau và giấu mất giá trị bì đang gõ sai.
-    if (defaultTare >= grossKg) {
-      message.warning(
-        `Bì mặc định ${fmtKg(defaultTare)} kg ≥ số cân ${fmtKg(grossKg)} kg — sửa ô "Bì mặc định/bao (kg)" ở mục 2`,
-      )
-      return false
-    }
-    const tare = defaultTare
-    const net = Math.round((grossKg - tare) * 100) / 100
-    // Cảnh báo MỀM (không chặn): bì ăn quá nửa số cân gần như chắc chắn là gõ nhầm ô bì —
-    // trường hợp này im lặng thì mất tiền thật của khách mà không ai biết.
-    if (tare > grossKg * 0.5) {
-      message.warning(`Bì ${fmtKg(tare)} kg chiếm hơn nửa số cân ${fmtKg(grossKg)} kg — kiểm tra lại ô bì`)
-    }
+    // Mua CẢ BÌ → net = số cân (tare = 0).
     setLots(prev => [
       ...prev,
-      { gross_kg: grossKg, tare_kg: tare, net_kg: net, container_type: containerType, container_count: 1, note: null },
+      { gross_kg: grossKg, tare_kg: 0, net_kg: grossKg, container_type: containerType, container_count: 1, note: null },
     ])
     return true
   }
@@ -236,11 +208,7 @@ export default function WeighPage() {
     if (!lots.length) return message.warning('Chưa cân bao nào')
     const bad = lots.findIndex(l => !(l.net_kg > 0))
     if (bad >= 0) {
-      const l = lots[bad]
-      return message.warning(
-        `Bao ${bad + 1}: bì ${fmtKg(l.tare_kg)} kg ≥ cân ${fmtKg(l.gross_kg)} kg ` +
-        `(thực ${fmtKg(l.net_kg)} kg) — sửa lại trước khi lưu`,
-      )
+      return message.warning(`Bao ${bad + 1} có khối lượng ≤ 0 — sửa lại trước khi lưu`)
     }
     // Chốt lại loại mủ trước khi lưu. DRC + đơn giá + thành tiền nhập ở bước CHỐT DRC.
     Modal.confirm({
@@ -281,7 +249,6 @@ export default function WeighPage() {
         notes: notes || null,
         operator_id: operator?.id ?? null,
       })
-      try { localStorage.setItem(DEFAULT_TARE_KEY, String(defaultTare)) } catch { /* ignore */ }
       message.success(`Đã lưu ${ticket.code} — vào danh sách chờ DRC`)
       // Xoá dòng cân trước khi điều hướng → cảnh báo beforeunload không bật nhầm sau khi lưu.
       setLots([])
@@ -309,35 +276,17 @@ export default function WeighPage() {
       render: (_v, _r, i) => <Text strong>{i + 1}</Text>,
     },
     {
-      title: 'Cân (kg)', dataIndex: 'gross_kg', width: 130,
+      // Mua CẢ BÌ → không trừ bì, số cân = thực nhận (net = gross). 1 cột duy nhất.
+      title: 'Khối lượng (kg)', dataIndex: 'gross_kg', width: 170, align: 'right',
       render: (v: number, _r, i) => (
         <InputNumber
           value={v}
           min={0}
           step={0.5}
-          style={{ width: '100%', ...MONO }}
+          size="large"
+          style={{ width: '100%', ...MONO, fontWeight: 700 }}
           onChange={val => updateLot(i, { gross_kg: Number(val) || 0 })}
         />
-      ),
-    },
-    {
-      title: 'Bì (kg)', dataIndex: 'tare_kg', width: 120,
-      render: (v: number, _r, i) => (
-        <InputNumber
-          value={v}
-          min={0}
-          step={0.1}
-          style={{ width: '100%', ...MONO }}
-          onChange={val => updateLot(i, { tare_kg: Number(val) || 0 })}
-        />
-      ),
-    },
-    {
-      title: 'Thực (kg)', dataIndex: 'net_kg', width: 110, align: 'right',
-      render: (v: number) => (
-        <Text strong style={{ ...MONO, fontSize: 17, color: v > 0 ? '#15803D' : '#DC2626' }}>
-          {fmtKg(v)}
-        </Text>
       ),
     },
     {
@@ -495,7 +444,7 @@ export default function WeighPage() {
           {/* 2. LOẠI MỦ + GIÁ */}
           <Card size="small" title="2 · Loại mủ & đơn giá" style={{ borderRadius: 12 }}>
             <Row gutter={12} align="bottom">
-              <Col xs={24} md={11}>
+              <Col xs={24} md={10}>
                 {RETAIL_RUBBER_TYPES_VISIBLE.length > 1 ? (
                   <Segmented
                     block
@@ -515,21 +464,11 @@ export default function WeighPage() {
                   </div>
                 )}
               </Col>
-              <Col xs={12} md={6}>
-                <Text type="secondary" style={{ fontSize: 12 }}>Bì mặc định/bao (kg)</Text>
-                <InputNumber
-                  value={defaultTare}
-                  onChange={v => setDefaultTare(Number(v) || 0)}
-                  min={0}
-                  step={0.1}
-                  size="large"
-                  style={{ width: '100%', ...MONO }}
-                />
-              </Col>
-              <Col xs={24} md={7}>
+              <Col xs={24} md={14}>
                 <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-                  🧪 <b>DRC + đơn giá nhập ở bước sau.</b> Cân xong bấm “Lưu — chờ DRC”; có kết
-                  quả DRC rồi mở lại phiếu để chốt + in. Tiền = kg khô (net × DRC) × đơn giá.
+                  🧪 <b>Mua cả bì</b> — số cân = thực nhận (không trừ bì). <b>DRC + đơn giá nhập ở
+                  bước sau:</b> cân xong bấm “Lưu — chờ DRC”; có kết quả DRC rồi mở lại phiếu để
+                  chốt + in. Tiền = kg khô (tổng net × DRC) × đơn giá.
                 </Text>
               </Col>
             </Row>
@@ -629,18 +568,12 @@ export default function WeighPage() {
                     <Table.Summary fixed>
                       <Table.Summary.Row>
                         <Table.Summary.Cell index={0} colSpan={1}><b>Tổng</b></Table.Summary.Cell>
-                        <Table.Summary.Cell index={1}>
-                          <Text style={MONO}>{fmtKg(grossTotal)}</Text>
-                        </Table.Summary.Cell>
-                        <Table.Summary.Cell index={2}>
-                          <Text style={MONO}>{fmtKg(tareTotal)}</Text>
-                        </Table.Summary.Cell>
-                        <Table.Summary.Cell index={3} align="right">
+                        <Table.Summary.Cell index={1} align="right">
                           <Text strong style={{ ...MONO, fontSize: 19, color: '#15803D' }}>
                             {fmtKg(netTotal)}
                           </Text>
                         </Table.Summary.Cell>
-                        <Table.Summary.Cell index={4} colSpan={2}>
+                        <Table.Summary.Cell index={2} colSpan={2}>
                           <Text type="secondary">{lots.length} bao</Text>
                         </Table.Summary.Cell>
                       </Table.Summary.Row>

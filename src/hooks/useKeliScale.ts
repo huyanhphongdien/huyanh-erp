@@ -88,6 +88,12 @@ export interface KeliScaleOptions {
    * → truyền 1000 để hiển thị đúng kg (XÁC NHẬN 2026-09-09: 20 kg thật ↔ chuỗi "=0.02000").
    */
   weightScale?: number
+  /**
+   * Làm tròn số cân (sau khi ×weightScale) về bội của giá trị này = ĐỘ CHIA đầu cân.
+   * Cân 1 tấn mủ lẻ độ chia 0,5 kg (5 lạng) → truyền 0.5 để khỏi hiện số lẻ vô nghĩa.
+   * Mặc định 0 = không làm tròn.
+   */
+  snapKg?: number
 }
 
 export interface UseKeliScaleReturn {
@@ -239,10 +245,12 @@ function splitScaleLines(buffer: string): { lines: string[]; rest: string } {
   return { lines: parts, rest }
 }
 
-/** Nhân số cân đọc được với hệ số → kg (đầu cân 1 tấn mủ lẻ xuất theo TẤN nên factor=1000). */
-function scaleReading(r: ScaleReading, factor: number): ScaleReading {
-  if (!factor || factor === 1) return r
-  return { ...r, weight: Math.round(r.weight * factor * 100) / 100 }
+/** Nhân số cân với hệ số → kg (đầu cân 1 tấn xuất theo TẤN nên factor=1000), rồi làm tròn về
+ *  độ chia đầu cân (snapKg, vd 0.5 = 5 lạng). factor=1 & snapKg=0 → giữ nguyên. */
+function scaleReading(r: ScaleReading, factor: number, snapKg = 0): ScaleReading {
+  let w = (!factor || factor === 1) ? r.weight : r.weight * factor
+  if (snapKg && snapKg > 0) w = Math.round(w / snapKg) * snapKg
+  return { ...r, weight: Math.round(w * 100) / 100 }
 }
 
 function parseKeliOutput(line: string): ScaleReading | null {
@@ -591,6 +599,8 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
   const defaultCfg = options?.defaultConfig ?? null
   // Hệ số nhân số cân → kg. Cân 1 tấn mủ lẻ xuất theo TẤN → truyền 1000. Mặc định 1 (kg thẳng).
   const weightScale = options?.weightScale ?? 1
+  // Làm tròn về độ chia đầu cân (0.5 kg = 5 lạng cho cân 1 tấn mủ lẻ). 0 = không làm tròn.
+  const snapKg = options?.snapKg ?? 0
 
   const [connected, setConnected] = useState(false)
   const [liveWeight, setLiveWeight] = useState<ScaleReading | null>(null)
@@ -686,7 +696,7 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
               if (line.trim()) {
                 const parsed = parseKeliOutput(line)
                 if (parsed) {
-                  const reading = scaleReading(parsed, weightScale)
+                  const reading = scaleReading(parsed, weightScale, snapKg)
                   console.log(`[KeliScale] ✅ Weight: ${reading.weight} ${reading.unit} | Stable: ${reading.stable} | Line: ${JSON.stringify(line)}`)
                   setLiveWeight(reading)
                   lastDataAtRef.current = Date.now()
@@ -702,7 +712,7 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
               const { readings, remaining } = extractBinaryFrames(rawByteBufferRef.current)
               rawByteBufferRef.current = remaining
               for (const parsed of readings) {
-                const reading = scaleReading(parsed, weightScale)
+                const reading = scaleReading(parsed, weightScale, snapKg)
                 console.log(`[KeliScale] ✅ Binary weight: ${reading.weight} ${reading.unit}`)
                 setLiveWeight(reading)
                 lastDataAtRef.current = Date.now()
@@ -753,7 +763,7 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
     } finally {
       readingRef.current = false
     }
-  }, [weightScale])
+  }, [weightScale, snapKg])
 
   // --------------------------------------------------------------------------
   // AUTO-DETECT — Try different configs to find the right one

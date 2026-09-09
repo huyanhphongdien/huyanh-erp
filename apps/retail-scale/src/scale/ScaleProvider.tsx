@@ -38,6 +38,8 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
     // Đầu cân 1 TẤN này xuất theo TẤN ("=0.02000" = 0.02 tấn = 20 kg) → ×1000 để hiện đúng kg.
     // XÁC NHẬN 2026-09-09: 20 kg thật ↔ chuỗi "=0.02000".
     weightScale: 1000,
+    // Độ chia đầu cân = 0,5 kg (5 lạng) → làm tròn hiển thị về bội 0,5, khỏi ra số lẻ vô nghĩa.
+    snapKg: 0.5,
   })
   return <ScaleContext.Provider value={scale}>{children}</ScaleContext.Provider>
 }

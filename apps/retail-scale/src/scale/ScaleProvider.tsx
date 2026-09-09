@@ -16,9 +16,17 @@
 // ============================================================================
 
 import { createContext, useContext, type ReactNode } from 'react'
-import { useKeliScale, type UseKeliScaleReturn } from '@erp/hooks/useKeliScale'
+import { useKeliScale, type UseKeliScaleReturn, type KeliScaleConfig } from '@erp/hooks/useKeliScale'
 
 export const SCALE_NAMESPACE = 'rs_scale'
+
+// Đầu cân BÀN của Cân mủ lẻ = KELI XK3118T1: 9600 / 7 data bits / None / 1 stop — XÁC NHẬN
+// 2026-09-09 qua Terminal máy thật (số thực 2.2kg = chuỗi "=02.2000"). KHÁC hẳn cân XE (8 data
+// bits). Truyền làm defaultConfig → nối THẲNG thông số này, khỏi dò; nếu sai (đổi đầu cân khác)
+// thì hook tự dò lại và lưu. Hằng số MODULE-LEVEL để identity ổn định (không churn deps).
+const BENCH_SCALE_CONFIG: KeliScaleConfig = {
+  baudRate: 9600, dataBits: 7, stopBits: 1, parity: 'none', flowControl: 'none',
+}
 
 const ScaleContext = createContext<UseKeliScaleReturn | null>(null)
 
@@ -26,6 +34,7 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
   const scale = useKeliScale({
     storageNamespace: SCALE_NAMESPACE,
     useFacilityDefaults: false,
+    defaultConfig: BENCH_SCALE_CONFIG,
   })
   return <ScaleContext.Provider value={scale}>{children}</ScaleContext.Provider>
 }

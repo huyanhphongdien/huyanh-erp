@@ -76,6 +76,12 @@ export interface KeliScaleOptions {
    * Cân bàn/cân sàn là ĐẦU CÂN KHÁC → truyền false để tự dò, đừng ép 9600/8/None/1 của cân xe.
    */
   useFacilityDefaults?: boolean
+  /**
+   * Thông số ƯU TIÊN của chính đầu cân này (khi useFacilityDefaults=false). App Cân mủ lẻ
+   * truyền 9600/7/None/1 (XK3118T1 cân bàn) → nối THẲNG, khỏi dò; auto-detect cũng thử nó
+   * TRƯỚC. localStorage (đã dò đúng lần trước) vẫn ưu tiên hơn nếu có.
+   */
+  defaultConfig?: KeliScaleConfig
 }
 
 export interface UseKeliScaleReturn {
@@ -150,13 +156,13 @@ function isLockedFacility(useFacilityDefaults = true): boolean {
   return getLockedConfig(useFacilityDefaults) != null
 }
 
-/** Cấu hình ĐANG DÙNG: localStorage (do dò thành công lần trước lưu) → mặc định nhà máy → generic. */
-function readSavedConfig(ns = DEFAULT_NS, useFacilityDefaults = true): KeliScaleConfig {
+/** Cấu hình ĐANG DÙNG: localStorage (do dò thành công lần trước) → defaultConfig của đầu cân → mặc định nhà máy → generic. */
+function readSavedConfig(ns = DEFAULT_NS, useFacilityDefaults = true, defaultConfig?: KeliScaleConfig | null): KeliScaleConfig {
   try {
     const s = localStorage.getItem(cfgKey(ns))
     if (s) return { ...DEFAULT_CONFIG, ...JSON.parse(s) }
   } catch { /* ignore */ }
-  return getFacilityDefaultConfig(useFacilityDefaults) ?? DEFAULT_CONFIG
+  return defaultConfig ?? getFacilityDefaultConfig(useFacilityDefaults) ?? DEFAULT_CONFIG
 }
 
 /** Nhà máy hiện tại có KHÓA cấu hình cân không (ưu tiên thông số cố định, chỉ dò khi cần). */
@@ -178,6 +184,10 @@ const AUTO_DETECT_CONFIGS: Array<{ baudRate: number; parity: ParityType; dataBit
   // 8 data bits (most common)
   { baudRate: 9600, parity: 'even', label: '9600/8/Even/1 (XK3190-A9/A9+/QS-D)' },
   { baudRate: 9600, parity: 'none', label: '9600/8/None/1 (D2008FA/DS3/DS6)' },
+  // 7 data bits — CÂN BÀN XK3118T1 (Cân mủ lẻ): 9600/7/None/1, xuất "=NN.NNNN" liên tục.
+  //   XÁC NHẬN 2026-09-09 qua Terminal máy thật (số thực 2.2kg = "=02.2000"). Đặt SỚM vì đây
+  //   là đầu cân bàn thật của Huy Anh; đừng bỏ.
+  { baudRate: 9600, parity: 'none', dataBits: 7, stopBits: 1, label: '9600/7/None/1 (XK3118T1 cân bàn)' },
   // 7 data bits + even parity (common for large truck scales 120T)
   { baudRate: 9600, parity: 'even', dataBits: 7, stopBits: 2, label: '9600/7/Even/2 (120T truck scale)' },
   { baudRate: 9600, parity: 'even', dataBits: 7, stopBits: 1, label: '9600/7/Even/1 (truck scale)' },
@@ -209,6 +219,19 @@ function lastOkKey(ns: string): string { return `${ns}_last_success` }
 // ============================================================================
 // PARSER — Parse Keli output formats (text + binary)
 // ============================================================================
+
+/**
+ * Tách buffer thành các "dòng" đọc được. Ngoài \r\n|\r|\n, còn coi '=' là ĐẦU mỗi bản đọc:
+ * đầu cân bàn XK3118T1 gửi "=NN.NNNN" NỐI LIỀN nhau, KHÔNG có \r\n (vd "=02.2000=02.2000…").
+ * Không tách kiểu này thì buffer phình mãi và không parse được bản nào (đúng lỗi cân mủ lẻ).
+ * Chèn '\n' trước mỗi '=' → mỗi bản "=NN.NNNN" thành 1 dòng riêng; đuôi dở giữ lại ở `rest`.
+ * Vô hại với format khác: "ST,GS,+…" và frame nhị phân (parse từ byte, không phải text) không có '='.
+ */
+function splitScaleLines(buffer: string): { lines: string[]; rest: string } {
+  const parts = buffer.replace(/=/g, '\n=').split(/\r\n|\r|\n/)
+  const rest = parts.pop() || ''
+  return { lines: parts, rest }
+}
 
 function parseKeliOutput(line: string): ScaleReading | null {
   const trimmed = line.trim()
@@ -498,9 +521,9 @@ async function tryConfigOnPort(
 
         buffer += decoder.decode(value, { stream: true })
 
-        // Check text lines
-        const lines = buffer.split(/\r\n|\r|\n/)
-        buffer = lines.pop() || ''
+        // Check text lines (kể cả stream "=NN.NNNN" nối liền của XK3118T1 cân bàn)
+        const { lines, rest } = splitScaleLines(buffer)
+        buffer = rest
 
         for (const line of lines) {
           if (line.trim() && parseKeliOutput(line)) {
@@ -552,12 +575,14 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
   // Bỏ trống = hành vi CŨ của app cân xe (không đổi gì).
   const ns = options?.storageNamespace || DEFAULT_NS
   const useFacDefaults = options?.useFacilityDefaults !== false
+  // Thông số ưu tiên của đầu cân này (cân bàn mủ lẻ truyền 9600/7/None/1). null = không có.
+  const defaultCfg = options?.defaultConfig ?? null
 
   const [connected, setConnected] = useState(false)
   const [liveWeight, setLiveWeight] = useState<ScaleReading | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Cấu hình đang dùng = localStorage (dò lần trước lưu) → mặc định nhà máy → generic.
-  const [config, setConfigState] = useState<KeliScaleConfig>(() => readSavedConfig(ns, useFacDefaults))
+  const [config, setConfigState] = useState<KeliScaleConfig>(() => readSavedConfig(ns, useFacDefaults, defaultCfg))
 
   const portRef = useRef<SerialPort | null>(null)
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null)
@@ -575,6 +600,9 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
   const lastDataAtRef = useRef(0)
   // User bấm Ngắt kết nối → KHÔNG tự nối lại.
   const manualDisconnectRef = useRef(false)
+  // Lần rớt vừa rồi do SAI CẤU HÌNH (ParityError / đọc rác liên tục) → lần nối lại phải DÒ LẠI
+  // cả danh sách chứ đừng dùng lại config cũ (nếu không sẽ lặp ParityError vô tận).
+  const needsRedetectRef = useRef(false)
   // Ref trỏ tới scheduleReconnect (tránh phụ thuộc vòng giữa read-loop và reconnect).
   const scheduleRef = useRef<(delayMs?: number) => void>(() => {})
 
@@ -635,9 +663,9 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
             console.log(`[KeliScale] 📥 Raw (${bytes.length} bytes):`, JSON.stringify(rawText), '| HEX:', rawHex)
             bufferRef.current += rawText
 
-            // === Method 1: Text lines (separated by \r\n, \n, or \r) ===
-            const lines = bufferRef.current.split(/\r\n|\r|\n/)
-            bufferRef.current = lines.pop() || ''
+            // === Method 1: Text lines (kể cả stream "=NN.NNNN" nối liền của XK3118T1 cân bàn) ===
+            const { lines, rest } = splitScaleLines(bufferRef.current)
+            bufferRef.current = rest
             let textParsed = false
 
             for (const line of lines) {
@@ -673,6 +701,9 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
             readingRef.current = false
             setConnected(false)
             fatalErrorRef.current = true
+            // Parity sai = SAI CẤU HÌNH → lần nối lại phải DÒ LẠI, đừng dùng lại config cũ
+            // (không có cờ này thì reconnectNow nối lại đúng config sai → lặp Parity vô tận).
+            needsRedetectRef.current = true
             // Close port so auto-detect can use it
             try { await port.close() } catch { /* ignore */ }
             portRef.current = null
@@ -726,8 +757,9 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
         const s = JSON.parse(saved)
         if (s && typeof s.baudRate === 'number') firstCfg = s
       }
-      // Chưa lưu → dùng default theo nhà máy (chỉ áp cho cân XE; cân bàn truyền
-      // useFacilityDefaults=false nên bỏ qua, tự dò từ đầu).
+      // Chưa lưu → thử defaultConfig của đầu cân (cân bàn mủ lẻ: 9600/7/None/1) TRƯỚC,
+      // rồi mới tới default theo nhà máy (chỉ áp cho cân XE).
+      if (!firstCfg) firstCfg = defaultCfg
       if (!firstCfg) firstCfg = getFacilityDefaultConfig(useFacDefaults)
       if (firstCfg) {
         configList = [
@@ -787,7 +819,7 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
     }
 
     return null
-  }, [ns, useFacDefaults])
+  }, [ns, useFacDefaults, defaultCfg])
 
   // --------------------------------------------------------------------------
   // CONNECT — Open browser serial port picker
@@ -974,19 +1006,31 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
       if (!ports.length) return false
       const port = ports[0]
 
-      // CHỈ dùng cấu hình ĐÃ LƯU (cấu hình đang chạy tốt) — mở cổng phát 1, ~tức thì.
-      // KHÔNG dò 14 cấu hình ở đây: dò mất ~60s, không hợp cho tự-nối-lại.
-      // Nếu cấu hình sai/garbled → watchdog 12s sẽ bắt và thử lại vòng sau.
-      // Dò đầy đủ chỉ chạy khi user bấm "Kết nối cổng COM" (connect()).
-      // Dùng cấu hình ĐANG CHẠY (localStorage — đã phục hồi đúng nếu từng dò) — mở phát 1, không dò.
-      const saved = readSavedConfig(ns, useFacDefaults)
+      // Rớt do SAI CẤU HÌNH (ParityError / đọc rác liên tục) → DÒ LẠI cả danh sách, tìm đúng
+      // rồi LƯU (self-heal). Không có nhánh này thì nối lại đúng config sai → lặp Parity vô tận
+      // (đúng lỗi cân mủ lẻ kẹt ở 9600/8/Even).
+      if (needsRedetectRef.current) {
+        needsRedetectRef.current = false
+        console.log('[KeliScale] Nối lại: rớt do sai cấu hình → dò lại để tìm đúng')
+        const detected = await autoDetect(port)
+        if (detected) {
+          setConfigState(detected)
+          try { localStorage.setItem(cfgKey(ns), JSON.stringify(detected)) } catch { /* ignore */ }
+          await new Promise(r => setTimeout(r, 300))
+          return await connectWithConfig(port, detected)
+        }
+        // Dò không ra → thử config đã lưu như đường lùi.
+      }
+      // Rớt bình thường (cáp/nguồn/USB re-enumerate) → dùng thẳng cấu hình ĐANG CHẠY, mở phát 1
+      // cho nhanh (dò 14 config mất ~60s, không hợp cho tự-nối-lại thường).
+      const saved = readSavedConfig(ns, useFacDefaults, defaultCfg)
       return await connectWithConfig(port, saved)
     } catch {
       return false
     } finally {
       connectingRef.current = false
     }
-  }, [supported, connectWithConfig, ns, useFacDefaults])
+  }, [supported, connectWithConfig, autoDetect, ns, useFacDefaults, defaultCfg])
 
   const scheduleReconnect = useCallback((delayMs?: number) => {
     if (manualDisconnectRef.current) return

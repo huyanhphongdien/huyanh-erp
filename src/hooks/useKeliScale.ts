@@ -283,10 +283,15 @@ function parseKeliOutput(line: string): ScaleReading | null {
     }
   }
 
-  // Format 2: "=0000.54(kg)" or "=12345.6(kg)" (Keli XK3118T1 format)
+  // Format 2: Keli XK3118T1 gửi số cân ĐẢO NGƯỢC (LSB-first) — phải đảo chuỗi rồi mới đọc.
+  //   "=0.02000" → đảo "0.02000" → "00020.0" = 20,0 kg
+  //   "=0.58000" → đảo "0.58000" → "00085.0" = 85,0 kg
+  //   XÁC NHẬN 2026-09-09 qua 2 mẫu thật (20 kg ↔ "=0.02000", 85 kg ↔ "=0.58000").
+  //   (Đây là lý do trước đó ×1000 chỉ đúng tình cờ ở 20 kg mà sai ở 85 kg → 580.)
   const xk3118Match = trimmed.match(/^=\s*([\d.]+)\s*\(?(kg|lb|t|g)?\)?$/i)
   if (xk3118Match) {
-    const weight = parseFloat(xk3118Match[1])
+    const reversed = xk3118Match[1].split('').reverse().join('')
+    const weight = parseFloat(reversed)
     const unit = (xk3118Match[2] || 'kg').toLowerCase()
 
     if (isNaN(weight)) return null

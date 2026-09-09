@@ -35,9 +35,9 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
     storageNamespace: SCALE_NAMESPACE,
     useFacilityDefaults: false,
     defaultConfig: BENCH_SCALE_CONFIG,
-    // Đầu cân 1 TẤN này xuất theo TẤN ("=0.02000" = 0.02 tấn = 20 kg) → ×1000 để hiện đúng kg.
-    // XÁC NHẬN 2026-09-09: 20 kg thật ↔ chuỗi "=0.02000".
-    weightScale: 1000,
+    // KHÔNG cần weightScale: đầu cân XK3118T1 này gửi số cân ĐẢO NGƯỢC (LSB-first) — parser
+    // đã tự đảo chuỗi rồi đọc ("=0.02000"→"00020.0"=20; "=0.58000"→"00085.0"=85). Xem
+    // parseKeliOutput format 2. (Trước đây tưởng "theo tấn ×1000" — chỉ trùng ở 20 kg.)
     // Độ chia đầu cân = 0,5 kg (5 lạng) → làm tròn hiển thị về bội 0,5, khỏi ra số lẻ vô nghĩa.
     snapKg: 0.5,
   })

@@ -82,6 +82,12 @@ export interface KeliScaleOptions {
    * TRƯỚC. localStorage (đã dò đúng lần trước) vẫn ưu tiên hơn nếu có.
    */
   defaultConfig?: KeliScaleConfig
+  /**
+   * Hệ số nhân số cân đọc được → ra kg. Mặc định 1 (đầu cân xuất thẳng kg).
+   * ĐẦU CÂN 1 TẤN của Cân mủ lẻ (XK3118T1) xuất theo TẤN: "=0.02000" = 0.02 tấn = 20 kg
+   * → truyền 1000 để hiển thị đúng kg (XÁC NHẬN 2026-09-09: 20 kg thật ↔ chuỗi "=0.02000").
+   */
+  weightScale?: number
 }
 
 export interface UseKeliScaleReturn {
@@ -231,6 +237,12 @@ function splitScaleLines(buffer: string): { lines: string[]; rest: string } {
   const parts = buffer.replace(/=/g, '\n=').split(/\r\n|\r|\n/)
   const rest = parts.pop() || ''
   return { lines: parts, rest }
+}
+
+/** Nhân số cân đọc được với hệ số → kg (đầu cân 1 tấn mủ lẻ xuất theo TẤN nên factor=1000). */
+function scaleReading(r: ScaleReading, factor: number): ScaleReading {
+  if (!factor || factor === 1) return r
+  return { ...r, weight: Math.round(r.weight * factor * 100) / 100 }
 }
 
 function parseKeliOutput(line: string): ScaleReading | null {
@@ -577,6 +589,8 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
   const useFacDefaults = options?.useFacilityDefaults !== false
   // Thông số ưu tiên của đầu cân này (cân bàn mủ lẻ truyền 9600/7/None/1). null = không có.
   const defaultCfg = options?.defaultConfig ?? null
+  // Hệ số nhân số cân → kg. Cân 1 tấn mủ lẻ xuất theo TẤN → truyền 1000. Mặc định 1 (kg thẳng).
+  const weightScale = options?.weightScale ?? 1
 
   const [connected, setConnected] = useState(false)
   const [liveWeight, setLiveWeight] = useState<ScaleReading | null>(null)
@@ -670,8 +684,9 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
 
             for (const line of lines) {
               if (line.trim()) {
-                const reading = parseKeliOutput(line)
-                if (reading) {
+                const parsed = parseKeliOutput(line)
+                if (parsed) {
+                  const reading = scaleReading(parsed, weightScale)
                   console.log(`[KeliScale] ✅ Weight: ${reading.weight} ${reading.unit} | Stable: ${reading.stable} | Line: ${JSON.stringify(line)}`)
                   setLiveWeight(reading)
                   lastDataAtRef.current = Date.now()
@@ -686,7 +701,8 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
             if (!textParsed) {
               const { readings, remaining } = extractBinaryFrames(rawByteBufferRef.current)
               rawByteBufferRef.current = remaining
-              for (const reading of readings) {
+              for (const parsed of readings) {
+                const reading = scaleReading(parsed, weightScale)
                 console.log(`[KeliScale] ✅ Binary weight: ${reading.weight} ${reading.unit}`)
                 setLiveWeight(reading)
                 lastDataAtRef.current = Date.now()
@@ -737,7 +753,7 @@ export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
     } finally {
       readingRef.current = false
     }
-  }, [])
+  }, [weightScale])
 
   // --------------------------------------------------------------------------
   // AUTO-DETECT — Try different configs to find the right one

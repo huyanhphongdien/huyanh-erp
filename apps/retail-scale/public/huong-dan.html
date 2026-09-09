@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hướng dẫn Cân mủ lẻ</title>
+<style>
+  :root{
+    --green:#1B4D3E; --green2:#256B54; --gold:#B7791F; --gold-bg:#FFFBEB; --gold-bd:#FDE68A;
+    --ink:#1a1f1c; --muted:#5b6560; --line:#e6e4dd; --card:#ffffff; --ground:#f6f5f0;
+    --red:#B91C1C; --red-bg:#FEF2F2; --red-bd:#FBD5D5;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:"Segoe UI",Tahoma,system-ui,-apple-system,Arial,sans-serif;
+    font-size:16.5px; line-height:1.55;
+  }
+  .wrap{max-width:840px; margin:0 auto; padding:24px 18px 60px}
+
+  header.top{
+    background:var(--green); color:#fff; border-radius:16px; padding:22px 26px;
+    display:flex; align-items:center; gap:16px; box-shadow:0 6px 20px rgba(27,77,62,.18);
+  }
+  header.top .logo{background:#fff;border-radius:12px;width:56px;height:56px;display:grid;place-items:center;flex:none;font-size:30px}
+  header.top h1{margin:0;font-size:24px;letter-spacing:.3px}
+  header.top .sub{color:#FFD54F;font-size:14px;margin-top:2px}
+  header.top .who{margin-left:auto;text-align:right;font-size:13px;color:rgba(255,255,255,.85)}
+
+  .lead{margin:18px 4px 6px;color:var(--muted);font-size:15px}
+
+  section.step{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:18px 20px 16px; margin:16px 0; box-shadow:0 1px 3px rgba(0,0,0,.03);
+    break-inside:avoid;
+  }
+  section.step > h2{
+    margin:0 0 10px; font-size:19px; color:var(--green);
+    display:flex; align-items:center; gap:12px;
+  }
+  .num{
+    flex:none; width:34px; height:34px; border-radius:50%; background:var(--green);
+    color:#fff; font-weight:700; font-size:17px; display:grid; place-items:center;
+  }
+  section.step ol, section.step ul{margin:6px 0 0; padding-left:22px}
+  section.step li{margin:7px 0}
+  b,strong{color:#111}
+  .btn{
+    display:inline-block; background:var(--green); color:#fff; border-radius:8px;
+    padding:2px 10px; font-weight:600; font-size:14px; white-space:nowrap;
+  }
+  .btn.gold{background:var(--gold)}
+  .btn.gray{background:#4b5563}
+  .kbd{background:#eef0ee;border:1px solid #d7dbd7;border-radius:6px;padding:1px 7px;font-size:14px;white-space:nowrap}
+
+  .callout{border-radius:12px;padding:12px 16px;margin:12px 0;border:1px solid}
+  .callout.warn{background:var(--gold-bg);border-color:var(--gold-bd)}
+  .callout.warn .t{color:var(--gold);font-weight:700}
+  .callout.stop{background:var(--red-bg);border-color:var(--red-bd)}
+  .callout.stop .t{color:var(--red);font-weight:700}
+  .callout .t{display:block;margin-bottom:4px}
+
+  table.help{width:100%;border-collapse:collapse;margin-top:8px;font-size:15px}
+  table.help th,table.help td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.help th{background:#f0efe9;font-weight:700}
+  table.help td:first-child{white-space:nowrap;font-weight:600;color:var(--green)}
+
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 2px;font-size:15px}
+  .flow .chip{background:#EEF6F2;border:1px solid #cfe6db;border-radius:20px;padding:5px 12px;font-weight:600;color:var(--green)}
+  .flow .arr{color:var(--muted);font-weight:700}
+
+  footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center;border-top:1px solid var(--line);padding-top:14px}
+
+  .print-hint{margin:14px 4px 0;font-size:13px;color:var(--muted)}
+  @media print{
+    body{background:#fff;font-size:12.5pt}
+    .wrap{max-width:none;padding:0}
+    header.top{box-shadow:none;border:2px solid var(--green)}
+    section.step{box-shadow:none;border:1px solid #bbb}
+    .print-hint{display:none}
+    a[href]:after{content:""}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="logo">🧺</div>
+    <div>
+      <h1>HƯỚNG DẪN CÂN MỦ LẺ</h1>
+      <div class="sub">Cao su Huy Anh · dành cho nhân viên cân</div>
+    </div>
+    <div class="who">Mở app tại:<br><b style="color:#fff">canle.huyanhrubber.vn</b></div>
+  </header>
+
+  <p class="lead">
+    Quy trình mua mủ tạp của hộ dân / khách vãng lai chở tới bằng xe máy. Cân từng bao → chờ cán bộ
+    đo DRC → nhập DRC &amp; đơn giá → in phiếu. Tiền do <b>phòng kế toán chi qua Đề nghị thanh toán</b>,
+    <b>KHÔNG đưa tiền tại cân</b>.
+  </p>
+
+  <div class="flow">
+    <span class="chip">1· Đăng nhập</span><span class="arr">→</span>
+    <span class="chip">2· Nối cân</span><span class="arr">→</span>
+    <span class="chip">3· Cân từng bao</span><span class="arr">→</span>
+    <span class="chip">4· Lưu — chờ DRC</span><span class="arr">→</span>
+    <span class="chip">5· Nhập DRC + giá → In</span>
+  </div>
+
+  <!-- 1 -->
+  <section class="step">
+    <h2><span class="num">1</span> Mở app &amp; đăng nhập</h2>
+    <ol>
+      <li>Mở trình duyệt <b>Chrome</b> (hoặc Edge) trên máy tính trạm cân.</li>
+      <li>Vào địa chỉ <b>canle.huyanhrubber.vn</b> (nên lưu vào Bookmark cho lần sau).</li>
+      <li>Nhập <b>mã PIN</b> của bạn để đăng nhập.</li>
+    </ol>
+    <div class="callout warn"><span class="t">⚠ Phải dùng Chrome hoặc Edge</span>
+      Trình duyệt khác (Firefox, Safari…) <b>không đọc được đầu cân</b>.</div>
+  </section>
+
+  <!-- 2 -->
+  <section class="step">
+    <h2><span class="num">2</span> Kết nối đầu cân (làm 1 lần đầu ngày)</h2>
+    <ol>
+      <li>Kiểm tra góc phải trên: nếu ghi <span class="btn gray">○ Chưa nối</span> thì cần kết nối.</li>
+      <li>Bấm <span class="btn">Kết nối cổng COM</span> → cửa sổ hiện danh sách cổng → chọn đúng cổng của đầu cân → <b>Kết nối</b>.</li>
+      <li>Khi thành công: góc phải hiện <span class="btn">● Cân OK</span> và <b>số cân nhảy theo vật đặt lên</b>.</li>
+    </ol>
+    <div class="callout warn"><span class="t">Đầu cân tự dò thông số</span>
+      Không cần chỉnh gì thủ công. Nếu lỡ nối sai, app tự dò lại. Máy nhớ cổng nên
+      <b>các lần sau thường tự nối</b>, khỏi làm lại bước này.</div>
+  </section>
+
+  <!-- 3 -->
+  <section class="step">
+    <h2><span class="num">3</span> Cân khách mới — cân từng bao</h2>
+    <ol>
+      <li>Ở Trang chủ bấm <span class="btn">＋ Cân khách mới</span>.</li>
+      <li>Nhập <b>Tên khách</b> (bắt buộc). Có SĐT thì nhập thêm. Khách quen có thể chọn từ gợi ý.</li>
+      <li><b>Đặt 1 bao lên cân</b> → chờ chữ <b style="color:#15803D">● Đã đứng số</b> (đèn xanh) →
+          bấm nút xanh lớn <span class="btn" style="background:#16a34a">⚡ LẤY SỐ → THÊM BAO</span>.</li>
+      <li>Nhấc bao xuống, đặt bao tiếp theo, lặp lại cho <b>hết các bao</b> (mỗi bao 1 dòng).</li>
+      <li>Kiểm tra <b>Tổng khối lượng</b> ở dưới đúng với số bao đã cân.</li>
+      <li>Bấm <span class="btn">💾 LƯU — CHỜ DRC</span>.</li>
+    </ol>
+    <div class="callout warn"><span class="t">💡 Mua CẢ BÌ — không trừ bì</span>
+      Số cân hiện trên màn = <b>số thực nhận</b> (đã tính cả bao). Không phải trừ gì thêm.</div>
+    <div class="callout warn"><span class="t">⚠ Chờ đèn xanh mới bấm lấy số</span>
+      Số còn nhảy (chưa đứng) mà bấm là sai cân. Nhấc bao trước xuống rồi mới cân bao sau
+      (app sẽ hỏi lại nếu cân chưa về 0).</div>
+  </section>
+
+  <!-- 4 -->
+  <section class="step">
+    <h2><span class="num">4</span> Lấy mẫu → chờ đo DRC</h2>
+    <ol>
+      <li>Sau khi lưu, phiếu vào khối <b>⏳ Chờ DRC</b> ở Trang chủ.</li>
+      <li>Lấy <b>mẫu từng bao, gộp chung</b> lại → đưa cán bộ đi đo <b>DRC</b> (1 kết quả cho cả xe).</li>
+      <li>Trong lúc chờ, <b>cân tiếp khách khác bình thường</b> — nhiều xe chờ DRC cùng lúc được.</li>
+    </ol>
+  </section>
+
+  <!-- 5 -->
+  <section class="step">
+    <h2><span class="num">5</span> Chốt DRC + In phiếu</h2>
+    <ol>
+      <li>Khi có kết quả DRC: về Trang chủ → khối <b>⏳ Chờ DRC</b> → bấm đúng phiếu của khách đó
+          (<span class="btn gold">Nhập DRC →</span>).</li>
+      <li>Nhập <b>DRC (%)</b> mà cán bộ báo.</li>
+      <li>Nhập <b>Đơn giá</b> (₫/kg khô) theo giá ngày.</li>
+      <li>App tự tính: <b>Khô = Tổng kg × DRC%</b>, rồi <b>Thành tiền = Khô × Đơn giá</b>. Xem lại số tiền.</li>
+      <li>Bấm <span class="btn">🖨 CHỐT &amp; IN PHIẾU</span> → phiếu ra máy in nhiệt, đưa khách.</li>
+    </ol>
+    <div class="callout warn"><span class="t">Ví dụ tính tiền</span>
+      Tổng cân 55 kg · DRC 43% → khô 23,65 kg · giá 30.000 ₫/kg khô →
+      <b>Thành tiền = 23,65 × 30.000 = 709.500 ₫</b>.</div>
+  </section>
+
+  <!-- 6 -->
+  <section class="step">
+    <h2><span class="num">6</span> Lưu ý &amp; xử lý sự cố</h2>
+    <table class="help">
+      <tr><th>Tình huống</th><th>Cách xử lý</th></tr>
+      <tr><td>Góc phải ghi "Chưa nối"</td><td>Bấm <b>Kết nối cổng COM</b> → chọn cổng (bước 2).</td></tr>
+      <tr><td>Số cân không lên / đứng im</td><td>Kiểm tra dây cắm đầu cân ↔ máy tính. Vẫn không được → báo kỹ thuật.</td></tr>
+      <tr><td>Số cân lệch với đầu cân</td><td>Báo kỹ thuật ngay, <b>đừng tự cân tiếp</b> (sai tiền khách).</td></tr>
+      <tr><td>Bấm Lưu bị lỗi mạng</td><td>Đọc kỹ thông báo. Nếu app báo "đã tạo phiếu, đừng lưu lại" thì <b>KHÔNG bấm lưu lần 2</b> — báo kế toán.</td></tr>
+      <tr><td>Cân nhầm / khách bỏ về</td><td>Vào phiếu → <b>Huỷ phiếu</b> (ghi lý do). Phiếu đã in/đã chốt thì báo kế toán.</td></tr>
+    </table>
+    <div class="callout stop"><span class="t">⛔ Tuyệt đối</span>
+      <b>Không đưa tiền cho khách tại cân.</b> Tiền do phòng kế toán chi qua <b>Đề nghị thanh toán</b>
+      theo phiếu đã in. &nbsp;·&nbsp; <b>Không bấm Lưu / Chốt hai lần</b> cho cùng một xe.</div>
+  </section>
+
+  <footer>
+    Cao su Huy Anh — Hướng dẫn Cân mủ lẻ · Vướng mắc kỹ thuật: báo bộ phận IT / kế toán.
+  </footer>
+
+  <p class="print-hint">💡 Để in: bấm <span class="kbd">Ctrl</span> + <span class="kbd">P</span> → chọn máy in → In.</p>
+
+</div>
+</body>
+</html>

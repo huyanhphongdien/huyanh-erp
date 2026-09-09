@@ -142,8 +142,12 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
 ## Cân mủ lẻ (apps/retail-scale)
 Hộ tiểu điền / khách vãng lai bán **mủ tạp** tại nhà máy — cân bàn RS232, **cân 1 lần**,
 không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.md](docs/CAN_MU_LE_KE_HOACH.md).
+- **Quy trình (owner chốt 2026-09-08): cân → CHỜ cán bộ đo DRC → nhập DRC + giá → in.**
+  Nhiều hộ chờ song song. Trạng thái phiếu: `pending_drc` (vừa cân, chưa in, KHÔNG lọt Đề nghị
+  thanh toán) → `finalizeTicket` → `completed`. `createPendingTicket`/`finalizeTicket` +
+  màn `/finalize/:id` + khối "Chờ DRC" ở Trang chủ. Migration `retail_scale_p4_pending_drc_status.sql`.
 - **Không có bảng phiếu riêng**: phiếu = `weighbridge_tickets` với `ticket_type='retail'`,
-  `status='completed'`, `has_items=false`; từng bao = `weighbridge_ticket_lots`.
+  `has_items=false`; từng bao = `weighbridge_ticket_lots`.
   - Dùng `weighbridge_ticket_lots` **chứ không phải** `weighbridge_ticket_items`: bảng items có
     `chk_exactly_one_source` (bắt buộc deal/partner/supplier), trigger `allocate_ticket_item_weights()`
     ghi đè khối lượng theo prorata, và không có policy `anon`.
@@ -151,8 +155,12 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
 - **Tiền**: không chi tại cân. Phiếu chảy vào Đề nghị thanh toán (`payment_requests`) như mọi
   luồng mua mủ khác; `paymentRequestService.listAvailableTickets` lọc `ticket_type IN ('in','retail')`
   và lấy giá từ `weighbridge_tickets.unit_price` (`price_source='retail'`).
-- **Giá mủ tạp = kg TƯƠI** (`price_unit='wet'`, không nhân DRC). Chỉ `mu_nuoc` mới là giá khô.
-  ⚠ `src/services/b2b/intakeWalkinService.ts` nhân DRC cho mọi loại mủ — đó là **bug**, đừng bắt chước.
+- **🔴 Giá mủ tạp lẻ = kg KHÔ** (`price_unit='dry'`): tiền = kg tươi × DRC% × đơn giá (owner chốt
+  2026-09-08, ĐẢO bản đầu "kg tươi"). `priceUnitFor` trong `apps/retail-scale/src/lib/retail.ts`
+  trả `'dry'`; ERP `paymentRequestService` bill theo `price_unit`+`qc_actual_drc` của phiếu nên số
+  chi = số in. (`src/services/b2b/intakeWalkinService.ts` là flow CŨ hỏng — sẽ gỡ, đừng dùng.)
+- **🔴 Đầu cân bàn = KELI XK3118T1: 9600 / 7 data bits / None / 1 stop** (7 data bits, KHÁC cân xe 8),
+  xuất chuỗi `=NN.NNNN` nối liền. `ScaleProvider` truyền `defaultConfig` thông số này (commit 046eccbd).
 - Migrations: `docs/migrations/retail_scale_p{1,2,3}_*.sql` — chạy theo thứ tự.
   Kiểm tra DB sẵn sàng: `powershell -File docs/retail_scale_preflight.ps1`.
 - Phiếu retail **không** sinh `rubber_intake_batches` (bridge chỉ chạy cho `ticket_type='in'`) —

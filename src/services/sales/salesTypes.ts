@@ -614,6 +614,8 @@ export const SVR_GRADE_OPTIONS = [
   { value: 'SVR10 EUDR', label: 'SVR10 EUDR' },
   { value: 'SVR3L EUDR', label: 'SVR3L EUDR' },
   { value: 'RSS3 EUDR', label: 'RSS3 EUDR' },
+  // Tên xuất khẩu viết liền (khách yêu cầu 2026-09-11) — in NGUYÊN VĂN lên hợp đồng.
+  { value: 'SVRCV60', label: 'SVRCV60' },
 ] as const
 
 // Quốc gia mua mủ phổ biến

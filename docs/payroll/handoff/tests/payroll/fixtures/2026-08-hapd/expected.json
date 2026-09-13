@@ -1,0 +1,39 @@
+{
+  "by_employee": {
+    "046085007061": {
+      "full_name": "Lê Vang",
+      "piece_total": 100000,
+      "meal_total": 0
+    },
+    "046090006706": {
+      "full_name": "Phạm Bá Lượng",
+      "piece_total": 100000,
+      "meal_total": 0
+    },
+    "046074013724": {
+      "full_name": "Nguyễn Ngọc Phương",
+      "piece_total": 106735000,
+      "meal_total": 6408000
+    },
+    "046084009142": {
+      "full_name": "Trần Văn Hiền",
+      "piece_total": 200000,
+      "meal_total": 0
+    },
+    "046207415351": {
+      "full_name": "Trần Văn Tâm",
+      "piece_total": 88448000,
+      "meal_total": 5971000
+    },
+    "045200002742": {
+      "full_name": "Hoàng Văn Anh",
+      "piece_total": 137850000,
+      "meal_total": 9709000
+    }
+  },
+  "totals": {
+    "piece_total": 333433000,
+    "meal_total": 22088000,
+    "grand_total": 355521000
+  }
+}

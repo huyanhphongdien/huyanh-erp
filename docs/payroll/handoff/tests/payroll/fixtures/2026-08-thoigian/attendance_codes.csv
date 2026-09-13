@@ -1,0 +1,37 @@
+code,description,paid_hours,leave_hours,holiday_hours,holiday_worked_hours,company_leave_hours,laos_trip_hours
+P,Nghỉ phép năm 1 ngày,0,8,0,0,0,0
+P/2,"Nghỉ phép 0,5 ngày",0,4,0,0,0,0
+NL,Nghỉ lễ hưởng lương,0,0,8,0,0,0
+NL/2,"Nghỉ lễ 0,5 ngày",0,0,4,0,0,0
+CTL,Công tác Lào 1 ngày,8,0,0,0,0,8
+CTL/2,"Công tác Lào 0,5 ngày",4,0,0,0,0,4
+CT,Công tác (có công tác phí),8,0,0,0,0,0
+H,"Nghỉ chế độ công ty hiếu, hỉ 1 ngày",0,0,0,0,8,0
+H/2,"Nghỉ chế độ 0,5 ngày",0,0,0,0,4,0
+CĐ,"Nghỉ chế độ BHXH (ốm, thai sản…)",0,0,0,0,0,0
+KL,Nghỉ không lương,0,0,0,0,0,0
+X,Nghỉ không phép,0,0,0,0,0,0
+L1,Nghỉ lễ nhưng đi làm 1 giờ,1,0,8,1,0,0
+L2,Nghỉ lễ nhưng đi làm 2 giờ,2,0,8,2,0,0
+L3,Nghỉ lễ nhưng đi làm 3 giờ,3,0,8,3,0,0
+L4,Nghỉ lễ nhưng đi làm 4 giờ,4,0,8,4,0,0
+L5,Nghỉ lễ nhưng đi làm 5 giờ,5,0,8,5,0,0
+L6,Nghỉ lễ nhưng đi làm 6 giờ,6,0,8,6,0,0
+L7,Nghỉ lễ nhưng đi làm 7 giờ,7,0,8,7,0,0
+L8,Nghỉ lễ nhưng đi làm 8 giờ,8,0,8,8,0,0
+L9,Nghỉ lễ nhưng đi làm 9 giờ,9,0,8,9,0,0
+L10,Nghỉ lễ nhưng đi làm 10 giờ,10,0,8,10,0,0
+L11,Nghỉ lễ nhưng đi làm 11 giờ,11,0,8,11,0,0
+L12,Nghỉ lễ nhưng đi làm 12 giờ,12,0,8,12,0,0
+L13,Nghỉ lễ nhưng đi làm 13 giờ,13,0,8,13,0,0
+L14,Nghỉ lễ nhưng đi làm 14 giờ,14,0,8,14,0,0
+L15,Nghỉ lễ nhưng đi làm 15 giờ,15,0,8,15,0,0
+L16,Nghỉ lễ nhưng đi làm 16 giờ,16,0,8,16,0,0
+L17,Nghỉ lễ nhưng đi làm 17 giờ,17,0,8,17,0,0
+L18,Nghỉ lễ nhưng đi làm 18 giờ,18,0,8,18,0,0
+L19,Nghỉ lễ nhưng đi làm 19 giờ,19,0,8,19,0,0
+L20,Nghỉ lễ nhưng đi làm 20 giờ,20,0,8,20,0,0
+L21,Nghỉ lễ nhưng đi làm 21 giờ,21,0,8,21,0,0
+L22,Nghỉ lễ nhưng đi làm 22 giờ,22,0,8,22,0,0
+L23,Nghỉ lễ nhưng đi làm 23 giờ,23,0,8,23,0,0
+L24,Nghỉ lễ nhưng đi làm 24 giờ,24,0,8,24,0,0

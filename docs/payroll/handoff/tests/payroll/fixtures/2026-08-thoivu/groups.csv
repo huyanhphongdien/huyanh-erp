@@ -1,0 +1,7 @@
+group,description,default_daily_rate,hours_per_unit,support_day,support_night,meal_per_unit,month_divisor,rounding
+RSS HAPĐ,Công nhân thời vụ RSS Phong Điền,350000,8,0,0,0,30,1
+Trực lò,Trực lò 12 giờ/ca,250000,12,0,0,0,30,1
+A Lưới SX,Thời vụ A Lưới – sản xuất,270000,8,80000,100000,0,30,1
+A Lưới RSS,Thời vụ A Lưới – RSS,350000,8,0,20000,0,30,1
+Thời vụ HAQT,Công nhân thời vụ Huy Anh Quảng Trị,370000,8,0,0,0,30,1
+Lào,Công nhân Lào,0,8,0,0,0,30,1000

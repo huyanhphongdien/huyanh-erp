@@ -1,0 +1,4 @@
+employee_id,kind,currency,amount,reason,approved_by
+RSS-03,Cộng,VND,1000000,Hỗ trợ (cột AU file cũ) – chưa rõ lý do,?
+AL-04,Cộng,VND,500000,Thưởng/hỗ trợ +500.000 gõ trong công thức N11 file cũ – chưa rõ lý do,?
+LAO-002,Cộng,LAK,80000,"Nghen 14 công đổ bê tông, hỗ trợ thêm 80.000 kíp (ghi chú sheet trực lò)",

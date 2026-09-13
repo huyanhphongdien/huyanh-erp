@@ -1,0 +1,51 @@
+employee_id,full_name,position,department,pay_type,grade,daily_rate,status
+046085007061,Lê Vang,Quản lý SX,Sản xuất,khoan,1.5,,Chính thức
+046077003925,Trần Đình Mạnh,Tổ phó ca sản xuất,Sản xuất,khoan,1.35,,Chính thức
+046177012486,Lê Thị Bình,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046179008435,Trần Thị Tích,Công nhân Chế biến,Sản xuất,khoan,1.15,,Chính thức
+046175005132,Lê Thị Nga,Công nhân Chế biến,Sản xuất,khoan,1.15,,Chính thức
+046090006706,Phạm Bá Lượng,Công nhân Chế biến,Sản xuất,khoan,1.3,,Chính thức
+046178011746,Văn Thị Vinh,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046172008975,Nguyễn Thị Điệp,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+NV_KIMANH,Lê Thị Kim Anh,Công nhân Chế biến,Sản xuất,khoan,1,,Chính thức
+046074011254,Trần Đức Phúc,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046172013837,Nguyễn Thị Nhung,Công nhân Chế biến,Sản xuất,khoan,0.9,,Chính thức
+046175008129,Lê Thị Thu Hữu,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046206004482,Trần Đình Lĩnh,Công nhân Chế biến,Sản xuất,khoan,1.05,,Thử việc
+046178006439,Nguyễn Thị Thúy Vân,Công nhân Chế biến,Sản xuất,khoan,1.15,,Chính thức
+046172008914,Trần Thị Thùy,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046177011413,Lê Thị Thơ,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046176012012,Lê Thị Hồng Lan,Công nhân Chế biến,Sản xuất,khoan,1,,Chính thức
+046091004633,Nguyễn Quang Thọ,Công nhân Chế biến,Sản xuất,khoan,0.9,,Chính thức
+046074013724,Nguyễn Ngọc Phương,Công nhân Chế biến,Sản xuất,khoan,1.3,,Chính thức
+046099007864,Lê Lộc,Công nhân Chế biến,Sản xuất,khoan,1.15,,Chính thức
+002191001272,Thèn Thị Giang,Công nhân Chế biến,Sản xuất,khoan,1.15,,Thử việc
+046087002473,Nguyễn Tình,Công nhân Chế biến,Sản xuất,khoan,0.9,,Thử việc
+046178010147,Đặng Thị Huế,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046089009803,Trần Văn Trình,Tổ trưởng ca sản xuất,Sản xuất,khoan,0.9,,Chính thức
+046084009142,Trần Văn Hiền,Tổ phó ca sản xuất,Sản xuất,khoan,1.5,,Chính thức
+046207415351,Trần Văn Tâm,Công nhân Chế biến,Sản xuất,khoan,1.15,,Chính thức
+NV_DINHHAI,Trần Đình Hải,Công nhân Chế biến,Sản xuất,khoan,1.2,,Chính thức
+046064009756,Hoàng Lự,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046172013307,Ngô Thị Thủy,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046165007228,Lê Thị Hương,Công nhân Chế biến,Sản xuất,khoan,1,,Chính thức
+046181009164,Hoàng Thị Nhung,Công nhân Chế biến,Sản xuất,khoan,1.15,,Chính thức
+046173005614,Trần Thị Thu Thủy,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046180005626,Trần Thị Cẩm Hà,Công nhân Chế biến,Sản xuất,khoan,1.15,,Chính thức
+046177004568,Nguyễn Thị Kim Tin,Công nhân Chế biến,Sản xuất,khoan,1.15,,Chính thức
+046176012968,Nguyễn Thị Loan,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046183006914,Nguyễn Thị Thu Hà,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046077008985,Ngô Văn Đính,Công nhân Chế biến,Sản xuất,khoan,1.25,,Chính thức
+046180009217,Ngô Thị Quý,Công nhân Chế biến,Sản xuất,khoan,1.15,,Chính thức
+046075012004,Ngô Văn Tịnh,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046181010233,Đỗ Thị Hoài,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046180005929,Nguyễn Thị Lợi,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+046095008572,Trần Văn Tấn,Công nhân Chế biến,Sản xuất,khoan,1.1,,Chính thức
+045200002742,Hoàng Văn Anh,Công nhân Chế biến,Sản xuất,khoan,1.1,,Thử việc
+CN_MAU_01,(Ví dụ) Nguyễn Văn A,Công nhật sản xuất,Sản xuất,cong_nhat,,270000,Thời vụ
+046083009048,Hoàng Hòa,Lái xe cont,Đội xe,lai_xe,,,Chính thức
+046096005123,Bùi Văn Nghĩa,Lái xe cont,Đội xe,lai_xe,,,Chính thức
+046082013042,Nguyễn Hữu Mạnh Cường,Lái xe cont,Đội xe,lai_xe,,,Chính thức
+046074006536,Nguyễn Đình Hiếu,Lái xe cont,Đội xe,lai_xe,,,Chính thức
+046091016108,Nguyễn Đăng Thiện,Lái xe cont,Đội xe,lai_xe,,,Chính thức
+046074005943,Lê Tấn Anh,Lái xe cont,Đội xe,lai_xe,,,Chính thức

@@ -1,0 +1,6 @@
+employee_id,kind,amount,effective_from,effective_to,reason,approved_by
+046090009551,Tạm ứng,3000000,2026-08,2026-08,Tạm ứng lương (Bảng lương cũ cột Y),KTT
+046078006770,Trừ khác,1500000,2025-07,2027-12,"Thu nợ công ty theo kế hoạch trả nợ 1,5tr/tháng; riêng 12/2027 thu 900.000 (sửa dòng riêng)",BGĐ
+046086012110,Chuyên cần,-300000,2026-08,2026-08,File cũ ghi tay 0 dù 29 công – HCNS CẦN XÁC NHẬN LÝ DO,?
+046078005974,Chuyên cần,-300000,2026-08,2026-08,"File cũ ghi tay 0% dù 34,5 công – HCNS CẦN XÁC NHẬN LÝ DO",?
+046208001119,Chuyên cần,300000,2026-08,2026-08,File cũ ghi tay 300.000 dù chỉ 27 công – HCNS CẦN XÁC NHẬN LÝ DO,?

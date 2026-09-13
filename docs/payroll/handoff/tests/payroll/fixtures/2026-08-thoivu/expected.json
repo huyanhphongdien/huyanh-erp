@@ -1,0 +1,989 @@
+{
+ "note": [
+  "Khớp tuyệt đối file cũ: RSS (15), trực lò (2), A Lưới SX/RSS (Bảng lương A Lưới cột N, gồm +500.000 Chai qua DIEU_CHINH), lương ngày HAQT (30), bốc xếp đích danh (3).",
+  "Khoán tấn theo tổ: tổng chia = tổng KHOAN_TAN (23.412.832 ± làm tròn); file cũ chia tay 23.392.000, từng người lệch 4–11k (thành viên) và hơn với trưởng tổ – quy tắc cũ không nhất quán, HCNS phải chốt quy tắc.",
+  "Lào: Nghen 4.500.000 + ăn 2.790.000 (+92.000 = 80.000 LAK); Ken theo quy tắc lương tháng/30×công = 1.900.000 (cũ 1.838.710 chia 31); Dương khoán 2.000.000.",
+  "Lê Văn Nghị: file cũ có ngày 17h RSS + 12h trực lò = 29h/ngày – KIEM_TRA báo LỖI (đúng)."
+ ],
+ "by_employee": {
+  "RSS-01": {
+   "full_name": "Hồ Thị Lẽ",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 31.125,
+     "night_days": 0,
+     "base_pay": 10893750,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 10893750
+    }
+   ],
+   "net": 10893750
+  },
+  "RSS-02": {
+   "full_name": "Thèn Thị Giang",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 26.375,
+     "night_days": 0,
+     "base_pay": 9231250,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 9231250
+    }
+   ],
+   "net": 9231250
+  },
+  "RSS-03": {
+   "full_name": "Lê Văn Nghị",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 36.25,
+     "night_days": 0,
+     "base_pay": 13412500,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 14412500
+    },
+    {
+     "group": "Trực lò",
+     "days": 15,
+     "night_days": 0,
+     "base_pay": 3750000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 3750000
+    }
+   ],
+   "net": 18162500
+  },
+  "RSS-04": {
+   "full_name": "Trần Thắng",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 31,
+     "night_days": 0,
+     "base_pay": 10850000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 10850000
+    },
+    {
+     "group": "Trực lò",
+     "days": 15,
+     "night_days": 0,
+     "base_pay": 3750000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 3750000
+    }
+   ],
+   "net": 14600000
+  },
+  "RSS-05": {
+   "full_name": "Trần Phước Hùng",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 25.8125,
+     "night_days": 0,
+     "base_pay": 9034375,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 9034375
+    }
+   ],
+   "net": 9034375
+  },
+  "RSS-06": {
+   "full_name": "Lê Thị Hảo",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 7.5,
+     "night_days": 0,
+     "base_pay": 2625000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 2625000
+    }
+   ],
+   "net": 2625000
+  },
+  "RSS-07": {
+   "full_name": "Dương Thị Huệ",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 27.625,
+     "night_days": 0,
+     "base_pay": 9668750,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 9668750
+    }
+   ],
+   "net": 9668750
+  },
+  "RSS-08": {
+   "full_name": "Lê Thị Như Ý",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 5,
+     "night_days": 0,
+     "base_pay": 1750000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 1750000
+    }
+   ],
+   "net": 1750000
+  },
+  "RSS-09": {
+   "full_name": "Nguyễn Thị Thùy Trang",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 30.625,
+     "night_days": 0,
+     "base_pay": 10718750,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 10718750
+    }
+   ],
+   "net": 10718750
+  },
+  "RSS-10": {
+   "full_name": "Võ Thị Ngọc Ánh",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 28.125,
+     "night_days": 0,
+     "base_pay": 9843750,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 9843750
+    }
+   ],
+   "net": 9843750
+  },
+  "RSS-11": {
+   "full_name": "Lê Thị Hiên",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 3,
+     "night_days": 0,
+     "base_pay": 1050000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 1050000
+    }
+   ],
+   "net": 1050000
+  },
+  "RSS-12": {
+   "full_name": "Phan Thị Như Nghĩa",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 3.5,
+     "night_days": 0,
+     "base_pay": 1225000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 1225000
+    }
+   ],
+   "net": 1225000
+  },
+  "RSS-13": {
+   "full_name": "Nguyễn Quyền",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 14,
+     "night_days": 0,
+     "base_pay": 4900000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 4900000
+    }
+   ],
+   "net": 4900000
+  },
+  "RSS-14": {
+   "full_name": "Lê Quốc Vượng",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 2,
+     "night_days": 0,
+     "base_pay": 700000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 700000
+    }
+   ],
+   "net": 700000
+  },
+  "RSS-15": {
+   "full_name": "Ngô Quý Anh Tuấn",
+   "rows": [
+    {
+     "group": "RSS HAPĐ",
+     "days": 6,
+     "night_days": 0,
+     "base_pay": 2100000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 2100000
+    }
+   ],
+   "net": 2100000
+  },
+  "AL-02": {
+   "full_name": "Hồ Thượng Thành",
+   "rows": [
+    {
+     "group": "A Lưới SX",
+     "days": 9.875,
+     "night_days": 4,
+     "base_pay": 2666250,
+     "support": 870000,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 3536250
+    },
+    {
+     "group": "A Lưới RSS",
+     "days": 4,
+     "night_days": 1.5,
+     "base_pay": 1400000,
+     "support": 30000,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 1430000
+    }
+   ],
+   "net": 4966250
+  },
+  "AL-03": {
+   "full_name": "Hồ Thượng Thư",
+   "rows": [
+    {
+     "group": "A Lưới SX",
+     "days": 7.375,
+     "night_days": 1.5,
+     "base_pay": 1991250,
+     "support": 620000,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 2611250
+    },
+    {
+     "group": "A Lưới RSS",
+     "days": 4,
+     "night_days": 0,
+     "base_pay": 1400000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 1400000
+    }
+   ],
+   "net": 4011250
+  },
+  "AL-05": {
+   "full_name": "Hồ Thượng Thảo",
+   "rows": [
+    {
+     "group": "A Lưới SX",
+     "days": 5.125,
+     "night_days": 2.5,
+     "base_pay": 1383750,
+     "support": 460000,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 1843750
+    }
+   ],
+   "net": 1843750
+  },
+  "AL-07": {
+   "full_name": "Hồ Văn Lài",
+   "rows": [
+    {
+     "group": "A Lưới SX",
+     "days": 10,
+     "night_days": 5.5,
+     "base_pay": 2700000,
+     "support": 910000,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 3610000
+    }
+   ],
+   "net": 3610000
+  },
+  "AL-01": {
+   "full_name": "Hồ Thị Thiệp",
+   "rows": [
+    {
+     "group": "A Lưới RSS",
+     "days": 7.0375,
+     "night_days": 0,
+     "base_pay": 2463125,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 2463125
+    }
+   ],
+   "net": 2463125
+  },
+  "AL-04": {
+   "full_name": "Lê Minh Chai",
+   "rows": [
+    {
+     "group": "A Lưới RSS",
+     "days": 14.2875,
+     "night_days": 0,
+     "base_pay": 5000625,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 5500625
+    }
+   ],
+   "net": 5500625
+  },
+  "AL-06": {
+   "full_name": "Hồ Thị Dịu",
+   "rows": [
+    {
+     "group": "A Lưới RSS",
+     "days": 5,
+     "night_days": 0,
+     "base_pay": 1750000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 1750000
+    }
+   ],
+   "net": 1750000
+  },
+  "QT-01": {
+   "full_name": "Lê Văn Đạt",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 9,
+     "night_days": 0,
+     "base_pay": 3330000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 835000,
+     "named_piece": 0,
+     "gross": 4165000
+    }
+   ],
+   "net": 4165000
+  },
+  "QT-02": {
+   "full_name": "Nguyễn Văn Ánh",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 5.5,
+     "night_days": 0,
+     "base_pay": 2035000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 828000,
+     "named_piece": 0,
+     "gross": 2863000
+    }
+   ],
+   "net": 2863000
+  },
+  "QT-03": {
+   "full_name": "Lê Đăng Đức",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 9,
+     "night_days": 0,
+     "base_pay": 3330000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 389000,
+     "named_piece": 0,
+     "gross": 3719000
+    }
+   ],
+   "net": 3719000
+  },
+  "QT-04": {
+   "full_name": "Phạm Khai",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 10,
+     "night_days": 0,
+     "base_pay": 3700000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 3700000
+    }
+   ],
+   "net": 3700000
+  },
+  "QT-05": {
+   "full_name": "Nguyễn Thị Nhung",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 5,
+     "night_days": 0,
+     "base_pay": 1850000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 828000,
+     "named_piece": 0,
+     "gross": 2678000
+    }
+   ],
+   "net": 2678000
+  },
+  "QT-06": {
+   "full_name": "Tạ Thị Na",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 7,
+     "night_days": 0,
+     "base_pay": 2590000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 1122000,
+     "named_piece": 0,
+     "gross": 3712000
+    }
+   ],
+   "net": 3712000
+  },
+  "QT-07": {
+   "full_name": "Lê Thị Thanh",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 6,
+     "night_days": 0,
+     "base_pay": 2220000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 733000,
+     "named_piece": 0,
+     "gross": 2953000
+    }
+   ],
+   "net": 2953000
+  },
+  "QT-08": {
+   "full_name": "Nguyễn Thị Thanh",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 6,
+     "night_days": 0,
+     "base_pay": 2220000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 733000,
+     "named_piece": 0,
+     "gross": 2953000
+    }
+   ],
+   "net": 2953000
+  },
+  "QT-09": {
+   "full_name": "Lưu Thị Lan",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 6,
+     "night_days": 0,
+     "base_pay": 2220000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 733000,
+     "named_piece": 0,
+     "gross": 2953000
+    }
+   ],
+   "net": 2953000
+  },
+  "QT-10": {
+   "full_name": "Lê Thị Minh Thu",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 5,
+     "night_days": 0,
+     "base_pay": 1850000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 439000,
+     "named_piece": 0,
+     "gross": 2289000
+    }
+   ],
+   "net": 2289000
+  },
+  "QT-11": {
+   "full_name": "Trần Viết Hải",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 6,
+     "night_days": 0,
+     "base_pay": 2220000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 935832.5,
+     "named_piece": 0,
+     "gross": 3155832.5
+    }
+   ],
+   "net": 3155832
+  },
+  "QT-12": {
+   "full_name": "Phạm Gia Hiếu",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 19,
+     "night_days": 0,
+     "base_pay": 7030000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 865000,
+     "named_piece": 0,
+     "gross": 7895000
+    }
+   ],
+   "net": 7895000
+  },
+  "QT-13": {
+   "full_name": "Nguyễn Thọ Lộc",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 8,
+     "night_days": 0,
+     "base_pay": 2960000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 485000,
+     "named_piece": 0,
+     "gross": 3445000
+    }
+   ],
+   "net": 3445000
+  },
+  "QT-14": {
+   "full_name": "Nguyễn Phước Thành",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 2,
+     "night_days": 0,
+     "base_pay": 740000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 924000,
+     "named_piece": 0,
+     "gross": 1664000
+    }
+   ],
+   "net": 1664000
+  },
+  "QT-15": {
+   "full_name": "Nguyễn Thị X Thành",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 10,
+     "night_days": 0,
+     "base_pay": 3700000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 3700000
+    }
+   ],
+   "net": 3700000
+  },
+  "QT-16": {
+   "full_name": "Nguyễn Thị Mai",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 7,
+     "night_days": 0,
+     "base_pay": 2590000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 485000,
+     "named_piece": 0,
+     "gross": 3075000
+    }
+   ],
+   "net": 3075000
+  },
+  "QT-17": {
+   "full_name": "Nguyễn Thị Điệp",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 9,
+     "night_days": 0,
+     "base_pay": 3330000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 924000,
+     "named_piece": 0,
+     "gross": 4254000
+    }
+   ],
+   "net": 4254000
+  },
+  "QT-18": {
+   "full_name": "Trần Thị Thắm",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 4,
+     "night_days": 0,
+     "base_pay": 1480000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 485000,
+     "named_piece": 0,
+     "gross": 1965000
+    }
+   ],
+   "net": 1965000
+  },
+  "QT-19": {
+   "full_name": "Lê Thị Thủy",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 5,
+     "night_days": 0,
+     "base_pay": 1850000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 924000,
+     "named_piece": 0,
+     "gross": 2774000
+    }
+   ],
+   "net": 2774000
+  },
+  "QT-20": {
+   "full_name": "Nguyễn Thị Kim Thoa",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 6,
+     "night_days": 0,
+     "base_pay": 2220000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 485000,
+     "named_piece": 0,
+     "gross": 2705000
+    }
+   ],
+   "net": 2705000
+  },
+  "QT-21": {
+   "full_name": "Hồ Xuân Đông",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 7,
+     "night_days": 0,
+     "base_pay": 2590000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 868000,
+     "named_piece": 0,
+     "gross": 3458000
+    }
+   ],
+   "net": 3458000
+  },
+  "QT-22": {
+   "full_name": "Nguyễn Chí Thành",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 12,
+     "night_days": 0,
+     "base_pay": 4440000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 4440000
+    }
+   ],
+   "net": 4440000
+  },
+  "QT-23": {
+   "full_name": "Nguyễn Thị Vân",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 7,
+     "night_days": 0,
+     "base_pay": 2590000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 865000,
+     "named_piece": 0,
+     "gross": 3455000
+    }
+   ],
+   "net": 3455000
+  },
+  "QT-24": {
+   "full_name": "Đào Thị Lương",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 4,
+     "night_days": 0,
+     "base_pay": 1480000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 485000,
+     "named_piece": 0,
+     "gross": 1965000
+    }
+   ],
+   "net": 1965000
+  },
+  "QT-25": {
+   "full_name": "Trần Thị Anh",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 4,
+     "night_days": 0,
+     "base_pay": 1480000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 865000,
+     "named_piece": 0,
+     "gross": 2345000
+    }
+   ],
+   "net": 2345000
+  },
+  "QT-26": {
+   "full_name": "Nguyễn Thị Kim Duyên",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 7,
+     "night_days": 0,
+     "base_pay": 2590000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 485000,
+     "named_piece": 0,
+     "gross": 3075000
+    }
+   ],
+   "net": 3075000
+  },
+  "QT-27": {
+   "full_name": "Trần Thị Gái",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 5,
+     "night_days": 0,
+     "base_pay": 1850000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 865000,
+     "named_piece": 0,
+     "gross": 2715000
+    }
+   ],
+   "net": 2715000
+  },
+  "QT-28": {
+   "full_name": "Phạm Thị Thu",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 2,
+     "night_days": 0,
+     "base_pay": 740000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 740000
+    }
+   ],
+   "net": 740000
+  },
+  "QT-29": {
+   "full_name": "La Trọng Sơn",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 22.5,
+     "night_days": 0,
+     "base_pay": 8325000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 2911000,
+     "named_piece": 501000,
+     "gross": 11737000
+    }
+   ],
+   "net": 11737000
+  },
+  "QT-30": {
+   "full_name": "Nguyễn Đình Bình",
+   "rows": [
+    {
+     "group": "Thời vụ HAQT",
+     "days": 21.5,
+     "night_days": 0,
+     "base_pay": 7955000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 2911000,
+     "named_piece": 1496750,
+     "gross": 12362750
+    }
+   ],
+   "net": 12362750
+  },
+  "LAO-002": {
+   "full_name": "Nghen",
+   "rows": [
+    {
+     "group": "Lào",
+     "days": 31,
+     "night_days": 0,
+     "base_pay": 4500000,
+     "support": 0,
+     "meal": 2790000,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 7382000
+    }
+   ],
+   "net": 7382000
+  },
+  "LAO-003": {
+   "full_name": "Ken",
+   "rows": [
+    {
+     "group": "Lào",
+     "days": 19,
+     "night_days": 0,
+     "base_pay": 1900000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 1900000
+    }
+   ],
+   "net": 1900000
+  },
+  "LAO-004": {
+   "full_name": "Dương",
+   "rows": [
+    {
+     "group": "Lào",
+     "days": 31,
+     "night_days": 0,
+     "base_pay": 2000000,
+     "support": 0,
+     "meal": 0,
+     "team_piece": 0,
+     "named_piece": 0,
+     "gross": 2000000
+    }
+   ],
+   "net": 2000000
+  }
+ }
+}

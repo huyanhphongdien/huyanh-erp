@@ -1,0 +1,60 @@
+employee_id,full_name,main_group,pay_type,own_rate,monthly_salary,own_meal,team,team_role,joined,status
+RSS-01,Hồ Thị Lẽ,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-02,Thèn Thị Giang,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-03,Lê Văn Nghị,RSS HAPĐ,Lương ngày,370000,,,,,,Thời vụ
+RSS-04,Trần Thắng,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-05,Trần Phước Hùng,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-06,Lê Thị Hảo,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-07,Dương Thị Huệ,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-08,Lê Thị Như Ý,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-09,Nguyễn Thị Thùy Trang,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-10,Võ Thị Ngọc Ánh,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-11,Lê Thị Hiên,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-12,Phan Thị Như Nghĩa,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-13,Nguyễn Quyền,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-14,Lê Quốc Vượng,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+RSS-15,Ngô Quý Anh Tuấn,RSS HAPĐ,Lương ngày,,,,,,,Thời vụ
+AL-01,Hồ Thị Thiệp,A Lưới SX,Lương ngày,,,,,,,Thời vụ
+AL-02,Hồ Thượng Thành,A Lưới SX,Lương ngày,,,,,,,Thời vụ
+AL-03,Hồ Thượng Thư,A Lưới SX,Lương ngày,,,,,,,Thời vụ
+AL-04,Lê Minh Chai,A Lưới SX,Lương ngày,,,,,,,Thời vụ
+AL-05,Hồ Thượng Thảo,A Lưới SX,Lương ngày,,,,,,,Thời vụ
+AL-06,Hồ Thị Dịu,A Lưới SX,Lương ngày,,,,,,,Thời vụ
+AL-07,Hồ Văn Lài,A Lưới SX,Lương ngày,,,,,,,Thời vụ
+QT-01,Lê Văn Đạt,Thời vụ HAQT,Lương ngày,,,,Tổ 1,Trưởng tổ,,Thời vụ
+QT-02,Nguyễn Văn Ánh,Thời vụ HAQT,Lương ngày,,,,Tổ 1,Thành viên,,Thời vụ
+QT-03,Lê Đăng Đức,Thời vụ HAQT,Lương ngày,,,,Tổ 1,Thành viên,,Thời vụ
+QT-04,Phạm Khai,Thời vụ HAQT,Lương ngày,,,,,,,Thời vụ
+QT-05,Nguyễn Thị Nhung,Thời vụ HAQT,Lương ngày,,,,Tổ 1,Thành viên,,Thời vụ
+QT-06,Tạ Thị Na,Thời vụ HAQT,Lương ngày,,,,Tổ 1,Thành viên,,Thời vụ
+QT-07,Lê Thị Thanh,Thời vụ HAQT,Lương ngày,,,,Tổ 1,Thành viên,,Thời vụ
+QT-08,Nguyễn Thị Thanh,Thời vụ HAQT,Lương ngày,,,,Tổ 1,Thành viên,,Thời vụ
+QT-09,Lưu Thị Lan,Thời vụ HAQT,Lương ngày,,,,Tổ 1,Thành viên,,Thời vụ
+QT-10,Lê Thị Minh Thu,Thời vụ HAQT,Lương ngày,,,,Tổ 1,Thành viên,,Thời vụ
+QT-11,Trần Viết Hải,Thời vụ HAQT,Lương ngày,,,,Tổ 2,Trưởng tổ,,Thời vụ
+QT-12,Phạm Gia Hiếu,Thời vụ HAQT,Lương ngày,,,,Tổ 3,Thành viên,,Thời vụ
+QT-13,Nguyễn Thọ Lộc,Thời vụ HAQT,Lương ngày,,,,Tổ 2,Thành viên,,Thời vụ
+QT-14,Nguyễn Phước Thành,Thời vụ HAQT,Lương ngày,,,,Tổ 2,Thành viên,,Thời vụ
+QT-15,Nguyễn Thị X Thành,Thời vụ HAQT,Lương ngày,,,,,,,Thời vụ
+QT-16,Nguyễn Thị Mai,Thời vụ HAQT,Lương ngày,,,,Tổ 2,Thành viên,,Thời vụ
+QT-17,Nguyễn Thị Điệp,Thời vụ HAQT,Lương ngày,,,,Tổ 2,Thành viên,,Thời vụ
+QT-18,Trần Thị Thắm,Thời vụ HAQT,Lương ngày,,,,Tổ 2,Thành viên,,Thời vụ
+QT-19,Lê Thị Thủy,Thời vụ HAQT,Lương ngày,,,,Tổ 2,Thành viên,,Thời vụ
+QT-20,Nguyễn Thị Kim Thoa,Thời vụ HAQT,Lương ngày,,,,Tổ 2,Thành viên,,Thời vụ
+QT-21,Hồ Xuân Đông,Thời vụ HAQT,Lương ngày,,,,Tổ 3,Trưởng tổ,,Thời vụ
+QT-22,Nguyễn Chí Thành,Thời vụ HAQT,Lương ngày,,,,,,,Thời vụ
+QT-23,Nguyễn Thị Vân,Thời vụ HAQT,Lương ngày,,,,Tổ 3,Thành viên,,Thời vụ
+QT-24,Đào Thị Lương,Thời vụ HAQT,Lương ngày,,,,Tổ 3,Thành viên,,Thời vụ
+QT-25,Trần Thị Anh,Thời vụ HAQT,Lương ngày,,,,Tổ 3,Thành viên,,Thời vụ
+QT-26,Nguyễn Thị Kim Duyên,Thời vụ HAQT,Lương ngày,,,,Tổ 3,Thành viên,,Thời vụ
+QT-27,Trần Thị Gái,Thời vụ HAQT,Lương ngày,,,,Tổ 3,Thành viên,,Thời vụ
+QT-28,Phạm Thị Thu,Thời vụ HAQT,Lương ngày,,,,,,,Thời vụ
+QT-29,La Trọng Sơn,Thời vụ HAQT,Lương ngày,,,,Tổ 3,Thành viên,,Thời vụ
+QT-30,Nguyễn Đình Bình,Thời vụ HAQT,Lương ngày,,,,Tổ 3,Thành viên,,Thời vụ
+QT-31,Phạm Khai,Thời vụ HAQT,Lương ngày,,,,,,,Thời vụ
+LAO-002,Nghen,Lào,Lương tháng,,4500000,90000,,,,Thời vụ
+LAO-003,Ken,Lào,Lương tháng,,3000000,,,,,Thời vụ
+LAO-004,Dương,Lào,Khoán tháng,,2000000,,,,,Thời vụ
+LAO-005,Lun (máy đào),Lào,Lương tháng,,10000000,,,,,Thời vụ
+LAO-006,Ngon,Lào,Lương tháng,,6000000,,,,,Thời vụ
+LAO-008,Bun,Lào,Lương ngày,115000,,,,,,Thời vụ

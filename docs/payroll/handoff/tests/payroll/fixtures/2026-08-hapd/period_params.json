@@ -1,0 +1,19 @@
+{
+  "period": {
+    "company_code": "HAPD",
+    "year": 2026,
+    "month": 8
+  },
+  "params": {
+    "tons_processed": 1077.49,
+    "tons_hanging": 0,
+    "hanging_rate": 252000,
+    "tons_insert": 105.37,
+    "insert_rate": 140000,
+    "headcount_norm": 42,
+    "meal_rate_per_ton": 20500,
+    "hours_per_day": 8,
+    "default_daily_rate": 270000,
+    "rounding": 1000
+  }
+}

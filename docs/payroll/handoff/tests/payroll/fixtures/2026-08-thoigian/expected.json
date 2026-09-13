@@ -1,0 +1,176 @@
+{
+  "note": "net khớp cột AC THỰC NHẬN Bảng lương APQT & HAQT T8/2026 (đã xác minh 13/09/2026)",
+  "params": {
+    "year": 2026,
+    "month": 8,
+    "leave_divisor": 26,
+    "probation_rate": 0.85,
+    "holiday_work_factor": 1.5,
+    "attendance_threshold": 29,
+    "attendance_bonus": 300000,
+    "si_employee_rate": 0.105,
+    "rounding": 1000
+  },
+  "by_employee": {
+    "046180000983": {
+      "full_name": "Hồ Thị Ngọc Á",
+      "days": 27,
+      "time_pay": 16000000,
+      "leave_pay": 0,
+      "attendance_bonus": 0,
+      "gross": 18000000,
+      "si_employee": 727440,
+      "net": 17272000
+    },
+    "045086000771": {
+      "full_name": "Nguyễn Nhật Tân",
+      "days": 31,
+      "time_pay": 15500000,
+      "leave_pay": 0,
+      "attendance_bonus": 0,
+      "gross": 17500000,
+      "si_employee": 727440,
+      "net": 16772000
+    },
+    "046077009424": {
+      "full_name": "Đặng Quang Chung",
+      "days": 31,
+      "time_pay": 17566666.67,
+      "leave_pay": 266461.54,
+      "attendance_bonus": 0,
+      "gross": 17833128.21,
+      "si_employee": 727440,
+      "net": 17105000
+    },
+    "046086012110": {
+      "full_name": "Nguyễn Hào",
+      "days": 29,
+      "time_pay": 10730000,
+      "leave_pay": 0,
+      "attendance_bonus": 0,
+      "gross": 10730000,
+      "si_employee": 459375,
+      "net": 10270000
+    },
+    "046485004744": {
+      "full_name": "Nguyễn Mạnh Thắng",
+      "days": 25.5,
+      "time_pay": 9435000,
+      "leave_pay": 0,
+      "attendance_bonus": 0,
+      "gross": 9435000,
+      "si_employee": 437115,
+      "net": 8997000
+    },
+    "046092012558": {
+      "full_name": "Nguyễn Quang Quốc",
+      "days": 36,
+      "time_pay": 13320000,
+      "leave_pay": 160115.38,
+      "attendance_bonus": 300000,
+      "gross": 13780115.38,
+      "si_employee": 437115,
+      "net": 13343000
+    },
+    "046066004079": {
+      "full_name": "Trần Đình Chiến",
+      "days": 25,
+      "time_pay": 12500000,
+      "leave_pay": 320230.77,
+      "attendance_bonus": 0,
+      "gross": 13320230.77,
+      "si_employee": 437115,
+      "net": 12883000
+    },
+    "046078005974": {
+      "full_name": "Phạm Bá Vinh",
+      "days": 34.5,
+      "time_pay": 12765000,
+      "leave_pay": 0,
+      "attendance_bonus": 0,
+      "gross": 13265000,
+      "si_employee": 437115,
+      "net": 12827000
+    },
+    "046080010214": {
+      "full_name": "Nguyễn Văn Cường",
+      "days": 34.5,
+      "time_pay": 12765000,
+      "leave_pay": 640461.54,
+      "attendance_bonus": 300000,
+      "gross": 14205461.54,
+      "si_employee": 437115,
+      "net": 13768000
+    },
+    "046097006456": {
+      "full_name": "Mai Bá Trung",
+      "days": 35,
+      "time_pay": 12950000,
+      "leave_pay": 480346.15,
+      "attendance_bonus": 300000,
+      "gross": 13730346.15,
+      "si_employee": 437115,
+      "net": 13293000
+    },
+    "046078006770": {
+      "full_name": "Cao Phước Tiến",
+      "days": 28,
+      "time_pay": 10769230.77,
+      "leave_pay": 0,
+      "attendance_bonus": 0,
+      "gross": 11769230.77,
+      "si_employee": 437115,
+      "net": 9832000
+    },
+    "046090009551": {
+      "full_name": "Nguyễn Ngọc Thanh",
+      "days": 27,
+      "time_pay": 12046153.85,
+      "leave_pay": 0,
+      "attendance_bonus": 0,
+      "gross": 13046153.85,
+      "si_employee": 437115,
+      "net": 9609000
+    },
+    "046208001119": {
+      "full_name": "Dương Vinh Quang",
+      "days": 27,
+      "time_pay": 8307692.31,
+      "leave_pay": 0,
+      "attendance_bonus": 300000,
+      "gross": 8607692.31,
+      "si_employee": 437115,
+      "net": 8170000
+    },
+    "045086003213": {
+      "full_name": "Hoàng Xuân Quang",
+      "days": 35,
+      "time_pay": 13235384.62,
+      "leave_pay": 0,
+      "attendance_bonus": 0,
+      "gross": 15235384.62,
+      "si_employee": 516600,
+      "net": 14718000
+    },
+    "044058002123": {
+      "full_name": "Trần Văn Khai",
+      "days": 31,
+      "time_pay": 6000000,
+      "leave_pay": 0,
+      "attendance_bonus": 0,
+      "gross": 7260000,
+      "si_employee": 0,
+      "net": 7260000
+    },
+    "045089005452": {
+      "full_name": "Lê Văn Dũng",
+      "days": 31,
+      "time_pay": 6000000,
+      "leave_pay": 0,
+      "attendance_bonus": 0,
+      "gross": 6260000,
+      "si_employee": 0,
+      "net": 6260000
+    }
+  }
+}

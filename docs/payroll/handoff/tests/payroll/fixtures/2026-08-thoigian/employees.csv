@@ -1,0 +1,18 @@
+employee_id,full_name,company,department,position,pay_type,std_days,base_salary,probation_salary,si_salary,pays_si,fixed_allowance,attendance_group,status
+046180000983,Hồ Thị Ngọc Á,APQT,Cơ khí chế tạo,Kế toán trưởng,Khoán tháng,26,16000000,,6928000,Có,2000000,Không,Chính thức
+045086000771,Nguyễn Nhật Tân,APQT,Cơ khí chế tạo,Phó giám đốc,Thời gian,30,15000000,,6928000,Có,2000000,Không,Chính thức
+046077009424,Đặng Quang Chung,APQT,Cơ khí chế tạo,Tổ trưởng CKCT,Thời gian,30,17000000,,6928000,Có,0,Không,Chính thức
+046086012110,Nguyễn Hào,APQT,Cơ khí chế tạo,Nhân viên CKCT,Thời gian,26,9620000,,4375000,Có,0,Chung,Chính thức
+046485004744,Nguyễn Mạnh Thắng,APQT,Cơ khí chế tạo,Nhân viên CKCT,Thời gian,26,9620000,,4163000,Có,0,Chung,Chính thức
+046092012558,Nguyễn Quang Quốc,APQT,Cơ khí chế tạo,Nhân viên CKCT,Thời gian,26,9620000,,4163000,Có,0,Chung,Chính thức
+046066004079,Trần Đình Chiến,APQT,Cơ khí chế tạo,Nhân viên CKCT,Thời gian,30,15000000,,4163000,Có,500000,Không,Chính thức
+046078005974,Phạm Bá Vinh,APQT,Cơ khí chế tạo,Tổ phó CKCT,Thời gian,26,9620000,,4163000,Có,500000,Chung,Chính thức
+046080010214,Nguyễn Văn Cường,APQT,Cơ khí chế tạo,Nhân viên CKCT,Thời gian,26,9620000,,4163000,Có,500000,Chung,Chính thức
+046097006456,Mai Bá Trung,APQT,Cơ khí chế tạo,Nhân viên CKCT,Thời gian,26,9620000,,4163000,Có,0,Chung,Chính thức
+046078006770,Cao Phước Tiến,APQT,Cơ khí chế tạo,Nhân viên CKCT,Thời gian,26,10000000,,4163000,Có,1000000,Chung,Chính thức
+046090009551,Nguyễn Ngọc Thanh,APQT,Cơ khí chế tạo,Nhân viên CKCT,Thời gian,26,11600000,,4163000,Có,1000000,Chung,Chính thức
+046208001119,Dương Vinh Quang,APQT,Cơ khí chế tạo,Phụ bảo dưỡng xe,Thời gian,26,8000000,,4163000,Có,0,Chung,Chính thức
+045086003213,Hoàng Xuân Quang,HAQT,Cơ điện,Cơ điện,Thời gian,26,9832000,,4920000,Có,2000000,Không,Chính thức
+044058002123,Trần Văn Khai,HAQT,Bảo vệ,Nhân viên bảo vệ,Khoán tháng,26,6000000,,0,Không,1260000,Không,Thời vụ
+045089005452,Lê Văn Dũng,HAQT,Bảo vệ,Nhân viên bảo vệ,Khoán tháng,26,6000000,,0,Không,260000,Không,Thời vụ
+TV_MAU_01,(Ví dụ) Nguyễn Văn B,HAPD,Kỹ thuật,NV bảo trì,Thử việc,26,9000000,,0,Không,0,Cơ điện,Thử việc

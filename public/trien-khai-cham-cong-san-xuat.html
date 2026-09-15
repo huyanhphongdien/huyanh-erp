@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triển khai chấm công sản xuất theo giờ-việc — Cao su Huy Anh</title>
+<meta name="description" content="Hướng dẫn triển khai thử nghiệm bảng phân công ca theo giờ-việc tại nhà máy Cao su Huy Anh, tháng 10/2026. Tải biểu mẫu BM-00…BM-07.">
+<style>
+:root{
+  color-scheme:light dark;
+  --ink:#1c211e;--muted:#5b635e;--line:#d9ded9;--paper:#f6f7f4;--card:#ffffff;
+  --accent:#1f5a3a;--accent-ink:#ffffff;--accent-soft:#e6f0ea;--accent-soft-ink:#173f2a;
+  --warn:#8a5a0c;--warn-soft:#fbf1dc;--bad:#9b2f2f;--bad-soft:#f8e3e3;--code:#eef1ee;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#e8ebe7;--muted:#a3aba5;--line:#39413c;--paper:#151917;--card:#1e2421;
+    --accent:#7fc39d;--accent-ink:#0f1f16;--accent-soft:#1f3328;--accent-soft-ink:#cfe9d9;
+    --warn:#e6b85c;--warn-soft:#3a2e14;--bad:#f08a8a;--bad-soft:#3d1f1f;--code:#262d29;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#e8ebe7;--muted:#a3aba5;--line:#39413c;--paper:#151917;--card:#1e2421;
+  --accent:#7fc39d;--accent-ink:#0f1f16;--accent-soft:#1f3328;--accent-soft-ink:#cfe9d9;
+  --warn:#e6b85c;--warn-soft:#3a2e14;--bad:#f08a8a;--bad-soft:#3d1f1f;--code:#262d29;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 "Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;padding-inline:16px;padding-block:0 48px}
+a{color:var(--accent)}
+h1{font-size:1.55rem;line-height:1.2;margin:.2em 0 .3em;text-wrap:balance}
+h2{font-size:1.2rem;margin:2em 0 .6em;padding-top:.2em;scroll-margin-top:64px;text-wrap:balance}
+h3{font-size:1rem;margin:1.2em 0 .4em}
+p{margin:.5em 0}
+.wrap{max-width:720px;margin:0 auto}
+.top{padding-block:18px 6px;color:var(--muted);font-size:.85rem;letter-spacing:.04em;text-transform:uppercase}
+.lead{color:var(--muted);font-size:1.02rem}
+.badge{display:inline-block;background:var(--accent-soft);color:var(--accent-soft-ink);border-radius:999px;padding:2px 10px;font-size:.8rem;font-weight:600;margin-right:6px}
+.cta{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 8px}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 16px;border-radius:10px;background:var(--accent);color:var(--accent-ink);text-decoration:none;font-weight:600;border:1px solid transparent}
+.btn.alt{background:var(--card);color:var(--accent);border-color:var(--accent)}
+.btn:focus-visible,.chips a:focus-visible,.dl a:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.chips{position:sticky;top:0;z-index:5;background:var(--paper);padding:10px 0;margin:12px -16px 0;padding-inline:16px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line)}
+.chips::-webkit-scrollbar{display:none}
+.chips a{flex:0 0 auto;white-space:nowrap;text-decoration:none;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:10px 0}
+.card h3{margin-top:0}
+.grid2{display:grid;grid-template-columns:1fr;gap:10px}
+@media (min-width:560px){.grid2{grid-template-columns:1fr 1fr}}
+ul,ol{padding-left:22px;margin:.4em 0}
+li{margin:.3em 0}
+.steps{counter-reset:s;list-style:none;padding:0;margin:.6em 0}
+.steps li{counter-increment:s;position:relative;padding-left:40px;margin:.6em 0}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-weight:700;display:grid;place-items:center;font-size:.9rem}
+.timeline{list-style:none;padding:0;margin:.6em 0;border-left:3px solid var(--accent-soft)}
+.timeline li{position:relative;padding:0 0 14px 18px}
+.timeline li::before{content:"";position:absolute;left:-8.5px;top:7px;width:14px;height:14px;border-radius:50%;background:var(--accent);border:3px solid var(--paper)}
+.timeline .t{display:block}
+.when{display:block;color:var(--muted);font-size:.9rem;margin-bottom:2px}
+.tbl{overflow-x:auto;margin:.6em 0;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--accent-soft);color:var(--accent-soft-ink);font-weight:600;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+code,.k{font-family:ui-monospace,Consolas,"Courier New",monospace;background:var(--code);padding:1px 6px;border-radius:5px;font-size:.92em}
+.k{font-weight:700}
+.mono{font-family:ui-monospace,Consolas,"Courier New",monospace;font-variant-numeric:tabular-nums}
+.ex td,.ex th{text-align:center;padding:5px 6px;font-variant-numeric:tabular-nums}
+.ex td:first-child,.ex th:first-child{text-align:left;white-space:nowrap}
+.flag{display:inline-block;border-radius:6px;padding:1px 8px;font-weight:600;font-size:.85rem}
+.flag.y{background:var(--warn-soft);color:var(--warn)}
+.flag.r{background:var(--bad-soft);color:var(--bad)}
+.dl{list-style:none;padding:0;margin:.4em 0}
+.dl li{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
+.dl .code{flex:0 0 auto;font-weight:700;color:var(--accent);min-width:58px}
+.dl .name{flex:1 1 auto;min-width:0}
+.dl .name small{display:block;color:var(--muted)}
+.dl a.get{flex:0 0 auto;text-decoration:none;background:var(--accent-soft);color:var(--accent-soft-ink);border-radius:8px;padding:8px 12px;font-weight:600;min-height:40px;display:inline-flex;align-items:center}
+details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:0 14px;margin:8px 0}
+summary{cursor:pointer;padding:12px 0;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:10px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--accent);font-weight:700}
+details[open] summary::after{content:"–"}
+details p{margin:0 0 12px}
+.note{border-left:4px solid var(--accent);background:var(--accent-soft);color:var(--accent-soft-ink);padding:10px 14px;border-radius:0 10px 10px 0;margin:12px 0}
+.note.w{border-color:var(--warn);background:var(--warn-soft);color:var(--ink)}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padding-top:14px}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">Công ty CP Cao su Huy Anh · Nhà máy</div>
+<h1>Chấm công sản xuất theo giờ‑việc</h1>
+<p class="lead">Hướng dẫn triển khai thử nghiệm bằng giấy, tháng 10/2026. Dành cho <b>Trưởng ca</b>, <b>QLSX</b>, <b>người quản lý tổ</b> và <b>HCNS</b>.</p>
+<p><span class="badge">Thử nghiệm T10/2026</span><span class="badge">Lương T10 vẫn tính cách cũ</span></p>
+<div class="cta">
+  <a class="btn" href="bieu-mau/bieu-mau-cham-cong-san-xuat.pdf">⬇ Tải bộ biểu mẫu (PDF)</a>
+  <a class="btn alt" href="bieu-mau/bieu-mau-cham-cong-san-xuat.docx">Word để chỉnh sửa</a>
+  <a class="btn alt" href="bieu-mau-cham-cong-san-xuat.html">Bản in từ trình duyệt</a>
+</div>
+
+<nav class="chips" aria-label="Mục lục">
+  <a href="#vi-sao">Vì sao</a><a href="#ai-lam-gi">Ai làm gì</a><a href="#lo-trinh">Lộ trình</a><a href="#moi-ca">Mỗi ca</a><a href="#ma-viec">Mã việc</a><a href="#vi-du">Ví dụ</a><a href="#kiem-soat">Kiểm soát</a><a href="#tai">Tải biểu mẫu</a><a href="#hoi-dap">Hỏi đáp</a>
+</nav>
+
+<h2 id="vi-sao">1. Đổi cái gì, vì sao</h2>
+<p>Hiện nay sổ chấm công ghi <b>một số giờ cho mỗi người mỗi ngày</b> và không hỏi giờ đó làm việc gì. Trong ca, người thường chuyển việc: làm 3–4 giờ trên dây chuyền rồi xuống đóng RSS, đi vệ sinh máy, bốc xếp… với giá trị khoán khác nhau. Hậu quả:</p>
+<ul>
+  <li>Người làm 4h SX + 8h RSS vẫn được tính 12h trong <b>quỹ tấn</b> như người đứng máy 12h → người đứng máy bị chia loãng.</li>
+  <li>Việc ngoài dây chuyền được gõ một cục cuối tháng ("vệ sinh 38 ca", "đóng SW 10 công") và chia đều cho cả tổ → người làm không được hơn, người không làm vẫn nhận.</li>
+  <li>Không ai chặn được một người nằm ở 2–3 bảng (đã có ngày 29 giờ).</li>
+</ul>
+<p><b>Cách mới:</b> đơn vị ghi là <b>người × giờ × mã việc</b>. Trưởng ca vẫn <b>toàn quyền điều người</b>; chỉ thêm một việc: mỗi lần chuyển, ghi một chữ cái vào ô giờ của người đó. Cuối tháng, giờ nào rơi đúng túi tiền nấy.</p>
+<div class="note">Tháng 10 chạy <b>song song</b>: lương vẫn tính theo cách cũ. Bảng mới chỉ dùng để đối chiếu và đo chênh lệch từng người, trước khi Ban Giám đốc quyết định đổi cách trả.</div>
+
+<h2 id="ai-lam-gi">2. Ai làm gì</h2>
+<div class="grid2">
+  <div class="card"><h3>Trưởng ca sản xuất</h3><ul><li>Ghi <b>BM‑01</b> mỗi ca, ngay lúc điều người.</li><li>Cuối ca cộng hàng/cột, chép sản lượng, ký, chốt trong 2 giờ.</li><li>Việc chưa có lệnh → gọi QLSX mở lệnh trước, chưa ghi.</li></ul></div>
+  <div class="card"><h3>QLSX</h3><ul><li>Mở <b>lệnh việc (BM‑02)</b> trước khi có việc ngoài dây chuyền; ghi sổ <b>BM‑03</b>.</li><li>Đặt định mức giờ‑người, định biên tối thiểu dây chuyền.</li><li>Xác nhận BM‑01 sau ca; ký ca bị cờ đỏ; duyệt BM‑05.</li></ul></div>
+  <div class="card"><h3>Người quản lý tổ (trực lò, RSS, A Lưới)</h3><ul><li>Ghi giờ hàng ngày vào <b>BM‑04</b>.</li><li>Ngày người của tổ vào ca sản xuất: ghi <code>→01</code>, không ghi giờ (đã có ở BM‑01).</li></ul></div>
+  <div class="card"><h3>HCNS</h3><ul><li>In mẫu, dán BM‑00 ở xưởng, họp hướng dẫn trưởng ca.</li><li>Hàng tuần nhập BM‑01/04, lập <b>BM‑06</b>, hỏi ca có cờ.</li><li>Cuối tháng lập <b>BM‑07</b>, niêm yết 2 ngày, nhận BM‑05, tính thử theo cách mới để so.</li></ul></div>
+  <div class="card"><h3>Công nhân</h3><ul><li>Xem công của mình trên bảng niêm yết BM‑07.</li><li>Thấy sai → báo trưởng ca hoặc HCNS, sửa bằng phiếu BM‑05.</li></ul></div>
+</div>
+
+<h2 id="lo-trinh">3. Lộ trình triển khai</h2>
+<ul class="timeline">
+  <li><strong class="t">Tuần cuối tháng 9 — chuẩn bị</strong><span class="when">HCNS · QLSX</span>
+    In bộ mẫu (BM‑01 in dư ~70 tờ, A4 ngang). Dán BM‑00 cạnh chỗ ghi bảng ở xưởng. QLSX điền <b>định biên tối thiểu</b> dây chuyền và mở lệnh việc cho các việc đang có (vệ sinh mix, đóng SW RSS…), lập BM‑03, dán bản sao lệnh ở xưởng. Họp trưởng ca <b>30 phút</b>: phát tờ HD, ghi thử một ca giả định trên giấy.</li>
+  <li><strong class="t">Tuần 1 tháng 10 — chạy thử 2 ca</strong><span class="when">1 ca ngày + 1 ca đêm</span>
+    HCNS thu bảng ngay sau ca, xem chỗ nào vướng (mã thiếu, cột hẹp, lệnh chưa mở) và sửa mẫu trước khi nhân rộng.</li>
+  <li><strong class="t">Tuần 2–4 — toàn bộ ca + các tổ</strong><span class="when">Mỗi ca · mỗi ngày</span>
+    Tất cả trưởng ca ghi BM‑01; các tổ ghi BM‑04. <b>Thứ Hai hàng tuần</b> HCNS lập BM‑06; ca cờ vàng hỏi trưởng ca, ca cờ đỏ QLSX kiểm và ký.</li>
+  <li><strong class="t">1–3/11 — niêm yết</strong><span class="when">HCNS</span>
+    Lập BM‑07 từng tổ/ca, dán 2 ngày cho công nhân xem. Sai sót sửa bằng BM‑05 có QLSX duyệt.</li>
+  <li><strong class="t">5/11 — so sánh và quyết định</strong><span class="when">HCNS → BGĐ</span>
+    Tính thử lương tháng 10 theo giờ‑việc, so với bảng lương cũ từng người. Trình BGĐ: đổi cách trả từ tháng 11 hay chạy thêm 1 tháng.</li>
+</ul>
+
+<h2 id="moi-ca">4. Trưởng ca làm gì trong một ca</h2>
+<div class="card"><h3>Đầu ca — 5 phút</h3>
+<ol class="steps">
+  <li>Lấy tờ BM‑01 mới: ghi ngày, ca, tên mình, số tờ. Ghi tên người có mặt (hoặc dùng tờ in sẵn tên tổ).</li>
+  <li>Chép các lệnh việc đang mở (từ bảng dán ở xưởng) vào ô "Lệnh việc đang mở", kèm định mức còn lại.</li>
+  <li>Người đang ở dây chuyền: ghi <span class="k">S</span> vào cột giờ 1. Người chưa vào: để trống.</li>
+</ol></div>
+<div class="card"><h3>Trong ca — mỗi lần điều người, 10 giây</h3>
+<ol class="steps">
+  <li>Chuyển ai sang việc gì → ghi mã việc vào ô giờ hiện tại của người đó. Trước phút 30 ghi vào giờ này; sau phút 30 ghi từ giờ sau.</li>
+  <li>Người quay lại dây chuyền → ghi <span class="k">S</span> từ ô giờ đó.</li>
+  <li>Việc chưa có trong ô lệnh đang mở → <b>gọi QLSX mở lệnh</b> trước, chưa ghi.</li>
+  <li>Người tổ khác / thời vụ vào giúp → thêm dòng cuối bảng, ghi tổ gốc ở cột Ghi chú.</li>
+  <li>Số người trên dây chuyền tụt dưới định biên tối thiểu → báo QLSX, ghi giờ đó vào ô "Giờ S thấp nhất".</li>
+</ol></div>
+<div class="card"><h3>Cuối ca — 10 phút</h3>
+<ol class="steps">
+  <li>Người về sớm: ô giờ không làm để trống.</li>
+  <li>Cộng hàng: đếm chữ cái từng người → điền S/H/C/R/V/T/L và Tổng.</li>
+  <li>Cộng cột: đếm số người S, R, V, khác ở mỗi giờ → 4 dòng "Số người theo giờ".</li>
+  <li>Kiểm: tổng các hàng phải bằng tổng 4 dòng số người. Lệch → tìm ô ghi thiếu/thừa.</li>
+  <li>Chép sản lượng ca từ sổ ca (tấn SVR, hanging, chèn, kiện RSS). Tick 4 ô kiểm nhanh. Ký, ghi giờ chốt.</li>
+  <li>Nộp QLSX xác nhận trong 2 giờ sau ca (QLSX vắng: chụp ảnh gửi HCNS).</li>
+</ol></div>
+<div class="note w"><b>Khi sai:</b> chưa chốt → gạch chéo một nét, ghi mã đúng bên cạnh, ký nháy; không tẩy. Đã chốt → không sửa lên bảng, viết phiếu BM‑05 có lý do, QLSX duyệt.</div>
+
+<h2 id="ma-viec">5. Mã việc ghi vào ô giờ</h2>
+<div class="tbl"><table>
+<thead><tr><th>Mã</th><th>Việc</th><th>Cách tính lương</th></tr></thead>
+<tbody>
+<tr><td><span class="k">S</span></td><td>Chế biến SVR — đứng dây chuyền</td><td>Chia <b>quỹ tấn</b> theo giờ S và hệ số (công thức hiện hành)</td></tr>
+<tr><td><span class="k">H</span></td><td>Hanging</td><td>Đơn giá tấn hanging, chia theo giờ H</td></tr>
+<tr><td><span class="k">C</span></td><td>Chèn hàng</td><td>Đơn giá tấn chèn, chia theo giờ C</td></tr>
+<tr><td><span class="k">R</span></td><td>Làm RSS / đóng SW RSS</td><td>Theo <b>lệnh việc</b> (R + số lệnh, vd R15)</td></tr>
+<tr><td><span class="k">V</span></td><td>Vệ sinh máy, dây chuyền, kho</td><td>Theo lệnh việc — trả đích danh người làm</td></tr>
+<tr><td><span class="k">T</span></td><td>Trực lò</td><td>Đơn giá trực lò / 12h</td></tr>
+<tr><td><span class="k">L</span></td><td>Việc khác có lệnh (bốc xếp, thay bao, sửa chữa…)</td><td>Theo lệnh việc (L + số lệnh)</td></tr>
+<tr><td>(trống)</td><td>Không có mặt giờ đó</td><td>Không tính</td></tr>
+</tbody></table></div>
+<p><b>Quy ước:</b> 1 ô = 1 giờ, chỉ 1 mã. Chuyển việc trước phút 30 → ô đó ghi việc mới; sau phút 30 → việc cũ. Ghi ngay lúc điều người, không ghi dồn cuối ca.</p>
+
+<h2 id="vi-du">6. Ví dụ một ca</h2>
+<p>Ca ngày 12h, 16 người vào ca. 10h: 6 người xuống đóng SW RSS (lệnh R15). 13h: 3 người quay lại dây chuyền. 15h: 2 người vệ sinh máy mix (V12) một giờ. 17h: 4 người ra bốc xếp cont (L20).</p>
+<div class="tbl"><table class="ex mono">
+<thead><tr><th>Họ tên</th><th>06</th><th>07</th><th>08</th><th>09</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>S</th><th>R</th><th>V</th><th>L</th><th>Σ</th></tr></thead>
+<tbody>
+<tr><td>Nga</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>12</td><td></td><td></td><td></td><td>12</td></tr>
+<tr><td>Bình</td><td>S</td><td>S</td><td>S</td><td>S</td><td>R</td><td>R</td><td>R</td><td>R</td><td>R</td><td>R</td><td>R</td><td>R</td><td>4</td><td>8</td><td></td><td></td><td>12</td></tr>
+<tr><td>Điệp</td><td>S</td><td>S</td><td>S</td><td>S</td><td>R</td><td>R</td><td>R</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>9</td><td>3</td><td></td><td></td><td>12</td></tr>
+<tr><td>Lượng</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>V</td><td>S</td><td>S</td><td>11</td><td></td><td>1</td><td></td><td>12</td></tr>
+<tr><td>Phúc</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>S</td><td>L</td><td>11</td><td></td><td></td><td>1</td><td>12</td></tr>
+<tr><td colspan="18" style="text-align:left;color:var(--muted)">… 11 người còn lại tương tự</td></tr>
+<tr><th>Số người S</th><th>16</th><th>16</th><th>16</th><th>16</th><th>10</th><th>10</th><th>10</th><th>13</th><th>13</th><th>11</th><th>11</th><th>8</th><th colspan="5"></th></tr>
+<tr><th>Số người R</th><th>0</th><th>0</th><th>0</th><th>0</th><th>6</th><th>6</th><th>6</th><th>3</th><th>3</th><th>3</th><th>3</th><th>3</th><th colspan="5"></th></tr>
+</tbody></table></div>
+<p>Cộng cả ca: S 148 · R 38 · V 4 · L 4 = <b>192 giờ = 16 người × 12</b>. Sản lượng ca: 40 tấn SVR, 120 kiện RSS. Trưởng ca chỉ phải viết chữ cái vào <b>8 dòng khác mặc định</b>; 8 người còn lại là tick S.</p>
+
+<h2 id="kiem-soat">7. Vì sao khó ghi sai</h2>
+<div class="tbl"><table>
+<thead><tr><th>Phép kiểm (BM‑06)</th><th>Bắt được gì</th></tr></thead>
+<tbody>
+<tr><td><b>Bảo toàn giờ</b> — mỗi người Σ = giờ có mặt; tổng ca = số người × 12</td><td>Ghi thừa, ghi kép, một người ở hai sổ</td></tr>
+<tr><td><b>Lệnh mở trước + định mức</b> — chỉ ghi R/V/L vào lệnh đang mở, không vượt ĐM còn lại</td><td>Việc "tự nhớ ra" cuối tháng, vệ sinh không đáy</td></tr>
+<tr><td><b>Năng suất</b> — tấn SVR ÷ giờ S phải trong dải bình thường</td><td>Ghi S cho người thực ra làm việc khác</td></tr>
+<tr><td><b>Đầu ra việc khác</b> — kiện RSS ↔ giờ R</td><td>Có kiện mà 0 giờ R = có người làm không ghi</td></tr>
+<tr><td><b>Chốt đúng hạn, sửa có duyệt, công nhân được xem</b></td><td>Sửa lén sau ca; chấm thiếu cho người khác</td></tr>
+</tbody></table></div>
+<p><span class="flag y">Cờ vàng</span> = 1 chỉ số lệch → HCNS hỏi trưởng ca, ghi kết luận. <span class="flag r">Cờ đỏ</span> = từ 2 chỉ số lệch, hoặc tổng giờ ≠ người × 12, hoặc có kiện RSS mà 0 giờ R → QLSX kiểm và ký trước khi tính lương. Không cần kiểm hết 60 ca/tháng — chỉ kiểm ca có cờ.</p>
+<p>Điểm mấu chốt: <b>sản lượng ca do người khác ghi</b> (sổ ca WMS). Bảng phân công và sổ ca soi lẫn nhau, trưởng ca không còn tự chấm tự duyệt.</p>
+
+<h2 id="tai">8. Tải biểu mẫu</h2>
+<p>Mỗi mẫu là một file PDF đúng khổ in (A4 ngang hoặc dọc). Trên điện thoại: mở PDF → <i>Chia sẻ</i> → gửi Zalo cho văn phòng in, hoặc <i>In</i> nếu máy in có Wi‑Fi.</p>
+<ul class="dl">
+  <li><span class="code">Bộ</span><span class="name">Toàn bộ 10 trang<small>PDF · in một lần</small></span><a class="get" href="bieu-mau/bieu-mau-cham-cong-san-xuat.pdf">PDF</a><a class="get" href="bieu-mau/bieu-mau-cham-cong-san-xuat.docx">Word</a></li>
+  <li><span class="code">BM‑00</span><span class="name">Danh mục mã việc &amp; quy ước ghi<small>A4 dọc · dán ở xưởng</small></span><a class="get" href="bieu-mau/bm-00-danh-muc-ma-viec.pdf">PDF</a></li>
+  <li><span class="code">BM‑01</span><span class="name">Bảng phân công ca theo giờ<small>A4 ngang · trưởng ca, mỗi ca</small></span><a class="get" href="bieu-mau/bm-01-bang-phan-cong-ca.pdf">PDF</a></li>
+  <li><span class="code">BM‑02</span><span class="name">Lệnh việc<small>A4 dọc · QLSX mở trước khi có việc</small></span><a class="get" href="bieu-mau/bm-02-lenh-viec.pdf">PDF</a></li>
+  <li><span class="code">BM‑03</span><span class="name">Sổ đăng ký lệnh việc<small>A4 ngang · QLSX</small></span><a class="get" href="bieu-mau/bm-03-so-dang-ky-lenh-viec.pdf">PDF</a></li>
+  <li><span class="code">BM‑04</span><span class="name">Bảng chấm công tổ theo tháng<small>A4 ngang · trực lò, RSS, A Lưới</small></span><a class="get" href="bieu-mau/bm-04-bang-cham-cong-to-thang.pdf">PDF</a></li>
+  <li><span class="code">BM‑05</span><span class="name">Phiếu điều chỉnh công sau chốt<small>A4 dọc · 2 phiếu/trang</small></span><a class="get" href="bieu-mau/bm-05-phieu-dieu-chinh-cong.pdf">PDF</a></li>
+  <li><span class="code">BM‑06</span><span class="name">Bảng đối chiếu ca<small>A4 ngang · HCNS hàng tuần</small></span><a class="get" href="bieu-mau/bm-06-bang-doi-chieu-ca.pdf">PDF</a></li>
+  <li><span class="code">BM‑07</span><span class="name">Tổng hợp công tháng theo mã việc<small>A4 ngang · niêm yết</small></span><a class="get" href="bieu-mau/bm-07-tong-hop-cong-thang.pdf">PDF</a></li>
+  <li><span class="code">HD</span><span class="name">Hướng dẫn trưởng ca (1 trang)<small>A4 dọc · phát cho trưởng ca</small></span><a class="get" href="bieu-mau/hd-huong-dan-truong-ca.pdf">PDF</a></li>
+</ul>
+<p>Cần sửa chữ, tên tổ, định mức: dùng bản <a href="bieu-mau/bieu-mau-cham-cong-san-xuat.docx">Word</a>. Bản <a href="bieu-mau-cham-cong-san-xuat.html">in từ trình duyệt</a> luôn là bản mới nhất.</p>
+
+<h2 id="hoi-dap">9. Hỏi đáp</h2>
+<details><summary>Chuyển việc chỉ 20 phút thì ghi thế nào?</summary><p>Không ghi. Ô giờ là đơn vị nhỏ nhất; chuyển dưới 30 phút vẫn tính cho việc đang làm. Nếu thấy 30 phút quá thô sau tháng thử, HCNS sẽ đổi sang ô nửa giờ.</p></details>
+<details><summary>Việc phát sinh đột xuất, QLSX chưa kịp mở lệnh?</summary><p>Gọi điện cho QLSX mở lệnh bằng miệng, ghi số lệnh tạm vào ô "Lệnh việc đang mở", QLSX bổ sung BM‑02 trong ngày. Không có lệnh trong 24h thì giờ đó tính là <span class="k">S</span>.</p></details>
+<details><summary>Công nhân thời vụ A Lưới vào làm dây chuyền hôm nay?</summary><p>Thêm dòng cuối BM‑01, ghi "TV A Lưới" ở Ghi chú, chấm giờ như mọi người. Bảng tổ A Lưới (BM‑04) ngày đó ghi <code>→01</code>, không ghi giờ. Tiền công nhật của người đó vẫn trừ vào quỹ như quy định hiện hành, nhưng đúng ngày, đúng giờ.</p></details>
+<details><summary>Trưởng ca vắng, ai ghi?</summary><p>Phó ca ghi và ghi tên mình vào ô "Người ghi". QLSX xác nhận như bình thường.</p></details>
+<details><summary>Trưởng ca chấm cho chính mình được không?</summary><p>Được, ghi như mọi người. QLSX là người xác nhận bảng nên đã có người thứ hai kiểm.</p></details>
+<details><summary>Làm quá 12 giờ thì ghi đâu?</summary><p>Bảng có 12 cột giờ theo ca. Người ở lại sang ca sau → ghi ở bảng của ca sau (trưởng ca sau ghi). Một ngày một người không nằm ở hai bảng cùng giờ.</p></details>
+<details><summary>Lỡ ghi sai mã?</summary><p>Chưa chốt: gạch chéo một nét, ghi mã đúng bên cạnh, ký nháy. Đã chốt: viết phiếu BM‑05, có lý do, QLSX duyệt, HCNS cập nhật. Không tẩy, không dùng bút xoá.</p></details>
+<details><summary>Tháng 10 lương có thay đổi không?</summary><p>Không. Lương tháng 10 tính theo cách cũ. Bảng mới chỉ để so sánh; kết quả so sánh sẽ được trình BGĐ đầu tháng 11.</p></details>
+<details><summary>Công nhân xem công của mình ở đâu?</summary><p>Bảng BM‑07 dán 2 ngày đầu tháng tại xưởng. Thấy sai thì báo trưởng ca hoặc HCNS trong 2 ngày niêm yết.</p></details>
+
+<footer>
+  <p>Thắc mắc về biểu mẫu: phòng Hành chính – Nhân sự. Về lệnh việc và định mức: QLSX.</p>
+  <p>Phiên bản 15/09/2026 · <a href="bieu-mau-cham-cong-san-xuat.html">Bản in biểu mẫu</a></p>
+</footer>
+
+</div>
+</body>
+</html>

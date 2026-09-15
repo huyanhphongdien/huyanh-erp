@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 """
 Sinh BỘ BIỂU MẪU CHẤM CÔNG SẢN XUẤT (thử nghiệm giấy T10/2026)
-  → docs/payroll/BIEU_MAU_CHAM_CONG_SAN_XUAT.docx   (HCNS chỉnh sửa, in)
-  → public/bieu-mau-cham-cong-san-xuat.html          (in thẳng từ trình duyệt, host trên huyanhrubber.vn)
+  → public/bieu-mau-cham-cong-san-xuat.html                 (in thẳng từ trình duyệt)
+  → public/bieu-mau/bieu-mau-cham-cong-san-xuat.docx        (HCNS chỉnh sửa, in)
+  → public/bieu-mau/bieu-mau-cham-cong-san-xuat.pdf + bm-XX-*.pdf từng mẫu (cần Edge/Chrome trên máy)
+Tất cả host trên huyanhrubber.vn; trang hướng dẫn triển khai: public/trien-khai-cham-cong-san-xuat.html
 
 Chạy:  python docs/payroll/generate_bieu_mau_cham_cong.py
-Một nguồn nội dung (FORMS) → hai bản xuất, để sửa chữ một chỗ.
+Một nguồn nội dung (FORMS) → các bản xuất, để sửa chữ một chỗ.
 """
 import html as _html
 import os
+import shutil
+import subprocess
 import sys
 
 from docx import Document
@@ -22,8 +26,11 @@ from docx.shared import Cm, Pt, RGBColor
 sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUT_DOCX = os.path.join(ROOT, "docs", "payroll", "BIEU_MAU_CHAM_CONG_SAN_XUAT.docx")
+OUT_DIR = os.path.join(ROOT, "public", "bieu-mau")
+OUT_DOCX = os.path.join(OUT_DIR, "bieu-mau-cham-cong-san-xuat.docx")
+OUT_PDF = os.path.join(OUT_DIR, "bieu-mau-cham-cong-san-xuat.pdf")
 OUT_HTML = os.path.join(ROOT, "public", "bieu-mau-cham-cong-san-xuat.html")
+GUIDE_HTML = "trien-khai-cham-cong-san-xuat.html"
 
 BOX = "☐"
 HOURS_DAY = ["06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17"]
@@ -39,8 +46,8 @@ HOURS_DAY = ["06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "
 FORMS = []
 
 
-def form(code, title, orient, sub, blocks):
-    FORMS.append(dict(code=code, title=title, orient=orient, sub=sub, blocks=blocks))
+def form(code, title, orient, sub, blocks, slug):
+    FORMS.append(dict(code=code, title=title, orient=orient, sub=sub, blocks=blocks, slug=slug))
 
 
 # ---------- TRANG BÌA ----------
@@ -83,7 +90,7 @@ form("", "BỘ BIỂU MẪU CHẤM CÔNG SẢN XUẤT", "P",
              "Đối chiếu với sản lượng ca (tấn SVR, kiện RSS) do người khác ghi — BM-06.",
              "Chốt ≤ 2h sau ca, sửa sau chốt có lý do + duyệt, người lao động được xem công của mình — BM-01, BM-05, BM-07.",
          ]),
-     ])
+     ], slug="bia-danh-sach-bieu-mau")
 
 # ---------- BM-00 ----------
 form("BM-00", "DANH MỤC MÃ VIỆC & QUY ƯỚC GHI BẢNG PHÂN CÔNG", "P",
@@ -128,7 +135,7 @@ form("BM-00", "DANH MỤC MÃ VIỆC & QUY ƯỚC GHI BẢNG PHÂN CÔNG", "P",
                  ["K", "Nghỉ không phép / không báo"],
                  ["→01", "Ngày đó làm trong ca sản xuất, đã ghi ở BM-01 — KHÔNG ghi giờ ở đây"],
              ])),
-     ])
+     ], slug="bm-00-danh-muc-ma-viec")
 
 # ---------- BM-01 ----------
 bm01_cols = [("STT", 0.7), ("Mã NV", 1.6), ("Họ tên", 3.5)]
@@ -162,7 +169,7 @@ form("BM-01", "BẢNG PHÂN CÔNG CA THEO GIỜ", "L",
          ], [
              ("sign", ["Trưởng ca (ghi giờ chốt)", "QLSX xác nhận", "HCNS nhận (ghi ngày)"]),
          ], 15.8, 11.9),
-     ])
+     ], slug="bm-01-bang-phan-cong-ca")
 
 # ---------- BM-02 ----------
 form("BM-02", "LỆNH VIỆC", "P",
@@ -193,7 +200,7 @@ form("BM-02", "LỆNH VIỆC", "P",
          ("fields", ["Ngày đóng: ____/____/2026", "Tổng giờ-người thực tế: ________ / ĐM ________",
                      "Đầu ra thực tế: ______________", "Vượt ĐM: " + BOX + " Không  " + BOX + " Có — lý do: ______________________________"]),
          ("sign", ["QLSX đóng lệnh", "HCNS xác nhận để tính lương"]),
-     ])
+     ], slug="bm-02-lenh-viec")
 
 # ---------- BM-03 ----------
 form("BM-03", "SỔ ĐĂNG KÝ LỆNH VIỆC", "L",
@@ -206,7 +213,7 @@ form("BM-03", "SỔ ĐĂNG KÝ LỆNH VIỆC", "L",
                    ("Người mở", 2.0), ("Ngày đóng", 1.8)],
              rows=16, rowh=0.62, font=8)),
          ("sign", ["QLSX", "HCNS đối chiếu cuối tháng"]),
-     ])
+     ], slug="bm-03-so-dang-ky-lenh-viec")
 
 # ---------- BM-04 ----------
 bm04_cols = [("STT", 0.7), ("Mã", 1.4), ("Họ tên", 2.9)] + [(str(d), 0.57) for d in range(1, 32)]
@@ -221,7 +228,7 @@ form("BM-04", "BẢNG CHẤM CÔNG TỔ THEO THÁNG", "L",
          ("note", "Số = giờ làm (bội số 0,5; > 12 phải ghi chú + QLSX ký) · 12Đ = ca đêm · P phép · L lễ · K không phép · "
                   "→01 = ngày đó làm trong ca sản xuất, đã ghi ở BM-01, KHÔNG ghi giờ ở đây. Công = tổng giờ ÷ 8 (trực lò: ÷ 12)."),
          ("sign", ["Người quản lý tổ", "QLSX / Trưởng bộ phận", "HCNS nhận (ngày, ký)"]),
-     ])
+     ], slug="bm-04-bang-cham-cong-to-thang")
 
 # ---------- BM-05 ----------
 bm05 = [
@@ -237,7 +244,7 @@ bm05 = [
 ]
 form("BM-05", "PHIẾU ĐIỀU CHỈNH CÔNG SAU CHỐT", "P",
      "Mọi thay đổi trên bảng đã chốt phải qua phiếu này. Không sửa trực tiếp lên bảng.",
-     bm05 + [("cut",)] + bm05)
+     bm05 + [("cut",)] + bm05, slug="bm-05-phieu-dieu-chinh-cong")
 
 # ---------- BM-06 ----------
 form("BM-06", "BẢNG ĐỐI CHIẾU CA", "L",
@@ -255,7 +262,7 @@ form("BM-06", "BẢNG ĐỐI CHIẾU CA", "L",
          ("note", "CỜ VÀNG = 1 chỉ số lệch dải (năng suất, định biên, lệnh vượt ĐM, chốt trễ) → hỏi trưởng ca, ghi kết luận. "
                   "CỜ ĐỎ = từ 2 chỉ số lệch, hoặc Σ giờ ≠ người × 12, hoặc có kiện RSS mà 0 giờ R → QLSX kiểm và ký trước khi HCNS nhập tính lương."),
          ("sign", ["HCNS lập", "QLSX xem & ký ca cờ đỏ"]),
-     ])
+     ], slug="bm-06-bang-doi-chieu-ca")
 
 # ---------- BM-07 ----------
 form("BM-07", "BẢNG TỔNG HỢP CÔNG THÁNG THEO MÃ VIỆC", "L",
@@ -270,7 +277,7 @@ form("BM-07", "BẢNG TỔNG HỢP CÔNG THÁNG THEO MÃ VIỆC", "L",
              rows=18, rowh=0.6, font=8,
              footer=[[("Cộng", 3)] + [""] * 13 + [("", 2)]])),
          ("sign", ["HCNS lập", "QLSX", "Giám đốc nhà máy"]),
-     ])
+     ], slug="bm-07-tong-hop-cong-thang")
 
 # ---------- HƯỚNG DẪN TRƯỞNG CA ----------
 form("HD", "HƯỚNG DẪN TRƯỞNG CA — GHI BẢNG PHÂN CÔNG CA (BM-01)", "P",
@@ -308,7 +315,7 @@ form("HD", "HƯỚNG DẪN TRƯỞNG CA — GHI BẢNG PHÂN CÔNG CA (BM-01)", 
          ("h2", "Vì sao phải ghi đúng"),
          ("p", "Quỹ khoán SVR chỉ chia cho giờ S. Ghi S cho người đang làm RSS/vệ sinh là lấy tiền của người đứng máy chia cho người không đứng máy. "
                "Ghi R/V/L đúng thì người làm việc đó được trả đích danh theo lệnh. Sản lượng ca do người khác ghi — bảng lệch sản lượng sẽ bị hỏi."),
-     ])
+     ], slug="hd-huong-dan-truong-ca")
 
 # ===========================================================================
 # XUẤT DOCX
@@ -687,6 +694,9 @@ def build_html():
     for f in FORMS:
         if f["code"]:
             parts.append(f'<a href="#{f["code"]}">{esc(f["code"])}</a>')
+    parts.append(f'<a href="{GUIDE_HTML}">📘 Hướng dẫn triển khai</a>'
+                 f'<a href="bieu-mau/{os.path.basename(OUT_DOCX)}">⬇ Word</a>'
+                 f'<a href="bieu-mau/{os.path.basename(OUT_PDF)}">⬇ PDF</a>')
     parts.append('<button type="button" onclick="window.print()">🖨 In / Lưu PDF</button></div>')
 
     for f in FORMS:
@@ -705,6 +715,39 @@ def build_html():
     return OUT_HTML
 
 
+def build_pdfs():
+    """In HTML → PDF bằng Edge/Chrome headless, rồi tách từng mẫu (1 mẫu = 1 trang)."""
+    browsers = [
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        shutil.which("msedge"), shutil.which("chrome"), shutil.which("google-chrome"), shutil.which("chromium"),
+    ]
+    exe = next((b for b in browsers if b and os.path.exists(b)), None)
+    if not exe:
+        print("PDF: bỏ qua (không tìm thấy Edge/Chrome)")
+        return
+    subprocess.run([exe, "--headless=new", "--disable-gpu", "--no-sandbox", "--no-pdf-header-footer",
+                    f"--print-to-pdf={OUT_PDF}", "file:///" + OUT_HTML.replace("\\", "/")],
+                   check=True, capture_output=True, timeout=120)
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        print("PDF:", OUT_PDF, "(không tách từng mẫu — thiếu PyMuPDF)")
+        return
+    src = fitz.open(OUT_PDF)
+    if len(src) != len(FORMS):
+        print(f"PDF: {len(src)} trang ≠ {len(FORMS)} mẫu — có mẫu tràn trang, KHÔNG tách từng mẫu")
+        return
+    for i, f in enumerate(FORMS):
+        one = fitz.open()
+        one.insert_pdf(src, from_page=i, to_page=i)
+        one.save(os.path.join(OUT_DIR, f["slug"] + ".pdf"), garbage=4, deflate=True)
+    print("PDF:", OUT_PDF, f"+ {len(FORMS)} file từng mẫu")
+
+
 if __name__ == "__main__":
+    os.makedirs(OUT_DIR, exist_ok=True)
     print("DOCX:", build_docx())
     print("HTML:", build_html())
+    build_pdfs()

@@ -10,7 +10,7 @@
 //   ⑤ Mobile-first giữ nguyên: 48px buttons, active: states, safe-area
 // ============================================================
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Clock,
@@ -25,13 +25,15 @@ import {
   Briefcase,
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
-import { attendanceService } from '../../services/attendanceService'
+import { attendanceService, validateGPS } from '../../services/attendanceService'
 import { getActiveShifts } from '../../services/opsService'
+import { getDeviceType, getDeviceInfo } from '../../utils/deviceDetect'
 import type {
   ShiftInfo,
   AttendanceRecord,
   TodayShiftAssignment,
   GPSData,
+  GPSConfig,
 } from '../../services/attendanceService'
 
 // ============================================================
@@ -39,6 +41,8 @@ import type {
 // ============================================================
 
 type GPSStatus = 'idle' | 'checking' | 'requesting' | 'available' | 'denied' | 'unavailable' | 'error'
+
+const fmtDist = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1).replace('.', ',')} km` : `${Math.round(m)} m`)
 
 interface Props {
   onCheckInOut?: () => void
@@ -161,6 +165,10 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
   const queryClient = useQueryClient()
   const employeeId = user?.employee_id
 
+  // ── Thiết bị: máy tính bỏ qua GPS; điện thoại/tablet bắt buộc (luật 16/09/2026) ──
+  const deviceType = useMemo(() => getDeviceType(), [])
+  const isDesktop = deviceType === 'desktop'
+
   // ── State ──
   const [currentTime, setCurrentTime] = useState(new Date())
   const [gpsStatus, setGpsStatus] = useState<GPSStatus>('idle')
@@ -226,15 +234,34 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
     )
   }, [])
 
-  // Auto-request GPS on mount
+  // Auto-request GPS on mount — máy tính bỏ qua, điện thoại/tablet phải lấy toạ độ
   useEffect(() => {
-    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
-    if (!isMobile) {
-      setGpsStatus('available') // Desktop = bypass GPS
+    if (isDesktop) {
+      setGpsStatus('available')
       return
     }
     requestGPS()
-  }, [requestGPS])
+  }, [requestGPS, isDesktop])
+
+  // ── Cấu hình bán kính (attendance_settings.gps_config) để báo khoảng cách TRƯỚC khi bấm ──
+  const { data: gpsConfig } = useQuery<GPSConfig | null>({
+    queryKey: ['gps-config'],
+    queryFn: () => attendanceService.getGPSConfig(),
+    staleTime: 10 * 60 * 1000,
+  })
+
+  // Kết quả đối chiếu toạ độ hiện tại với bán kính (null = chưa có gì để đối chiếu)
+  const gpsCheck = useMemo(() => {
+    if (!gpsPosition || !gpsConfig?.enabled || !gpsConfig.locations?.length) return null
+    const r = validateGPS(gpsPosition.latitude, gpsPosition.longitude, gpsConfig)
+    const radius = Math.max(...gpsConfig.locations.map(l => l.radius_meters || 0))
+    return { ...r, radius }
+  }, [gpsPosition, gpsConfig])
+
+  // Điều kiện GPS để được bấm Check-in:
+  //   máy tính → luôn sẵn sàng; điện thoại → có toạ độ VÀ (chưa có cấu hình HOẶC trong bán kính)
+  const gpsOutOfRange = !isDesktop && gpsStatus === 'available' && gpsCheck !== null && !gpsCheck.valid
+  const gpsReady = isDesktop || (gpsStatus === 'available' && !gpsOutOfRange)
 
   // ── Query: Today's shift assignments (via service V4 — includes overnight) ──
   const { data: todayShifts = [], isLoading: shiftsLoading } = useQuery({
@@ -325,7 +352,7 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
   // Tự chọn ca: khi NV chủ động chọn ca (selectedShiftId) → cho check-in kể cả
   // chưa phân ca hoặc đã xong ca trước (làm 2 ca liên tục). Không chọn → y như cũ.
   const canCheckIn =
-    gpsStatus === 'available' &&
+    gpsReady &&
     !openAttendance &&
     (currentShiftAssignment !== null || !!selectedShiftId) &&
     (!isComplete || !!selectedShiftId) &&
@@ -375,7 +402,9 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
       return attendanceService.checkIn(employeeId, {
         targetShiftId: selectedShiftId || currentShift?.id,
         gps: gpsPosition,
-        isGpsVerified: gpsStatus === 'available' && !!gpsPosition,
+        isGpsVerified: gpsReady && !!gpsPosition,
+        deviceType,
+        deviceInfo: getDeviceInfo(),
       })
     },
     onSuccess: (data) => {
@@ -398,6 +427,8 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
 
       return attendanceService.checkOut(employeeId, {
         gps: gpsPosition,
+        deviceType,
+        deviceInfo: getDeviceInfo(),
       })
     },
     onSuccess: (data) => {
@@ -455,10 +486,23 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
 
           {/* GPS indicator */}
           <div className="flex items-center gap-1.5 text-xs">
-            {gpsStatus === 'available' ? (
+            {isDesktop ? (
+              <span className="flex items-center gap-1 bg-white/15 text-blue-100 px-2 py-0.5 rounded-full">
+                <MapPin size={10} />
+                Máy tính — không cần GPS
+              </span>
+            ) : gpsOutOfRange ? (
+              <button
+                onClick={requestGPS}
+                className="flex items-center gap-1 bg-red-500/20 text-red-100 px-2 py-0.5 rounded-full active:bg-red-500/40"
+              >
+                <AlertCircle size={10} />
+                Ngoài phạm vi {gpsCheck ? fmtDist(gpsCheck.distance) : ''}
+              </button>
+            ) : gpsStatus === 'available' ? (
               <span className="flex items-center gap-1 bg-green-500/20 text-green-100 px-2 py-0.5 rounded-full">
                 <MapPin size={10} />
-                GPS ✓
+                GPS ✓{gpsCheck ? ` ${fmtDist(gpsCheck.distance)}` : ''}
               </span>
             ) : gpsStatus === 'requesting' || gpsStatus === 'checking' ? (
               <span className="flex items-center gap-1 bg-yellow-500/20 text-yellow-100 px-2 py-0.5 rounded-full">
@@ -523,22 +567,23 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
         )}
       </div>
 
-      {/* ── GPS Warning Banner ── */}
-      {gpsStatus !== 'available' &&
+      {/* ── GPS Warning Banner (điện thoại: chưa có toạ độ HOẶC ngoài bán kính) ── */}
+      {!gpsReady &&
         gpsStatus !== 'checking' &&
         gpsStatus !== 'requesting' && (
-          <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-start gap-2">
+          <div className={`px-4 py-2.5 border-b flex items-start gap-2 ${gpsOutOfRange ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
             <AlertCircle
               size={16}
-              className="text-amber-600 mt-0.5 flex-shrink-0"
+              className={`mt-0.5 flex-shrink-0 ${gpsOutOfRange ? 'text-red-600' : 'text-amber-600'}`}
             />
             <div className="flex-1">
-              <p className="text-sm font-medium text-amber-800">
-                Cần bật GPS để điểm danh
+              <p className={`text-sm font-medium ${gpsOutOfRange ? 'text-red-800' : 'text-amber-800'}`}>
+                {gpsOutOfRange ? 'Ngoài phạm vi nhà máy — không thể điểm danh' : 'Cần bật GPS để điểm danh'}
               </p>
-              <p className="text-xs text-amber-600 mt-0.5">
-                {gpsError ||
-                  'Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt.'}
+              <p className={`text-xs mt-0.5 ${gpsOutOfRange ? 'text-red-600' : 'text-amber-600'}`}>
+                {gpsOutOfRange && gpsCheck
+                  ? `Bạn đang cách ${gpsCheck.location_name} ${fmtDist(gpsCheck.distance)} — chỉ được điểm danh trong phạm vi ${fmtDist(gpsCheck.radius)}.`
+                  : gpsError || 'Điện thoại phải bật định vị và cho phép truy cập vị trí.'}
               </p>
               <button
                 onClick={requestGPS}
@@ -717,7 +762,7 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
             )}
 
             {/* GPS chưa sẵn sàng + chưa check-in */}
-            {!canCheckIn && !canCheckOut && !isComplete && !allComplete && !openAttendance && gpsStatus !== 'available' && (
+            {!canCheckIn && !canCheckOut && !isComplete && !allComplete && !openAttendance && !gpsReady && (
               <button
                 disabled
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold
@@ -730,7 +775,7 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
 
             {/* Không có ca + không có gì đang mở → thông báo */}
             {!canCheckIn && !canCheckOut && !isComplete && !allComplete &&
-              gpsStatus === 'available' && todayShifts.length === 0 && !openAttendance && (
+              gpsReady && todayShifts.length === 0 && !openAttendance && (
               <div className="text-center py-3 text-gray-400">
                 <p className="text-sm">Chưa phân ca hôm nay</p>
                 <p className="text-xs mt-1">Liên hệ quản lý để được phân ca</p>

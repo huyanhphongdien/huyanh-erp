@@ -12,8 +12,10 @@ import {
   getTodayTasks, getTodayAttendanceRows, getActiveShifts, getOpenIssues, taskDone,
 } from '../../services/opsService'
 import { firstName, hhmm, clock } from './opsUtil'
+import { getDeviceType, getDeviceInfo } from '../../utils/deviceDetect'
 
-// Lấy vị trí GPS (không bắt buộc — service tự báo lỗi nếu công ty yêu cầu GPS)
+// Lấy vị trí GPS. App Ops chạy trên điện thoại → không có toạ độ là KHÔNG vào ca được
+// (luật 16/09/2026: điện thoại phải trong bán kính nhà máy; máy tính bỏ qua).
 function getGps(): Promise<{ latitude: number; longitude: number; accuracy: number } | undefined> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(undefined)
@@ -47,9 +49,14 @@ export default function OpsHome() {
   async function punch(kind: 'in' | 'out', shiftId?: string) {
     setBusy(true); setMsg(null); setPicker(false)
     try {
+      const deviceType = getDeviceType()
       const gps = await getGps()
-      if (kind === 'in') await attendanceService.checkIn(emp, { targetShiftId: shiftId, gps, isGpsVerified: !!gps })
-      else await attendanceService.checkOut(emp, { gps })
+      if (kind === 'in' && deviceType !== 'desktop' && !gps) {
+        throw new Error('Điện thoại phải bật định vị (GPS) và cho phép truy cập vị trí mới được vào ca.')
+      }
+      const dev = { deviceType, deviceInfo: getDeviceInfo() }
+      if (kind === 'in') await attendanceService.checkIn(emp, { targetShiftId: shiftId, gps, isGpsVerified: !!gps, ...dev })
+      else await attendanceService.checkOut(emp, { gps, ...dev })
       setMsg({ ok: true, text: kind === 'in' ? '✅ Đã vào ca' : '✅ Đã ra ca' })
       qc.invalidateQueries({ queryKey: ['ops-today-att', emp] })
       qc.invalidateQueries({ queryKey: ['open-attendance'] })

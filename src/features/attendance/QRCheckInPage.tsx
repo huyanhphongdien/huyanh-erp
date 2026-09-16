@@ -9,12 +9,26 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, XCircle, Camera, Loader2, Clock, LogOut } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
+import { getDeviceType, getDeviceInfo } from '../../utils/deviceDetect'
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
 const BRAND = { primary: '#1B4D3E', secondary: '#2D8B6E' }
+
+// Lấy toạ độ 1 lần cho lượt quét. Điện thoại/tablet bắt buộc có (luật 16/09/2026);
+// không lấy được thì trả undefined để service chặn với thông báo rõ.
+function getGps(): Promise<{ latitude: number; longitude: number; accuracy: number } | undefined> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(undefined)
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy }),
+      () => resolve(undefined),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
+    )
+  })
+}
 
 // QR payload format: HUYANH_CHECKIN:{location_id}:{daily_secret}
 // For now, any QR starting with HUYANH_CHECKIN is valid (MVP)
@@ -167,6 +181,11 @@ export default function QRCheckInPage() {
       // GPS verify, shift_assignments lookup theo ngày, ADMIN_PROD fallback.
       const { attendanceService } = await import('../../services/attendanceService')
 
+      // Thiết bị + toạ độ: quét QR gần như luôn từ điện thoại → phải trong bán kính nhà máy
+      const deviceType = getDeviceType()
+      const gps = deviceType === 'desktop' ? undefined : await getGps()
+      const dev = { deviceType, deviceInfo: getDeviceInfo() }
+
       // Check existing today
       const { data: existing } = await supabase
         .from('attendance')
@@ -184,7 +203,7 @@ export default function QRCheckInPage() {
           return
         }
         // Check-in exists but no check-out → use service checkOut (đúng logic late_and_early/early_leave detection)
-        await attendanceService.checkOut(user.employee_id, {})
+        await attendanceService.checkOut(user.employee_id, { gps, ...dev })
 
         setStatus('success')
         setMessage(`Check-out thành công lúc ${timeStr}`)
@@ -193,9 +212,7 @@ export default function QRCheckInPage() {
       }
 
       // No record today → use service checkIn (đúng logic shift lookup theo date + late_minutes + business_trip block)
-      await attendanceService.checkIn(user.employee_id, {
-        // QR scan không có GPS → để default false (service sẽ validate theo gps_config)
-      })
+      await attendanceService.checkIn(user.employee_id, { gps, ...dev })
 
       setStatus('success')
       setMessage(`Check-in thành công lúc ${timeStr}`)

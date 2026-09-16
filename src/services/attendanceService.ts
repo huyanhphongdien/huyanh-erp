@@ -79,14 +79,26 @@ export interface GPSData {
   accuracy?: number
 }
 
+export type CheckInDeviceType = 'mobile' | 'tablet' | 'desktop'
+
 export interface CheckInOptions {
   targetShiftId?: string
   gps?: GPSData | null
   isGpsVerified?: boolean
+  /**
+   * Loại thiết bị do client phát hiện (utils/deviceDetect). Luật 16/09/2026:
+   * điện thoại/tablet BẮT BUỘC có toạ độ trong bán kính nhà máy; desktop bỏ qua.
+   * Không truyền = coi như điện thoại (fail-closed).
+   */
+  deviceType?: CheckInDeviceType
+  /** navigator.userAgent — ghi vào attendance.check_in_device để truy vết */
+  deviceInfo?: string
 }
 
 export interface CheckOutOptions {
   gps?: GPSData | null
+  deviceType?: CheckInDeviceType
+  deviceInfo?: string
 }
 
 export interface AttendanceListParams {
@@ -111,14 +123,14 @@ export interface PaginatedResponse<T> {
   totalPages: number
 }
 
-interface GPSLocation {
+export interface GPSLocation {
   latitude: number
   longitude: number
   radius_meters: number
   name: string
 }
 
-interface GPSConfig {
+export interface GPSConfig {
   enabled: boolean
   locations: GPSLocation[]
 }
@@ -127,17 +139,33 @@ interface GPSConfig {
 // GPS HELPERS
 // ============================================================================
 
+/**
+ * Cấu hình GPS ở attendance_settings (setting_key = 'gps_config').
+ * ⚠ Bản cũ đọc bảng app_settings không tồn tại → vòng kiểm bán kính chưa bao giờ chạy
+ * (0/2.748 bản ghi is_gps_verified tính đến 13/09/2026). Sửa 16/09/2026.
+ */
 async function getGPSConfig(): Promise<GPSConfig | null> {
   try {
     const { data } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'gps_attendance')
+      .from('attendance_settings')
+      .select('setting_value')
+      .eq('setting_key', 'gps_config')
       .maybeSingle()
-    return data?.value || null
+    const cfg = data?.setting_value as GPSConfig | null | undefined
+    if (!cfg || !Array.isArray(cfg.locations)) return null
+    return cfg
   } catch {
     return null
   }
+}
+
+function formatDistance(meters: number): string {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1).replace('.', ',')} km` : `${Math.round(meters)} m`
+}
+
+/** "<loại>|<userAgent>" → attendance.check_in_device. DB trigger ép GPS khi bắt đầu bằng mobile/tablet. */
+function deviceLabel(deviceType?: CheckInDeviceType, deviceInfo?: string): string {
+  return `${deviceType || 'mobile'}|${(deviceInfo || '').slice(0, 200)}`
 }
 
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -150,7 +178,8 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-function validateGPS(lat: number, lng: number, config: GPSConfig): {
+/** Kiểm toạ độ với danh sách điểm cho phép. Dùng chung service + widget (báo khoảng cách trước khi bấm). */
+export function validateGPS(lat: number, lng: number, config: GPSConfig): {
   valid: boolean; distance: number; location_name: string
 } {
   for (const loc of config.locations) {
@@ -159,9 +188,18 @@ function validateGPS(lat: number, lng: number, config: GPSConfig): {
       return { valid: true, distance: Math.round(dist), location_name: loc.name }
     }
   }
-  const nearest = config.locations[0]
-  const dist = nearest ? haversineDistance(lat, lng, nearest.latitude, nearest.longitude) : 0
-  return { valid: false, distance: Math.round(dist), location_name: nearest?.name || 'N/A' }
+  // Ngoài mọi điểm → báo điểm GẦN NHẤT (bản cũ luôn lấy locations[0])
+  let nearest: GPSLocation | null = null
+  let nearestDist = Infinity
+  for (const loc of config.locations) {
+    const d = haversineDistance(lat, lng, loc.latitude, loc.longitude)
+    if (d < nearestDist) { nearestDist = d; nearest = loc }
+  }
+  return {
+    valid: false,
+    distance: Number.isFinite(nearestDist) ? Math.round(nearestDist) : 0,
+    location_name: nearest?.name || 'N/A',
+  }
 }
 
 // ============================================================================
@@ -378,6 +416,9 @@ function normalize(r: any): AttendanceRecord {
 // ============================================================================
 
 export const attendanceService = {
+  /** Cấu hình GPS (attendance_settings.gps_config) — widget dùng để báo bán kính/khoảng cách trước khi bấm. */
+  getGPSConfig,
+
 
   // ═══════════════════════════════════════════════════
   // LIST (AttendanceListPage)
@@ -503,7 +544,7 @@ export const attendanceService = {
   // ═══════════════════════════════════════════════════
 
   async checkIn(employeeId: string, options: CheckInOptions = {}): Promise<AttendanceRecord> {
-    const { targetShiftId, gps, isGpsVerified } = options
+    const { targetShiftId, gps, deviceType, deviceInfo } = options
     const now = new Date()
     const today = getToday()
     const nowISO = now.toISOString()
@@ -554,30 +595,35 @@ export const attendanceService = {
       }
     }
 
-    // ② GPS
-    // R2-6 fix: KHÔNG tin client claim isGpsVerified=true. Chỉ set verified=true
-    // khi server-side validateGPS pass. Client gửi flag chỉ để debug/fallback,
-    // không có giá trị trust.
+    // ② GPS — luật 16/09/2026 (owner chốt):
+    //   • Điện thoại / tablet (hoặc không khai thiết bị): PHẢI có toạ độ và nằm trong
+    //     bán kính nhà máy (attendance_settings.gps_config, 3 km) — không thì chặn.
+    //   • Máy tính (PC/laptop): bỏ qua; nếu có toạ độ thì chỉ ghi nhận.
+    //   is_gps_verified chỉ true khi validateGPS pass (không tin flag từ client).
+    //   DB trigger attendance_enforce_mobile_gps() lặp lại luật này ở tầng dữ liệu.
     let gpsVerified = false
-    let checkInLat: number | null = gps?.latitude || null
-    let checkInLng: number | null = gps?.longitude || null
+    const checkInLat: number | null = gps?.latitude ?? null
+    const checkInLng: number | null = gps?.longitude ?? null
 
     const gpsConfig = await getGPSConfig()
-    if (gpsConfig?.enabled) {
-      if (!gps) throw new Error('Vui lòng bật định vị GPS để check-in')
-      checkInLat = gps.latitude
-      checkInLng = gps.longitude
-      const gpsResult = validateGPS(gps.latitude, gps.longitude, gpsConfig)
+    const gpsEnabled = !!gpsConfig?.enabled && gpsConfig.locations.length > 0
+    const mustVerify = gpsEnabled && deviceType !== 'desktop'
+
+    if (mustVerify) {
+      if (!gps) {
+        throw new Error('Điện thoại phải bật định vị (GPS) và cho phép truy cập vị trí mới được điểm danh.')
+      }
+      const gpsResult = validateGPS(gps.latitude, gps.longitude, gpsConfig!)
       if (!gpsResult.valid) {
+        const radius = Math.max(...gpsConfig!.locations.map(l => l.radius_meters || 0))
         throw new Error(
-          `Bạn không ở trong khu vực công ty. Khoảng cách đến ${gpsResult.location_name}: ${gpsResult.distance}m (cho phép: ${gpsConfig.locations[0]?.radius_meters || 300}m)`
+          `Bạn đang cách ${gpsResult.location_name} ${formatDistance(gpsResult.distance)} — ` +
+          `chỉ được điểm danh trong phạm vi ${formatDistance(radius)} quanh nhà máy.`
         )
       }
-      gpsVerified = true  // chỉ true khi validateGPS pass
-    } else if (gps && isGpsVerified) {
-      // GPS config disabled nhưng client tự verify — chỉ ghi nhận có lat/lng,
-      // không trust verified flag
-      gpsVerified = false
+      gpsVerified = true
+    } else if (gpsEnabled && gps) {
+      gpsVerified = validateGPS(gps.latitude, gps.longitude, gpsConfig!).valid
     }
 
     // ③ LOOKUP shift_assignments — cả today + yesterday
@@ -690,6 +736,7 @@ export const attendanceService = {
         break_minutes: breakMins,
         check_in_lat: checkInLat,
         check_in_lng: checkInLng,
+        check_in_device: deviceLabel(deviceType, deviceInfo),
         is_gps_verified: gpsVerified,
         auto_checkout: false,
       })

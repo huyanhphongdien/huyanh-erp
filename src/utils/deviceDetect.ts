@@ -17,6 +17,7 @@ export type DeviceType = 'mobile' | 'tablet' | 'desktop'
  * Loại thiết bị. Thứ tự ưu tiên:
  *  1. App Capacitor (Huy Anh Ops) → luôn là điện thoại.
  *  2. Client Hints `userAgentData.mobile` (Chrome/Edge mới, không giả được bằng "Desktop site").
+ *  2b. Media query `(pointer: coarse) and (hover: none)` → thiết bị cảm ứng thật, kể cả khi UA bị đổi.
  *  3. UA điện thoại / tablet, kể cả iPad giả Macintosh (iPadOS 13+ có maxTouchPoints > 1).
  *  4. UA Windows / ChromeOS → máy tính (laptop cảm ứng vẫn là máy tính).
  *  5. Android bật "Desktop site" → UA "Linux x86_64" nhưng màn hình cảm ứng nhiều điểm → điện thoại/tablet.
@@ -31,6 +32,13 @@ export function getDeviceType(): DeviceType {
 
   if (native) return 'mobile'
   if (uaData?.mobile === true) return 'mobile'
+  // Con trỏ chính là ngón tay và không có "hover" = điện thoại/tablet thật, bất kể UA khai gì
+  // (extension đổi UA thành Windows cũng không đổi được media query này; laptop cảm ứng có chuột → hover: hover).
+  if (typeof window.matchMedia === 'function'
+      && window.matchMedia('(pointer: coarse)').matches
+      && window.matchMedia('(hover: none)').matches) {
+    return Math.min(window.screen?.width || 0, window.screen?.height || 0) >= 700 ? 'tablet' : 'mobile'
+  }
   if (/iPad/i.test(ua) || (/Macintosh/i.test(ua) && touch > 1)) return 'tablet'
   if (/Android(?!.*Mobile)/i.test(ua)) return 'tablet'
   if (/iPhone|iPod|Android.*Mobile|webOS|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua)) return 'mobile'

@@ -168,6 +168,36 @@ function deviceLabel(deviceType?: CheckInDeviceType, deviceInfo?: string): strin
   return `${deviceType || 'mobile'}|${(deviceInfo || '').slice(0, 200)}`
 }
 
+/**
+ * Ghi lại lượt điểm danh BỊ CHẶN vì GPS vào attendance_gps_rejections để HCNS theo dõi
+ * (màn /attendance/gps-monitor). Lỗi ghi log không được làm hỏng luồng chấm công.
+ */
+async function logGpsRejection(employeeId: string, p: {
+  gps?: GPSData | null
+  distance?: number | null
+  nearest?: string | null
+  radius?: number | null
+  deviceType?: CheckInDeviceType
+  deviceInfo?: string
+  reason: string
+}): Promise<void> {
+  try {
+    await supabase.from('attendance_gps_rejections').insert({
+      employee_id: employeeId,
+      lat: p.gps?.latitude ?? null,
+      lng: p.gps?.longitude ?? null,
+      accuracy_m: p.gps?.accuracy ?? null,
+      distance_m: p.distance ?? null,
+      nearest_name: p.nearest ?? null,
+      radius_m: p.radius ?? null,
+      device: deviceLabel(p.deviceType, p.deviceInfo),
+      reason: p.reason.slice(0, 300),
+    })
+  } catch {
+    /* chỉ là log */
+  }
+}
+
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
   const toRad = (x: number) => (x * Math.PI) / 180
@@ -611,11 +641,16 @@ export const attendanceService = {
 
     if (mustVerify) {
       if (!gps) {
+        await logGpsRejection(employeeId, { deviceType, deviceInfo, reason: 'no_gps' })
         throw new Error('Điện thoại phải bật định vị (GPS) và cho phép truy cập vị trí mới được điểm danh.')
       }
       const gpsResult = validateGPS(gps.latitude, gps.longitude, gpsConfig!)
       if (!gpsResult.valid) {
         const radius = Math.max(...gpsConfig!.locations.map(l => l.radius_meters || 0))
+        await logGpsRejection(employeeId, {
+          gps, distance: gpsResult.distance, nearest: gpsResult.location_name, radius,
+          deviceType, deviceInfo, reason: 'out_of_range',
+        })
         throw new Error(
           `Bạn đang cách ${gpsResult.location_name} ${formatDistance(gpsResult.distance)} — ` +
           `chỉ được điểm danh trong phạm vi ${formatDistance(radius)} quanh nhà máy.`
@@ -743,7 +778,13 @@ export const attendanceService = {
       .select(ATTENDANCE_SELECT)
       .single()
 
-    if (error) throw error
+    if (error) {
+      // Trigger attendance_enforce_mobile_gps chặn ở DB (client bị sửa / lệch cấu hình) → vẫn ghi log theo dõi
+      if ((error as { code?: string }).code === 'P0001') {
+        await logGpsRejection(employeeId, { gps, deviceType, deviceInfo, reason: `db:${error.message}` })
+      }
+      throw error
+    }
     return normalize(data)
   },
 

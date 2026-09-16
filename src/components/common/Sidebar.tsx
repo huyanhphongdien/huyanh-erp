@@ -179,6 +179,7 @@ const getMenuGroups = (
       { path: '/attendance/qr-checkin', label: 'Chấm công QR', icon: <ScanLine size={18} /> },
       { path: '/attendance', label: 'Bảng chấm công', icon: <Clock size={18} /> },
       { path: '/attendance/monthly', label: 'Chấm công tháng', icon: <Calendar size={18} />, managerOnly: true },
+      { path: '/attendance/gps-monitor', label: 'Giám sát GPS', icon: <MapPin size={18} />, managerOnly: true },
       { path: '/operations/coverage', label: 'Coverage live', icon: <Activity size={18} />, managerOnly: true },
       { path: '/shifts', label: 'Quản lý ca', icon: <Timer size={18} />, executiveOnly: true },
       { path: '/shift-assignments', label: 'Phân ca', icon: <CalendarDays size={18} />, managerOnly: true },

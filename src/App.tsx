@@ -100,6 +100,7 @@ const TeamManagementPage = lazy(() => import('./features/shift-assignments').the
 
 // ★ Bảng chấm công tháng
 const MonthlyTimesheetPage = lazy(() => import('./features/attendance/MonthlyTimesheetPage'));
+const GpsMonitorPage = lazy(() => import('./features/attendance/GpsMonitorPage'));
 const QRCheckInPage = lazy(() => import('./features/attendance/QRCheckInPage'));
 
 // ★ Production MES (QLSX)
@@ -677,6 +678,7 @@ function App() {
               <Route path="leave-approvals" element={<LeaveApprovalPage />} />
               <Route path="attendance" element={<AttendanceListPage />} />
               <Route path="attendance/monthly" element={<MonthlyTimesheetPage />} />
+              <Route path="attendance/gps-monitor" element={<Suspense fallback={<LoadingSpinner />}><GpsMonitorPage /></Suspense>} />
               <Route path="attendance/qr-checkin" element={<Suspense fallback={<LoadingSpinner />}><QRCheckInPage /></Suspense>} />
 
               {/* Production MES (QLSX) */}

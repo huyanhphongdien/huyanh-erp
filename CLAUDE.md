@@ -168,6 +168,17 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
 - `apps/weighbridge` và `apps/retail-scale` dùng chung hook `src/hooks/useKeliScale.ts` nhưng
   **khác namespace localStorage** (`keli_scale` vs `rs_scale`) — chung key là ghim sai baud cho nhau.
 
+## Chấm công — GPS (owner chốt 16/09/2026)
+- **Điện thoại / tablet: BẮT BUỘC toạ độ và phải nằm trong bán kính nhà máy (3 km). Máy tính (PC/laptop): bỏ qua GPS.**
+- Cấu hình ở `attendance_settings` (`setting_key='gps_config'`: `enabled`, `locations[{name,latitude,longitude,radius_meters}]`).
+  ⚠ Bản cũ đọc bảng `app_settings` KHÔNG tồn tại → vòng kiểm chưa bao giờ chạy; đã sửa trong `attendanceService.getGPSConfig`.
+- Loại thiết bị do client phát hiện (`src/utils/deviceDetect.ts` — Capacitor native, `userAgentData.mobile`, iPad giả Mac,
+  Android "Desktop site") → truyền `deviceType`/`deviceInfo` vào `attendanceService.checkIn/checkOut`, ghi
+  `attendance.check_in_device = "<mobile|tablet|desktop>|<userAgent>"`.
+- Luật lặp lại ở DB: trigger `attendance_enforce_mobile_gps` (BEFORE INSERT) chỉ ép khi `check_in_device` bắt đầu bằng
+  `mobile`/`tablet`; dòng không có device (HCNS nhập tay, backfill) không bị ép. Migration `attendance_gps_p1_mobile_3km.sql`.
+- Giới hạn cố ý: người dùng khai "desktop" (UA giả) thì lọt — owner chấp nhận; muốn siết thêm thì whitelist IP nhà máy cho desktop.
+
 ## Git
 - Single branch: `main`
 - Push = auto-deploy to Vercel (huyanhrubber.vn)

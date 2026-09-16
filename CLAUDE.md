@@ -177,7 +177,14 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
   `attendance.check_in_device = "<mobile|tablet|desktop>|<userAgent>"`.
 - Luật lặp lại ở DB: trigger `attendance_enforce_mobile_gps` (BEFORE INSERT) chỉ ép khi `check_in_device` bắt đầu bằng
   `mobile`/`tablet`; dòng không có device (HCNS nhập tay, backfill) không bị ép. Migration `attendance_gps_p1_mobile_3km.sql`.
-- Giới hạn cố ý: người dùng khai "desktop" (UA giả) thì lọt — owner chấp nhận; muốn siết thêm thì whitelist IP nhà máy cho desktop.
+- Chống giả UA: `(pointer: coarse) and (hover: none)` → coi là điện thoại/tablet bất kể UA ("Desktop site", extension đổi UA
+  đều không qua). Máy tính thật vẫn bỏ qua GPS theo luật owner; IP client được ghi (`request_client_ip()` từ header PostgREST)
+  vào `attendance.check_in_ip` để siết theo IP nhà máy sau nếu cần.
+- Điểm cho phép hiện có: **Phong Điền** (16.5320, 107.2722) và **Tân Lâm / HAQT** (16.7896, 106.9556 — đo từ 30+ lượt chấm
+  thật). **Lào (Savannakhet) CHƯA có toạ độ** — statement để sẵn cuối `attendance_gps_p2_locations_monitor.sql`.
+- Lượt bị chặn ghi vào `attendance_gps_rejections` (client ghi; RLS insert = chính mình, select = mọi người đăng nhập).
+  Theo dõi ở **`/attendance/gps-monitor`** (menu Chấm công → Giám sát GPS, managerOnly): theo điểm × thiết bị × xác minh,
+  danh sách bị chặn, lượt thành công chưa xác minh (máy tính ở xa) — có link bản đồ.
 
 ## Git
 - Single branch: `main`

@@ -162,6 +162,69 @@ function SortTh<K extends string>({ label, k, sort, onSort, align = 'left', clas
 type RejSortKey = 'time' | 'employee' | 'dept' | 'reason' | 'distance' | 'device' | 'ip'
 type RowSortKey = 'time' | 'employee' | 'dept' | 'device' | 'loc' | 'distance' | 'ip'
 
+/** Điện thoại không có tiêu đề cột để bấm → chọn cách xếp bằng ô chọn (ẩn từ sm trở lên). */
+function SortSelect<K extends string>({ value, options, onChange }: {
+  value: SortState<K>
+  options: { key: K; dir: SortDir; label: string }[]
+  onChange: (s: SortState<K>) => void
+}) {
+  const cur = `${value.key}:${value.dir}`
+  const known = options.some(o => `${o.key}:${o.dir}` === cur)
+  return (
+    <select
+      value={known ? cur : '__custom'}
+      onChange={e => {
+        const [k, d] = e.target.value.split(':') as [K, SortDir]
+        if (k && d) onChange({ key: k, dir: d })
+      }}
+      className="sm:hidden text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white text-gray-700 max-w-full"
+      aria-label="Sắp xếp"
+    >
+      {!known && <option value="__custom">Đang xếp theo cột…</option>}
+      {options.map(o => (
+        <option key={`${o.key}:${o.dir}`} value={`${o.key}:${o.dir}`}>{o.label}</option>
+      ))}
+    </select>
+  )
+}
+
+const REJ_SORT_OPTIONS: { key: RejSortKey; dir: SortDir; label: string }[] = [
+  { key: 'time', dir: 'desc', label: 'Mới nhất trước' },
+  { key: 'time', dir: 'asc', label: 'Cũ nhất trước' },
+  { key: 'distance', dir: 'desc', label: 'Xa nhà máy nhất' },
+  { key: 'employee', dir: 'asc', label: 'Tên A → Z' },
+  { key: 'dept', dir: 'asc', label: 'Theo phòng' },
+  { key: 'reason', dir: 'asc', label: 'Theo lý do' },
+]
+const ROW_SORT_OPTIONS: { key: RowSortKey; dir: SortDir; label: string }[] = [
+  { key: 'time', dir: 'desc', label: 'Mới nhất trước' },
+  { key: 'time', dir: 'asc', label: 'Cũ nhất trước' },
+  { key: 'distance', dir: 'desc', label: 'Xa nhà máy nhất' },
+  { key: 'employee', dir: 'asc', label: 'Tên A → Z' },
+  { key: 'dept', dir: 'asc', label: 'Theo phòng' },
+  { key: 'loc', dir: 'asc', label: 'Theo điểm' },
+  { key: 'device', dir: 'asc', label: 'Theo thiết bị' },
+]
+
+/** Nhãn nhân viên + phòng, dùng chung cho bảng và thẻ điện thoại. */
+function EmpCell({ e }: { e: EmpLite | null }) {
+  return (
+    <>
+      <div className="font-medium text-gray-900">{e?.full_name || '—'}</div>
+      <div className="text-xs text-gray-500">{e?.department?.name || ''}</div>
+    </>
+  )
+}
+
+function MapLink({ lat, lng, className = '' }: { lat: number | null | undefined; lng: number | null | undefined; className?: string }) {
+  if (lat == null || lng == null) return <span className="text-gray-300">—</span>
+  return (
+    <a href={mapsUrl(Number(lat), Number(lng))} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-1 text-emerald-700 text-xs ${className}`}>
+      Bản đồ <ExternalLink size={12} />
+    </a>
+  )
+}
+
 const REASON_LABEL: Record<string, string> = {
   no_gps: 'Không lấy được toạ độ',
   out_of_range: 'Ngoài phạm vi',
@@ -315,19 +378,19 @@ export default function GpsMonitorPage() {
             Điện thoại/tablet phải trong bán kính điểm cho phép; máy tính bỏ qua GPS. Theo dõi từng điểm và các lượt bị chặn.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           {([7, 14, 30] as RangeDays[]).map(d => (
             <button
               key={d}
               onClick={() => setRange(d)}
-              className={`px-3 py-1.5 rounded-lg text-sm border ${range === d ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+              className={`flex-1 sm:flex-none px-3 py-2 sm:py-1.5 rounded-lg text-sm border min-h-[40px] ${range === d ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
             >
               {d} ngày
             </button>
           ))}
           <button
             onClick={() => { rowsQ.refetch(); rejQ.refetch(); cfgQ.refetch() }}
-            className="p-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+            className="p-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 min-h-[40px] min-w-[40px] flex items-center justify-center"
             title="Tải lại"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -365,7 +428,38 @@ export default function GpsMonitorPage() {
           <h2 className="font-semibold text-gray-800">Lượt điểm danh thành công theo điểm — {range} ngày</h2>
           <span className="text-xs text-gray-500">{classified.length} lượt · từ {fromDate}</span>
         </div>
-        <div className="overflow-x-auto">
+        {/* Điện thoại: thẻ theo điểm */}
+        <div className="sm:hidden divide-y divide-gray-100">
+          {summary.map(s => {
+            const warn = (s.name === 'Ngoài mọi điểm' || s.name === 'Không có toạ độ') && s.total > 0
+            const active = locFilter === s.name
+            const pct = s.total > 0 ? Math.round((s.verified / s.total) * 100) : 0
+            return (
+              <button
+                key={s.name}
+                onClick={() => setLocFilter(active ? 'all' : s.name)}
+                className={`w-full text-left px-4 py-3 ${active ? 'bg-emerald-50' : ''}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-medium text-gray-900 inline-flex items-center gap-1.5">
+                    {warn && <AlertTriangle size={14} className="text-amber-600 shrink-0" />}
+                    {s.name}
+                  </span>
+                  <span className="text-sm text-gray-700 tabular-nums whitespace-nowrap"><b>{s.total}</b> lượt · {s.people.size} người</span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-700"><Smartphone size={12} /> {s.mobile}</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-700"><Tablet size={12} /> {s.tablet}</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-700"><Monitor size={12} /> {s.desktop}</span>
+                  {s.unknown > 0 && <span className="px-2 py-0.5 rounded-full bg-gray-50 text-gray-400">bản cũ {s.unknown}</span>}
+                  <span className="ml-auto inline-flex items-center gap-1 text-emerald-700 font-medium"><ShieldCheck size={12} /> {s.verified} ({pct}%)</span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        {/* Máy tính: bảng */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-600">
               <tr>
@@ -421,14 +515,39 @@ export default function GpsMonitorPage() {
             <ShieldOff size={16} className="text-red-600" /> Lượt bị chặn ({rejections.length})
             {locFilter !== 'all' && <span className="text-xs font-normal text-gray-500">— lọc: {locFilter}</span>}
           </h2>
-          <span className="text-xs text-gray-500">Ai cố điểm danh bằng điện thoại ngoài phạm vi / không bật định vị</span>
+          <span className="hidden sm:inline text-xs text-gray-500">Ai cố điểm danh bằng điện thoại ngoài phạm vi / không bật định vị</span>
+          <SortSelect value={rejSort} options={REJ_SORT_OPTIONS} onChange={setRejSort} />
         </div>
         {rejQ.isLoading ? (
           <div className="p-6 text-center text-gray-400"><Loader2 className="animate-spin inline mr-2" size={16} />Đang tải…</div>
         ) : rejections.length === 0 ? (
           <div className="p-6 text-center text-gray-400 text-sm">Không có lượt bị chặn trong khoảng này.</div>
-        ) : (
-          <div className="overflow-x-auto">
+        ) : (<>
+          {/* Điện thoại: thẻ */}
+          <div className="sm:hidden divide-y divide-gray-100">
+            {rejections.map(x => {
+              const kind = deviceKind(x.device)
+              return (
+                <div key={x.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0"><EmpCell e={x.employee} /></div>
+                    <div className="text-xs text-gray-500 tabular-nums whitespace-nowrap">{fmtTime(x.attempted_at)}</div>
+                  </div>
+                  <div className="mt-1 text-sm text-red-700">
+                    {reasonLabel(x.reason)}
+                    {x.distance_m != null && <> · cách {x.nearest_name} <b>{fmtDist(Number(x.distance_m))}</b></>}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                    <span className="inline-flex items-center gap-1"><DeviceIcon kind={kind} size={12} /> {DEVICE_LABEL[kind]}</span>
+                    {x.ip && <span className="tabular-nums">IP {x.ip}</span>}
+                    <MapLink lat={x.lat} lng={x.lng} className="ml-auto" />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {/* Máy tính: bảng */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
@@ -470,21 +589,43 @@ export default function GpsMonitorPage() {
               </tbody>
             </table>
           </div>
-        )}
+        </>)}
       </div>
 
       {/* Lượt cần xem: thành công nhưng không xác minh / ngoài điểm */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
           <h2 className="font-semibold text-gray-800">Lượt thành công chưa xác minh GPS ({filtered.length})</h2>
-          <span className="text-xs text-gray-500">Máy tính ngoài nhà máy, không toạ độ, hoặc bản app cũ</span>
+          <span className="hidden sm:inline text-xs text-gray-500">Máy tính ngoài nhà máy, không toạ độ, hoặc bản app cũ</span>
+          <SortSelect value={rowSort} options={ROW_SORT_OPTIONS} onChange={setRowSort} />
         </div>
         {rowsQ.isLoading ? (
           <div className="p-6 text-center text-gray-400"><Loader2 className="animate-spin inline mr-2" size={16} />Đang tải…</div>
         ) : filtered.length === 0 ? (
           <div className="p-6 text-center text-gray-400 text-sm">Mọi lượt trong khoảng này đều đã xác minh vị trí.</div>
-        ) : (
-          <div className="overflow-x-auto">
+        ) : (<>
+          {/* Điện thoại: thẻ */}
+          <div className="sm:hidden divide-y divide-gray-100">
+            {filtered.map(c => (
+              <div key={c.r.id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0"><EmpCell e={c.r.employee} /></div>
+                  <div className="text-xs text-gray-500 tabular-nums whitespace-nowrap">{fmtTime(c.r.check_in_time)}</div>
+                </div>
+                <div className={`mt-1 text-sm ${c.inRange ? 'text-gray-800' : 'text-amber-700'}`}>
+                  {c.locName}
+                  {c.near && <> · cách {c.near.loc.name} <b>{fmtDist(c.near.dist)}</b></>}
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                  <span className="inline-flex items-center gap-1"><DeviceIcon kind={c.kind} size={12} /> {DEVICE_LABEL[c.kind]}</span>
+                  {c.r.check_in_ip && <span className="tabular-nums">IP {c.r.check_in_ip}</span>}
+                  <MapLink lat={c.hasCoords ? c.r.check_in_lat : null} lng={c.hasCoords ? c.r.check_in_lng : null} className="ml-auto" />
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Máy tính: bảng */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
@@ -525,7 +666,7 @@ export default function GpsMonitorPage() {
               </tbody>
             </table>
           </div>
-        )}
+        </>)}
       </div>
     </div>
   )

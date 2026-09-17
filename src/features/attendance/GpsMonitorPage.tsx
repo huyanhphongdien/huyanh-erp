@@ -288,8 +288,11 @@ export default function GpsMonitorPage() {
   const fromIso = useMemo(() => new Date(`${fromDate}T00:00:00+07:00`).toISOString(), [fromDate])
 
   const cfgQ = useQuery({ queryKey: ['gps-config'], queryFn: () => attendanceService.getGPSConfig(), staleTime: 5 * 60 * 1000 })
-  const rowsQ = useQuery({ queryKey: ['gps-monitor-checkins', fromDate], queryFn: () => fetchCheckIns(fromDate), enabled: allowed, staleTime: 60 * 1000 })
-  const rejQ = useQuery({ queryKey: ['gps-monitor-rejections', fromIso], queryFn: () => fetchRejections(fromIso), enabled: allowed, staleTime: 60 * 1000 })
+  // Tự làm mới mỗi 60 s khi đang mở + khi quay lại tab/app (điện thoại chuyển app rồi mở lại)
+  const LIVE = { staleTime: 30 * 1000, refetchInterval: 60 * 1000, refetchOnWindowFocus: true, refetchOnReconnect: true } as const
+  const rowsQ = useQuery({ queryKey: ['gps-monitor-checkins', fromDate], queryFn: () => fetchCheckIns(fromDate), enabled: allowed, ...LIVE })
+  const rejQ = useQuery({ queryKey: ['gps-monitor-rejections', fromIso], queryFn: () => fetchRejections(fromIso), enabled: allowed, ...LIVE })
+  const updatedAt = Math.max(rowsQ.dataUpdatedAt || 0, rejQ.dataUpdatedAt || 0)
 
   const cfg = cfgQ.data
   const locations = cfg?.locations || []
@@ -376,6 +379,12 @@ export default function GpsMonitorPage() {
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Điện thoại/tablet phải trong bán kính điểm cho phép; máy tính bỏ qua GPS. Theo dõi từng điểm và các lượt bị chặn.
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5 tabular-nums">
+            {updatedAt > 0
+              ? `Cập nhật lúc ${new Date(updatedAt).toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', second: '2-digit' })} · tự làm mới mỗi 60 giây`
+              : 'Đang tải…'}
+            {(rowsQ.isFetching || rejQ.isFetching) && <Loader2 size={11} className="inline animate-spin ml-1 align-[-2px]" />}
           </p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">

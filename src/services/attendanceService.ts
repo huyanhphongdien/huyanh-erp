@@ -163,9 +163,16 @@ function formatDistance(meters: number): string {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1).replace('.', ',')} km` : `${Math.round(meters)} m`
 }
 
-/** "<loại>|<userAgent>" → attendance.check_in_device. DB trigger ép GPS khi bắt đầu bằng mobile/tablet. */
+/**
+ * "<loại>|<userAgent>" → attendance.check_in_device. DB trigger ép GPS khi bắt đầu bằng mobile/tablet.
+ * Cột từng là varchar(200) → lỗi "value too long" trên điện thoại sáng 17/09 (UA Android dài
+ * hơn 200 ký tự). Cột đã đổi sang text; vẫn cắt ≤ 200 ký tự để không phụ thuộc DB.
+ */
+const DEVICE_LABEL_MAX = 200
 function deviceLabel(deviceType?: CheckInDeviceType, deviceInfo?: string): string {
-  return `${deviceType || 'mobile'}|${(deviceInfo || '').slice(0, 200)}`
+  const type = deviceType || 'mobile'
+  const ua = (deviceInfo || '').slice(0, Math.max(0, DEVICE_LABEL_MAX - type.length - 1))
+  return `${type}|${ua}`
 }
 
 /**

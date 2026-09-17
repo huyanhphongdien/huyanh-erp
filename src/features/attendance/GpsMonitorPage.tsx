@@ -8,7 +8,7 @@
 // Nguồn: attendance (lượt thành công) + attendance_gps_rejections (lượt bị chặn).
 // ============================================================================
 
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   MapPin, Smartphone, Monitor, Tablet, ShieldCheck, ShieldOff, RefreshCw,
@@ -116,6 +116,52 @@ function nearestOf(lat: number, lng: number, cfg: GPSConfig | null | undefined):
 
 const mapsUrl = (lat: number, lng: number) => `https://www.google.com/maps?q=${lat},${lng}`
 
+// ── Sắp xếp cột (bấm tiêu đề) ──
+type SortDir = 'asc' | 'desc'
+interface SortState<K extends string> { key: K; dir: SortDir }
+type SortVal = string | number | null | undefined
+
+/** Cột số/thời gian mặc định giảm dần (mới nhất / xa nhất trước), cột chữ tăng dần. */
+const DESC_FIRST = new Set(['time', 'distance'])
+
+function toggleSort<K extends string>(s: SortState<K>, key: K): SortState<K> {
+  if (s.key === key) return { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+  return { key, dir: DESC_FIRST.has(key) ? 'desc' : 'asc' }
+}
+
+function sortRows<T>(rows: T[], get: (r: T) => SortVal, dir: SortDir): T[] {
+  const sign = dir === 'asc' ? 1 : -1
+  return [...rows].sort((a, b) => {
+    const va = get(a), vb = get(b)
+    // null/rỗng luôn xuống cuối, bất kể chiều
+    if (va == null || va === '') return vb == null || vb === '' ? 0 : 1
+    if (vb == null || vb === '') return -1
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * sign
+    return String(va).localeCompare(String(vb), 'vi', { numeric: true, sensitivity: 'base' }) * sign
+  })
+}
+
+function SortTh<K extends string>({ label, k, sort, onSort, align = 'left', className = '' }: {
+  label: React.ReactNode; k: K; sort: SortState<K>; onSort: (k: K) => void; align?: 'left' | 'right'; className?: string
+}) {
+  const active = sort.key === k
+  return (
+    <th
+      onClick={() => onSort(k)}
+      title="Bấm để sắp xếp"
+      className={`${align === 'right' ? 'text-right' : 'text-left'} px-3 py-2 cursor-pointer select-none whitespace-nowrap hover:text-gray-900 ${active ? 'text-gray-900' : ''} ${className}`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className={`text-[10px] ${active ? 'text-emerald-700' : 'text-gray-300'}`}>{active ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+      </span>
+    </th>
+  )
+}
+
+type RejSortKey = 'time' | 'employee' | 'dept' | 'reason' | 'distance' | 'device' | 'ip'
+type RowSortKey = 'time' | 'employee' | 'dept' | 'device' | 'loc' | 'distance' | 'ip'
+
 const REASON_LABEL: Record<string, string> = {
   no_gps: 'Không lấy được toạ độ',
   out_of_range: 'Ngoài phạm vi',
@@ -163,6 +209,8 @@ export default function GpsMonitorPage() {
   const { user } = useAuthStore()
   const [range, setRange] = useState<RangeDays>(14)
   const [locFilter, setLocFilter] = useState<string>('all')
+  const [rejSort, setRejSort] = useState<SortState<RejSortKey>>({ key: 'time', dir: 'desc' })
+  const [rowSort, setRowSort] = useState<SortState<RowSortKey>>({ key: 'time', dir: 'desc' })
 
   // Cùng ngưỡng với Sidebar (managerOnly): admin hoặc cấp ≤ 5
   const isAdmin = user?.role === 'admin'
@@ -214,14 +262,35 @@ export default function GpsMonitorPage() {
   const filtered = useMemo(() => {
     const list = locFilter === 'all' ? classified : classified.filter(c => c.locName === locFilter)
     // Chỉ liệt kê những lượt đáng xem: không verify, ngoài điểm, không toạ độ, bản cũ
-    return list.filter(c => !c.r.is_gps_verified || !c.inRange).slice(0, 300)
-  }, [classified, locFilter])
+    const rows = list.filter(c => !c.r.is_gps_verified || !c.inRange)
+    const get: Record<RowSortKey, (c: typeof rows[number]) => SortVal> = {
+      time: c => c.r.check_in_time,
+      employee: c => c.r.employee?.full_name,
+      dept: c => c.r.employee?.department?.name,
+      device: c => DEVICE_LABEL[c.kind],
+      loc: c => c.locName,
+      distance: c => c.near?.dist ?? null,
+      ip: c => c.r.check_in_ip,
+    }
+    return sortRows(rows, get[rowSort.key], rowSort.dir).slice(0, 300)
+  }, [classified, locFilter, rowSort])
 
   const rejections = useMemo(() => {
     const list = rejQ.data || []
-    if (locFilter === 'all') return list
-    return list.filter(x => (x.nearest_name || 'Không có toạ độ') === locFilter || (locFilter === 'Không có toạ độ' && x.lat == null))
-  }, [rejQ.data, locFilter])
+    const scoped = locFilter === 'all'
+      ? list
+      : list.filter(x => (x.nearest_name || 'Không có toạ độ') === locFilter || (locFilter === 'Không có toạ độ' && x.lat == null))
+    const get: Record<RejSortKey, (x: RejectionRow) => SortVal> = {
+      time: x => x.attempted_at,
+      employee: x => x.employee?.full_name,
+      dept: x => x.employee?.department?.name,
+      reason: x => reasonLabel(x.reason),
+      distance: x => (x.distance_m == null ? null : Number(x.distance_m)),
+      device: x => DEVICE_LABEL[deviceKind(x.device)],
+      ip: x => x.ip,
+    }
+    return sortRows(scoped, get[rejSort.key], rejSort.dir)
+  }, [rejQ.data, locFilter, rejSort])
 
   if (!allowed) {
     return (
@@ -363,12 +432,12 @@ export default function GpsMonitorPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
-                  <th className="text-left px-4 py-2">Lúc</th>
-                  <th className="text-left px-3 py-2">Nhân viên</th>
-                  <th className="text-left px-3 py-2">Lý do</th>
-                  <th className="text-right px-3 py-2">Cách điểm gần nhất</th>
-                  <th className="text-left px-3 py-2">Thiết bị</th>
-                  <th className="text-left px-3 py-2">IP</th>
+                  <SortTh label="Lúc" k="time" sort={rejSort} onSort={k => setRejSort(s => toggleSort(s, k))} className="pl-4" />
+                  <SortTh label="Nhân viên" k="employee" sort={rejSort} onSort={k => setRejSort(s => toggleSort(s, k))} />
+                  <SortTh label="Lý do" k="reason" sort={rejSort} onSort={k => setRejSort(s => toggleSort(s, k))} />
+                  <SortTh label="Cách điểm gần nhất" k="distance" sort={rejSort} onSort={k => setRejSort(s => toggleSort(s, k))} align="right" />
+                  <SortTh label="Thiết bị" k="device" sort={rejSort} onSort={k => setRejSort(s => toggleSort(s, k))} />
+                  <SortTh label="IP" k="ip" sort={rejSort} onSort={k => setRejSort(s => toggleSort(s, k))} />
                   <th className="text-left px-4 py-2">Vị trí</th>
                 </tr>
               </thead>
@@ -419,12 +488,12 @@ export default function GpsMonitorPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
-                  <th className="text-left px-4 py-2">Lúc</th>
-                  <th className="text-left px-3 py-2">Nhân viên</th>
-                  <th className="text-left px-3 py-2">Thiết bị</th>
-                  <th className="text-left px-3 py-2">Điểm</th>
-                  <th className="text-right px-3 py-2">Khoảng cách</th>
-                  <th className="text-left px-3 py-2">IP</th>
+                  <SortTh label="Lúc" k="time" sort={rowSort} onSort={k => setRowSort(s => toggleSort(s, k))} className="pl-4" />
+                  <SortTh label="Nhân viên" k="employee" sort={rowSort} onSort={k => setRowSort(s => toggleSort(s, k))} />
+                  <SortTh label="Thiết bị" k="device" sort={rowSort} onSort={k => setRowSort(s => toggleSort(s, k))} />
+                  <SortTh label="Điểm" k="loc" sort={rowSort} onSort={k => setRowSort(s => toggleSort(s, k))} />
+                  <SortTh label="Khoảng cách" k="distance" sort={rowSort} onSort={k => setRowSort(s => toggleSort(s, k))} align="right" />
+                  <SortTh label="IP" k="ip" sort={rowSort} onSort={k => setRowSort(s => toggleSort(s, k))} />
                   <th className="text-left px-4 py-2">Vị trí</th>
                 </tr>
               </thead>

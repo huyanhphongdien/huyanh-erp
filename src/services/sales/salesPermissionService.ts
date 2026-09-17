@@ -23,6 +23,7 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   // Logistics (Xuất nhập khẩu) — quyền edit Booking / Container / Shipping only
   'logistics@huyanhrubber.com': 'logistics',
   'anhlp@huyanhrubber.com': 'logistics',
+  'supplychain@huyanhrubber.com': 'logistics', // Trần Quốc Nhật — NV phòng Logistics (2026-09-17)
   'nhungtt@huyanhrubber.com': 'admin',  // Trương Thị Nhung — nâng ADMIN, phân quyền đầy đủ module Đơn hàng bán (2026-06-12)
   // Accounting — TOÀN phòng Kế toán, quyền như yendt (accounting + reviewer + xem/tải HĐ) 2026-07-16
   'yendt@huyanhrubber.com': 'accounting',   // Đỗ Thị Yến

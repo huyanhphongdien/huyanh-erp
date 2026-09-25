@@ -34,6 +34,7 @@ import { salesContractWorkflowService } from '../../../services/sales/salesContr
 import { supabase } from '../../../lib/supabase'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../../services/sales/salesTypes'
+import { isVnd, fmtMoney, orderTotalInCurrency } from '../../../services/sales/salesMoney'
 import {
   getSalesRole,
   getVisibleTabs,
@@ -244,8 +245,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       order.customer ? `Khách hàng: ${order.customer.name}` : null,
       order.grade ? `Grade: ${order.grade}` : null,
       order.quantity_tons ? `Số lượng: ${order.quantity_tons} MT` : null,
-      order.unit_price ? `Đơn giá: $${order.unit_price}/MT` : null,
-      order.total_value_usd ? `Tổng: $${order.total_value_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : null,
+      order.unit_price ? `Đơn giá: ${fmtMoney(order.unit_price, order.currency)}/MT` : null,
+      orderTotalInCurrency(order) ? `Tổng: ${fmtMoney(orderTotalInCurrency(order), order.currency)}` : null,
       (order as { incoterm?: string }).incoterm ? `Incoterm: ${(order as { incoterm?: string }).incoterm}` : null,
       `Trạng thái: ${ORDER_STATUS_LABELS[order.status as SalesOrderStatus] || order.status}`,
       `Link: ${window.location.origin}/sales/orders/${order.id}`,
@@ -727,9 +728,11 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
                     🚢 <b style={{ color: '#262626', fontWeight: 600 }}>{(order as { incoterm?: string }).incoterm}</b>
                   </span>
                 )}
-                {order.total_value_usd ? (
+                {orderTotalInCurrency(order) ? (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    💰 <b style={{ color: '#1B4D3E', fontWeight: 700 }}>{fmtUSD(order.total_value_usd)}</b>
+                    💰 <b style={{ color: '#1B4D3E', fontWeight: 700 }}>
+                      {isVnd(order.currency) ? fmtMoney(orderTotalInCurrency(order), 'VND', { compact: true }) : fmtUSD(order.total_value_usd)}
+                    </b>
                   </span>
                 ) : null}
                 {(order as { etd?: string }).etd && (

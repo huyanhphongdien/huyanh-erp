@@ -94,6 +94,17 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
   Migration: `wms_m4_p2_lenh_huy_khong_phai_hang_da_di.sql`.
 - Migrations: `docs/migrations/sales_lots_p{1,2,3}_*.sql` — chạy theo thứ tự (đã áp production 26/08/2026).
 
+## Đồng tiền đơn hàng bán — USD / VNĐ (25/09/2026)
+- `sales_orders.currency` ∈ USD (xuất khẩu, mặc định) | VND (bán nội địa). `unit_price` và `sales_order_items.unit_price`
+  tính theo đồng tiền đó (/tấn). Chọn ở form tạo đơn (thẻ "Sản phẩm & Giá"); **không đổi đồng tiền khi sửa** — tạo đơn mới.
+- **Đơn VND bắt buộc có `exchange_rate`** (service từ chối nếu thiếu): `total_value_vnd` = tấn × giá (số thật trên HĐ),
+  `total_value_usd` = vnd ÷ tỷ giá = **số quy đổi** để công nợ (`v_ar_aging_rows`), sổ lô, dashboard, tab Tài chính cộng
+  chung một đơn vị. Đơn USD giữ như cũ (`total_value_vnd` = usd × tỷ giá nếu có).
+- Mọi nhãn/định dạng lấy từ `src/services/sales/salesMoney.ts` (`isVnd`, `priceUnitLabel` "$/tấn"|"₫/tấn", `fmtMoney`,
+  `orderTotalInCurrency`, `toUsdEquivalent`, `orderTotals`, `vndInputProps`) — đừng gõ cứng "$" ở màn mới.
+- Chưa phủ: sinh hợp đồng/Invoice .docx (mẫu xuất khẩu, chữ USD), hoa hồng & tab Tài chính vẫn tính bằng USD quy đổi,
+  trang Công nợ khách hiện USD quy đổi cho đơn VND.
+
 ## Công nợ phải thu (A/R)
 - **Mẫu số phải thu = `sales_orders.total_value_usd`** (trị giá hợp đồng). Trị giá lô chỉ
   dùng để PHÂN BỔ tiền vào lô, **không bao giờ** làm mẫu số công nợ.

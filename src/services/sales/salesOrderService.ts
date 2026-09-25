@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { isVnd, orderTotals, toUsdEquivalent } from './salesMoney'
 import type {
   SalesOrder,
   SalesOrderStatus,
@@ -415,9 +416,15 @@ export const salesOrderService = {
     const balesPerContainer20ft = baleWeight >= 35 ? 600 : 630
     const balesPerContainer = containerType === '40ft' ? balesPerContainer20ft * 2 : balesPerContainer20ft
     const containerCount = Math.ceil(totalBales / balesPerContainer)
-    const totalValueUsd = input.quantity_tons * input.unit_price
+    // Đồng tiền của đơn: USD (xuất khẩu) hoặc VND (nội địa) — xem salesMoney.ts.
+    // Đơn VND phải có tỷ giá để có số USD quy đổi cho công nợ/báo cáo.
+    const currency = (input.currency || 'USD').toUpperCase()
     const exchangeRate = input.exchange_rate || 0
-    const totalValueVnd = exchangeRate > 0 ? totalValueUsd * exchangeRate : 0
+    if (isVnd(currency) && exchangeRate <= 0) {
+      throw new Error('Đơn bán nội địa (VNĐ) phải nhập tỷ giá VND/USD để quy đổi báo cáo')
+    }
+    const { total_value_usd: totalValueUsd, total_value_vnd: totalValueVnd } =
+      orderTotals(currency, input.quantity_tons, input.unit_price, exchangeRate)
 
     // Lấy chỉ tiêu kỹ thuật từ bảng tiêu chuẩn nếu chưa nhập thủ công
     let qualitySpecs: Record<string, number | undefined> = {}
@@ -443,10 +450,10 @@ export const salesOrderService = {
         quantity_tons: input.quantity_tons,
         quantity_kg: quantityKg,
         unit_price: input.unit_price,
-        currency: input.currency || 'USD',
+        currency,
         exchange_rate: exchangeRate || null,
         total_value_usd: totalValueUsd,
-        total_value_vnd: totalValueVnd || null,
+        total_value_vnd: totalValueVnd,
         incoterm: input.incoterm || 'FOB',
         port_of_loading: input.port_of_loading || null,
         port_of_destination: input.port_of_destination || null,
@@ -539,9 +546,10 @@ export const salesOrderService = {
           grade: item.grade,
           quantity_tons: item.quantity_tons,
           unit_price: item.unit_price,
-          currency: item.currency || 'USD',
+          currency,
           payment_terms: item.payment_terms || null,
-          total_value_usd: item.quantity_tons * item.unit_price,
+          // Cột tên _usd: với đơn VND đây là số USD quy đổi (÷ tỷ giá) để cộng chung báo cáo
+          total_value_usd: toUsdEquivalent(item.quantity_tons * item.unit_price, currency, exchangeRate),
           quantity_kg: qtyKg,
           bale_weight_kg: bw,
           bale_weights_kg: baleWeights,
@@ -611,6 +619,7 @@ export const salesOrderService = {
     const baleWeight = input.bale_weight_kg ?? existing.bale_weight_kg
     const containerType = input.container_type ?? existing.container_type ?? '20ft'
     const exchangeRate = input.exchange_rate ?? existing.exchange_rate ?? 0
+    const currency = (input.currency ?? existing.currency ?? 'USD').toUpperCase()
 
     const recalculated: Record<string, unknown> = {}
 
@@ -619,20 +628,20 @@ export const salesOrderService = {
       input.bale_weight_kg !== undefined ||
       input.container_type !== undefined ||
       input.unit_price !== undefined ||
-      input.exchange_rate !== undefined
+      input.exchange_rate !== undefined ||
+      input.currency !== undefined
     ) {
       const quantityKg = quantityTons * 1000
       const totalBales = Math.round(quantityKg / baleWeight)
       const maxTonsPerContainer = containerType === '20ft' ? 20 : 25
       const containerCount = Math.ceil(quantityTons / maxTonsPerContainer)
-      const totalValueUsd = quantityTons * unitPrice
-      const totalValueVnd = exchangeRate > 0 ? totalValueUsd * exchangeRate : 0
+      const totals = orderTotals(currency, quantityTons, unitPrice, exchangeRate)
 
       recalculated.quantity_kg = quantityKg
       recalculated.total_bales = totalBales
       recalculated.container_count = containerCount
-      recalculated.total_value_usd = totalValueUsd
-      recalculated.total_value_vnd = totalValueVnd || null
+      recalculated.total_value_usd = totals.total_value_usd
+      recalculated.total_value_vnd = totals.total_value_vnd
     }
 
     const { data, error } = await supabase

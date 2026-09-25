@@ -50,6 +50,7 @@ import { salesCustomerService } from '../../services/sales/salesCustomerService'
 import { salesOrderService, type CreateSalesOrderData } from '../../services/sales/salesOrderService'
 import { rubberGradeService } from '../../services/wms/rubberGradeService'
 import type { SalesCustomer } from '../../services/sales/salesTypes'
+import { SALES_CURRENCY_OPTIONS, isVnd, priceUnitLabel, fmtMoney, vndInputProps } from '../../services/sales/salesMoney'
 import type { RubberGradeStandard } from '../../services/wms/wms.types'
 import {
   SVR_GRADE_OPTIONS,
@@ -158,6 +159,9 @@ function SalesOrderCreatePage() {
   const balesPerContInput = Form.useWatch('bales_per_container', form) || 576
   const containerType = Form.useWatch('container_type', form) || '20ft'
   const currency = Form.useWatch('currency', form) || 'USD'
+  // Bán nội địa: giá nhập bằng VNĐ, cần tỷ giá để quy đổi USD cho công nợ/báo cáo (salesMoney.ts)
+  const vnd = isVnd(currency)
+  const exchangeRateWatch = Form.useWatch('exchange_rate', form) || 0
   const commissionPct = Form.useWatch('commission_pct', form) || 0
   const commissionUsdPerMt = Form.useWatch('commission_usd_per_mt', form) || 0
 
@@ -416,8 +420,11 @@ function SalesOrderCreatePage() {
         commission_amount: values.commission_usd_per_mt
           ? itemsTotalTons * values.commission_usd_per_mt
           : (values.commission_pct ? itemsTotalUSD * (values.commission_pct / 100) : undefined),
-        // Multi-item data
-        items: validItems,
+        // Đồng tiền + tỷ giá (đơn VNĐ bắt buộc có tỷ giá — service kiểm lại)
+        currency: values.currency || 'USD',
+        exchange_rate: values.exchange_rate || undefined,
+        // Multi-item data — từng dòng mang đồng tiền của đơn
+        items: validItems.map(i => ({ ...i, currency: values.currency || 'USD' })),
       }
 
       const created = await salesOrderService.create(payload)
@@ -604,6 +611,27 @@ function SalesOrderCreatePage() {
           title={<Space><span style={{ fontSize: 14, fontWeight: 600 }}>Sản phẩm & Giá</span><Tag color="blue">{orderItems.length} sản phẩm</Tag></Space>}
           extra={<Button size="small" type="dashed" onClick={addItem} icon={<span>+</span>}>Thêm SP</Button>}>
 
+          {/* Đồng tiền của đơn — USD xuất khẩu / VNĐ bán nội địa. Áp cho mọi dòng sản phẩm. */}
+          <Row gutter={12} style={{ marginBottom: 10 }}>
+            <Col xs={12} sm={7}>
+              <Form.Item name="currency" label={<span style={{ fontSize: 11, color: '#999' }}>Đồng tiền</span>} style={{ marginBottom: 0 }}>
+                <Select options={SALES_CURRENCY_OPTIONS} popupMatchSelectWidth={false} />
+              </Form.Item>
+            </Col>
+            {vnd && (
+              <Col xs={12} sm={9}>
+                <Form.Item
+                  name="exchange_rate"
+                  label={<span style={{ fontSize: 11, color: '#999' }}>Tỷ giá VND/USD (quy đổi báo cáo)</span>}
+                  rules={[{ required: true, message: 'Đơn VNĐ cần tỷ giá' }]}
+                  style={{ marginBottom: 0 }}
+                >
+                  <InputNumber min={1} step={100} style={{ width: '100%' }} placeholder="25.500" {...vndInputProps} />
+                </Form.Item>
+              </Col>
+            )}
+          </Row>
+
           {orderItems.map((item, idx) => (
             <div key={item.key} style={{ background: idx % 2 === 0 ? '#fafafa' : '#fff', padding: '12px', borderRadius: 8, marginBottom: 8, border: '1px solid #f0f0f0' }}>
               <Row gutter={[12, 8]} align="middle">
@@ -632,10 +660,16 @@ function SalesOrderCreatePage() {
                 </Col>
                 <Col xs={12} sm={4}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>
-                    <span style={{ color: '#ff4d4f' }}>*</span> $/tấn
+                    <span style={{ color: '#ff4d4f' }}>*</span> {priceUnitLabel(currency)}
                   </div>
-                  <InputNumber value={item.unit_price || undefined} min={0} step={10} style={{ width: '100%' }} placeholder="1,924"
-                    onChange={(v) => updateItem(item.key, 'unit_price', v || 0)} />
+                  {vnd ? (
+                    <InputNumber value={item.unit_price || undefined} min={0} step={100000} style={{ width: '100%' }} placeholder="35.000.000"
+                      {...vndInputProps}
+                      onChange={(v) => updateItem(item.key, 'unit_price', v || 0)} />
+                  ) : (
+                    <InputNumber value={item.unit_price || undefined} min={0} step={10} style={{ width: '100%' }} placeholder="1,924"
+                      onChange={(v) => updateItem(item.key, 'unit_price', v || 0)} />
+                  )}
                 </Col>
                 <Col xs={12} sm={5}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>
@@ -880,10 +914,17 @@ function SalesOrderCreatePage() {
               </div>
             </Col>
             <Col span={24}>
-              <div style={{ fontSize: 11, color: '#999' }}>Giá trị {currency}</div>
+              <div style={{ fontSize: 11, color: '#999' }}>Giá trị {vnd ? 'VNĐ' : 'USD'}</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: '#10b981' }}>
-                ${itemsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {fmtMoney(itemsTotalUSD, currency)}
               </div>
+              {vnd && (
+                <div style={{ fontSize: 11, color: '#999' }}>
+                  {exchangeRateWatch > 0
+                    ? `≈ ${fmtMoney(itemsTotalUSD / exchangeRateWatch, 'USD')} theo tỷ giá ${Number(exchangeRateWatch).toLocaleString('vi-VN')}`
+                    : 'Nhập tỷ giá để quy đổi USD (công nợ, báo cáo cộng chung USD)'}
+                </div>
+              )}
             </Col>
           </Row>
         </Card>

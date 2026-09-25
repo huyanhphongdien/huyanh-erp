@@ -46,6 +46,7 @@ import dayjs from 'dayjs'
 import { supabase } from '../../lib/supabase'
 import { salesOrderService, SORTABLE_ORDER_COLUMNS } from '../../services/sales/salesOrderService'
 import type { SalesOrderStats, SalesOrderListParams, SortableOrderColumn } from '../../services/sales/salesOrderService'
+import { isVnd, fmtMoney } from '../../services/sales/salesMoney'
 import { dispatchService, deliveredTons, remainingTons, type LotProgress } from '../../services/logistics/dispatchService'
 import LotProgressBadge, { DispatchChips } from '../../components/sales/LotProgressBadge'
 import LotChipStrip, { mergeLotAxes } from '../../components/sales/LotChipStrip'
@@ -919,7 +920,7 @@ const SalesOrderListPage = () => {
     'Số LOT': 'Số LOT của khách hàng (Customer PO)',
     'Số BKG': 'Số booking vận tải (đặt tàu)',
     'ETD': 'Estimated Time of Departure — Ngày tàu chạy dự kiến',
-    'Đ.giá': 'Đơn giá USD/tấn',
+    'Đ.giá': 'Đơn giá /tấn theo đồng tiền của đơn ($ xuất khẩu, ₫ nội địa)',
     'CK': 'Chiết khấu',
     'NH CK': 'Ngân hàng chiết khấu',
     'T.độ': 'Tiến độ 4 phase: Hợp đồng → Sản xuất → Logistics → Kế toán',
@@ -1279,7 +1280,12 @@ const SalesOrderListPage = () => {
       align: 'right',
       sorter: true,
       sortOrder: sortedColumn('unit_price'),
-      render: (v: number, r: SalesOrder) => <InlineNumberCell orderId={r.id} field="unit_price" value={v} />,
+      render: (v: number, r: SalesOrder) => (
+        <>
+          <InlineNumberCell orderId={r.id} field="unit_price" value={v} />
+          {isVnd(r.currency) && <span style={{ fontSize: 10, color: '#999' }}>₫</span>}
+        </>
+      ),
     },
     {
       title: hdr('Thành tiền'),
@@ -1289,7 +1295,15 @@ const SalesOrderListPage = () => {
       align: 'right',
       sorter: true,
       sortOrder: sortedColumn('total_usd'),
-      render: (v: number) => v ? <strong style={{ color: '#1B4D3E', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(v)}</strong> : gray(null),
+      // Đơn VNĐ: hiện số VNĐ thật, kèm USD quy đổi nhỏ (cột sort vẫn theo total_value_usd)
+      render: (v: number, r: SalesOrder) => isVnd(r.currency)
+        ? (r.total_value_vnd
+            ? <span style={{ display: 'inline-block', textAlign: 'right' }}>
+                <strong style={{ color: '#1B4D3E', fontFamily: 'monospace', fontSize: 12 }}>{fmtMoney(r.total_value_vnd, 'VND')}</strong>
+                {v ? <div style={{ fontSize: 10, color: '#999' }}>≈ {fmtMoney(v, 'USD', { decimals: 0 })}</div> : null}
+              </span>
+            : gray(null))
+        : (v ? <strong style={{ color: '#1B4D3E', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(v)}</strong> : gray(null)),
     },
     {
       title: hdr('Đặt cọc'),
@@ -1865,8 +1879,12 @@ const SalesOrderListPage = () => {
                         <tr key={item.id || i} style={{ borderBottom: '1px solid #f5f5f5' }}>
                           <td style={{ padding: '6px 12px' }}><Tag color="green">{item.grade}</Tag></td>
                           <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.quantity_tons} tấn</td>
-                          <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>${item.unit_price?.toLocaleString()}</td>
-                          <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#1B4D3E' }}>${item.total_value_usd?.toLocaleString()}</td>
+                          <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{fmtMoney(item.unit_price, record.currency, { decimals: 0 })}</td>
+                          <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#1B4D3E' }}>
+                            {isVnd(record.currency)
+                              ? fmtMoney((item.quantity_tons || 0) * (item.unit_price || 0), 'VND')
+                              : fmtMoney(item.total_value_usd, 'USD', { decimals: 0 })}
+                          </td>
                           <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.total_bales?.toLocaleString()}</td>
                           <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.container_count}</td>
                           <td style={{ padding: '6px 12px' }}>{item.bale_weight_kg} kg</td>

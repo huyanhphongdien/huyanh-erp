@@ -25,6 +25,7 @@ import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import { supabase } from '../../../lib/supabase'
 import type { SalesOrder, SalesOrderItem } from '../../../services/sales/salesTypes'
+import { isVnd, fmtMoney, priceUnitLabel, orderTotalInCurrency, toUsdEquivalent, vndInputProps } from '../../../services/sales/salesMoney'
 import {
   INCOTERM_LABELS,
   PAYMENT_TERMS_LABELS,
@@ -271,6 +272,9 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         .eq('sales_order_id', order.id)
       if (delErr) throw delErr
 
+      // Đồng tiền của đơn giữ nguyên khi sửa dòng (đổi USD↔VNĐ = tạo đơn mới)
+      const cur = order.currency || 'USD'
+      const rate = order.exchange_rate || 0
       const itemRows = validItems.map((it, idx) => {
         const qtyKg = it.quantity_tons * 1000
         const bw = it.bale_weight_kg || 33.33
@@ -281,9 +285,10 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
           grade: it.grade,
           quantity_tons: it.quantity_tons,
           unit_price: it.unit_price,
-          currency: order.currency || 'USD',
+          currency: cur,
           payment_terms: it.payment_terms || null,
-          total_value_usd: it.quantity_tons * it.unit_price,
+          // đơn VNĐ: số USD quy đổi (÷ tỷ giá) — xem salesMoney.ts
+          total_value_usd: toUsdEquivalent(it.quantity_tons * it.unit_price, cur, rate),
           quantity_kg: qtyKg,
           bale_weight_kg: bw,
           total_bales: bales,
@@ -297,13 +302,17 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       if (insErr) throw insErr
 
       const totalTons = itemRows.reduce((s, i) => s + i.quantity_tons, 0)
-      const totalValueUsd = itemRows.reduce((s, i) => s + (i.total_value_usd || 0), 0)
+      const totalValueUsd = itemRows.reduce((s, i) => s + (i.total_value_usd || 0), 0)   // USD (quy đổi nếu VNĐ)
+      const totalInCurrency = itemRows.reduce((s, i) => s + i.quantity_tons * i.unit_price, 0) // theo đồng tiền đơn
       const totalBales = itemRows.reduce((s, i) => s + (i.total_bales || 0), 0)
       const containerCount = itemRows.reduce((s, i) => s + (i.container_count || 0), 0)
       const aggregatedGrade = itemRows.length === 1 ? itemRows[0].grade : itemRows.map(i => i.grade).join(' + ')
       const firstItem = validItems[0]
 
-      const avgUnitPrice = totalTons > 0 ? Math.round((totalValueUsd / totalTons) * 100) / 100 : 0
+      // unit_price header theo đồng tiền của đơn (VNĐ không lấy số lẻ)
+      const avgUnitPrice = totalTons > 0
+        ? (isVnd(cur) ? Math.round(totalInCurrency / totalTons) : Math.round((totalInCurrency / totalTons) * 100) / 100)
+        : 0
       const commissionAmount = vals.commission_usd_per_mt
         ? totalTons * vals.commission_usd_per_mt
         : (vals.commission_pct ? totalValueUsd * (vals.commission_pct / 100) : null)
@@ -312,6 +321,8 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       updateData.quantity_kg = totalTons * 1000
       updateData.unit_price = avgUnitPrice
       updateData.total_value_usd = totalValueUsd
+      if (isVnd(cur)) updateData.total_value_vnd = Math.round(totalInCurrency)
+      else if (rate > 0) updateData.total_value_vnd = Math.round(totalValueUsd * rate)
       updateData.total_bales = totalBales
       updateData.container_count = containerCount
       updateData.grade = aggregatedGrade
@@ -400,7 +411,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                   <tr style={{ background: '#fafafa' }}>
                     <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, color: '#666', minWidth: 110 }}>Grade</th>
                     <th style={{ padding: '6px 8px', textAlign: 'right', fontSize: 11, color: '#666', minWidth: 90 }}>Tấn</th>
-                    <th style={{ padding: '6px 8px', textAlign: 'right', fontSize: 11, color: '#666', minWidth: 100 }}>$/tấn</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right', fontSize: 11, color: '#666', minWidth: 100 }}>{priceUnitLabel(order.currency)}</th>
                     <th style={{ padding: '6px 8px', textAlign: 'right', fontSize: 11, color: '#666', minWidth: 100 }}>Thành tiền</th>
                     <th style={{ padding: '6px 8px', textAlign: 'right', fontSize: 11, color: '#666', minWidth: 80 }}>KL bành</th>
                     <th style={{ padding: '6px 8px', textAlign: 'right', fontSize: 11, color: '#666', minWidth: 80 }}>Bành/cont</th>
@@ -444,18 +455,19 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                       <td style={{ padding: '4px 6px' }}>
                         <InputNumber
                           size="small"
-                          min={0.01}
-                          step={0.01}
-                          placeholder="vd: 2150"
+                          min={isVnd(order.currency) ? 1 : 0.01}
+                          step={isVnd(order.currency) ? 100000 : 0.01}
+                          placeholder={isVnd(order.currency) ? 'vd: 35.000.000' : 'vd: 2150'}
                           value={it.unit_price}
                           style={{ width: '100%' }}
+                          {...(isVnd(order.currency) ? vndInputProps : {})}
                           onChange={(v) => {
                             const next = [...editItems]; next[idx] = { ...it, unit_price: Number(v) || 0 }; setEditItems(next)
                           }}
                         />
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#1B4D3E' }}>
-                        ${(it.quantity_tons * it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {fmtMoney(it.quantity_tons * it.unit_price, order.currency)}
                       </td>
                       <td style={{ padding: '4px 6px' }}>
                         <InputNumber
@@ -522,7 +534,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                     <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{itemsTotalTons.toFixed(2)}</td>
                     <td />
                     <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace', color: '#1B4D3E' }}>
-                      ${itemsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {fmtMoney(itemsTotalUSD, order.currency)}
                     </td>
                     <td colSpan={5} />
                   </tr>
@@ -743,9 +755,10 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       <SectionHeader title="Sản phẩm & Giá" color="#1B4D3E" />
       <Descriptions column={3} size="small" bordered>
         <Descriptions.Item label="Số lượng">{order.quantity_tons} tấn</Descriptions.Item>
-        <Descriptions.Item label="Đơn giá">{fmtCurrency(order.unit_price)}/tấn</Descriptions.Item>
+        <Descriptions.Item label="Đơn giá">{fmtMoney(order.unit_price, order.currency)}/tấn</Descriptions.Item>
         <Descriptions.Item label="Tổng giá trị">
-          <strong style={{ color: '#1B4D3E' }}>{fmtCurrency(totalValueUSD)}</strong>
+          <strong style={{ color: '#1B4D3E' }}>{fmtMoney(orderTotalInCurrency(order), order.currency)}</strong>
+          {isVnd(order.currency) && totalValueUSD ? <span style={{ fontSize: 11, color: '#999', marginLeft: 6 }}>≈ {fmtCurrency(totalValueUSD)}</span> : null}
         </Descriptions.Item>
         <Descriptions.Item label="KL bành">{order.bale_weight_kg || 33.33} kg</Descriptions.Item>
         <Descriptions.Item label="Tổng bành">{totalBales}</Descriptions.Item>
@@ -772,7 +785,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
               <tr style={{ background: '#fafafa' }}>
                 <th style={{ padding: '6px 10px', textAlign: 'left', fontSize: 11, color: '#666' }}>Grade</th>
                 <th style={{ padding: '6px 10px', textAlign: 'right', fontSize: 11, color: '#666' }}>Tấn</th>
-                <th style={{ padding: '6px 10px', textAlign: 'right', fontSize: 11, color: '#666' }}>$/tấn</th>
+                <th style={{ padding: '6px 10px', textAlign: 'right', fontSize: 11, color: '#666' }}>{priceUnitLabel(order.currency)}</th>
                 <th style={{ padding: '6px 10px', textAlign: 'right', fontSize: 11, color: '#666' }}>Thành tiền</th>
                 <th style={{ padding: '6px 10px', textAlign: 'left', fontSize: 11, color: '#666' }}>Đóng gói</th>
                 <th style={{ padding: '6px 10px', textAlign: 'left', fontSize: 11, color: '#666' }}>Thanh toán</th>
@@ -783,8 +796,12 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                 <tr key={item.id || i} style={{ borderTop: '1px solid #f0f0f0' }}>
                   <td style={{ padding: '6px 10px' }}><Tag color="green">{item.grade}</Tag></td>
                   <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{item.quantity_tons}</td>
-                  <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace' }}>${item.unit_price?.toLocaleString()}</td>
-                  <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#1B4D3E' }}>${item.total_value_usd?.toLocaleString()}</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{fmtMoney(item.unit_price, order.currency, { decimals: 0 })}</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#1B4D3E' }}>
+                    {isVnd(order.currency)
+                      ? fmtMoney((item.quantity_tons || 0) * (item.unit_price || 0), 'VND')
+                      : fmtMoney(item.total_value_usd, 'USD', { decimals: 0 })}
+                  </td>
                   <td style={{ padding: '6px 10px', fontSize: 11 }}>{item.packing_type?.replace('_', ' ') || '—'}</td>
                   <td style={{ padding: '6px 10px', fontSize: 11 }}>{item.payment_terms ? item.payment_terms.split(',').join(' + ') : '—'}</td>
                 </tr>

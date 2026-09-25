@@ -11,6 +11,7 @@ import {
   CUSTOMER_TIER_COLORS, CUSTOMER_TIER_LABELS, SVR_GRADE_OPTIONS,
   soDisplayCode,
 } from '../../../services/sales/salesTypes'
+import { isVnd, fmtMoney, orderTotalInCurrency } from '../../../services/sales/salesMoney'
 
 const fDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString('vi-VN') : '-')
 const fUsd = (v?: number | null) => (v != null ? '$' + v.toLocaleString('en-US') : '-')
@@ -34,8 +35,8 @@ export default function OrderInfoTab({ order }: { order: SalesOrder }) {
             <Descriptions.Item label="Grade"><Tag color="blue">{gradeLabel}</Tag></Descriptions.Item>
             <Descriptions.Item label="Khách hàng" span={2}>{cust?.name || '-'} {cust?.country ? `(${cust.country})` : ''}</Descriptions.Item>
             <Descriptions.Item label="Số lượng">{order.quantity_tons} tấn ({order.quantity_kg?.toLocaleString()} kg)</Descriptions.Item>
-            <Descriptions.Item label="Đơn giá">{fUsd(order.unit_price)} / tấn</Descriptions.Item>
-            <Descriptions.Item label="Giá trị">{fUsd(order.total_value_usd)}</Descriptions.Item>
+            <Descriptions.Item label="Đơn giá">{fmtMoney(order.unit_price, order.currency, { decimals: 0 })} / tấn</Descriptions.Item>
+            <Descriptions.Item label="Giá trị">{fmtMoney(orderTotalInCurrency(order), order.currency, { decimals: 0 })}</Descriptions.Item>
             <Descriptions.Item label="Incoterm">{INCOTERM_LABELS[order.incoterm as Incoterm] || order.incoterm}</Descriptions.Item>
             <Descriptions.Item label="Cảng xếp">{order.port_of_loading || '-'}</Descriptions.Item>
             <Descriptions.Item label="Cảng đích">{order.port_of_destination || '-'}</Descriptions.Item>
@@ -48,7 +49,9 @@ export default function OrderInfoTab({ order }: { order: SalesOrder }) {
               {order.packing_note ? <span style={{ fontSize: 12, color: '#666', fontStyle: 'italic' }}> · {order.packing_note}</span> : ''}
             </Descriptions.Item>
             <Descriptions.Item label="PO# KH">{order.customer_po || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Giá trị VND">{fVnd(order.total_value_vnd)}</Descriptions.Item>
+            {isVnd(order.currency)
+              ? <Descriptions.Item label="Quy đổi USD">{fUsd(order.total_value_usd)}</Descriptions.Item>
+              : <Descriptions.Item label="Giá trị VND">{fVnd(order.total_value_vnd)}</Descriptions.Item>}
             <Descriptions.Item label="Tỷ giá">{order.exchange_rate ? `${order.exchange_rate.toLocaleString('vi-VN')} VND/USD` : '-'}</Descriptions.Item>
             <Descriptions.Item label="Thanh toán" span={2}>
               {PAYMENT_TERMS_LABELS[order.payment_terms as PaymentTerms] || order.payment_terms || '-'}

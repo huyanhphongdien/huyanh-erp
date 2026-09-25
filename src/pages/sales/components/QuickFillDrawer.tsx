@@ -13,6 +13,7 @@ import type { ReadyGroup, ReadyCtx } from '../../../services/sales/docReadiness'
 import { GROUP_LABEL } from '../../../services/sales/docReadiness'
 import { INCOTERM_LABELS, type SalesOrderContainer } from '../../../services/sales/salesTypes'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
+import { isVnd } from '../../../services/sales/salesMoney'
 import { containerService } from '../../../services/sales/containerService'
 import { customerExportProfileService, type CompanyBank } from '../../../services/sales/customerExportProfileService'
 
@@ -194,7 +195,7 @@ export default function QuickFillDrawer(
             <InputNumber min={0} style={{ width: '100%' }} addonAfter="tấn" />
           </Form.Item>
           <Form.Item name="unit_price" label="Đơn giá" rules={[{ required: true }]}>
-            <InputNumber min={0} style={{ width: '100%' }} addonAfter="USD/tấn" />
+            <InputNumber min={0} style={{ width: '100%' }} addonAfter={isVnd(order.currency) ? '₫/tấn' : 'USD/tấn'} />
           </Form.Item>
           <Form.Item name="incoterm" label="Incoterm" rules={[{ required: true }]}>
             <Select options={Object.entries(INCOTERM_LABELS).map(([v, l]) => ({ value: v, label: l }))} />

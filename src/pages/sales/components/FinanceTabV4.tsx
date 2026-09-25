@@ -28,6 +28,7 @@ import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { PAYMENT_TERMS_LABELS, type PaymentTerms } from '../../../services/sales/salesTypes'
+import { fmtMoney, toUsdEquivalent } from '../../../services/sales/salesMoney'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
 import PaymentHistorySection from './PaymentHistorySection'
@@ -85,7 +86,8 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
   const canEdit = editable && (salesRole === 'accounting' || salesRole === 'admin')
 
   // ── Computed ──
-  const totalUSD = order.total_value_usd || (order.quantity_tons * order.unit_price)
+  // Tab tài chính tính bằng USD; đơn VNĐ dùng số quy đổi (total_value_usd = vnd ÷ tỷ giá)
+  const totalUSD = order.total_value_usd || toUsdEquivalent(order.quantity_tons * order.unit_price, order.currency, order.exchange_rate)
   const exchangeRate = order.exchange_rate || 0
   const totalVND = exchangeRate > 0 ? totalUSD * exchangeRate : (order.total_value_vnd || 0)
   const deposit = order.deposit_amount || 0
@@ -422,13 +424,13 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
           <Divider style={{ margin: '12px 0' }} />
           <SectionHeader title="Giá" color="#cf1322" />
           <Descriptions column={3} size="small" bordered>
-            <Descriptions.Item label="Giá chốt (đơn giá)">{fmtUSD(order.unit_price)}/MT</Descriptions.Item>
-            <Descriptions.Item label="Giá HĐ">{fmtUSD(order.contract_price)}/MT</Descriptions.Item>
+            <Descriptions.Item label="Giá chốt (đơn giá)">{fmtMoney(order.unit_price, order.currency)}/MT</Descriptions.Item>
+            <Descriptions.Item label="Giá HĐ">{fmtMoney(order.contract_price, order.currency)}/MT</Descriptions.Item>
             <Descriptions.Item label="Chênh lệch">
               {(() => {
                 const diff = (order.unit_price || 0) - (order.contract_price || 0)
                 const c = diff > 0 ? '#1B4D3E' : diff < 0 ? '#cf1322' : '#666'
-                return <span style={{ color: c, fontWeight: 600 }}>{diff >= 0 ? '+' : ''}{fmtUSD(diff)}/MT</span>
+                return <span style={{ color: c, fontWeight: 600 }}>{diff >= 0 ? '+' : ''}{fmtMoney(diff, order.currency)}/MT</span>
               })()}
             </Descriptions.Item>
           </Descriptions>

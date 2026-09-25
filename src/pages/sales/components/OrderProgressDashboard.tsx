@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button, Tag, Spin, Modal, message } from 'antd'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
+import { fmtMoney, priceUnitLabel, orderTotalInCurrency } from '../../../services/sales/salesMoney'
 import {
   salesContractWorkflowService,
   type SalesOrderContract,
@@ -343,11 +344,11 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
                 <tr>
                   <th style={{ ...th, paddingLeft: 16 }}>Grade</th>
                   <th style={th}>Tấn</th>
-                  <th style={th}>$/MT</th>
+                  <th style={th}>{priceUnitLabel(order.currency)}</th>
                   <th style={th}>Bành</th>
                   <th style={th}>Đóng gói</th>
                   <th style={th}>Thanh toán</th>
-                  <th style={{ ...th, textAlign: 'right', paddingRight: 16 }}>Tổng USD</th>
+                  <th style={{ ...th, textAlign: 'right', paddingRight: 16 }}>Tổng {order.currency || 'USD'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -360,12 +361,12 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
                     <tr key={idx} style={{ borderTop: '1px solid #f5f5f5' }}>
                       <td style={{ ...td, paddingLeft: 16 }}><strong>{item.grade || '—'}</strong></td>
                       <td style={td}>{(item.quantity_tons || 0).toFixed(2)}</td>
-                      <td style={td}>${(item.unit_price || 0).toLocaleString()}</td>
+                      <td style={td}>{fmtMoney(item.unit_price || 0, order.currency, { decimals: 0 })}</td>
                       <td style={td}>{bales.toLocaleString()}</td>
                       <td style={td}>{(item.packing_type || '—').replace(/_/g, ' ')}</td>
                       <td style={td}>{item.payment_terms || '—'}</td>
                       <td style={{ ...td, textAlign: 'right', paddingRight: 16 }}>
-                        <strong>{fmtFull(total)}</strong>
+                        <strong>{fmtMoney(total, order.currency, { decimals: 0 })}</strong>
                       </td>
                     </tr>
                   )
@@ -382,7 +383,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
 
         <div style={card}>
           <div style={cardTitle}>💰 Tài chính</div>
-          <FieldRow label="Giá trị HĐ" value={fmtFull(order.total_value_usd)} />
+          <FieldRow label="Giá trị HĐ" value={fmtMoney(orderTotalInCurrency(order), order.currency, { decimals: 0 })} />
           <FieldRow
             label="L/C"
             value={

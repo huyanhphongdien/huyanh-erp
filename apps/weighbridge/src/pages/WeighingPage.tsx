@@ -235,17 +235,19 @@ export default function WeighingPage() {
     getRubberSuppliers().then((s) => setSuppliers(s.map((x: any) => ({ id: x.id, code: x.code, name: x.name })))).catch(() => {})
     // Gợi ý nhà máy bán thành phẩm: tên đã dùng ở phiếu thành phẩm trước + điểm bốc hàng thương mại/đi lấy mủ
     // trong Lệnh điều động (Hoàng Đại, Thái Hoà…). Gõ tự do vẫn được — đây chỉ là gợi ý để khỏi gõ sai chính tả.
-    // + danh mục đối tác chung của ERP (business_partners: đại lý, khách, NCC — 170 tên).
+    // + danh mục đối tác B2B (b2b_partners: đại lý, NCC, cơ sở gia công). App cân chạy bằng anon
+    //   (đăng nhập PIN, không có Supabase auth) nên KHÔNG đọc được business_partners (RLS chỉ authenticated)
+    //   — b2b_partners không bật RLS nên đọc được.
     Promise.allSettled([
       supabase.from('weighbridge_tickets').select('supplier_name').eq('cargo_kind', 'finished').not('supplier_name', 'is', null).limit(300),
       supabase.from('dispatch_orders').select('pickup_location').in('trip_type', ['trading', 'fetch_mu']).not('pickup_location', 'is', null).limit(300),
-      supabase.from('business_partners').select('legal_name, short_name').is('deleted_at', null).limit(1000),
+      supabase.from('b2b_partners').select('name, short_name').eq('is_deleted', false).limit(1000),
     ]).then((rs) => {
       const names = new Set<string>()
       for (const r of rs) {
         if (r.status !== 'fulfilled' || !r.value.data) continue
         for (const row of r.value.data as any[]) {
-          for (const v of [row.supplier_name, row.pickup_location, row.legal_name, row.short_name]) {
+          for (const v of [row.supplier_name, row.pickup_location, row.name, row.short_name]) {
             const s = String(v ?? '').trim()
             if (s && !/kho nhà|\(kho nhà\)/i.test(s)) names.add(s)
           }

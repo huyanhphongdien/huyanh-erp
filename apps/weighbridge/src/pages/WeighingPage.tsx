@@ -656,8 +656,11 @@ export default function WeighingPage() {
     // Phiếu nhập mủ phải gắn NGUỒN để không "vô chủ" (mủ bộc phát phải gắn đại lý → tính thưởng).
     // Bỏ qua nếu là phiếu chuyển kho nội bộ (transfer) — không phải nguồn mua.
     if (ticketDirection === 'in' && isFinished) {
-      // Thành phẩm: chỉ cần biết mua của ai; mã hàng/số bành khai lúc dỡ (cân lần 2)
+      // Thành phẩm: biết mua của ai + ít nhất 1 mã hàng có loại hàng (grade). Số cân lấy ở cân lần 2.
       if (!fgSupplierName.trim()) { setError('Nhập tên nhà máy / nhà cung cấp bán thành phẩm'); return }
+      const declared = nhapLots.filter(l => l.code.trim() || l.grade || l.baleCount || l.declaredKg)
+      if (!declared.length) { setError('Khai ít nhất 1 mã hàng trên xe (loại hàng SVR 3L / SVR 10 / RSS…)'); return }
+      if (declared.some(l => !l.grade)) { setError('Mỗi mã hàng phải chọn LOẠI HÀNG (grade)'); return }
     } else if (ticketDirection === 'in' && !selectedTransferId) {
       if (sourceType === 'deal' && !selectedDealId) { setError('Vui lòng chọn Deal nguồn'); return }
       if (sourceType === 'supplier' && !selectedSupplierId) { setError('Vui lòng chọn nhà cung cấp'); return }
@@ -771,6 +774,24 @@ export default function WeighingPage() {
           await supabase.from('weighbridge_tickets')
             .update({ cargo_kind: 'finished', manifest_no: manifestNo.trim() || null })
             .eq('id', t.id)
+          // Lưu các mã hàng đã khai (net_kg = 0, sẽ được thay bằng số cân thật ở cân lần 2)
+          const declared = nhapLots.filter(l => l.code.trim() || l.grade || l.baleCount || l.declaredKg)
+          if (declared.length) {
+            await supabase.from('weighbridge_ticket_lots').delete().eq('ticket_id', t.id)
+            const { error: lotErr } = await supabase.from('weighbridge_ticket_lots').insert(declared.map((l, i) => ({
+              ticket_id: t.id,
+              lot_code: l.code.trim() || null,
+              grade: l.grade || null,
+              bale_count: l.baleCount ?? null,
+              bale_kg: l.baleKg ?? null,
+              declared_kg: l.declaredKg ?? null,
+              net_kg: 0,
+              is_derived: i === declared.length - 1,
+              sort_order: i + 1,
+            })))
+            if (lotErr) console.warn('[thành phẩm] lưu mã hàng khai báo lỗi:', lotErr.message)
+            setNhapLots(declared.map(l => ({ ...l, weighAfter: null })))
+          }
         } catch (e) { console.warn('[thành phẩm] lưu cargo_kind lỗi:', e) }
       } else if (sourceType === 'deal' && selectedDealId) {
         const deal = deals.find((d) => d.id === selectedDealId)
@@ -1277,10 +1298,21 @@ export default function WeighingPage() {
   // ── Tách lô: load các lô đã lưu khi mở phiếu ──
   useEffect(() => {
     if (!ticket?.id) { setSavedLots([]); return }
-    supabase.from('weighbridge_ticket_lots').select('lot_code, rubber_type, net_kg, grade, bale_count, bale_kg, declared_kg')
+    supabase.from('weighbridge_ticket_lots').select('lot_code, rubber_type, net_kg, grade, bale_count, bale_kg, declared_kg, weigh_after_kg, is_derived')
       .eq('ticket_id', ticket.id).order('sort_order')
-      .then(({ data }) => setSavedLots((data as any[]) || []))
-  }, [ticket?.id])
+      .then(({ data }) => {
+        const rows = (data as any[]) || []
+        setSavedLots(rows)
+        // Thành phẩm chưa hoàn tất: nạp lại các mã đã khai lúc tạo phiếu để cân lần 2 chỉ còn lấy số
+        if ((ticket as any)?.cargo_kind === 'finished' && rows.length && ticket.status !== 'completed') {
+          setNhapLots(rows.map((r: any) => ({
+            code: r.lot_code || '', rubberType: '', grade: r.grade || '',
+            baleCount: r.bale_count ?? null, baleKg: r.bale_kg ?? 33.33, declaredKg: r.declared_kg ?? null,
+            weighAfter: null,
+          })))
+        }
+      })
+  }, [ticket?.id, ticket?.status])
 
   // ── Tách lô: tính KL từng lô + lưu ──
   const tongNet = Number(ticket?.net_weight || 0)
@@ -2062,9 +2094,72 @@ export default function WeighingPage() {
                         placeholder="VD: LLM-2026-09-29-01"
                         disabled={!isCreate}
                       />
+                      {/* Loại hàng / mã hàng trên xe — khai TRƯỚC theo Lý lịch mủ (tài xế đưa ở cổng).
+                          Cân lần 2 chỉ còn việc lấy số cân sau mỗi lần dỡ. Lưu tạm vào weighbridge_ticket_lots (net_kg = 0). */}
+                      {isCreate && (
+                        <div style={{ marginTop: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              Loại hàng / mã hàng trên xe <span style={{ color: '#dc2626' }}>*</span> <span style={{ color: '#94a3b8' }}>(theo Lý lịch mủ — mỗi mã 1 dòng)</span>
+                            </Text>
+                            <Space size={4}>
+                              <Button size="small" onClick={() => setNhapLots(prev => [...prev, emptyLot()])}>+ Thêm mã</Button>
+                              {nhapLots.length > 1 && <Button size="small" danger onClick={() => setNhapLots(prev => prev.slice(0, -1))}>− Bớt</Button>}
+                            </Space>
+                          </div>
+                          {nhapLots.map((lot, i) => (
+                            <div key={i} style={{ border: '1px solid #DDD6FE', borderRadius: 8, padding: '8px 10px', marginBottom: 6, background: i % 2 ? '#fff' : '#FAF5FF' }}>
+                              <Row gutter={6} align="middle">
+                                <Col span={2} style={{ textAlign: 'center' }}>
+                                  <span style={{ display: 'inline-flex', width: 22, height: 22, borderRadius: '50%', background: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 12, alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+                                </Col>
+                                <Col span={12}>
+                                  <Input size="small" value={lot.code} placeholder="Mã hàng (vd TM H'LEO-01)"
+                                    onChange={e => setNhapLots(prev => prev.map((l, k) => k === i ? { ...l, code: e.target.value } : l))} />
+                                </Col>
+                                <Col span={10}>
+                                  <Select size="small" value={lot.grade || undefined} placeholder="Loại hàng (grade)" style={{ width: '100%' }}
+                                    options={FG_GRADES.map(g => ({ value: g, label: g }))}
+                                    onChange={v => setNhapLots(prev => prev.map((l, k) => k === i ? { ...l, grade: v } : l))} />
+                                </Col>
+                              </Row>
+                              <Row gutter={6} style={{ marginTop: 6 }}>
+                                <Col span={2} />
+                                <Col span={7}>
+                                  <InputNumber size="small" min={0} precision={0} value={lot.baleCount ?? undefined} placeholder="Số bành" style={{ width: '100%' }}
+                                    onChange={v => setNhapLots(prev => prev.map((l, k) => k === i ? { ...l, baleCount: v == null ? null : Number(v) } : l))} />
+                                </Col>
+                                <Col span={7}>
+                                  <InputNumber size="small" min={0} step={0.01} value={lot.baleKg ?? undefined} placeholder="kg/bành" style={{ width: '100%' }}
+                                    onChange={v => setNhapLots(prev => prev.map((l, k) => k === i ? { ...l, baleKg: v == null ? null : Number(v) } : l))} />
+                                </Col>
+                                <Col span={8}>
+                                  <InputNumber size="small" min={0} value={lot.declaredKg ?? undefined} placeholder="KL khai báo (kg)" style={{ width: '100%' }}
+                                    formatter={(v) => (v == null || `${v}` === '' ? '' : `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ','))}
+                                    onChange={v => setNhapLots(prev => prev.map((l, k) => k === i ? { ...l, declaredKg: v == null ? null : Number(v) } : l))} />
+                                </Col>
+                              </Row>
+                              {lot.baleCount && lot.baleKg && lot.declaredKg ? (() => {
+                                const byBales = lot.baleCount * lot.baleKg
+                                const d = lot.declaredKg - byBales
+                                const off = Math.abs(d) / byBales > FG_TOL_BALES
+                                return (
+                                  <div style={{ fontSize: 11, marginTop: 4, color: off ? '#B45309' : '#15803D' }}>
+                                    {off ? '⚠️' : '✓'} {lot.baleCount} bành × {lot.baleKg} = {Math.round(byBales).toLocaleString('vi-VN')} kg {off ? `— lệch ${d > 0 ? '+' : ''}${Math.round(d).toLocaleString('vi-VN')} kg so với khai báo, kiểm lại Lý lịch mủ` : 'khớp khai báo'}
+                                  </div>
+                                )
+                              })() : null}
+                            </div>
+                          ))}
+                          <div style={{ fontSize: 12, color: '#5B21B6', textAlign: 'right' }}>
+                            Σ khai báo: <b>{nhapLots.reduce((s, l) => s + (Number(l.declaredKg) || 0), 0).toLocaleString('vi-VN')} kg</b>
+                            {' · '}Σ bành: <b>{nhapLots.reduce((s, l) => s + (Number(l.baleCount) || 0), 0).toLocaleString('vi-VN')}</b>
+                          </div>
+                        </div>
+                      )}
                       <div style={{ fontSize: 11, color: '#6D28D9', marginTop: 8, background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 8, padding: '6px 10px' }}>
                         Xe có nhiều mã hàng → <b>mỗi mã được cân riêng</b>: cân đầy → dỡ hết mã 1 → lên cân → dỡ mã 2 → … → xe rỗng.
-                        Mã hàng, grade, số bành, KL khai báo (theo Lý lịch mủ) nhập ở <b>cân lần 2</b>; app tự đối chiếu 3 số.
+                        Ở <b>cân lần 2</b> chỉ còn bấm 📥 lấy số sau mỗi lần dỡ; app đối chiếu KL cân với khai báo và số bành × kg.
                       </div>
                     </div>
                   )}
@@ -2543,7 +2638,15 @@ export default function WeighingPage() {
                   </div>
                   <div style={{ fontSize: 13, color: '#374151', marginTop: 2 }}>
                     {isFinished
-                      ? <>Hàng thương mại — cân từng mã hàng ở cân lần 2{manifestNo ? <> · Lý lịch mủ <strong>{manifestNo}</strong></> : null}</>
+                      ? <>
+                          {(() => {
+                            const declared = nhapLots.filter(l => l.code.trim() || l.grade)
+                            return declared.length
+                              ? <>{declared.length} mã: <strong>{declared.map(l => `${l.code.trim() || '?'} ${l.grade || ''}${l.declaredKg ? ` ${Number(l.declaredKg).toLocaleString('vi-VN')} kg` : ''}`.trim()).join(' · ')}</strong></>
+                              : <>Hàng thương mại — khai mã hàng ở cân lần 2</>
+                          })()}
+                          {manifestNo ? <> · Lý lịch mủ <strong>{manifestNo}</strong></> : null}
+                        </>
                       : <>Loại mủ: <strong>{RUBBER_LABELS[rubberType] || rubberType}</strong></>}
                   </div>
                 </Card>
@@ -2925,8 +3028,8 @@ export default function WeighingPage() {
               </Card>
 
               {/* Chi tiết lô — hiện ngay trên màn hình khi phiếu đã tách lô (theo dõi khỏi cần in) */}
-              {savedLots.length > 0 && (
-                <Card size="small" title={`🔀 Chi tiết lô (${savedLots.length} lô)`} style={{ borderRadius: 12, marginTop: 8, borderColor: '#C4B5FD' }}
+              {savedLots.length > 0 && savedLots.some(l => Number(l.net_kg) > 0) && (
+                <Card size="small" title={isFinished ? `📦 Khối lượng từng mã hàng (${savedLots.length} mã)` : `🔀 Chi tiết lô (${savedLots.length} lô)`} style={{ borderRadius: 12, marginTop: 8, borderColor: '#C4B5FD' }}
                   styles={{ header: { background: '#F5F3FF', color: '#5B21B6', minHeight: 38 }, body: { padding: '8px 14px' } }}>
                   {savedLots.map((l, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < savedLots.length - 1 ? '1px dashed #EDE9FE' : 'none' }}>

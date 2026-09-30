@@ -246,10 +246,24 @@ export const salesOrderPaymentService = {
     // 2/2 dòng trong hệ thống đang NULL. Không có nó thì "phải có người thực sự nhập
     // thanh toán" là điều không kiểm chứng được, và khoản thu sai không truy được về ai.
     // Hỏng phiên đăng nhập thì vẫn ghi (để null) chứ không chặn tiền về.
+    //
+    // ⚠ created_by là FK → employees(id), KHÔNG phải auth uid. Bản trước ghi thẳng auth uid nên
+    // MỌI lượt ghi tiền đều vỡ "violates foreign key constraint sales_order_payments_created_by_fkey"
+    // (phát hiện 30/09/2026 — từ lúc thêm đoạn này chưa ghi được khoản thu nào). Phải đổi
+    // auth uid → employees.id qua employees.user_id; không tìm thấy nhân viên thì để null.
     let created_by: string | null = null
     try {
       const { data: auth } = await supabase.auth.getUser()
-      created_by = auth?.user?.id ?? null
+      const uid = auth?.user?.id
+      if (uid) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('id')
+          .eq('user_id', uid)
+          .limit(1)
+          .maybeSingle()
+        created_by = emp?.id ?? null
+      }
     } catch { /* không chặn ghi tiền vì lỗi đọc phiên */ }
 
     const { data, error } = await supabase

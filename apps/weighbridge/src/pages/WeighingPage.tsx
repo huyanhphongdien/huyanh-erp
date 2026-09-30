@@ -202,6 +202,8 @@ export default function WeighingPage() {
   const [fgSupplierName, setFgSupplierName] = useState('')
   const [fgSourceHistory, setFgSourceHistory] = useState<string[]>([])
   const [manifestNo, setManifestNo] = useState('')
+  // Owner (30/09): form tạo phiếu chỉ cần Mã hàng + Loại hàng; số bành / KL khai báo là chi tiết tuỳ chọn, ẩn mặc định.
+  const [fgShowDetail, setFgShowDetail] = useState(false)
   const isFinished = cargoKind === 'finished'
   const FG_GRADES = ['SVR 3L', 'SVR 5', 'SVR 10', 'SVR 20', 'SVR CV60', 'SVR L', 'RSS1', 'RSS3', 'Khác']
   // Ngưỡng cờ đối chiếu (tạm, chờ owner chốt "ai chịu chênh lệch"): khai báo 1%, bành×kg 0,5%
@@ -2049,7 +2051,8 @@ export default function WeighingPage() {
                       onChange={(e) => {
                         const v = e.target.value as 'raw' | 'finished'
                         setCargoKind(v)
-                        if (v === 'finished') { setRubberType(''); setSelectedDealId(''); setDirectPartnerId(null); setSelectedSupplierId('') }
+                        if (v === 'finished') { setRubberType(''); setSelectedDealId(''); setDirectPartnerId(null); setSelectedSupplierId(''); setNhapLots([emptyLot()]) }
+                        else setNhapLots([emptyLot(), emptyLot()])
                       }}
                       style={{ width: '100%', display: 'flex', gap: 8 }}
                     >
@@ -2100,9 +2103,11 @@ export default function WeighingPage() {
                         <div style={{ marginTop: 10 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                             <Text type="secondary" style={{ fontSize: 12 }}>
-                              Loại hàng / mã hàng trên xe <span style={{ color: '#dc2626' }}>*</span> <span style={{ color: '#94a3b8' }}>(theo Lý lịch mủ — mỗi mã 1 dòng)</span>
+                              Loại hàng / mã hàng trên xe <span style={{ color: '#dc2626' }}>*</span> <span style={{ color: '#94a3b8' }}>(mỗi mã 1 dòng)</span>
                             </Text>
                             <Space size={4}>
+                              <Button size="small" type={fgShowDetail ? 'primary' : 'default'} style={fgShowDetail ? { background: '#7C3AED', borderColor: '#7C3AED' } : {}}
+                                onClick={() => setFgShowDetail(v => !v)}>{fgShowDetail ? '● Số bành / khai báo' : 'Số bành / khai báo…'}</Button>
                               <Button size="small" onClick={() => setNhapLots(prev => [...prev, emptyLot()])}>+ Thêm mã</Button>
                               {nhapLots.length > 1 && <Button size="small" danger onClick={() => setNhapLots(prev => prev.slice(0, -1))}>− Bớt</Button>}
                             </Space>
@@ -2123,6 +2128,7 @@ export default function WeighingPage() {
                                     onChange={v => setNhapLots(prev => prev.map((l, k) => k === i ? { ...l, grade: v } : l))} />
                                 </Col>
                               </Row>
+                              {fgShowDetail && (<>
                               <Row gutter={6} style={{ marginTop: 6 }}>
                                 <Col span={2} />
                                 <Col span={7}>
@@ -2149,12 +2155,15 @@ export default function WeighingPage() {
                                   </div>
                                 )
                               })() : null}
+                              </>)}
                             </div>
                           ))}
-                          <div style={{ fontSize: 12, color: '#5B21B6', textAlign: 'right' }}>
-                            Σ khai báo: <b>{nhapLots.reduce((s, l) => s + (Number(l.declaredKg) || 0), 0).toLocaleString('vi-VN')} kg</b>
-                            {' · '}Σ bành: <b>{nhapLots.reduce((s, l) => s + (Number(l.baleCount) || 0), 0).toLocaleString('vi-VN')}</b>
-                          </div>
+                          {fgShowDetail && (
+                            <div style={{ fontSize: 12, color: '#5B21B6', textAlign: 'right' }}>
+                              Σ khai báo: <b>{nhapLots.reduce((s, l) => s + (Number(l.declaredKg) || 0), 0).toLocaleString('vi-VN')} kg</b>
+                              {' · '}Σ bành: <b>{nhapLots.reduce((s, l) => s + (Number(l.baleCount) || 0), 0).toLocaleString('vi-VN')}</b>
+                            </div>
+                          )}
                         </div>
                       )}
                       <div style={{ fontSize: 11, color: '#6D28D9', marginTop: 8, background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 8, padding: '6px 10px' }}>
@@ -2293,7 +2302,7 @@ export default function WeighingPage() {
                         // (= chọn 📦 ở ô "Loại hàng trên xe" phía trên). Chỉ lúc tạo phiếu.
                         if (v === '__finished') {
                           if (!isCreate) return
-                          setCargoKind('finished'); setRubberType(''); setSelectedDealId(''); setDirectPartnerId(null); setSelectedSupplierId('')
+                          setCargoKind('finished'); setRubberType(''); setSelectedDealId(''); setDirectPartnerId(null); setSelectedSupplierId(''); setNhapLots([emptyLot()])
                           return
                         }
                         setRubberType(v)

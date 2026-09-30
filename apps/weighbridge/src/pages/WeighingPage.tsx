@@ -2157,6 +2157,13 @@ export default function WeighingPage() {
                       value={rubberType}
                       onChange={(e) => {
                         const v = e.target.value
+                        // Lối tắt: thợ cân tìm "thành phẩm" ở hàng Loại mủ → chuyển sang chế độ thành phẩm
+                        // (= chọn 📦 ở ô "Loại hàng trên xe" phía trên). Chỉ lúc tạo phiếu.
+                        if (v === '__finished') {
+                          if (!isCreate) return
+                          setCargoKind('finished'); setRubberType(''); setSelectedDealId(''); setDirectPartnerId(null); setSelectedSupplierId('')
+                          return
+                        }
                         setRubberType(v)
                         // Phiếu ĐÃ tạo nhưng CHƯA hoàn tất → lưu lại ngay. An toàn vì lô nhập
                         // (rubber_intake_batches) chỉ sinh lúc HOÀN TẤT → thợ cân tự sửa được
@@ -2176,6 +2183,7 @@ export default function WeighingPage() {
                       <Radio.Button value="mu_tap">🪨 Mủ tạp</Radio.Button>
                       <Radio.Button value="mu_chen">🥣 Mủ chén</Radio.Button>
                       <Radio.Button value="mu_rss3">🟫 Mủ RSS3</Radio.Button>
+                      <Radio.Button value="__finished" disabled={!isCreate} style={{ borderColor: '#C4B5FD', color: '#5B21B6' }}>📦 Thành phẩm SVR / RSS</Radio.Button>
                     </Radio.Group>
                     {sourceType === 'partner_direct' && (
                       <Text type="secondary" style={{ fontSize: 11, marginTop: 8, display: 'block' }}>

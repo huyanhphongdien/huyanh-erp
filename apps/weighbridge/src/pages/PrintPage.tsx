@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button, Spin, Typography, Space, Radio, Card } from 'antd'
 import { ArrowLeftOutlined, PrinterOutlined, LoadingOutlined } from '@ant-design/icons'
@@ -34,7 +34,11 @@ export default function PrintPage() {
   const navigate = useNavigate()
   const [ticket, setTicket] = useState<WeighbridgeTicket | null>(null)
   const [images, setImages] = useState<WeighbridgeImage[]>([])
-  const [lots, setLots] = useState<Array<{ lot_code: string | null; rubber_type: string | null; net_kg: number }>>([])
+  const [lots, setLots] = useState<Array<{
+    lot_code: string | null; rubber_type: string | null; net_kg: number
+    // Thành phẩm (30/09/2026): grade + số bành × kg/bành + KL khai báo (Lý lịch mủ)
+    grade?: string | null; bale_count?: number | null; bale_kg?: number | null; declared_kg?: number | null
+  }>>([])
   const [dealInfo, setDealInfo] = useState<{ deal_number: string; partner_name: string } | null>(null)
   // Đối tác (mọi nguồn): deal→đại lý, partner_direct→đại lý, supplier→NCC
   const [partner, setPartner] = useState<{ name: string; label: string } | null>(null)
@@ -73,7 +77,7 @@ export default function PrintPage() {
       setTicket(t)
       setImages(imgs)
       // Tách lô — chi tiết nhiều mã hàng trên xe (nếu có)
-      supabase.from('weighbridge_ticket_lots').select('lot_code, rubber_type, net_kg')
+      supabase.from('weighbridge_ticket_lots').select('lot_code, rubber_type, net_kg, grade, bale_count, bale_kg, declared_kg')
         .eq('ticket_id', id).order('sort_order')
         .then(({ data }) => setLots((data as any[]) || []))
       // Resolve đối tác theo nguồn: deal → đại lý, partner_direct → đại lý, supplier → NCC
@@ -667,8 +671,58 @@ export default function PrintPage() {
           )
         )}
 
-        {/* ===== CHI TIẾT LÔ (tách nhiều mã hàng trên xe) ===== */}
-        {lots.length > 0 && (
+        {/* ===== CHI TIẾT MÃ HÀNG — THÀNH PHẨM (KL tại nhà máy theo mẫu Lý lịch mủ) ===== */}
+        {lots.length > 0 && lots.some(l => l.grade || l.bale_count || l.declared_kg) && (() => {
+          const cell = (extra: CSSProperties = {}): CSSProperties => ({ border: '1px solid #ccc', padding: '4px 6px', ...extra })
+          const sumDecl = lots.reduce((s, l) => s + (Number(l.declared_kg) || 0), 0)
+          const sumNet = lots.reduce((s, l) => s + (Number(l.net_kg) || 0), 0)
+          const manifest = (ticket as any)?.manifest_no as string | null | undefined
+          return (
+            <div style={{ marginBottom: isThermal ? 4 : 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 4 }}>
+                Chi tiết mã hàng — khối lượng tại nhà máy{manifest ? <span style={{ fontWeight: 400 }}> · Lý lịch mủ số {manifest}</span> : null}
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+                <thead>
+                  <tr style={{ background: '#1B4D3E', color: '#fff' }}>
+                    <th style={cell({ textAlign: 'left' })}>Mã hàng</th>
+                    <th style={cell({ textAlign: 'left' })}>Grade</th>
+                    <th style={cell({ textAlign: 'right' })}>Số bành</th>
+                    <th style={cell({ textAlign: 'right' })}>KL khai báo</th>
+                    <th style={cell({ textAlign: 'right' })}>KL cân (kg)</th>
+                    <th style={cell({ textAlign: 'right' })}>Lệch</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lots.map((lo, i) => {
+                    const decl = Number(lo.declared_kg) || 0
+                    const diff = decl ? Number(lo.net_kg) - decl : null
+                    return (
+                      <tr key={i}>
+                        <td style={cell({ fontWeight: 600 })}>{lo.lot_code || '—'}</td>
+                        <td style={cell()}>{lo.grade || '—'}</td>
+                        <td style={cell({ textAlign: 'right', fontFamily: mono })}>{lo.bale_count ? `${lo.bale_count}${lo.bale_kg ? ` × ${lo.bale_kg}` : ''}` : '—'}</td>
+                        <td style={cell({ textAlign: 'right', fontFamily: mono })}>{decl ? fmt(decl) : '—'}</td>
+                        <td style={cell({ textAlign: 'right', fontWeight: 700, fontFamily: mono })}>{fmt(lo.net_kg)}</td>
+                        <td style={cell({ textAlign: 'right', fontFamily: mono })}>{diff == null ? '—' : `${diff > 0 ? '+' : ''}${fmt(diff)}`}</td>
+                      </tr>
+                    )
+                  })}
+                  <tr style={{ background: '#DCFCE7', fontWeight: 700 }}>
+                    <td style={cell()} colSpan={3}>TỔNG</td>
+                    <td style={cell({ textAlign: 'right', fontFamily: mono })}>{sumDecl ? fmt(sumDecl) : '—'}</td>
+                    <td style={cell({ textAlign: 'right', fontFamily: mono })}>{fmt(sumNet)}</td>
+                    <td style={cell({ textAlign: 'right', fontFamily: mono })}>{sumDecl ? `${sumNet - sumDecl > 0 ? '+' : ''}${fmt(sumNet - sumDecl)}` : '—'}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Mỗi mã cân riêng (cân bậc thang: xe đầy → dỡ từng mã → xe rỗng). Lệch = KL cân − KL khai báo.</div>
+            </div>
+          )
+        })()}
+
+        {/* ===== CHI TIẾT LÔ (tách nhiều mã hàng trên xe — mủ nguyên liệu) ===== */}
+        {lots.length > 0 && !lots.some(l => l.grade || l.bale_count || l.declared_kg) && (
           <div style={{ marginBottom: isThermal ? 4 : 12 }}>
             <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 4 }}>Chi tiết lô (nhiều mã hàng)</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>

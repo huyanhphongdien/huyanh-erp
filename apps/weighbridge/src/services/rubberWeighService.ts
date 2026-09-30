@@ -17,7 +17,7 @@ export interface RubberWeighData {
   vehicle_type?: string
   destination?: string
   deduction_kg?: number
-  source_type?: 'deal' | 'supplier' | 'partner_direct' | 'transfer'
+  source_type?: 'deal' | 'supplier' | 'partner_direct' | 'transfer' | 'finished_goods'
 }
 
 export interface WeightCalculation {

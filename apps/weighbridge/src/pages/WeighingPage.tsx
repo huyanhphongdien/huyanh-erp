@@ -235,16 +235,20 @@ export default function WeighingPage() {
     getRubberSuppliers().then((s) => setSuppliers(s.map((x: any) => ({ id: x.id, code: x.code, name: x.name })))).catch(() => {})
     // Gợi ý nhà máy bán thành phẩm: tên đã dùng ở phiếu thành phẩm trước + điểm bốc hàng thương mại/đi lấy mủ
     // trong Lệnh điều động (Hoàng Đại, Thái Hoà…). Gõ tự do vẫn được — đây chỉ là gợi ý để khỏi gõ sai chính tả.
+    // + danh mục đối tác chung của ERP (business_partners: đại lý, khách, NCC — 170 tên).
     Promise.allSettled([
       supabase.from('weighbridge_tickets').select('supplier_name').eq('cargo_kind', 'finished').not('supplier_name', 'is', null).limit(300),
       supabase.from('dispatch_orders').select('pickup_location').in('trip_type', ['trading', 'fetch_mu']).not('pickup_location', 'is', null).limit(300),
+      supabase.from('business_partners').select('legal_name, short_name').is('deleted_at', null).limit(1000),
     ]).then((rs) => {
       const names = new Set<string>()
       for (const r of rs) {
         if (r.status !== 'fulfilled' || !r.value.data) continue
         for (const row of r.value.data as any[]) {
-          const v = String(row.supplier_name ?? row.pickup_location ?? '').trim()
-          if (v && !/kho nhà|\(kho nhà\)/i.test(v)) names.add(v)
+          for (const v of [row.supplier_name, row.pickup_location, row.legal_name, row.short_name]) {
+            const s = String(v ?? '').trim()
+            if (s && !/kho nhà|\(kho nhà\)/i.test(s)) names.add(s)
+          }
         }
       }
       setFgSourceHistory(Array.from(names))
@@ -2071,25 +2075,34 @@ export default function WeighingPage() {
                         disabled={!isCreate}
                         style={{ width: '100%' }}
                         allowClear
+                        filterOption={false}
                         options={(() => {
-                          // Gộp: NCC mủ (rubber_suppliers) + tên đã dùng ở phiếu thành phẩm + điểm bốc hàng trong Lệnh điều động
+                          // Gộp: đối tác ERP (business_partners) + tên đã dùng ở phiếu thành phẩm + điểm bốc hàng
+                          // trong Lệnh điều động + NCC mủ. So khớp bỏ dấu, bỏ khoảng trắng & dấu câu
+                          // ("h leo" ↔ "Ea H'Leo"). Không khớp gì → gợi ý DÙNG TÊN MỚI (lần sau tự có).
+                          const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+                          const q = norm(fgSupplierName || '')
                           const seen = new Set<string>()
                           const out: Array<{ value: string; label: string }> = []
                           const push = (name: string, tag: string) => {
-                            const k = name.trim().toLowerCase()
+                            const t = name.trim(); const k = norm(t)
                             if (!k || seen.has(k)) return
+                            if (q && !k.includes(q)) return
                             seen.add(k)
-                            out.push({ value: name.trim(), label: `${name.trim()}  ·  ${tag}` })
+                            out.push({ value: t, label: `${t}  ·  ${tag}` })
                           }
-                          fgSourceHistory.forEach(n => push(n, 'đã cân / điều xe'))
+                          fgSourceHistory.forEach(n => push(n, 'đối tác / đã cân'))
                           suppliers.forEach(s => push(s.name, `NCC${s.code ? ' ' + s.code : ''}`))
-                          return out
+                          const typed = (fgSupplierName || '').trim()
+                          if (typed && !seen.has(norm(typed))) {
+                            out.unshift({ value: typed, label: `➕ Dùng tên mới: "${typed}" — lần sau sẽ tự gợi ý` })
+                          }
+                          return out.slice(0, 30)
                         })()}
-                        filterOption={(input, opt) => {
-                          const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-                          return norm(String(opt?.value || '')).includes(norm(input))
-                        }}
                       />
+                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                        Gõ vài chữ để tìm (không cần dấu). Nhà máy chưa có trong danh sách → gõ đủ tên rồi Enter, phiếu sau sẽ tự gợi ý.
+                      </div>
                       <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>Số Lý lịch mủ / chứng từ đi kèm (tuỳ chọn)</Text>
                       <Input
                         value={manifestNo}

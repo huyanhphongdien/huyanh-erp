@@ -200,6 +200,7 @@ export default function WeighingPage() {
   // KL từng mã hàng cân bậc thang ở cân lần 2 (bắt buộc), đối chiếu với khai báo và bành × kg.
   const [cargoKind, setCargoKind] = useState<'raw' | 'finished'>('raw')
   const [fgSupplierName, setFgSupplierName] = useState('')
+  const [fgSourceHistory, setFgSourceHistory] = useState<string[]>([])
   const [manifestNo, setManifestNo] = useState('')
   const isFinished = cargoKind === 'finished'
   const FG_GRADES = ['SVR 3L', 'SVR 5', 'SVR 10', 'SVR 20', 'SVR CV60', 'SVR L', 'RSS1', 'RSS3', 'Khác']
@@ -230,6 +231,22 @@ export default function WeighingPage() {
       .then((d) => { console.log('Deals loaded (facility=', currentFacility?.code, '):', d); setDeals(d) })
       .catch((err) => console.error('Deal load error:', err))
     getRubberSuppliers().then((s) => setSuppliers(s.map((x: any) => ({ id: x.id, code: x.code, name: x.name })))).catch(() => {})
+    // Gợi ý nhà máy bán thành phẩm: tên đã dùng ở phiếu thành phẩm trước + điểm bốc hàng thương mại/đi lấy mủ
+    // trong Lệnh điều động (Hoàng Đại, Thái Hoà…). Gõ tự do vẫn được — đây chỉ là gợi ý để khỏi gõ sai chính tả.
+    Promise.allSettled([
+      supabase.from('weighbridge_tickets').select('supplier_name').eq('cargo_kind', 'finished').not('supplier_name', 'is', null).limit(300),
+      supabase.from('dispatch_orders').select('pickup_location').in('trip_type', ['trading', 'fetch_mu']).not('pickup_location', 'is', null).limit(300),
+    ]).then((rs) => {
+      const names = new Set<string>()
+      for (const r of rs) {
+        if (r.status !== 'fulfilled' || !r.value.data) continue
+        for (const row of r.value.data as any[]) {
+          const v = String(row.supplier_name ?? row.pickup_location ?? '').trim()
+          if (v && !/kho nhà|\(kho nhà\)/i.test(v)) names.add(v)
+        }
+      }
+      setFgSourceHistory(Array.from(names))
+    })
     // Load bảng tra DRC (cache 5 phút trong service)
     drcLookupService.getAll().then(setDrcLookupRows).catch((err) => console.warn('drc_lookup load error:', err))
     // Đợt 1: định mức pallet (nhựa/sắt) từ danh mục. Lỗi/chưa migrate → giữ default 10/50.
@@ -2011,12 +2028,32 @@ export default function WeighingPage() {
                   {isFinished && (
                     <div>
                       <Text type="secondary" style={{ fontSize: 12 }}>Nhà máy / nhà cung cấp bán hàng <span style={{ color: '#dc2626' }}>*</span></Text>
-                      <Input
+                      <AutoComplete
                         size="large"
                         value={fgSupplierName}
-                        onChange={e => setFgSupplierName(e.target.value)}
-                        placeholder="VD: Cty TNHH MTV Cao su Ea H'Leo"
+                        onChange={(v) => setFgSupplierName(v || '')}
+                        placeholder="Gõ để tìm — VD: Ea H'Leo, Hoàng Đại… (chưa có thì gõ tên mới)"
                         disabled={!isCreate}
+                        style={{ width: '100%' }}
+                        allowClear
+                        options={(() => {
+                          // Gộp: NCC mủ (rubber_suppliers) + tên đã dùng ở phiếu thành phẩm + điểm bốc hàng trong Lệnh điều động
+                          const seen = new Set<string>()
+                          const out: Array<{ value: string; label: string }> = []
+                          const push = (name: string, tag: string) => {
+                            const k = name.trim().toLowerCase()
+                            if (!k || seen.has(k)) return
+                            seen.add(k)
+                            out.push({ value: name.trim(), label: `${name.trim()}  ·  ${tag}` })
+                          }
+                          fgSourceHistory.forEach(n => push(n, 'đã cân / điều xe'))
+                          suppliers.forEach(s => push(s.name, `NCC${s.code ? ' ' + s.code : ''}`))
+                          return out
+                        })()}
+                        filterOption={(input, opt) => {
+                          const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+                          return norm(String(opt?.value || '')).includes(norm(input))
+                        }}
                       />
                       <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>Số Lý lịch mủ / chứng từ đi kèm (tuỳ chọn)</Text>
                       <Input

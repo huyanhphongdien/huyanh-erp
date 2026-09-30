@@ -179,6 +179,18 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
 - `apps/weighbridge` và `apps/retail-scale` dùng chung hook `src/hooks/useKeliScale.ts` nhưng
   **khác namespace localStorage** (`keli_scale` vs `rs_scale`) — chung key là ghim sai baud cho nhau.
 
+## App cân — Nhập thành phẩm / hàng thương mại, cân từng mã (30/09/2026)
+- Phiếu NHẬP có **loại hàng** `weighbridge_tickets.cargo_kind`: `raw` (mủ, mặc định) | `finished` (thành phẩm mua của nhà máy
+  khác, vd TPSVR 3L Ea H'Leo). Finished: `source_type='finished_goods'`, `supplier_name` = nhà máy bán, `manifest_no` = số Lý lịch
+  mủ, KHÔNG rubber_type/DRC/đại lý → bridge `rubber_intake_batches` tự bỏ qua, không lọt thưởng đại lý.
+- **Mỗi mã hàng cân riêng** = tách lô bậc thang có sẵn (`nhapLots` ở cân lần 2: tổng → dỡ mã 1 → cân → … → xe rỗng; mã i = hiệu
+  2 lần cân), với finished thì bật luôn và cho **mọi nhà máy** (mủ thô chỉ PĐ). 1 mã = 1 lô.
+- Lô thành phẩm (`weighbridge_ticket_lots`): `lot_code` = mã hàng, `grade`, `bale_count × bale_kg`, `declared_kg` (Lý lịch mủ),
+  `weigh_after_kg` (số cân sau dỡ, truy vết). App đối chiếu 3 số: cân vs khai báo (cờ > 1%) vs bành×kg (cờ > 0,5%) — ngưỡng TẠM.
+  Phiếu in có bảng "KL tại nhà máy" theo bố cục Lý lịch mủ. Migration `weighbridge_p9_finished_goods.sql` (đã áp 30/09).
+- **Treo (owner chưa chốt):** nhập kho WMS nào sau cân; ai chịu chênh lệch cân vs khai báo / ngưỡng báo NCC. Chưa nối
+  Đề nghị thanh toán theo từng mã.
+
 ## Chấm công — GPS (owner chốt 16/09/2026)
 - **Điện thoại / tablet: BẮT BUỘC toạ độ và phải nằm trong bán kính nhà máy (3 km). Máy tính (PC/laptop): bỏ qua GPS.**
 - Cấu hình ở `attendance_settings` (`setting_key='gps_config'`: `enabled`, `locations[{name,latitude,longitude,radius_meters}]`).

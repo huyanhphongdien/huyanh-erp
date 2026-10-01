@@ -361,10 +361,9 @@ function sailingRow(s: Sailing, now: number): string {
   if (s.closing === null) closingHtml = `<span style="color:${C.muted}">Closing: chưa có</span>`
   else if (s.closing < now) closingHtml = `<span style="color:${C.muted}">Đã closing ${fmtDateTime(s.closing)}</span>`
   else closingHtml = `Closing <b style="color:${closingSoon ? C.warn : C.ink}">${fmtDateTime(s.closing)}</b>`
-  const whenHtml = `${s.keyIsDeparture ? 'Rời' : 'Đến'} <b style="color:${C.ink}">${fmtDateTime(s.key)}</b>`
   const bd = `border-bottom:1px solid ${C.line}`
   return `
-<tr><td valign="top" style="padding:9px 8px 9px 0;${bd}"><b style="font-size:14px;color:${C.ink}">${esc(s.vessel)}</b><br><span style="font-size:12px;color:${C.sub}">${esc(lineTxt)}</span></td><td align="right" valign="top" nowrap style="padding:9px 0;${bd};font-size:12px;line-height:18px;color:${C.sub}">${closingHtml}<br>${whenHtml}</td></tr>`
+<tr><td valign="top" style="padding:9px 8px 9px 0;${bd}"><b style="font-size:14px;color:${C.ink}">${esc(s.vessel)}</b><br><span style="font-size:12px;color:${C.sub}">${esc(lineTxt)}</span></td><td align="right" valign="top" nowrap style="padding:9px 0;${bd};font-size:12px;line-height:18px;color:${C.sub}">Rời <b style="font-size:13px;color:${C.ink}">${fmtDateTime(s.key)}</b><br>${closingHtml}</td></tr>`
 }
 
 function dayGroups(list: Sailing[], now: number): string {
@@ -384,33 +383,22 @@ function dayGroups(list: Sailing[], now: number): string {
   return html
 }
 
-function lineSummary(list: Sailing[]): string {
-  const by = new Map<string, Sailing[]>()
+/** Tàu sẽ ghé trong kỳ nhưng cảng CHƯA công bố giờ rời (Đà Nẵng chỉ công bố trước ~2 ngày).
+ *  Không phải dòng "tàu đi" đúng nghĩa nên chỉ liệt kê gọn theo ngày, không bịa giờ rời. */
+function pendingList(list: Sailing[]): string {
+  if (list.length === 0) return ''
+  const groups = new Map<string, Sailing[]>()
   for (const s of list) {
-    const k = lineLabel(s)
-    if (!by.has(k)) by.set(k, [])
-    by.get(k)!.push(s)
+    const k = dayKey(s.key)
+    if (!groups.has(k)) groups.set(k, [])
+    groups.get(k)!.push(s)
   }
-  const all = [...by.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
-  // Bảng dài quá 12 dòng thì các hãng chỉ có 1 chuyến gom lại một dòng cho dễ đọc trên điện thoại.
-  const rows = all.length > 12 ? all.filter(([, items]) => items.length > 1) : all
-  const singles = all.filter((e) => !rows.includes(e)).map(([name]) => name)
-  const th = `border-bottom:2px solid ${C.line};font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:${C.sub}`
-  const bd = `border-bottom:1px solid ${C.line}`
   return `
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
-    <tr>
-      <td style="padding:6px 8px 6px 0;${th}">Hãng</td>
-      <td align="center" style="padding:6px 8px;${th}">Chuyến</td>
-      <td align="right" style="padding:6px 0;${th}">Chuyến gần nhất</td>
-    </tr>${rows.map(([name, items]) => `
-    <tr>
-      <td style="padding:7px 8px 7px 0;${bd};font-size:13px;font-weight:600;color:${C.ink}">${esc(name)}</td>
-      <td align="center" style="padding:7px 8px;${bd};font-size:13px;font-weight:700;color:${C.brand}">${items.length}</td>
-      <td align="right" style="padding:7px 0;${bd};font-size:12px;line-height:16px;color:${C.sub}">${esc(items[0].vessel)}<br><span style="color:${C.ink}">${fmtDay(items[0].key)}</span></td>
-    </tr>`).join('')}
-  </table>${singles.length ? `
-  <div style="font-size:12px;line-height:18px;color:${C.sub};margin-top:8px;">Mỗi hãng 1 chuyến: ${esc(singles.join(', '))}.</div>` : ''}`
+    ${subTitle(`Chưa có giờ rời — ${list.length} chuyến`)}
+    <div style="font-size:12px;line-height:17px;color:${C.sub};">Cảng mới công bố ngày tàu ghé; giờ rời thường có trước khoảng 2 ngày.</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:4px;">${[...groups.values()].map((items) => `
+      <tr><td valign="top" nowrap style="padding:7px 10px 7px 0;border-bottom:1px solid ${C.line};font-size:12px;line-height:18px;font-weight:700;color:${C.brand}">${fmtDay(items[0].key)}</td><td style="padding:7px 0;border-bottom:1px solid ${C.line};font-size:12px;line-height:18px;color:${C.ink}">${items.map((s) => `${esc(s.vessel)} <span style="color:${C.sub}">(${esc(lineLabel(s))})</span>`).join('<br>')}</td></tr>`).join('')}
+    </table>`
 }
 
 function sectionTitle(text: string, note: string): string {
@@ -423,22 +411,20 @@ function subTitle(text: string): string {
   return `<div style="font-size:12px;line-height:16px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:${C.brand};margin:18px 0 4px;">${esc(text)}</div>`
 }
 
-function portSection(p: PortReport, now: number, days: number, detailDays: number): string {
+function portSection(p: PortReport, now: number, days: number): string {
   if (p.sailings.length === 0) return ''
-  const detailEnd = now + detailDays * DAY_MS
-  const detail = detailDays >= days ? p.sailings : p.sailings.filter((s) => s.key <= detailEnd)
-  const rest = p.sailings.length - detail.length
-  const note = `${p.sailings.length} chuyến trong ${days} ngày tới`
+  const departing = p.sailings.filter((s) => s.keyIsDeparture)
+  const pending = p.sailings.filter((s) => !s.keyIsDeparture)
+  const note = pending.length
+    ? `${departing.length} chuyến đã có giờ rời · ${pending.length} chuyến chưa có giờ rời · ${days} ngày tới`
+    : `${departing.length} chuyến rời cảng trong ${days} ngày tới`
   return `
   <tr><td style="padding:24px 16px 0;">
     ${sectionTitle(p.title, note)}
-    ${subTitle('Theo hãng')}
-    ${lineSummary(p.sailings)}
-    ${subTitle(detailDays >= days ? 'Từng chuyến' : `Từng chuyến — ${detailDays} ngày tới`)}
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:-10px;">
-      ${dayGroups(detail, now)}
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+      ${dayGroups(departing, now)}
     </table>
-    ${rest > 0 ? `<div style="font-size:12px;line-height:17px;color:${C.sub};margin-top:10px;">Còn ${rest} chuyến từ ${fmtDay(detailEnd)} trở đi — xem số chuyến theo hãng ở bảng trên.</div>` : ''}
+    ${pendingList(pending)}
   </td></tr>`
 }
 
@@ -456,7 +442,8 @@ function buildHtml(r: Omit<Report, 'html' | 'subject'>, isTrial: boolean): strin
   const now = r.generatedAt
   const all = r.ports.flatMap((p) => p.sailings)
   const closingSoon = all.filter((s) => s.closing !== null && s.closing >= now && s.closing - now <= DAY_MS).length
-  const count = (code: PortCode) => r.ports.find((p) => p.port === code)?.sailings.length ?? 0
+  // Ô số và dòng xem trước chỉ đếm chuyến ĐÃ CÓ giờ rời — khớp với danh sách bên dưới.
+  const count = (code: PortCode) => r.ports.find((p) => p.port === code)?.sailings.filter((s) => s.keyIsDeparture).length ?? 0
   const failed = r.sources.filter((s) => !s.ok)
 
   return `<!DOCTYPE html>
@@ -465,7 +452,7 @@ function buildHtml(r: Omit<Report, 'html' | 'subject'>, isTrial: boolean): strin
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>Lịch tàu dự kiến</title>
+<title>Lịch tàu rời cảng</title>
 </head>
 <body style="margin:0;padding:0;background:#EEF2F0;${FONT}-webkit-text-size-adjust:100%;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Đà Nẵng ${count('DAD')} chuyến, Cát Lái ${count('CTL')} chuyến trong ${r.days} ngày tới · ${closingSoon} chuyến closing trong 24 giờ.</div>
@@ -475,14 +462,14 @@ function buildHtml(r: Omit<Report, 'html' | 'subject'>, isTrial: boolean): strin
 
   <tr><td style="background:${C.brand};padding:20px 16px 18px;">
     <div style="font-size:11px;line-height:15px;letter-spacing:1.2px;text-transform:uppercase;color:#A9D3C4;">Huy Anh Rubber · Logistics${isTrial ? ' · Bản thử' : ''}</div>
-    <div style="font-size:21px;line-height:27px;font-weight:700;color:#FFFFFF;margin-top:6px;">Lịch tàu dự kiến<br>Đà Nẵng &amp; TP.HCM</div>
+    <div style="font-size:21px;line-height:27px;font-weight:700;color:#FFFFFF;margin-top:6px;">Lịch tàu rời cảng<br>Đà Nẵng &amp; TP.HCM</div>
     <div style="font-size:13px;line-height:19px;color:#CFE6DD;margin-top:8px;">Tra cứu lúc ${fmtFull(now)} · ${r.days} ngày tới</div>
   </td></tr>
 
   <tr><td style="padding:16px 12px 0;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
-      ${tile(String(count('DAD')), 'chuyến từ<br>Đà Nẵng', C.brandSoft, C.brand)}
-      ${tile(String(count('CTL')), 'chuyến từ<br>Cát Lái (TP.HCM)', C.brandSoft, C.brand)}
+      ${tile(String(count('DAD')), 'chuyến rời<br>Đà Nẵng', C.brandSoft, C.brand)}
+      ${tile(String(count('CTL')), 'chuyến rời<br>Cát Lái (TP.HCM)', C.brandSoft, C.brand)}
       ${tile(String(closingSoon), 'chuyến closing<br>trong 24 giờ', C.warnBg, C.warn)}
     </tr></table>
   </td></tr>
@@ -494,15 +481,15 @@ function buildHtml(r: Omit<Report, 'html' | 'subject'>, isTrial: boolean): strin
     </div>
   </td></tr>` : ''}
 
-  ${r.ports.map((p) => portSection(p, now, r.days, p.port === 'CTL' ? 3 : r.days)).join('')}
+  ${r.ports.map((p) => portSection(p, now, r.days)).join('')}
 
   <tr><td style="padding:24px 16px 0;">
     <div style="background:${C.band};border-radius:8px;padding:12px;font-size:12px;line-height:18px;color:${C.sub};">
       <b style="color:${C.ink};">Cách đọc</b><br>
       · <b>Closing</b> = hạn chót hạ container về cảng cho chuyến đó.<br>
-      · Giờ rời là <b>dự kiến</b> do cảng công bố, có thể đổi; chuyến xa ở Đà Nẵng mới có ngày đến, chưa có giờ rời.<br>
+      · Giờ rời là <b>dự kiến</b> do cảng công bố, có thể đổi.<br>
       · Tên hãng viết tắt (NSL, JSV, MCV…) là mã của cảng, giữ nguyên khi chưa chắc tên đầy đủ.<br>
-      · Báo cáo xếp theo <b>cảng đi và hãng tàu</b>. Cảng đích và ngày đến nơi của từng chuyến chưa có — hai cảng không công bố, phải lấy từ hãng tàu.
+      · Báo cáo xếp theo <b>cảng đi và ngày rời</b>. Cảng đích và ngày đến nơi của từng chuyến chưa có — hai cảng không công bố, phải lấy từ hãng tàu.
     </div>
   </td></tr>
 
@@ -559,7 +546,7 @@ export async function buildReport(opts: { now?: number; days?: number; trial?: b
   const p = vnParts(now)
   return {
     ...base,
-    subject: `🚢 Lịch tàu dự kiến Đà Nẵng & TP.HCM — ${p2(p.d)}/${p2(p.m)}/${p.y}${opts.trial ? ' (bản thử)' : ''}`,
+    subject: `🚢 Lịch tàu rời Đà Nẵng & TP.HCM ${days} ngày tới — ${p2(p.d)}/${p2(p.m)}/${p.y}${opts.trial ? ' (bản thử)' : ''}`,
     html: buildHtml(base, !!opts.trial),
   }
 }

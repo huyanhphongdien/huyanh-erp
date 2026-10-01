@@ -191,6 +191,18 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
 - **Treo (owner chưa chốt):** nhập kho WMS nào sau cân; ai chịu chênh lệch cân vs khai báo / ngưỡng báo NCC. Chưa nối
   Đề nghị thanh toán theo từng mã.
 
+## Lịch tàu dự kiến — mail Ban Giám đốc (01/10/2026, bản thử)
+- Edge Function `vessel-schedule-report` (`index.ts` gửi mail qua Graph, `report.ts` lấy dữ liệu + dựng HTML; `report.ts`
+  chỉ dùng `fetch` chuẩn nên chạy thử được bằng Node trước khi deploy). Tàu container rời **Đà Nẵng** và **Cát Lái** 7 ngày tới.
+- Nguồn = **web cảng**, không phải web hãng: Cảng Đà Nẵng (Google Sheet "Dự báo tàu đến" + bảng lịch container tháng để biết
+  hãng) và Tân Cảng Cát Lái (`eport.saigonnewport.com.vn/ships/Searcher`, có số chuyến + closing + giờ rời dự kiến).
+- ⚠ **Web hãng không lấy tự động được** (thử 01/10/2026): CMA CGM, MSC, Hapag-Lloyd, Yang Ming, Wan Hai chặn robot; ONE có
+  Turnstile; COSCO và Evergreen nhận request nhưng không trả lịch. Đừng dò lại — muốn có **cảng đích/ETA** phải dùng API chính
+  thức của hãng (công ty đăng ký key). Vì vậy báo cáo xếp theo **cảng đi + hãng**, CHƯA theo cảng đích.
+- Hàm tự kiểm bearer = service role (khác các hàm báo cáo cũ `--no-verify-jwt`). Body: `dry_run`, `test_to`, `trial`.
+- **Chưa** gắn pg_cron và **chưa** lưu lịch sử để so thay đổi (`docs/migrations/vessel_schedule_p1_raw_collector.sql` là bản
+  nháp chỉ có Đà Nẵng, CHƯA áp). Mail phải < ~100KB kẻo Gmail cắt — Cát Lái chỉ liệt kê chi tiết 3 ngày.
+
 ## Chấm công — GPS (owner chốt 16/09/2026)
 - **Điện thoại / tablet: BẮT BUỘC toạ độ và phải nằm trong bán kính nhà máy (3 km). Máy tính (PC/laptop): bỏ qua GPS.**
 - Cấu hình ở `attendance_settings` (`setting_key='gps_config'`: `enabled`, `locations[{name,latitude,longitude,radius_meters}]`).

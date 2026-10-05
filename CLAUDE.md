@@ -178,6 +178,11 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
   cố ý, để hộ tiểu điền không lọt vào `compute_monthly_bonus` của đại lý B2B.
 - `apps/weighbridge` và `apps/retail-scale` dùng chung hook `src/hooks/useKeliScale.ts` nhưng
   **khác namespace localStorage** (`keli_scale` vs `rs_scale`) — chung key là ghim sai baud cho nhau.
+- **Báo cáo 21:00 cho BGĐ** (`supabase/functions/daily-rubber-report`) có mục riêng "🧺 Thu mua mủ lẻ" từ 05/10/2026: phiếu
+  retail ĐÃ CHỐT trong kỳ (khách, kg tươi, DRC, kg khô, đơn giá, thành tiền) + lũy kế tháng + số phiếu đang chờ DRC.
+  Cố ý **KHÔNG cộng** vào tổng mủ tươi / số xe / bảng đại lý (khách lẻ không phải đại lý; mủ tạp lẻ có DRC nên gộp là sai nhãn
+  "KL khô — chỉ mủ nước"). Tiền tính bằng `retailCalc` — bản sao công thức `computeAmount` của app cân, sửa một nơi phải sửa cả hai.
+  Query mủ lẻ lỗi thì mail ghi "không đọc được", phần chính vẫn gửi.
 
 ## App cân — Nhập thành phẩm / hàng thương mại, cân từng mã (30/09/2026)
 - Phiếu NHẬP có **loại hàng** `weighbridge_tickets.cargo_kind`: `raw` (mủ, mặc định) | `finished` (thành phẩm mua của nhà máy

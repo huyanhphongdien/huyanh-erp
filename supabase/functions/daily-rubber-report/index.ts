@@ -10,6 +10,8 @@
 //   Phiếu cũ/backfill không có completed_at → fallback về created_at.
 //
 // Nguồn: weighbridge_tickets (NHẬP, completed) + facilities + b2b_partners.
+// Mục "Thu mua mủ lẻ" (05/10/2026): phiếu app Cân mủ lẻ (ticket_type='retail') đã chốt DRC + giá
+// trong kỳ — báo RIÊNG một mục có tiền, KHÔNG cộng vào các số tổng (xem ghi chú ở fetchRetail).
 // (Tùy chọn body {"range":"today"} để xem nhanh HÔM NAY 00:00 → giờ gọi — KHÔNG trọn kỳ.)
 //
 // Deploy: npx supabase functions deploy daily-rubber-report --no-verify-jwt
@@ -113,6 +115,7 @@ function fmt1(n: number): string {
 }
 const fmtT = (kg: number) => fmt1(kg / 1000)        // kg → tấn (1 chữ số)
 const fmtKg = (kg: number) => String(Math.round(kg)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')  // kg, chấm nghìn
+const fmtVnd = (n: number) => `${fmtKg(n)} ₫`
 const esc = (s: string) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!))
 // Nhãn nhà máy hiển thị trên báo cáo: TL (Tân Lâm/Quảng Trị) → "No2".
 const FAC_LABEL: Record<string, string> = { TL: 'No2' }
@@ -147,7 +150,51 @@ async function fetchIN(supabase: any, fromISO: string, toISO: string): Promise<T
   return (data || []) as Ticket[]
 }
 
-function facCode(t: Ticket): { code: string; name: string } {
+// ── Thu mua MỦ LẺ (app Cân mủ lẻ — hộ tiểu điền bán tại cân, hiện chỉ có ở Phong Điền) ──
+// Phiếu = weighbridge_tickets ticket_type='retail', chỉ tính khi ĐÃ CHỐT (completed = có DRC + giá).
+// ⚠ KHÔNG cộng vào các số tổng phía trên, cố ý:
+//   · "xe" / "đại lý" không áp dụng cho khách lẻ;
+//   · mủ tạp lẻ CÓ DRC (đo để tính tiền theo kg khô) → gộp vào là sai nhãn "KL khô — chỉ mủ nước";
+//   · khối Lũy kế tháng đang khớp với trang Thống kê mủ, vốn không gồm mủ lẻ.
+interface RetailTicket {
+  id: string; code: string; supplier_name: string | null; rubber_type: string | null
+  net_weight: number | null; qc_actual_drc: number | null
+  unit_price: number | null; price_unit: string | null
+  facility?: { code: string; name: string } | { code: string; name: string }[] | null
+}
+
+const RETAIL_SELECT = `id, code, supplier_name, rubber_type, net_weight, qc_actual_drc, unit_price, price_unit,
+  facility:facilities!facility_id(code, name)`
+
+async function fetchRetail(supabase: any, fromISO: string, toISO: string): Promise<RetailTicket[]> {
+  const inWindow =
+    `and(completed_at.gte.${fromISO},completed_at.lt.${toISO}),` +
+    `and(completed_at.is.null,created_at.gte.${fromISO},created_at.lt.${toISO})`
+  const { data, error } = await supabase
+    .from('weighbridge_tickets')
+    .select(RETAIL_SELECT)
+    .eq('ticket_type', 'retail')
+    .eq('status', 'completed')
+    .or(inWindow)
+    .order('completed_at', { ascending: true })
+  if (error) throw error
+  return (data || []) as RetailTicket[]
+}
+
+// Tiền 1 phiếu mủ lẻ — CÙNG công thức với app cân (apps/retail-scale/src/lib/retail.ts computeAmount)
+// và Đề nghị thanh toán: KL tính tiền × đơn giá, làm tròn NGHÌN = đúng số in trên phiếu khách cầm.
+// Sửa công thức ở đây mà không sửa hai nơi kia là BGĐ thấy một số, khách cầm một số.
+function retailCalc(t: RetailTicket) {
+  const net = Number(t.net_weight) || 0
+  const drc = t.qc_actual_drc != null && Number(t.qc_actual_drc) > 0 ? Number(t.qc_actual_drc) : null
+  const dry = drc != null ? Math.round((net * drc) / 100 * 100) / 100 : null
+  const billable = t.price_unit === 'dry' ? (dry ?? 0) : net
+  const price = Number(t.unit_price) || 0
+  const amount = price > 0 && billable > 0 ? Math.round(Math.round(billable * price) / 1000) * 1000 : 0
+  return { net, drc, dry, price, amount }
+}
+
+function facCode(t: { facility?: Ticket['facility'] }): { code: string; name: string } {
   const f: any = Array.isArray(t.facility) ? t.facility[0] : t.facility
   return { code: f?.code || '?', name: f?.name || 'Chưa rõ' }
 }
@@ -181,10 +228,16 @@ async function collectData(supabase: any, mode: 'cutoff' | 'today' = 'cutoff') {
   const monthStartUTC = Date.UTC(reportedVn.getUTCFullYear(), reportedVn.getUTCMonth(), 1) - VN_OFFSET
   const monthStart = new Date(monthStartUTC).toISOString()
 
-  const [today, yesterday, month] = await Promise.all([
+  const [today, yesterday, month, retailToday, retailMonth, retailPendingRes] = await Promise.all([
     fetchIN(supabase, repStart, repEnd),
     fetchIN(supabase, prevStart, prevEnd),
     fetchIN(supabase, monthStart, repEnd),
+    // Mủ lẻ là mục PHỤ: query lỗi thì trả null và mail ghi rõ "không đọc được", chứ không
+    // ném lỗi làm cả báo cáo thu mua (phần chính) không gửi được.
+    fetchRetail(supabase, repStart, repEnd).catch((e) => { console.error('[daily-rubber-report] mủ lẻ (kỳ):', e); return null }),
+    fetchRetail(supabase, monthStart, repEnd).catch((e) => { console.error('[daily-rubber-report] mủ lẻ (tháng):', e); return null }),
+    // Đã cân nhưng CHƯA đo DRC (chưa có giá, chưa in) — đếm tại lúc gửi để BGĐ biết còn treo.
+    supabase.from('weighbridge_tickets').select('net_weight').eq('ticket_type', 'retail').eq('status', 'pending_drc'),
   ])
 
   // QUY ĐỔI KHÔ: CHỈ phiếu có DRC THỰC (mủ nước đã đốt + đo DRC). Mủ tạp/loại khác chưa đo DRC
@@ -277,6 +330,33 @@ async function collectData(supabase: any, mode: 'cutoff' | 'today' = 'cutoff') {
     xeCount: month.length, dealerCount: mDealerMap.size, topDealers: mTopDealers,
   }
 
+  // ── THU MUA MỦ LẺ (mục riêng) ──
+  const retailFailed = retailToday === null || retailMonth === null
+  const retailRows = (retailToday || []).map((t) => {
+    const f = facCode(t)
+    return { code: t.code, name: t.supplier_name || 'Khách lẻ', type: normRt(t.rubber_type), facName: f.name, ...retailCalc(t) }
+  })
+  const retailMonthList = retailMonth || []
+  const retailMonthCalc = retailMonthList.map(retailCalc)
+  const retailPending = ((retailPendingRes as any)?.data || []) as Array<{ net_weight: number | null }>
+  const retail = {
+    failed: retailFailed,
+    rows: retailRows,
+    count: retailRows.length,
+    tuoi: retailRows.reduce((s, r) => s + r.net, 0),
+    kho: retailRows.reduce((s, r) => s + (r.dry || 0), 0),
+    amount: retailRows.reduce((s, r) => s + r.amount, 0),
+    // Tên nhà máy lấy từ chính phiếu (kỳ này, không có thì lấy trong tháng) — không gõ cứng "Phong Điền".
+    facNames: [...new Set((retailRows.length ? retailRows.map((r) => r.facName) : retailMonthList.map((t) => facCode(t).name)))],
+    month: {
+      count: retailMonthList.length,
+      tuoi: retailMonthCalc.reduce((s, r) => s + r.net, 0),
+      amount: retailMonthCalc.reduce((s, r) => s + r.amount, 0),
+    },
+    pendingCount: retailPending.length,
+    pendingKg: retailPending.reduce((s, r) => s + (Number(r.net_weight) || 0), 0),
+  }
+
   // Cảnh báo: CHỈ phiếu MỦ NƯỚC thiếu DRC (mủ nước phải có DRC; mủ tạp không đo DRC nên không cảnh báo)
   const missing = today.filter((t) => t.rubber_type === 'mu_nuoc' && !hasDrc(t) && (t.net_weight || 0) > 0)
   const missingKg = missing.reduce((s, t) => s + (t.net_weight || 0), 0)
@@ -302,7 +382,7 @@ async function collectData(supabase: any, mode: 'cutoff' | 'today' = 'cutoff') {
     totalTuoi, totalKho, yTuoi, pct, drcTB,
     xeCount: today.length, dealerCount,
     facilities, types, topDealers, dealerDetail,
-    monthAgg,
+    monthAgg, retail,
     missingCount: missing.length, missingKg,
     empty: today.length === 0,
   }
@@ -429,6 +509,74 @@ function renderHtml(d: any): string {
       ${m.dealerCount > 5 ? `<div style="font-size:11px;color:#94a3b8;padding:6px 10px 0;">…và ${m.dealerCount - 5} đại lý khác.</div>` : ''}
     </td></tr>` : ''}`
 
+  // ── Thu mua mủ lẻ (app Cân mủ lẻ) — mục riêng, có tiền ──
+  const r = d.retail || { failed: false, rows: [], count: 0, tuoi: 0, kho: 0, amount: 0, facNames: [], month: { count: 0, tuoi: 0, amount: 0 }, pendingCount: 0, pendingKg: 0 }
+  // Bảng mủ lẻ cố ý HẸP (6 cột, lề ô 4px, 2 ô số): rộng hơn bảng "Chi tiết đại lý" là cả mail
+  // bị kéo ngang trên điện thoại.
+  const retailRowsHtml = r.rows.map((x: any, i: number) => {
+    const rb = (RUBBER as any)[x.type] || null
+    return `
+    <tr style="border-top:1px solid #eef1f0;${i % 2 ? 'background:#fafcfb;' : ''}">
+      <td style="padding:6px 4px;"><span style="font-weight:600;">${esc(x.name)}</span><br><span style="font-size:11px;color:#94a3b8;">${rb ? rb.label : esc(x.type)} · ${esc(x.code)}</span></td>
+      <td align="right" style="padding:6px 4px;font-weight:700;">${fmt1(x.net)}</td>
+      <td align="right" style="padding:6px 4px;">${x.drc != null ? fmt1(x.drc) + '%' : '—'}</td>
+      <td align="right" style="padding:6px 4px;color:#92400E;">${x.dry != null ? fmt1(x.dry) : '—'}</td>
+      <td align="right" style="padding:6px 4px;">${x.price > 0 ? fmtKg(x.price) : '—'}</td>
+      <td align="right" style="padding:6px 4px;font-weight:700;color:#1B4D3E;white-space:nowrap;">${x.amount > 0 ? fmtVnd(x.amount) : '—'}</td>
+    </tr>`
+  }).join('')
+  const retailHtml = `
+    <tr><td style="padding:16px 24px 4px 24px;"><div style="font-size:15px;font-weight:700;color:#1B4D3E;border-bottom:2px solid #1B4D3E;padding-bottom:6px;">🧺 Thu mua mủ lẻ${r.facNames.length ? ` <span style="color:#64748b;font-weight:600;font-size:13px;">— Nhà máy ${esc(r.facNames.join(', '))}</span>` : ''}</div></td></tr>
+    ${r.failed ? `
+    <tr><td style="padding:10px 24px 8px 24px;font-size:13px;color:#b91c1c;">Không đọc được số liệu mủ lẻ của kỳ này. Các phần khác của báo cáo không bị ảnh hưởng.</td></tr>` : r.count > 0 ? `
+    <tr><td style="padding:8px 18px 0 18px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td width="50%" style="padding:6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F0F9F4;border:1px solid #cde8d8;border-radius:10px;"><tr><td style="padding:12px;">
+              <div style="font-size:11px;color:#15803d;font-weight:600;">MỦ TƯƠI</div>
+              <div style="font-size:18px;font-weight:800;color:#1B4D3E;margin-top:2px;">${fmt1(r.tuoi)}&nbsp;<span style="font-size:13px;font-weight:600;">kg</span></div>
+              <div style="font-size:11px;color:#15803d;margin-top:2px;">${r.count} phiếu</div>
+            </td></tr></table>
+          </td>
+          <td width="50%" style="padding:6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8EC;border:1px solid #f3e1bd;border-radius:10px;"><tr><td style="padding:12px;">
+              <div style="font-size:11px;color:#B45309;font-weight:600;">THÀNH TIỀN</div>
+              <div style="font-size:18px;font-weight:800;color:#92400E;margin-top:2px;">${fmtKg(r.amount)}&nbsp;<span style="font-size:13px;font-weight:600;">₫</span></div>
+              <div style="font-size:11px;color:#B45309;margin-top:2px;">${r.kho > 0 ? `${fmt1(r.kho)} kg khô` : 'chưa có DRC'}</div>
+            </td></tr></table>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+    <tr><td style="padding:8px 24px 4px 24px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:12px;">
+        <tr style="background:#1B4D3E;color:#fff;">
+          <th align="left" style="padding:6px 4px;font-weight:600;">Khách</th>
+          <th align="right" style="padding:6px 4px;font-weight:600;">Tươi (kg)</th>
+          <th align="right" style="padding:6px 4px;font-weight:600;">DRC</th>
+          <th align="right" style="padding:6px 4px;font-weight:600;">Khô (kg)</th>
+          <th align="right" style="padding:6px 4px;font-weight:600;">Đơn giá</th>
+          <th align="right" style="padding:6px 4px;font-weight:600;">Thành tiền</th>
+        </tr>
+        ${retailRowsHtml}
+        <tr style="background:#F0F9F4;font-weight:800;color:#1B4D3E;">
+          <td style="padding:8px 4px;">TỔNG</td>
+          <td align="right" style="padding:8px 4px;">${fmt1(r.tuoi)}</td>
+          <td align="right" style="padding:8px 4px;">${r.tuoi > 0 && r.kho > 0 ? fmt1(r.kho / r.tuoi * 100) + '%' : '—'}</td>
+          <td align="right" style="padding:8px 4px;">${r.kho > 0 ? fmt1(r.kho) : '—'}</td>
+          <td style="padding:8px 4px;"></td>
+          <td align="right" style="padding:8px 4px;white-space:nowrap;">${fmtVnd(r.amount)}</td>
+        </tr>
+      </table>
+    </td></tr>` : `
+    <tr><td style="padding:10px 24px 2px 24px;font-size:13px;color:#64748b;">Không có phiếu mủ lẻ nào chốt trong kỳ.</td></tr>`}
+    ${r.failed ? '' : `<tr><td style="padding:4px 24px 8px 24px;">
+      <div style="font-size:12px;color:#475569;padding:4px 8px 0;">Lũy kế tháng (${esc(m.label)}): <b>${r.month.count} phiếu</b> · <b>${fmt1(r.month.tuoi)} kg</b> tươi · <b>${fmtVnd(r.month.amount)}</b></div>
+      ${r.pendingCount > 0 ? `<div style="font-size:12px;color:#92400E;padding:4px 8px 0;">⏳ ${r.pendingCount} phiếu đã cân, đang chờ đo DRC (≈${fmt1(r.pendingKg)} kg) — chưa có giá nên chưa tính ở trên.</div>` : ''}
+      <div style="font-size:11px;color:#94a3b8;padding:6px 8px 0;">Khách lẻ bán tại cân, tính tiền theo kg khô (tươi × DRC × đơn giá), làm tròn nghìn — đúng số in trên phiếu khách cầm. Không cộng vào các số tổng phía trên.</div>
+    </td></tr>`}`
+
   const warnHtml = d.missingCount > 0 ? `
     <tr><td style="padding:10px 24px 4px 24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF7E6;border:1px solid #FFE08A;border-radius:8px;">
@@ -443,7 +591,7 @@ function renderHtml(d: any): string {
       Không có phiếu cân NHẬP hoàn tất nào trong kỳ ${esc(d.periodLabel)}.
     </td></tr>` : ''
 
-  const body = d.empty ? `${emptyHtml}${monthHtml}` : `
+  const body = d.empty ? `${emptyHtml}${retailHtml}${monthHtml}` : `
     <!-- KPI -->
     <tr><td style="padding:18px 18px 4px 18px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -542,6 +690,7 @@ function renderHtml(d: any): string {
       </table>
       ${d.dealerCount > 5 ? `<div style="font-size:11px;color:#94a3b8;padding:6px 10px 0;">…và ${d.dealerCount - 5} đại lý khác.</div>` : ''}
     </td></tr>
+    ${retailHtml}
     ${monthHtml}
     ${warnHtml}`
 
@@ -579,7 +728,8 @@ function renderHtml(d: any): string {
           Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b> trong kỳ <b>${esc(d.periodLabel)}</b> (giờ VN), tính theo <b>giờ hoàn tất phiếu</b>.<br>
           <b>KL khô = KL tươi × DRC, CHỈ quy đổi cho mủ có DRC thực</b> (mủ nước đã đốt). Mủ tạp chưa đo DRC nên KHÔNG quy đổi khô.<br>
           Khối <b>Lũy kế từ đầu tháng</b> tính theo <b>tháng dương lịch</b>: từ 00:00 ngày 01 đến hết kỳ báo cáo
-          (khớp với trang Thống kê mủ trên phần mềm).
+          (khớp với trang Thống kê mủ trên phần mềm).<br>
+          Mục <b>Thu mua mủ lẻ</b> = phiếu app Cân mủ lẻ đã chốt DRC và giá trong kỳ; báo riêng, <b>không cộng</b> vào tổng mủ tươi, số xe và bảng đại lý.
         </div>
       </td></tr>
     </table>
@@ -608,6 +758,10 @@ serve(async (req) => {
     const d = await collectData(supabase, mode)
     const html = renderHtml(d)
     const subject = `Báo cáo thu mua mủ ngày ${d.dateLabel} — ${fmtT(d.totalTuoi)} tấn tươi · ${fmtT(d.totalKho)} tấn khô · ${d.xeCount} xe`
+      + (d.retail.count > 0 ? ` · mủ lẻ ${fmt1(d.retail.tuoi)} kg` : '')
+    // Hàm này deploy --no-verify-jwt (ai có URL cũng gọi được) → CHỈ trả nguyên HTML để xem trước
+    // khi người gọi cầm khoá service role; người ngoài chỉ nhận số tổng như trước.
+    const isAdminCall = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '') === SUPABASE_SERVICE_ROLE_KEY
 
     if (!dry) {
       const token = await getAccessToken()
@@ -622,6 +776,8 @@ serve(async (req) => {
       period: d.periodLabel,
       html_bytes: html.length,
       stats: { tuoi_kg: d.totalTuoi, kho_kg: d.totalKho, xe: d.xeCount, dai_ly: d.dealerCount, missing_drc: d.missingCount },
+      retail: { failed: d.retail.failed, phieu: d.retail.count, tuoi_kg: d.retail.tuoi, tien: d.retail.amount, cho_drc: d.retail.pendingCount },
+      ...(dry && isAdminCall ? { html } : {}),
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (error: any) {
     console.error('❌ [daily-rubber-report]', error)

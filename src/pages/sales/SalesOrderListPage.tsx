@@ -1249,7 +1249,8 @@ const SalesOrderListPage = () => {
       title: hdr('Incoterm'),
       dataIndex: 'incoterm',
       key: 'incoterm',
-      width: 80,
+      // 105px: tiêu đề in hoa + giãn chữ (INCOTERM) + mũi tên sort; 80px thì mũi tên đè lên chữ
+      width: 105,
       align: 'center' as const,
       sorter: true,
       sortOrder: sortedColumn('incoterm'),

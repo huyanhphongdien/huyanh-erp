@@ -126,7 +126,7 @@ export interface CreateSalesOrderData {
 export const SORTABLE_ORDER_COLUMN_LIST = [
   'order_date', 'created_at', 'updated_at', 'code', 'id',
   'contract_no', 'contract_no_sort_key', 'customer_id', 'grade', 'customer_po',
-  'quantity_tons', 'delivery_date', 'ready_date', 'bank_name', 'booking_reference',
+  'quantity_tons', 'delivery_date', 'ready_date', 'bank_name', 'incoterm', 'booking_reference',
   'etd', 'unit_price', 'total_value_usd', 'deposit_amount', 'discount_amount',
   'discount_bank', 'remaining_amount', 'payment_received_date',
   'status', 'payment_status', 'current_stage',

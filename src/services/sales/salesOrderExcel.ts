@@ -104,7 +104,7 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
     'STT', 'Số HĐ', 'Khách hàng', 'Loại hàng', 'Số LOT',
     'SL (tấn)', 'Đã giao (T)', 'Còn thiếu (T)',
     'Đơn giá USD', 'Thành tiền USD', 'Đặt cọc', 'CK', 'NH CK', 'Còn lại (USD)',
-    'Hạn giao', 'Sẵn hàng', 'Ngân hàng', 'Số BKG', 'ETD', 'Tiền về', 'Trạng thái',
+    'Hạn giao', 'Sẵn hàng', 'Incoterm', 'Số BKG', 'ETD', 'Tiền về', 'Trạng thái',
     // ⚠ HAI CỘT LÔ ĐẶT Ở CUỐI, KHÔNG chèn giữa. File này khoá cứng chỉ số định dạng
     // ([6,7,8] số, [9,10,11,12,14] tiền, [15,16,19,20] ngày) và khoá tổng theo 6/7/8/10 —
     // chèn một cột vào giữa là lệch TOÀN BỘ mà không có gì báo lỗi.
@@ -154,7 +154,7 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
         ((o.total_value_usd || 0) - ((o as any).deposit_amount || 0) - ((o as any).discount_amount || 0)),
       toDate(o.delivery_date),
       toDate((o as any).ready_date),
-      (o as any).bank_name || '',
+      (o as any).incoterm || '',
       (o as any).booking_reference || '',
       toDate(o.etd),
       toDate((o as any).payment_received_date),

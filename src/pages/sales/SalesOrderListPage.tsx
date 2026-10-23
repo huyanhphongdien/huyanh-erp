@@ -130,7 +130,7 @@ const SORT_FIELD_LABELS: Record<string, string> = {
   shortage: 'Còn thiếu (tấn)',
   unit_price: 'Đơn giá',
   total_value_usd: 'Thành tiền',
-  bank_name: 'Ngân hàng',
+  incoterm: 'Incoterm',
   booking_reference: 'Số BKG',
   deposit_amount: 'Đặt cọc',
   discount_amount: 'CK',
@@ -176,7 +176,7 @@ const SORT_FIELD_BY_COLUMN: Record<string, SortableOrderColumn> = {
   qty: 'quantity_tons',
   delivery: 'delivery_date',
   ready_date: 'ready_date',
-  bank: 'bank_name',
+  incoterm: 'incoterm',
   bkg: 'booking_reference',
   etd: 'etd',
   unit_price: 'unit_price',
@@ -196,7 +196,7 @@ const SORT_FIELD_BY_COLUMN: Record<string, SortableOrderColumn> = {
 const HIDEABLE_COLUMNS: { key: string; label: string }[] = [
   { key: 'lot',           label: 'Số LOT' },
   { key: 'ready_date',    label: 'Sẵn hàng' },
-  { key: 'bank',          label: 'Ngân hàng' },
+  { key: 'incoterm',      label: 'Incoterm' },
   { key: 'bkg',           label: 'Số BKG' },
   { key: 'deposit',       label: 'Đặt cọc' },
   { key: 'discount',      label: 'CK' },
@@ -923,6 +923,7 @@ const SalesOrderListPage = () => {
     'Đ.giá': 'Đơn giá /tấn theo đồng tiền của đơn ($ xuất khẩu, ₫ nội địa)',
     'CK': 'Chiết khấu',
     'NH CK': 'Ngân hàng chiết khấu',
+    'Incoterm': 'Điều kiện giao hàng: FOB / CIF / CNF / DDP / EXW',
     'T.độ': 'Tiến độ 4 phase: Hợp đồng → Sản xuất → Logistics → Kế toán',
     'Tiền về': 'Ngày tiền về tài khoản',
   }
@@ -1245,14 +1246,14 @@ const SalesOrderListPage = () => {
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {
-      title: hdr('Ngân hàng'),
-      dataIndex: 'bank_name',
-      key: 'bank',
-      width: 110,
-      ellipsis: true,
+      title: hdr('Incoterm'),
+      dataIndex: 'incoterm',
+      key: 'incoterm',
+      width: 80,
+      align: 'center' as const,
       sorter: true,
-      sortOrder: sortedColumn('bank'),
-      render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
+      sortOrder: sortedColumn('incoterm'),
+      render: (v: string) => v ? <span style={{ fontSize: 11, fontWeight: 600 }}>{v}</span> : gray(null),
     },
     {
       title: hdr('Số BKG'),
@@ -1705,7 +1706,7 @@ const SalesOrderListPage = () => {
         <Row gutter={[12, 12]} align="middle">
           <Col xs={24} sm={8} md={7}>
             <Input.Search
-              placeholder="Tìm số HĐ, booking, B/L, grade, ngân hàng..."
+              placeholder="Tìm số HĐ, booking, B/L, grade..."
               allowClear
               onSearch={handleSearch}
               onChange={(e) => {

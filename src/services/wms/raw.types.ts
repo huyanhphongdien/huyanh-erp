@@ -10,18 +10,20 @@
 // Mọi màn hình kho NVL dùng kiểu này, KHÔNG dùng RubberType cũ trong wms.types.ts.
 // ============================================================================
 
-export type RawRubberGroup = 'mu_tho' | 'thanh_pham' | 'khac'
+export type RawRubberGroup = 'mu_tho' | 'thanh_pham' | 'tong_hop' | 'khac'
 
 export type RawRubberType =
   | 'mu_nuoc' | 'mu_dong' | 'mu_tap' | 'mu_chen' | 'mu_to'
   | 'svr_3l' | 'svr_l' | 'svr_5' | 'svr_10' | 'svr_20' | 'svr_cv50' | 'svr_cv60'
   | 'rss_1' | 'rss_3' | 'latex_60'
+  | 'sbr_1502'
   | 'khac'
 
 export const RAW_RUBBER_TYPES: RawRubberType[] = [
   'mu_nuoc', 'mu_dong', 'mu_tap', 'mu_chen', 'mu_to',
   'svr_3l', 'svr_l', 'svr_5', 'svr_10', 'svr_20', 'svr_cv50', 'svr_cv60',
   'rss_1', 'rss_3', 'latex_60',
+  'sbr_1502',
   'khac',
 ]
 
@@ -41,6 +43,7 @@ export const RAW_RUBBER_TYPE_LABELS: Record<RawRubberType, string> = {
   rss_1: 'RSS 1',
   rss_3: 'RSS 3',
   latex_60: 'Mủ ly tâm 60 %',
+  sbr_1502: 'SBR 1502 (cao su tổng hợp)',
   khac: 'Khác',
 }
 
@@ -48,12 +51,14 @@ export const RAW_RUBBER_TYPE_GROUP: Record<RawRubberType, RawRubberGroup> = {
   mu_nuoc: 'mu_tho', mu_dong: 'mu_tho', mu_tap: 'mu_tho', mu_chen: 'mu_tho', mu_to: 'mu_tho',
   svr_3l: 'thanh_pham', svr_l: 'thanh_pham', svr_5: 'thanh_pham', svr_10: 'thanh_pham', svr_20: 'thanh_pham',
   svr_cv50: 'thanh_pham', svr_cv60: 'thanh_pham', rss_1: 'thanh_pham', rss_3: 'thanh_pham', latex_60: 'thanh_pham',
+  sbr_1502: 'tong_hop',
   khac: 'khac',
 }
 
 export const RAW_RUBBER_GROUP_LABELS: Record<RawRubberGroup, string> = {
   mu_tho: 'Mủ thô',
   thanh_pham: 'Thành phẩm (NM khác / mua ngoài)',
+  tong_hop: 'Cao su tổng hợp (SBR…)',
   khac: 'Khác',
 }
 
@@ -62,6 +67,7 @@ export const RAW_RUBBER_TYPE_DEFAULT_DRC: Record<RawRubberType, number | null> =
   mu_nuoc: null, mu_dong: null, mu_tap: null, mu_chen: null, mu_to: null,
   svr_3l: 100, svr_l: 100, svr_5: 100, svr_10: 100, svr_20: 100, svr_cv50: 100, svr_cv60: 100,
   rss_1: 100, rss_3: 100, latex_60: 60,
+  sbr_1502: 100,
   khac: null,
 }
 
@@ -91,6 +97,7 @@ export function chuanHoaLoaiMu(v?: string | null): RawRubberType {
   if (/^(mu_)?rss_?1$/.test(s)) return 'rss_1'
   if (/^(mu_)?rss_?3$/.test(s) || s === 'rss') return 'rss_3'
   if (/^latex_?60$/.test(s) || s === 'mu_ly_tam' || s === 'mủ_ly_tâm') return 'latex_60'
+  if (/^sbr_?1502$/.test(s) || s === 'sbr') return 'sbr_1502'
   return 'khac'
 }
 

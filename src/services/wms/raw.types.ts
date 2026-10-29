@@ -2,43 +2,111 @@
 // KHO NGUYÊN LIỆU MỦ — kiểu dữ liệu dùng chung (GĐ0)
 // File: src/services/wms/raw.types.ts
 //
-// Mã loại mủ CHUẨN đồng bộ với bảng raw_rubber_types + hàm fn_chuan_hoa_loai_mu
-// (docs/migrations/wms_nvl_p0_ma_loai_mu.sql). Mọi màn hình kho NVL dùng kiểu
-// này, KHÔNG dùng RubberType cũ (10 giá trị, trùng nghĩa) trong wms.types.ts.
+// Mã loại hàng CHUẨN đồng bộ với bảng raw_rubber_types + hàm fn_chuan_hoa_loai_mu
+// (docs/migrations/wms_nvl_p0_ma_loai_mu.sql + _v2_thanh_pham.sql).
+// Hai nhóm: mủ thô (phải đo DRC) và thành phẩm từ nhà máy khác / mua ngoài
+// (SVR, RSS, mủ ly tâm — DRC mặc định). "Hàng thương mại" là NGUỒN của lô,
+// không phải loại hàng (xem RawLotSource).
+// Mọi màn hình kho NVL dùng kiểu này, KHÔNG dùng RubberType cũ trong wms.types.ts.
 // ============================================================================
 
-export type RawRubberType = 'mu_nuoc' | 'mu_dong' | 'mu_tap' | 'mu_chen' | 'mu_to' | 'khac'
+export type RawRubberGroup = 'mu_tho' | 'thanh_pham' | 'khac'
 
-export const RAW_RUBBER_TYPES: RawRubberType[] = ['mu_nuoc', 'mu_dong', 'mu_tap', 'mu_chen', 'mu_to', 'khac']
+export type RawRubberType =
+  | 'mu_nuoc' | 'mu_dong' | 'mu_tap' | 'mu_chen' | 'mu_to'
+  | 'svr_3l' | 'svr_l' | 'svr_5' | 'svr_10' | 'svr_20' | 'svr_cv50' | 'svr_cv60'
+  | 'rss_1' | 'rss_3' | 'latex_60'
+  | 'khac'
+
+export const RAW_RUBBER_TYPES: RawRubberType[] = [
+  'mu_nuoc', 'mu_dong', 'mu_tap', 'mu_chen', 'mu_to',
+  'svr_3l', 'svr_l', 'svr_5', 'svr_10', 'svr_20', 'svr_cv50', 'svr_cv60',
+  'rss_1', 'rss_3', 'latex_60',
+  'khac',
+]
 
 export const RAW_RUBBER_TYPE_LABELS: Record<RawRubberType, string> = {
   mu_nuoc: 'Mủ nước',
   mu_dong: 'Mủ đông',
   mu_tap: 'Mủ tạp',
   mu_chen: 'Mủ chén',
-  mu_to: 'Mủ tờ',
+  mu_to: 'Mủ tờ (chưa phân hạng)',
+  svr_3l: 'SVR 3L',
+  svr_l: 'SVR L',
+  svr_5: 'SVR 5',
+  svr_10: 'SVR 10',
+  svr_20: 'SVR 20',
+  svr_cv50: 'SVR CV50',
+  svr_cv60: 'SVR CV60',
+  rss_1: 'RSS 1',
+  rss_3: 'RSS 3',
+  latex_60: 'Mủ ly tâm 60 %',
   khac: 'Khác',
 }
 
+export const RAW_RUBBER_TYPE_GROUP: Record<RawRubberType, RawRubberGroup> = {
+  mu_nuoc: 'mu_tho', mu_dong: 'mu_tho', mu_tap: 'mu_tho', mu_chen: 'mu_tho', mu_to: 'mu_tho',
+  svr_3l: 'thanh_pham', svr_l: 'thanh_pham', svr_5: 'thanh_pham', svr_10: 'thanh_pham', svr_20: 'thanh_pham',
+  svr_cv50: 'thanh_pham', svr_cv60: 'thanh_pham', rss_1: 'thanh_pham', rss_3: 'thanh_pham', latex_60: 'thanh_pham',
+  khac: 'khac',
+}
+
+export const RAW_RUBBER_GROUP_LABELS: Record<RawRubberGroup, string> = {
+  mu_tho: 'Mủ thô',
+  thanh_pham: 'Thành phẩm (NM khác / mua ngoài)',
+  khac: 'Khác',
+}
+
+/** DRC dùng cho sổ khô khi phiếu không có DRC đo. null = bắt buộc đo (mủ thô). Khớp raw_rubber_types.drc_mac_dinh. */
+export const RAW_RUBBER_TYPE_DEFAULT_DRC: Record<RawRubberType, number | null> = {
+  mu_nuoc: null, mu_dong: null, mu_tap: null, mu_chen: null, mu_to: null,
+  svr_3l: 100, svr_l: 100, svr_5: 100, svr_10: 100, svr_20: 100, svr_cv50: 100, svr_cv60: 100,
+  rss_1: 100, rss_3: 100, latex_60: 60,
+  khac: null,
+}
+
 /** Loại nào vào sổ kho khô (khac = không). Khớp raw_rubber_types.is_raw. */
-export const RAW_RUBBER_TYPE_IS_RAW: Record<RawRubberType, boolean> = {
-  mu_nuoc: true, mu_dong: true, mu_tap: true, mu_chen: true, mu_to: true, khac: false,
+export const RAW_RUBBER_TYPE_IS_RAW: Record<RawRubberType, boolean> = Object.fromEntries(
+  RAW_RUBBER_TYPES.map((t) => [t, t !== 'khac']),
+) as Record<RawRubberType, boolean>
+
+/**
+ * Bản TypeScript của fn_chuan_hoa_loai_mu (v2) — dùng khi hiển thị dữ liệu cũ ở client
+ * (phiếu cân, lô, thưởng B2B, grade). Sổ kho tính ở DB bằng hàm SQL, đây chỉ để hiển thị.
+ */
+export function chuanHoaLoaiMu(v?: string | null): RawRubberType {
+  const s = (v ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_')
+  if (['mu_nuoc', 'nuoc', 'latex', 'mủ_nước'].includes(s)) return 'mu_nuoc'
+  if (['mu_dong', 'dong', 'mủ_đông'].includes(s)) return 'mu_dong'
+  if (['mu_tap', 'tap', 'mủ_tạp'].includes(s)) return 'mu_tap'
+  if (['mu_chen', 'chen', 'cup_lump', 'mủ_chén'].includes(s)) return 'mu_chen'
+  if (['mu_to', 'to', 'sheet', 'mủ_tờ'].includes(s)) return 'mu_to'
+  if (/^svr_?3l$/.test(s)) return 'svr_3l'
+  if (/^svr_?l$/.test(s)) return 'svr_l'
+  if (/^svr_?5$/.test(s)) return 'svr_5'
+  if (/^svr_?10$/.test(s)) return 'svr_10'
+  if (/^svr_?20$/.test(s)) return 'svr_20'
+  if (/^svr_?cv_?50$/.test(s)) return 'svr_cv50'
+  if (/^svr_?cv_?60$/.test(s)) return 'svr_cv60'
+  if (/^(mu_)?rss_?1$/.test(s)) return 'rss_1'
+  if (/^(mu_)?rss_?3$/.test(s) || s === 'rss') return 'rss_3'
+  if (/^latex_?60$/.test(s) || s === 'mu_ly_tam' || s === 'mủ_ly_tâm') return 'latex_60'
+  return 'khac'
 }
 
 /**
- * Bản TypeScript của fn_chuan_hoa_loai_mu — dùng khi hiển thị dữ liệu cũ ở client
- * (phiếu cân, lô, thưởng B2B). Sổ kho tính ở DB bằng hàm SQL, đây chỉ để hiển thị.
+ * Nguồn của một lô trong kho NVL (ghi ở lô từ GĐ1, không phải loại hàng).
+ * thuong_mai = hàng mua về bán lại / không qua chế biến → xuất bán, không xuất sản xuất.
  */
-export function chuanHoaLoaiMu(v?: string | null): RawRubberType {
-  const s = (v ?? '').trim().toLowerCase()
-  switch (s) {
-    case 'mu_nuoc': case 'nuoc': case 'latex': case 'mủ nước': return 'mu_nuoc'
-    case 'mu_dong': case 'dong': case 'mủ đông': return 'mu_dong'
-    case 'mu_tap': case 'tap': case 'mủ tạp': return 'mu_tap'
-    case 'mu_chen': case 'chen': case 'cup_lump': case 'mủ chén': return 'mu_chen'
-    case 'mu_to': case 'to': case 'sheet': case 'mu_rss3': case 'rss': case 'mủ tờ': return 'mu_to'
-    default: return 'khac'
-  }
+export type RawLotSource = 'nong_ho' | 'dai_ly' | 'nha_may_khac' | 'thuong_mai' | 'chuyen_kho' | 'khac'
+
+export const RAW_LOT_SOURCE_LABELS: Record<RawLotSource, string> = {
+  nong_ho: 'Nông hộ / tiểu điền',
+  dai_ly: 'Đại lý / thương lái',
+  nha_may_khac: 'Nhà máy khác (mua thành phẩm)',
+  thuong_mai: 'Hàng thương mại (mua về bán lại)',
+  chuyen_kho: 'Chuyển kho nội bộ (TL / Lào / PD)',
+  khac: 'Khác',
 }
 
 // ----------------------------------------------------------------------------

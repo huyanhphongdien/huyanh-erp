@@ -17,6 +17,7 @@ Mỗi quyết định ghi: ai chốt, ngày, giá trị, nằm ở đâu trong h
 | 9 | Sơ đồ ô bãi, bể chứa | **Chưa làm** đợt này; lô chỉ thuộc "kho NVL" của nhà máy | Chủ doanh nghiệp (29/10) | Mockup đã bỏ màn 05 |
 | 10 | Mã loại mủ chuẩn | `mu_nuoc · mu_dong · mu_tap · mu_chen · mu_to · khac`; dữ liệu cũ không sửa, đi qua `fn_chuan_hoa_loai_mu()` | Claude đề xuất | `raw_rubber_types`, `wms_nvl_p0_ma_loai_mu.sql` |
 | 11 | Lệch DRC nhà cung cấp khai báo so với thực | Gắn cờ điểm NCC khi thấp hơn **3 điểm** | Claude đề xuất | `raw_settings.nguong_lech_drc_ncc_diem` |
+| 12 | Hàng vào kho NVL gồm cả **thành phẩm từ nhà máy khác** (SVR, RSS, mủ ly tâm) và **hàng thương mại** | Danh mục mở rộng 2 nhóm: `mu_tho` (phải đo DRC) và `thanh_pham` (DRC mặc định 100 cho SVR/RSS, 60 cho latex 60 %). "Hàng thương mại" là **nguồn của lô** (`nguon_hang`: nông hộ / đại lý / nhà máy khác / thương mại / chuyển kho, ghi ở GĐ1), sổ có bút toán **xuất bán** riêng, không trộn với xuất sản xuất | **Chủ doanh nghiệp** (29/10) | `wms_nvl_p0_ma_loai_mu_v2_thanh_pham.sql`, `raw.types.ts` |
 
 Các ngưỡng số (1–5, 11) đổi bằng cách BGĐ sửa bảng `raw_settings` theo nhà máy, không cần sửa code.
 

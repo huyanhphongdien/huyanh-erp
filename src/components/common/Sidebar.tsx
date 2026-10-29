@@ -19,6 +19,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useOpenTab } from '../../hooks/useOpenTab';
+import { useRawRole } from '../../hooks/useRawRole';
 import { getSalesRole, hasSalesAccess } from '../../services/sales/salesPermissionService';
 import { supabase } from '../../lib/supabase';
 import { isFinanceUser } from '../../lib/financeAccess';
@@ -149,6 +150,7 @@ interface MenuGroup {
   adminOnly?: boolean;        // CHỈ Admin (vd Vốn vay — dữ liệu tài chính nhạy cảm)
   financeOnly?: boolean;      // Admin / Ban giám đốc / Phòng kế toán (Module Tài chính)
   transportOnly?: boolean;    // Admin / BGĐ / Hành chính / QC (Module Vận tải)
+  rawKeeperAllowed?: boolean; // Kho NVL: thủ kho (raw_store_keepers) / QC cũng thấy dù executiveOnly — luật ở DB, không email cứng
 }
 
 // ============================================================
@@ -423,6 +425,7 @@ const getMenuGroups = (
     icon: <Warehouse size={18} />,
     collapsible: true,
     executiveOnly: true,
+    rawKeeperAllowed: true,   // GĐ0 kho NVL: thủ kho / QC theo raw_store_keepers
     items: [
       { path: '/wms', label: 'Tồn kho', icon: <Warehouse size={18} /> }, // tabs: overview | nvl | alerts | stock-check
       { path: '/wms/stock-in', label: 'Nhập kho', icon: <PackagePlus size={18} /> },
@@ -543,6 +546,7 @@ export function Sidebar() {
 
   // ★ Sales Role — phân quyền module Đơn hàng bán
   const salesRole = useMemo(() => getSalesRole(user) || '', [user]);
+  const rawRole = useRawRole();   // kho NVL: BGĐ / thủ kho / QC — hỏi DB qua fn_nvl_quyen (GĐ0)
   
   const [pendingOTCount, setPendingOTCount] = useState(0);
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
@@ -753,7 +757,7 @@ export function Sidebar() {
     if (group.adminOnly && !isAdmin) return false;
     if (group.financeOnly && !isFinance) return false;
     if (group.transportOnly && !isTransport) return false;
-    if (group.executiveOnly && !isExecutive && !isAdmin) return false;
+    if (group.executiveOnly && !isExecutive && !isAdmin && !(group.rawKeeperAllowed && rawRole.canSeeRaw)) return false;
     if (group.managerLevelOnly && !isManagerLevel) return false;
     if (group.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;
     if (group.requireB2BPurchaser && !isB2BPurchaser && !isAdmin) return false;

@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kho Nguyên Liệu Mủ · Kế hoạch phần mềm theo giai đoạn</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+  :root {
+    --bg: #F9FAFB; --surface: #FFFFFF; --surface-2: #F3F4F6;
+    --text: #1F2937; --muted: #6B7280; --border: #E5E7EB;
+    --brand: #1B4D3E; --brand-dark: #0D2E25; --brand-soft: #E8F5F0; --brand-mid: #2D8B6E;
+    --accent: #E8A838; --accent-soft: #FFF4DE;
+    --ok: #15803D; --ok-soft: #DCFCE7; --warn: #B45309; --warn-soft: #FEF3C7; --bad: #B91C1C; --bad-soft: #FEE2E2; --info: #1D4ED8; --info-soft: #DBEAFE;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F1A16; --surface: #16241F; --surface-2: #1E2E28; --text: #E6EDEA; --muted: #9DB2A9; --border: #2A3B34;
+      --brand: #6FCBA6; --brand-dark: #0D2E25; --brand-soft: #1B3A30; --brand-mid: #2D8B6E; --accent: #E8A838; --accent-soft: #3A2E14;
+      --ok: #6EE7A0; --ok-soft: #14361F; --warn: #F5C86B; --warn-soft: #3A2A0E; --bad: #F58A8A; --bad-soft: #3C1515; --info: #8FB4FF; --info-soft: #152646;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1A16; --surface: #16241F; --surface-2: #1E2E28; --text: #E6EDEA; --muted: #9DB2A9; --border: #2A3B34;
+    --brand: #6FCBA6; --brand-dark: #0D2E25; --brand-soft: #1B3A30; --brand-mid: #2D8B6E; --accent: #E8A838; --accent-soft: #3A2E14;
+    --ok: #6EE7A0; --ok-soft: #14361F; --warn: #F5C86B; --warn-soft: #3A2A0E; --bad: #F58A8A; --bad-soft: #3C1515; --info: #8FB4FF; --info-soft: #152646;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.55; padding-inline: 16px; }
+  a { color: var(--brand); }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: .92em; }
+  .page { max-width: 1180px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 32px; padding-block: 28px 64px; align-items: flex-start; }
+  nav.toc { flex: 1 1 220px; max-width: 250px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 14px 16px; font-size: 13px; }
+  nav.toc strong { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  nav.toc a { text-decoration: none; display: block; padding: 5px 8px; border-radius: 6px; color: var(--text); }
+  nav.toc a:hover { background: var(--brand-soft); }
+  main { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 32px; }
+  header.hero { display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  h1 { margin: 0; font-size: 30px; line-height: 1.2; font-weight: 700; color: var(--brand); text-wrap: balance; }
+  h2 { margin: 0 0 12px; font-size: 21px; font-weight: 700; color: var(--brand); text-wrap: balance; }
+  h3 { margin: 16px 0 6px; font-size: 15px; font-weight: 600; }
+  p { margin: 0 0 10px; max-width: 74ch; }
+  .lede { font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 22px 24px 24px; }
+  section.phase { border-left: 0; }
+  .phead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; margin-bottom: 8px; }
+  .phead .n { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: var(--muted); }
+  .phead .time { font-size: 13px; color: var(--muted); }
+  .goal { border: 1px solid var(--brand-mid); background: var(--brand-soft); border-radius: 8px; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 12px; }
+  .card { background: var(--surface-2); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .card .k { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .card ul { margin: 2px 0 0; padding-left: 18px; font-size: 13.5px; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .ok { color: var(--ok); background: var(--ok-soft); } .warn { color: var(--warn); background: var(--warn-soft); } .info { color: var(--info); background: var(--info-soft); } .new { color: var(--warn); background: var(--accent-soft); }
+  .tbl { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: bottom; }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  ul, ol { margin: 0 0 10px; padding-left: 22px; } li { margin-bottom: 4px; }
+  .accept { border: 1px dashed var(--brand-mid); border-radius: 8px; padding: 10px 14px; background: var(--surface); }
+  .accept ol { margin: 4px 0 0; font-size: 13.5px; }
+  .you { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 8px; padding: 10px 14px; font-size: 13.5px; }
+  .roadmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 8px; }
+  .rm { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--surface); display: flex; flex-direction: column; gap: 3px; }
+  .rm .n { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; color: var(--muted); }
+  .rm b { color: var(--brand); font-size: 14px; }
+  .rm span { font-size: 12.5px; color: var(--muted); }
+  footer { font-size: 12px; color: var(--muted); padding-top: 8px; }
+  @media print { body { padding: 0; background: #fff; } nav.toc { display: none; } section { break-inside: avoid; border: 0; padding: 0 0 16px; } .page { display: block; } }
+</style>
+</head>
+<body>
+<div class="page">
+<nav class="toc" aria-label="Mục lục">
+<strong>Mục lục</strong>
+<ol>
+<li><a href="#tongquan">Tổng quan 6 giai đoạn</a></li>
+<li><a href="#cachlam">Cách làm việc mỗi giai đoạn</a></li>
+<li><a href="#gd0">GĐ 0 · Chuẩn bị</a></li>
+<li><a href="#gd1">GĐ 1 · Sổ kho khô + nhập kho</a></li>
+<li><a href="#gd2">GĐ 2 · Xuất sản xuất + cân lại</a></li>
+<li><a href="#gd3">GĐ 3 · Kiểm kê + cân đối + mobile</a></li>
+<li><a href="#gd4">GĐ 4 · Hàng chèn</a></li>
+<li><a href="#gd5">GĐ 5 · Chạy song song, nhân rộng</a></li>
+<li><a href="#quyuoc">Quy ước kỹ thuật</a></li>
+</ol>
+<p style="margin: 12px 0 0; font-size: 12px; color: var(--muted)">Liên quan: <a href="KHO_NGUYEN_LIEU_KE_HOACH.html">kế hoạch &amp; quy trình</a> · <a href="KHO_NGUYEN_LIEU_MOCKUP.html">mockup</a></p>
+</nav>
+<main>
+<header class="hero">
+<span class="eyebrow">Huy Anh ERP · kho nguyên liệu mủ · phần mềm</span>
+<h1>Kế hoạch phát triển phần mềm theo giai đoạn</h1>
+<p class="lede">Mỗi giai đoạn là một gói chạy được, nghiệm thu được, dùng được ngay tại Phong Điền trước khi sang gói sau. Mỗi gói ghi rõ: cần gì trước, tôi làm gì (migration, service, màn hình, mobile, quyền), bạn làm gì, kiểm tra thế nào để chốt.</p>
+<div class="meta"><span>Phiên bản 1 · 29/10/2026</span><span>Repo <span class="mono">huyanh-erp</span> · nhánh theo gói <span class="mono">feat/wms-nvl-gd&lt;n&gt;</span></span><span>DB: Supabase, migration chạy tay trong SQL Editor</span></div>
+</header>
+
+<section id="tongquan">
+<h2>Tổng quan 6 giai đoạn</h2>
+<div class="roadmap">
+<div class="rm"><span class="n">GĐ 0 · 3–4 ngày</span><b>Chuẩn bị</b><span>Mã loại mủ thống nhất, quyền thủ kho, nhập tồn đầu</span></div>
+<div class="rm"><span class="n">GĐ 1 · 2–3 tuần</span><b>Sổ kho khô + nhập kho</b><span>Ledger, nhập tách lô, tổng quan, chi tiết lô</span></div>
+<div class="rm"><span class="n">GĐ 2 · 2 tuần</span><b>Xuất sản xuất + cân lại</b><span>Lệnh xuất FIFO, cân thực, trừ sổ, điều chỉnh khô</span></div>
+<div class="rm"><span class="n">GĐ 3 · 2 tuần</span><b>Kiểm kê + cân đối + mobile</b><span>Kiểm kê tháng, báo cáo hao hụt, app thủ kho</span></div>
+<div class="rm"><span class="n">GĐ 4 · 2–3 tuần</span><b>Hàng chèn</b><span>Kho chèn, phiếu chèn, ảnh, sổ ca tự điền</span></div>
+<div class="rm"><span class="n">GĐ 5 · 2 tuần + 2×2 tuần</span><b>Chạy song song, nhân rộng</b><span>Phong Điền chốt, rồi Tân Lâm, Lào</span></div>
+</div>
+<p style="margin-top: 12px">Tổng khoảng 11–13 tuần cho Phong Điền. Mỗi gói kết thúc bằng một buổi nghiệm thu tại nhà máy theo kịch bản ở cuối từng giai đoạn; chưa đạt thì chưa mở gói sau. GĐ 4 (hàng chèn) chỉ phụ thuộc GĐ 0 và sổ ca có sẵn, nên nếu nhà máy cần sớm có thể kéo lên chạy song song với GĐ 2.</p>
+</section>
+
+<section id="cachlam">
+<h2>Cách làm việc mỗi giai đoạn</h2>
+<ol>
+<li><b>Mở gói:</b> tôi tạo nhánh <span class="mono">feat/wms-nvl-gd&lt;n&gt;</span>, viết migration SQL vào <span class="mono">docs/migrations/</span> cùng service, màn hình, mobile.</li>
+<li><b>Bạn chạy SQL</b> trong Supabase SQL Editor theo đúng thứ tự file (tôi chỉ có anon key, không chạy DB được). Cuối mỗi file có câu kiểm chứng, bạn gửi lại kết quả.</li>
+<li><b>Tôi merge vào main và push</b> như các việc trước; bản web lên theo deploy hiện tại.</li>
+<li><b>Nghiệm thu tại Phong Điền</b> theo kịch bản của gói, có số liệu thật của 1–2 ngày cân. Lỗi sửa ngay trên nhánh <span class="mono">fix/</span>.</li>
+<li><b>Chốt gói:</b> ghi lại ngưỡng đã chọn, cập nhật tài liệu hướng dẫn 1 trang cho người dùng, mở gói kế tiếp.</li>
+</ol>
+<div class="you">Việc của bạn trong mọi gói: chạy migration, cấp quyền cho người dùng thật, cung cấp số liệu thật để thử, và chốt các ngưỡng. Không có việc nào cần bạn viết code.</div>
+</section>
+
+<section id="gd0" class="phase">
+<div class="phead"><div><span class="n">GIAI ĐOẠN 0</span><h2>Chuẩn bị nền</h2></div><span class="time">3–4 ngày · không phụ thuộc gì</span></div>
+<div class="goal">Mục tiêu: các gói sau có chung mã loại mủ, chung quyền thủ kho, và có tồn đầu để sổ khô bắt đầu đúng.</div>
+<div class="grid">
+<div class="card"><span class="k">Migration</span><ul>
+<li><span class="mono">wms_nvl_p0_ma_loai_mu.sql</span>: bảng danh mục <span class="mono">rubber_types</span> (mu_nuoc · mu_dong · mu_tap · mu_chen · khac), view ánh xạ cho giá trị cũ (<span class="mono">tap|nuoc</span>, <span class="mono">latex|cup_lump</span>), hàm chuẩn hóa dùng trong view.</li>
+<li><span class="mono">wms_nvl_p0_thu_kho_nvl.sql</span>: bảng <span class="mono">raw_store_keepers</span> (employee_id, facility_id, is_active) + hàm <span class="mono">fn_nvl_duoc_ky(buoc, facility)</span> chép khuôn <span class="mono">fn_shift_book_duoc_ky</span>; RLS chỉ BGĐ cấp quyền.</li>
+<li><span class="mono">wms_nvl_p0_cau_hinh.sql</span>: bảng <span class="mono">raw_settings</span> theo nhà máy: ngưỡng tuổi lô, chu kỳ cân lại, ngưỡng lệch khô, giới hạn chèn theo grade.</li>
+</ul></div>
+<div class="card"><span class="k">Code</span><ul>
+<li>Nới nhóm menu KHO (WMS) trong <span class="mono">Sidebar.tsx</span>: ngoài <span class="mono">executiveOnly</span>, người có trong <span class="mono">raw_store_keepers</span> thấy các mục kho NVL.</li>
+<li>Hook <span class="mono">useRawRole()</span>: admin · thủ kho · trưởng ca · QS · xem.</li>
+<li>Script nhập tồn đầu từ CSV (mã lô, loại, kg ướt, DRC, ngày nhập) → tạo <span class="mono">stock_batches</span> + bút toán mở sổ ở GĐ 1.</li>
+</ul></div>
+<div class="card"><span class="k">Bạn làm</span><ul>
+<li>Chốt 6 quyết định trong tài liệu quy trình (mục 8).</li>
+<li>Danh sách thủ kho, trưởng ca, QS cho Phong Điền (email ERP).</li>
+<li>Tổ chức kiểm kê mở sổ: cân lại mọi lô tồn, lấy mẫu DRC, ghi vào mẫu CSV tôi gửi.</li>
+</ul></div>
+</div>
+<div class="accept" style="margin-top: 12px"><b>Nghiệm thu:</b><ol><li>Truy vấn đối chiếu: mọi giá trị rubber_type cũ đều ánh xạ được, không còn null.</li><li>Tài khoản thủ kho đăng nhập thấy menu kho NVL; tài khoản khác không thấy.</li><li>File CSV tồn đầu có đủ DRC cho ≥ 95 % lô, phần còn lại gắn cờ "ước".</li></ol></div>
+</section>
+
+<section id="gd1" class="phase">
+<div class="phead"><div><span class="n">GIAI ĐOẠN 1</span><h2>Sổ kho khô và nhập kho từ phiếu cân</h2></div><span class="time">2–3 tuần · cần GĐ 0</span></div>
+<div class="goal">Mục tiêu: Phong Điền biết tồn kg khô theo loại và theo lô; mọi lô mới đều sinh từ phiếu cân, có DRC, có tem QR.</div>
+<div class="grid">
+<div class="card"><span class="k">Migration</span><ul>
+<li><span class="mono">wms_nvl_p1_so_kho_kho.sql</span>: bảng <span class="mono">raw_stock_ledger</span> (chỉ thêm dòng; dry_kg = wet_kg × drc/100 tính sẵn), view <span class="mono">v_raw_stock_balance</span> (nhà máy × loại × lô: ướt, DRC hiện tại, khô, tuổi), view <span class="mono">v_raw_stock_by_type</span>; RLS đọc cho authenticated, ghi qua hàm.</li>
+<li><span class="mono">wms_nvl_p1_nhap_tach_lo.sql</span>: hàm <span class="mono">fn_nhap_kho_tu_phieu_can(ticket_id)</span>: với mỗi dòng <span class="mono">weighbridge_ticket_items</span> (hoặc cả phiếu nếu không có dòng) tạo <span class="mono">stock_batches</span> NVL-&lt;phiếu&gt;-&lt;dòng&gt; + bút toán <span class="mono">in</span>; từ chối nếu thiếu DRC; chống nhập 2 lần.</li>
+<li><span class="mono">wms_nvl_p1_mo_so.sql</span>: bút toán <span class="mono">opening</span> từ CSV tồn đầu.</li>
+</ul></div>
+<div class="card"><span class="k">Service</span><ul>
+<li><span class="mono">src/services/wms/rawStockService.ts</span>: balance, ledger theo lô, danh sách phiếu chờ nhập, nhập kho (gọi hàm DB), cảnh báo (quá tuổi, chờ DRC, DRC lệch NCC).</li>
+<li>Sửa <span class="mono">stockInService.createFromWeighbridgeTicket</span>: chuyển sang gọi hàm mới, bỏ tham số vị trí bãi.</li>
+<li>Sửa <span class="mono">nvlDashboardService.ts</span> đọc từ view sổ khô thay vì cộng <span class="mono">dry_weight</span>.</li>
+</ul></div>
+<div class="card"><span class="k">Màn hình (mockup 01, 02, 03)</span><ul>
+<li><span class="mono">/wms/nvl</span> Tổng quan: 6 chỉ số, tồn theo loại, cảnh báo, nhập–xuất 14 ngày, lô cần xử lý.</li>
+<li><span class="mono">/wms/nvl/nhap</span> Hàng đợi nhập kho: bảng phiếu hôm nay, panel chi tiết phiếu, nút nhập kho, in tem (dùng lại <span class="mono">BatchLabelPage</span>).</li>
+<li><span class="mono">/wms/nvl/lo/:id</span> Chi tiết lô: lúc nhập, hiện tại, chênh lệch, dòng thời gian, truy xuất, QC.</li>
+<li>Đăng ký route lazy trong <span class="mono">App.tsx</span>, mục menu trong nhóm KHO, tab qua <span class="mono">useOpenTab</span>.</li>
+</ul></div>
+<div class="card"><span class="k">Bạn làm</span><ul><li>Chạy 3 migration, gửi kết quả kiểm chứng.</li><li>Cho 2 ngày phiếu cân thật để đối chiếu.</li><li>Cùng thủ kho nhập thử 10 phiếu.</li></ul></div>
+</div>
+<div class="accept" style="margin-top: 12px"><b>Nghiệm thu:</b><ol><li>10 phiếu cân thật → đúng số lô theo dòng lô; tồn khô trên tổng quan = tổng (ướt × DRC) của sổ, lệch 0.</li><li>Phiếu thiếu DRC: nút nhập bị khóa, có nhãn chờ DRC; sau khi lab nhập DRC thì nhập được.</li><li>Nhập cùng một phiếu lần hai bị từ chối.</li><li>Tem QR in ra quét được bằng điện thoại, mở đúng lô.</li><li>Tồn đầu từ CSV khớp biên bản kiểm kê mở sổ.</li></ol></div>
+</section>
+
+<section id="gd2" class="phase">
+<div class="phead"><div><span class="n">GIAI ĐOẠN 2</span><h2>Xuất cho sản xuất và cân lại</h2></div><span class="time">2 tuần · cần GĐ 1</span></div>
+<div class="goal">Mục tiêu: sổ kho khô giảm đúng bằng kg cân thực khi hàng ra dây chuyền; DRC và kg ướt của lô được cập nhật định kỳ bằng bút toán điều chỉnh, không sửa tay.</div>
+<div class="grid">
+<div class="card"><span class="k">Migration</span><ul>
+<li><span class="mono">wms_nvl_p2_lenh_xuat.sql</span>: <span class="mono">raw_issue_orders</span> + <span class="mono">raw_issue_lines</span>, trạng thái draft → picking → weighed → submitted → qc_confirmed → received; trigger khi <span class="mono">received</span> sinh bút toán <span class="mono">out_production</span> từng dòng = kg cân × DRC lô; ràng buộc không ký khi thiếu kg cân; luật ký dùng <span class="mono">fn_nvl_duoc_ky</span>.</li>
+<li><span class="mono">wms_nvl_p2_can_lai.sql</span>: hàm <span class="mono">fn_can_lai(batch_id, wet_kg, drc, reason)</span> ghi <span class="mono">weight_check_logs</span> + bút toán <span class="mono">recheck_adjust</span>; view <span class="mono">v_raw_recheck_due</span> (lô đến hạn theo <span class="mono">raw_settings</span>); view <span class="mono">v_raw_dry_variance</span> (lô lệch khô quá ngưỡng, bắt buộc có lý do).</li>
+<li>Gắn <span class="mono">production_order_items.source_batch_id</span> và <span class="mono">drc_at_intake</span> từ dòng lệnh xuất.</li>
+</ul></div>
+<div class="card"><span class="k">Service</span><ul>
+<li><span class="mono">rawIssueService.ts</span>: gợi ý FIFO (lọc loại cho phép, ràng buộc % tạp, ưu tiên quá tuổi), tạo lệnh, ghi kg cân, ký 3 bước.</li>
+<li><span class="mono">rawRecheckService.ts</span>: lô đến hạn, cân lại, danh sách lệch khô.</li>
+<li>Đánh dấu trang đối chiếu cũ <span class="mono">/wms/production/xuat-kho</span> là chỉ đọc lịch sử.</li>
+</ul></div>
+<div class="card"><span class="k">Màn hình (mockup 04)</span><ul>
+<li><span class="mono">/wms/nvl/xuat</span>: chọn lệnh SX, bảng lô FIFO tick chọn với tổng khô chạy, panel tổng hợp, tạo lệnh; màn ghi kg cân từng lô; bước ký.</li>
+<li><span class="mono">/wms/nvl/can-lai</span>: lô đến hạn, nhập ướt mới + DRC mới, xem chênh.</li>
+<li>Thêm tab "Lô lệch khô" vào Tổng quan.</li>
+</ul></div>
+<div class="card"><span class="k">Bạn làm</span><ul><li>Chạy 2 migration.</li><li>Chốt ràng buộc % mủ tạp theo grade và ai ký QS cho lệnh xuất.</li><li>Cho 1 ca xuất thật để thử.</li></ul></div>
+</div>
+<div class="accept" style="margin-top: 12px"><b>Nghiệm thu:</b><ol><li>Lệnh xuất 42 t khô: gợi ý đúng thứ tự tuổi, tổng khô và % tạp đổi theo tick.</li><li>Không ký bước 1 được khi còn dòng thiếu kg cân.</li><li>Sau chữ ký thủ kho, sổ giảm đúng Σ kg cân × DRC; lô còn dư giữ nguyên mã và DRC.</li><li>Cân lại một lô: ướt giảm, DRC tăng, khô lệch dưới 0,5 % → không cảnh báo; làm giả lệch 2 % → vào danh sách lệch khô, bắt nhập lý do.</li><li>Lệnh sản xuất hiện đúng lô nguồn và DRC lúc nhập.</li></ol></div>
+</section>
+
+<section id="gd3" class="phase">
+<div class="phead"><div><span class="n">GIAI ĐOẠN 3</span><h2>Kiểm kê, cân đối hao hụt, mobile thủ kho</h2></div><span class="time">2 tuần · cần GĐ 2</span></div>
+<div class="goal">Mục tiêu: khép sổ tháng bằng số thật; thủ kho làm mọi việc tại bãi bằng điện thoại.</div>
+<div class="grid">
+<div class="card"><span class="k">Migration</span><ul>
+<li><span class="mono">wms_nvl_p3_kiem_ke.sql</span>: <span class="mono">raw_stocktakes</span> + lines (đếm ướt, DRC nếu quá hạn, khô đếm, khô sổ, chênh, lý do), duyệt BGĐ → bút toán <span class="mono">stocktake_adjust</span>, khóa kỳ.</li>
+<li><span class="mono">wms_nvl_p3_bao_cao.sql</span>: view <span class="mono">v_raw_balance_month</span> (tồn đầu, nhập, xuất, điều chỉnh, tồn cuối, kiểm kê, chênh theo loại), view <span class="mono">v_raw_wet_loss_by_age</span> (chuẩn hao ướt theo tuổi lô từ dữ liệu cân lại).</li>
+</ul></div>
+<div class="card"><span class="k">Service &amp; màn hình (mockup 06, 07)</span><ul>
+<li><span class="mono">rawStocktakeService.ts</span>, <span class="mono">rawReportService.ts</span>.</li>
+<li><span class="mono">/wms/nvl/kiem-ke</span>: mở kỳ, nhập đếm theo lô (hoặc quét QR), duyệt, khóa.</li>
+<li><span class="mono">/wms/nvl/can-doi</span>: 4 chỉ số, bảng cân đối theo loại, hao ướt theo tuổi, lô lệch khô; xuất Excel.</li>
+</ul></div>
+<div class="card"><span class="k">Mobile</span><ul>
+<li>Shell <span class="mono">/m/kho</span> theo khuôn <span class="mono">OpsShell</span>; quét QR bằng <span class="mono">BarcodeDetector</span> như <span class="mono">OpsQrScanner</span>, có nhập tay khi máy không hỗ trợ.</li>
+<li>Màn: lô vừa quét, xác nhận nhập kho, cân lại (nhập kg + DRC), xác nhận lấy cho lệnh xuất (nhập kg cân), kiểm kê đếm.</li>
+<li>Lưu nháp ngoại tuyến bằng localStorage, gửi lại khi có mạng.</li>
+</ul></div>
+<div class="card"><span class="k">Bạn làm</span><ul><li>Chạy 2 migration.</li><li>Tổ chức kiểm kê thử giữa tháng với 10 lô.</li><li>Phát điện thoại cho thủ kho, thử tại bãi, góp ý cỡ chữ và nút.</li></ul></div>
+</div>
+<div class="accept" style="margin-top: 12px"><b>Nghiệm thu:</b><ol><li>Kiểm kê thử: bảng cân đối ra đúng công thức, chênh lệch từng lô hiện đúng, duyệt mới sinh bút toán.</li><li>Khóa kỳ xong không ghi được bút toán lùi ngày.</li><li>Trên điện thoại thủ kho: quét tem → xác nhận nhập kho ≤ 3 thao tác; mất mạng vẫn lưu nháp và gửi lại được.</li><li>Số trên mobile và trên web giống nhau sau khi đồng bộ.</li></ol></div>
+</section>
+
+<section id="gd4" class="phase">
+<div class="phead"><div><span class="n">GIAI ĐOẠN 4</span><h2>Hàng chèn (mix)</h2></div><span class="time">2–3 tuần · cần GĐ 0 và sổ ca hiện có; có thể chạy song song GĐ 2</span></div>
+<div class="goal">Mục tiêu: mỗi ca biết lấy bao nhiêu kg hàng chèn, trả bao nhiêu, tiêu hao bao nhiêu, vào lô SVR nào, có ảnh; kho chèn có tồn đúng; sổ ca tự điền dòng CHÈN.</div>
+<div class="grid">
+<div class="card"><span class="k">Migration</span><ul>
+<li><span class="mono">wms_mix_p1_lo_chen.sql</span>: <span class="mono">mix_lots</span> (nguồn loi · dkl · std · mua_ngoai, chỉ số Po/Mooney/PRI, QC cho phép, metal_cleared, trạng thái), <span class="mono">mix_issues</span> (ca, lô, mục đích, kg_out, kg_return, kg_used, lô SVR nhận, bàn giao ca, 3 mốc ký), view <span class="mono">v_mix_balance</span> (tại kho / ở dây chuyền / tổng), <span class="mono">v_mix_movements</span>.</li>
+<li><span class="mono">wms_mix_p2_anh.sql</span>: bảng <span class="mono">raw_photos</span> (ref_type, ref_id, kind toan_canh · man_hinh_can · bo_sung, path, taken_at, gps, taken_by); bucket Storage <span class="mono">raw-photos</span> + policy; hàm kiểm tra đủ 2 ảnh trước khi ký.</li>
+<li><span class="mono">wms_mix_p3_so_qc_va_so_ca.sql</span>: chuẩn hóa <span class="mono">qc_reject_log.tinh_trang_xu_ly</span> (TRON · CHAY_LAI · LOAI), trigger tạo <span class="mono">mix_lots</span> khi QC chọn TRON/CHAY_LAI; trigger điền <span class="mono">shift_production_lines</span> mã CHÈN (xuat_kg_manual = Σ kg_used của ca) khi phiếu chèn được thủ kho nhận; sửa <span class="mono">v_vong_tai_che</span> thêm <span class="mono">chen_tieu_hao_kg</span>, <span class="mono">dat_tu_nvl_moi_kg</span>.</li>
+</ul></div>
+<div class="card"><span class="k">Service &amp; màn hình (mockup 08, 09, 10)</span><ul>
+<li><span class="mono">mixLotService.ts</span>, <span class="mono">mixIssueService.ts</span>, <span class="mono">rawPhotoService.ts</span> (nén ảnh phía máy, tải lên, ghi metadata).</li>
+<li><span class="mono">/wms/chen</span> Hàng chèn theo ca: chỉ số ca, phiếu chèn, cân đối ca và kết quả lab, kho chèn.</li>
+<li><span class="mono">/wms/chen/phieu/:id</span> Phiếu lấy đầu ca / trả cuối ca: kg, mục đích, lô SVR, ảnh, ký.</li>
+<li><span class="mono">/wms/chen/ton</span> Tồn kho chèn: tồn theo lô, sổ chuyển động, nhập lô mới, kiểm kê kho chèn.</li>
+</ul></div>
+<div class="card"><span class="k">Mobile (mockup 11, 12)</span><ul>
+<li><span class="mono">/m/chen/lay</span> và <span class="mono">/m/chen/tra</span>: quét QR lô chèn, một ô kg, 3 ô ảnh dùng <span class="mono">&lt;input type="file" capture="environment"&gt;</span> như <span class="mono">MachineReportPage</span>; nút gửi khóa khi thiếu ảnh 1 hoặc 2.</li>
+<li>Ảnh gắn giờ máy, GPS (nếu cho phép), người đăng nhập.</li>
+</ul></div>
+<div class="card"><span class="k">Bạn làm</span><ul><li>Chạy 3 migration; tạo bucket <span class="mono">raw-photos</span> theo hướng dẫn trong file.</li><li>Chốt giới hạn % chèn theo grade và luật bàn giao ca.</li><li>Cho 2 ca thật có chèn để thử.</li></ul></div>
+</div>
+<div class="accept" style="margin-top: 12px"><b>Nghiệm thu:</b><ol><li>QC chọn "trộn" ở sổ QC → lô chèn xuất hiện trong kho chèn với đúng kg và chỉ số.</li><li>Lấy đầu ca 1.000 kg, trả 400 kg → phiếu ghi tiêu hao 600 kg; thiếu ảnh màn hình cân thì không gửi được.</li><li>Sau khi thủ kho nhận: tồn kho chèn = nhập − tiêu hao − đang ở dây chuyền; dòng CHÈN của sổ ca ca đó = 600 kg mà không ai gõ.</li><li>View vòng tái chế ngày đó hiện kg chèn tiêu hao và sản lượng từ NVL mới.</li><li>Vượt giới hạn % chèn → cảnh báo và yêu cầu QC duyệt.</li></ol></div>
+</section>
+
+<section id="gd5" class="phase">
+<div class="phead"><div><span class="n">GIAI ĐOẠN 5</span><h2>Chạy song song, chốt, nhân rộng</h2></div><span class="time">2 tuần tại Phong Điền + 2 tuần mỗi nhà máy sau</span></div>
+<div class="goal">Mục tiêu: bỏ sổ giấy cho kho NVL và hàng chèn tại Phong Điền; Tân Lâm và Lào đi theo cùng cấu hình.</div>
+<div class="grid">
+<div class="card"><span class="k">Phần mềm</span><ul>
+<li>Trang đối chiếu giấy–máy theo ngày (nhập, xuất, chèn) để buổi sáng dò nhanh.</li>
+<li>Sửa lỗi phát sinh, tinh chỉnh ngưỡng trong <span class="mono">raw_settings</span>.</li>
+<li>Tài liệu hướng dẫn 1 trang cho từng vai trò, ảnh chụp màn hình thật.</li>
+<li>Nhân rộng: cấu hình nhà máy, quyền thủ kho, chạy script tồn đầu cho Tân Lâm rồi Lào.</li>
+</ul></div>
+<div class="card"><span class="k">Bạn làm</span><ul><li>Quy định 2 tuần đầu giấy là chuẩn, máy là đối chiếu; sau đó ngược lại.</li><li>Duyệt bỏ sổ giấy khi cân đối tháng đầu lệch dưới ngưỡng.</li><li>Lên lịch kiểm kê mở sổ cho Tân Lâm, Lào.</li></ul></div>
+</div>
+<div class="accept" style="margin-top: 12px"><b>Nghiệm thu:</b><ol><li>14 ngày đối chiếu: lệch giấy–máy có giải thích cho 100 % dòng.</li><li>Cân đối tháng đầu: lệch sổ so với kiểm kê ≤ 0,5 % khô.</li><li>100 % chuyển động hàng chèn có đủ 2 ảnh.</li></ol></div>
+</section>
+
+<section id="quyuoc">
+<h2>Quy ước kỹ thuật (theo code hiện có)</h2>
+<div class="tbl"><table>
+<thead><tr><th>Việc</th><th>Quy ước</th></tr></thead>
+<tbody>
+<tr><td>Tên migration</td><td><span class="mono">wms_nvl_p&lt;n&gt;_&lt;mô tả&gt;.sql</span> và <span class="mono">wms_mix_p&lt;n&gt;_&lt;mô tả&gt;.sql</span> trong <span class="mono">docs/migrations/</span>; đầu file ghi ngày, phụ thuộc, mục đích; cuối file câu kiểm chứng. Không dùng BEGIN/COMMIT (chạy qua RPC agent_sql bị lỗi 0A000).</td></tr>
+<tr><td>View</td><td><span class="mono">security_invoker = on</span>, GRANT SELECT cho authenticated, như <span class="mono">v_shift_stock_balance</span>.</td></tr>
+<tr><td>Số liệu</td><td>Cột numeric về client là chuỗi: luôn bọc <span class="mono">num()</span> như <span class="mono">shiftBookService</span>. Kg khô tính trong DB, không tính lại ở client.</td></tr>
+<tr><td>Chữ ký</td><td>Một hàm DB quyết định ai ký bước nào (khuôn <span class="mono">fn_shift_book_duoc_ky</span>); chỉ bước "thủ kho nhận" chạm vào sổ.</td></tr>
+<tr><td>Màn hình</td><td>Route lazy trong <span class="mono">App.tsx</span>, mở tab qua <span class="mono">useOpenTab</span>, Ant Design theo <span class="mono">antdTheme.ts</span>, cấu trúc trang như <span class="mono">WeighbridgeListPage</span> (chỉ số → bộ lọc → bảng).</td></tr>
+<tr><td>Mobile</td><td>Trang trong <span class="mono">src/pages/mobile</span>, khuôn <span class="mono">OpsShell</span>; quét QR <span class="mono">BarcodeDetector</span> có nhập tay dự phòng; ảnh qua input file capture; nút tối thiểu 44 px.</td></tr>
+<tr><td>Ảnh</td><td>Bucket riêng <span class="mono">raw-photos</span>, đường dẫn <span class="mono">&lt;facility&gt;/&lt;yyyy-mm&gt;/&lt;ref&gt;/&lt;kind&gt;.jpg</span>, nén về ≤ 1600 px trước khi tải.</td></tr>
+<tr><td>Quyền</td><td>Bảng whitelist theo nhân viên + nhà máy (<span class="mono">raw_store_keepers</span>), RLS ghi qua hàm; không mở rộng danh sách email cứng trong code.</td></tr>
+<tr><td>Git</td><td>Nhánh theo gói, commit tiếng Việt, merge nhanh vào main và push sau khi bạn xác nhận SQL đã chạy.</td></tr>
+</tbody></table></div>
+</section>
+
+<footer>Tài liệu kèm: <a href="KHO_NGUYEN_LIEU_KE_HOACH.html">kế hoạch và quy trình</a> · <a href="KHO_NGUYEN_LIEU_MOCKUP.html">mockup 12 màn</a>. Ước lượng thời gian cho một người làm toàn thời gian, chưa tính thời gian chờ nghiệm thu tại nhà máy.</footer>
+</main>
+</div>
+</body>
+</html>

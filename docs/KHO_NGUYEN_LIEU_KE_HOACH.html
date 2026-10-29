@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kho Nguyên Liệu Mủ · Kế hoạch triển khai</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+  :root {
+    --bg: #F9FAFB; --surface: #FFFFFF; --surface-2: #F3F4F6;
+    --text: #1F2937; --muted: #6B7280; --border: #E5E7EB;
+    --brand: #1B4D3E; --brand-dark: #0D2E25; --brand-soft: #E8F5F0; --brand-mid: #2D8B6E;
+    --accent: #E8A838; --accent-soft: #FFF4DE;
+    --ok: #15803D; --ok-soft: #DCFCE7; --warn: #B45309; --warn-soft: #FEF3C7; --bad: #B91C1C; --bad-soft: #FEE2E2; --info: #1D4ED8; --info-soft: #DBEAFE;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F1A16; --surface: #16241F; --surface-2: #1E2E28;
+      --text: #E6EDEA; --muted: #9DB2A9; --border: #2A3B34;
+      --brand: #6FCBA6; --brand-dark: #0D2E25; --brand-soft: #1B3A30; --brand-mid: #2D8B6E;
+      --accent: #E8A838; --accent-soft: #3A2E14;
+      --ok: #6EE7A0; --ok-soft: #14361F; --warn: #F5C86B; --warn-soft: #3A2A0E; --bad: #F58A8A; --bad-soft: #3C1515; --info: #8FB4FF; --info-soft: #152646;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1A16; --surface: #16241F; --surface-2: #1E2E28;
+    --text: #E6EDEA; --muted: #9DB2A9; --border: #2A3B34;
+    --brand: #6FCBA6; --brand-dark: #0D2E25; --brand-soft: #1B3A30; --brand-mid: #2D8B6E;
+    --accent: #E8A838; --accent-soft: #3A2E14;
+    --ok: #6EE7A0; --ok-soft: #14361F; --warn: #F5C86B; --warn-soft: #3A2A0E; --bad: #F58A8A; --bad-soft: #3C1515; --info: #8FB4FF; --info-soft: #152646;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.55; padding-inline: 16px; }
+  a { color: var(--brand); }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: .92em; }
+  .page { max-width: 1180px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 32px; padding-block: 28px 64px; align-items: flex-start; }
+  nav.toc { flex: 1 1 220px; max-width: 250px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 14px 16px; font-size: 13px; }
+  nav.toc strong { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  nav.toc a { text-decoration: none; display: block; padding: 5px 8px; border-radius: 6px; color: var(--text); }
+  nav.toc a:hover { background: var(--brand-soft); }
+  main { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 36px; }
+  header.hero { display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  h1 { margin: 0; font-size: 30px; line-height: 1.2; font-weight: 700; color: var(--brand); text-wrap: balance; }
+  h2 { margin: 0 0 12px; font-size: 21px; font-weight: 700; color: var(--brand); text-wrap: balance; padding-top: 6px; }
+  h3 { margin: 18px 0 8px; font-size: 16px; font-weight: 600; }
+  p { margin: 0 0 10px; max-width: 72ch; }
+  .lede { font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 22px 24px 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; }
+  .card { background: var(--surface-2); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .card .k { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .card .v { font-size: 15px; font-weight: 600; }
+  .card .s { font-size: 13px; color: var(--muted); }
+  .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .ok { color: var(--ok); background: var(--ok-soft); } .warn { color: var(--warn); background: var(--warn-soft); } .bad { color: var(--bad); background: var(--bad-soft); } .info { color: var(--info); background: var(--info-soft); } .new { color: var(--warn); background: var(--accent-soft); } .have { color: var(--ok); background: var(--ok-soft); }
+  .tbl { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: bottom; }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  ul, ol { margin: 0 0 10px; padding-left: 22px; } li { margin-bottom: 4px; }
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin: 6px 0 14px; }
+  .step { flex: 1 1 150px; background: var(--brand-soft); border: 1px solid var(--brand-mid); border-radius: 8px; padding: 8px 10px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+  .step b { color: var(--brand); }
+  .step .who { font-size: 11px; color: var(--muted); }
+  .step.new { background: var(--accent-soft); border-color: var(--accent); }
+  .callout { border: 1px solid var(--brand-mid); background: var(--brand-soft); border-radius: 8px; padding: 12px 14px; font-size: 14px; }
+  .callout.warn { border-color: var(--accent); background: var(--accent-soft); }
+  .timeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 10px; }
+  .phase { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; background: var(--surface); }
+  .phase .n { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: var(--muted); }
+  .phase h4 { margin: 0; font-size: 15px; color: var(--brand); }
+  .phase ul { font-size: 13px; padding-left: 18px; margin: 0; }
+  .phase .out { font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 6px; }
+  footer { font-size: 12px; color: var(--muted); padding-top: 8px; }
+  @media print { body { padding: 0; background: #fff; } nav.toc { display: none; } section { break-inside: avoid; border: 0; padding: 0 0 16px; } .page { display: block; } }
+</style>
+</head>
+<body>
+<div class="page">
+<nav class="toc" aria-label="Mục lục">
+<strong>Mục lục</strong>
+<ol>
+<li><a href="#tomtat">1 · Tóm tắt</a></li>
+<li><a href="#phamvi">2 · Phạm vi &amp; nguyên tắc</a></li>
+<li><a href="#quytrinh">3 · Quy trình vận hành</a></li>
+<li><a href="#kehoach">4 · Kế hoạch triển khai</a></li>
+<li><a href="#dulieu">5 · Dữ liệu &amp; kỹ thuật</a></li>
+<li><a href="#phanquyen">6 · Vai trò &amp; chữ ký</a></li>
+<li><a href="#kpi">7 · Chỉ số kiểm soát</a></li>
+<li><a href="#quyetdinh">8 · Quyết định cần chốt &amp; rủi ro</a></li>
+<li><a href="#golive">9 · Checklist go-live</a></li>
+</ol>
+<p style="margin: 12px 0 0; font-size: 12px; color: var(--muted)">Mockup giao diện: <a href="KHO_NGUYEN_LIEU_MOCKUP.html">KHO_NGUYEN_LIEU_MOCKUP.html</a></p>
+</nav>
+<main>
+<header class="hero">
+<span class="eyebrow">Huy Anh Rubber · ERP · module mới</span>
+<h1>Kho nguyên liệu mủ cao su &amp; hàng chèn: kế hoạch triển khai và quy trình</h1>
+<p class="lede">Quản lý mủ nước, mủ đông, mủ tạp, mủ chén từ lúc qua cân điện tử đến lúc vào dây chuyền, bằng một sổ kho tính theo kg khô. Kèm module nhỏ quản lý hàng chèn (mix) theo ca. Chưa làm sơ đồ ô bãi và bể chứa.</p>
+<div class="meta"><span>Phiên bản 1 · 29/10/2026</span><span>Nhà máy thí điểm: Phong Điền</span><span>Nền tảng: ERP hiện có (React + Supabase), app cân <span class="mono">apps/weighbridge</span></span></div>
+</header>
+
+<section id="tomtat">
+<h2>1 · Tóm tắt</h2>
+<div class="grid">
+<div class="card"><span class="k">Vấn đề</span><span class="v">Không biết đang tồn bao nhiêu kg khô, lô nào bao nhiêu tuổi, hao hụt bao nhiêu</span><span class="s">Sổ kho hiện ghi số lượng ướt; xuất cho sản xuất chỉ đối chiếu, không trừ kho; hàng chèn ghi tay, không tách được khỏi sản lượng ca.</span></div>
+<div class="card"><span class="k">Cách giải</span><span class="v">Sổ kho khô: mọi nhập, xuất, điều chỉnh đều ghi kg ướt + DRC → kg khô</span><span class="s">Phiếu cân là cửa duy nhất vào kho. Xuất sản xuất trừ kho thật theo kg cân. Hàng chèn ghi kg lấy − kg trả mỗi ca, có ảnh.</span></div>
+<div class="card"><span class="k">Dùng lại</span><span class="v">Khoảng 70 % đã có sẵn</span><span class="s">Cân 3 trạm, DRC tại cân, lô <span class="mono">stock_batches</span>, QC, lệnh sản xuất, sổ ca ba chữ ký, sổ QC hàng lỗi.</span></div>
+<div class="card"><span class="k">Thời gian</span><span class="v">12 tuần cho Phong Điền, 4 giai đoạn</span><span class="s">Nhân rộng Tân Lâm và Lào sau khi chạy ổn 1 tháng. Con số ước lượng cho 1 lập trình viên toàn thời gian, chỉnh theo thực tế.</span></div>
+</div>
+</section>
+
+<section id="phamvi">
+<h2>2 · Phạm vi &amp; nguyên tắc</h2>
+<div class="grid">
+<div class="card"><span class="k">Làm trong đợt này</span>
+<ul style="margin: 4px 0 0; font-size: 13.5px">
+<li>Sổ kho khô theo loại mủ × lô × nhà máy</li>
+<li>Nhập kho từ phiếu cân, tách theo từng dòng lô trên phiếu</li>
+<li>Màn chi tiết lô: nhập, hiện tại, chênh lệch, dòng thời gian, truy xuất</li>
+<li>Lệnh xuất cho sản xuất: gợi ý FIFO, cân thực tế, trừ sổ</li>
+<li>Cân lại và kiểm tra DRC định kỳ, kiểm kê, báo cáo cân đối và hao hụt</li>
+<li>Hàng chèn: kho chèn, phiếu lấy đầu ca và trả cuối ca theo kg, 2 ảnh bắt buộc, tồn kho chèn</li>
+<li>Màn mobile cho thủ kho và trưởng ca</li>
+</ul></div>
+<div class="card"><span class="k">Để sau</span>
+<ul style="margin: 4px 0 0; font-size: 13.5px">
+<li>Sơ đồ ô bãi, bể chứa mủ nước (mức, giờ lưu)</li>
+<li>Thông số lab mủ nước: TSC, VFA, NH3, pH</li>
+<li>Truy xuất EUDR tới từng vườn</li>
+<li>Thay đổi cách tính phiếu khoán theo sản lượng (vẫn tính trên tổng như quy định 28/08/2026)</li>
+</ul></div>
+</div>
+<h3>Nguyên tắc không đổi</h3>
+<ol>
+<li><b>Kg khô là đơn vị của sổ.</b> Kg ướt giảm tự nhiên khi mủ khô, DRC tăng theo; chỉ kg khô mới nói được có thất thoát hay không. Ngưỡng cảnh báo lệch khô: 0,5 % (cùng ngưỡng chuyển kho liên nhà máy đang dùng).</li>
+<li><b>Phiếu cân là cửa duy nhất vào kho.</b> Không có nhập kho thủ công. Phiếu chưa có DRC thì chưa nhập được, vì chưa có kg khô để ghi.</li>
+<li><b>Xuất phải cân.</b> Lệnh xuất chỉ là kế hoạch; sổ trừ đúng kg cân thực khi hàng rời kho, nhân với DRC của lô đó.</li>
+<li><b>Chữ ký làm tồn thay đổi.</b> Giữ luật ba chữ ký của sổ ca: bên giao → giám sát chất lượng → thủ kho. Chữ ký thứ ba mới động vào tồn.</li>
+<li><b>Hàng chèn tính bằng kg, có ảnh.</b> Mỗi lần lấy và trả: 1 số kg đọc từ màn hình cân, ảnh toàn cảnh và ảnh màn hình cân bắt buộc, ảnh thứ ba bổ sung.</li>
+<li><b>Không bịa phân bổ.</b> Chỗ nào dữ liệu không tách được thì hiển thị cờ, không tự chia tỷ lệ.</li>
+</ol>
+</section>
+
+<section id="quytrinh">
+<h2>3 · Quy trình vận hành</h2>
+
+<h3>3.1 · Nhập kho từ phiếu cân</h3>
+<div class="flow">
+<div class="step"><b>1 · Cân vào</b><span>Trạm cân, ảnh camera tự chụp</span><span class="who">Thủ cân</span></div>
+<div class="step"><b>2 · Lấy mẫu DRC</b><span>Metrolac (mủ nước) hoặc sấy mẫu (mủ đông/tạp/chén)</span><span class="who">KTV lab</span></div>
+<div class="step"><b>3 · Cân ra</b><span>Phiếu hoàn tất, thực nhận = tổng − bì − trừ tạp</span><span class="who">Thủ cân</span></div>
+<div class="step"><b>4 · Kết quả DRC</b><span>Ghi vào phiếu, quy khô, so với NCC khai báo</span><span class="who">KTV lab</span></div>
+<div class="step new"><b>5 · Nhập kho</b><span>Mỗi dòng lô trên phiếu = 1 lô NVL, in tem QR, sổ khô +</span><span class="who">Thủ kho NVL</span></div>
+<div class="step"><b>6 · Đề nghị thanh toán</b><span>Tự tạo từ phiếu cân như hiện nay</span><span class="who">Kế toán duyệt</span></div>
+</div>
+<div class="tbl"><table>
+<thead><tr><th>Bước</th><th>Trên màn hình</th><th>Hệ thống ghi</th><th>Kiểm soát</th></tr></thead>
+<tbody>
+<tr><td>1–4 (đã có)</td><td>App cân tại trạm</td><td><span class="mono">weighbridge_tickets</span> + <span class="mono">weighbridge_ticket_items</span>, <span class="mono">qc_actual_drc</span>, ảnh L1/L2</td><td>Phiếu thiếu DRC nằm ở trạng thái chờ, hiện trong hàng đợi nhập kho với nhãn "chờ DRC"</td></tr>
+<tr><td>5 (mới)</td><td>Nhập kho từ phiếu cân (màn 02) hoặc mobile quét QR phiếu</td><td>1 lô <span class="mono">stock_batches</span> cho mỗi dòng lô; bút toán nhập vào sổ kho khô; tem QR lô</td><td>Không nhập được nếu thiếu DRC. Lệch DRC khai báo vs thực quá 3 điểm thì gắn cờ cho điểm nhà cung cấp</td></tr>
+<tr><td>6 (đã có)</td><td>Đề nghị thanh toán</td><td><span class="mono">payment_requests</span></td><td>Giá theo kg khô của phiếu, không sửa tay</td></tr>
+</tbody></table></div>
+
+<h3>3.2 · Cân lại và kiểm tra DRC định kỳ</h3>
+<p>Mỗi lô mủ đông, tạp, chén cân lại và lấy mẫu DRC mỗi 7 ngày (theo <span class="mono">material_qc_standards.recheck_interval_days</span>) và trước khi xuất nếu đã quá 3 ngày kể từ lần đo gần nhất. Thủ kho cân sàn, KTV ghi DRC mới, hệ thống ghi một bút toán điều chỉnh khô = khô mới − khô cũ. Lệch khô quá 0,5 % thì lô vào danh sách "lệch khô", phải ghi nguyên nhân (tạp chất, mẫu không đại diện, cân sai) trước khi tiếp tục dùng.</p>
+
+<h3>3.3 · Xuất kho cho sản xuất</h3>
+<div class="flow">
+<div class="step"><b>1 · Lệnh sản xuất</b><span>Nhu cầu kg khô, loại mủ cho phép, ràng buộc tỷ lệ tạp</span><span class="who">Trưởng ca / KH sản xuất</span></div>
+<div class="step new"><b>2 · Chọn lô FIFO</b><span>Hệ thống gợi ý lô tồn lâu nhất, người duyệt chỉnh</span><span class="who">Thủ kho NVL</span></div>
+<div class="step new"><b>3 · Cân khi lấy</b><span>Xe nâng lấy lô, cân sàn, ghi kg thực từng lô</span><span class="who">Thủ kho + trưởng ca</span></div>
+<div class="step new"><b>4 · Trừ sổ</b><span>Khô trừ = kg cân × DRC lô; phần dư giữ nguyên mã lô</span><span class="who">Ký: giao → QS → thủ kho</span></div>
+<div class="step"><b>5 · Sản xuất</b><span>5 công đoạn như hiện có, lô SVR nhận được gắn lô NVL nguồn</span><span class="who">Sản xuất</span></div>
+</div>
+<p>Mủ nước xuất thẳng sang dây chuyền mủ nước theo kg × DRC lô, cùng luật cân và ký. Lô quá 20 ngày (mủ đông/tạp/chén) bị đẩy lên đầu danh sách gợi ý và hiện cảnh báo trên tổng quan.</p>
+
+<h3>3.4 · Kiểm kê và cân đối cuối tháng</h3>
+<p>Ngày cuối tháng, cân lại toàn bộ lô tồn (không đo DRC lại nếu còn hạn 7 ngày). Hệ thống lập bảng: tồn đầu + nhập − xuất ± điều chỉnh = tồn cuối sổ, so với kiểm kê. Lệch tổng dưới 0,5 % khô thì chốt sổ; trên ngưỡng thì liệt kê lô lệch, ghi nguyên nhân, BGĐ duyệt bút toán điều chỉnh. Báo cáo kèm chuẩn hao ướt theo tuổi lô để phân biệt khô tự nhiên với thất thoát.</p>
+
+<h3>3.5 · Hàng chèn (mix) theo ca</h3>
+<div class="flow">
+<div class="step"><b>1 · QC quyết định</b><span>Hàng lỗi: trộn / chạy lại / loại, ghi ở sổ QC</span><span class="who">QC</span></div>
+<div class="step new"><b>2 · Nhập kho chèn</b><span>Tạo lô chèn CH-…, ghi nguồn và chỉ số (Po, Mooney, PRI)</span><span class="who">Thủ kho</span></div>
+<div class="step new"><b>3 · Lấy đầu ca</b><span>Quét QR lô, nhập kg theo màn hình cân, 2 ảnh bắt buộc</span><span class="who">Trưởng ca (bên giao)</span></div>
+<div class="step new"><b>4 · Trả cuối ca</b><span>Nhập kg còn lại, 2 ảnh; tiêu hao = lấy − trả</span><span class="who">Trưởng ca</span></div>
+<div class="step new"><b>5 · Ký và ghi sổ</b><span>QS xác nhận, thủ kho nhận; tiêu hao vào lô SVR và dòng CHÈN của sổ ca</span><span class="who">QS → thủ kho</span></div>
+</div>
+<div class="tbl"><table>
+<thead><tr><th>Việc</th><th>Luật</th><th>Vì sao</th></tr></thead>
+<tbody>
+<tr><td>Nguồn hàng chèn</td><td>Hàng lỗi sau khi QC quyết; hàng chuẩn lấy từ kho thành phẩm; hàng mua ngoài qua phiếu cân. Hàng dính kim loại phải có dấu "đã xử lý kim loại"</td><td>Chủ doanh nghiệp xác nhận 29/08/2026: lỗi Po thấp xử lý bằng cả trộn lẫn chạy lại; DKL phải xử lý kim loại trước</td></tr>
+<tr><td>Khối lượng</td><td>Chỉ nhập kg, đọc đúng số trên màn hình cân, không quy đổi từ số bành</td><td>Đơn giản, khớp với ảnh màn hình cân</td></tr>
+<tr><td>Ảnh</td><td>Mỗi lần lấy và mỗi lần trả: ảnh 1 toàn cảnh, ảnh 2 màn hình cân bắt buộc; ảnh 3 bổ sung. Ảnh tự gắn giờ, vị trí, người chụp</td><td>Bằng chứng cho con số kg, tra lại được khi lệch</td></tr>
+<tr><td>Tỷ lệ chèn</td><td>Giới hạn theo grade (đề xuất 20 % cho SVR 10, cấu hình được); vượt thì cần QC duyệt riêng</td><td>Bảo vệ chỉ số lô thành phẩm</td></tr>
+<tr><td>Tồn kho chèn</td><td>Tồn = nhập − tiêu hao − phần đang ở dây chuyền. Chỉ đổi khi thủ kho ký. Kiểm kê cùng kỳ với kho NVL</td><td>Yêu cầu quản lý được số lượng tồn của hàng chèn</td></tr>
+<tr><td>Dùng dở, bàn giao ca</td><td>Lô chèn còn lại có thể trả về kho hoặc bàn giao cho ca sau, vẫn giữ mã và chỉ số cũ; ca sau ghi "lấy" bằng số bàn giao</td><td>Tránh cân đi cân lại, nhưng vẫn khép số từng ca</td></tr>
+<tr><td>Sản lượng ca</td><td>Sản lượng từ nguyên liệu mới ≈ tổng ca − chèn tiêu hao. View vòng tái chế đổi từ cờ sang số thật</td><td>Hiệu suất không còn vượt 100 %; khoán vẫn tính trên tổng cho tới khi có quyết định khác</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="kehoach">
+<h2>4 · Kế hoạch triển khai</h2>
+<div class="timeline">
+<div class="phase"><span class="n">Giai đoạn 0 · tuần 1</span><h4>Chốt và chuẩn bị</h4>
+<ul><li>Chốt 6 quyết định ở mục 8</li><li>Thống nhất mã loại mủ: <span class="mono">mu_nuoc, mu_dong, mu_tap, mu_chen</span> (+ view ánh xạ cho bảng cũ)</li><li>Danh sách thủ kho NVL, trưởng ca, QS từng nhà máy</li><li>Lên lịch kiểm kê mở sổ tại Phong Điền</li></ul>
+<span class="out">Đầu ra: biên bản quyết định, bảng mã, lịch kiểm kê</span></div>
+<div class="phase"><span class="n">Giai đoạn 1 · tuần 2–4</span><h4>Sổ kho khô và nhập kho</h4>
+<ul><li>Bảng sổ kho khô + view tồn theo loại × lô × nhà máy</li><li>Sửa nhập kho từ phiếu cân: tách theo dòng lô, chặn khi thiếu DRC, in tem QR</li><li>Màn tổng quan, hàng đợi nhập kho, chi tiết lô</li><li>Kiểm kê mở sổ: cân lại toàn bộ lô tồn, nhập tồn đầu khô</li></ul>
+<span class="out">Đầu ra: Phong Điền biết tồn kg khô theo lô, nhập kho không còn thủ công</span></div>
+<div class="phase"><span class="n">Giai đoạn 2 · tuần 5–7</span><h4>Xuất sản xuất và cân đối</h4>
+<ul><li>Lệnh xuất NVL: gợi ý FIFO, cân thực, ba chữ ký, trừ sổ</li><li>Cân lại / DRC định kỳ: bút toán điều chỉnh, danh sách lệch khô</li><li>Báo cáo cân đối tháng và hao ướt theo tuổi lô</li><li>Mobile thủ kho: quét QR, nhập kho, cân lại, xuất</li></ul>
+<span class="out">Đầu ra: cân đối tháng đầu tiên khép sổ bằng số thật</span></div>
+<div class="phase"><span class="n">Giai đoạn 3 · tuần 8–10</span><h4>Hàng chèn</h4>
+<ul><li>Bảng lô chèn, phiếu chèn, ảnh; view tồn kho chèn</li><li>Mobile lấy đầu ca / trả cuối ca với 2 ảnh bắt buộc</li><li>Mở rộng quyết định xử lý ở sổ QC; tự điền dòng CHÈN của sổ ca</li><li>Sửa view vòng tái chế: thêm kg chèn tiêu hao</li></ul>
+<span class="out">Đầu ra: mỗi ca biết chèn bao nhiêu kg, từ lô nào, còn bao nhiêu</span></div>
+<div class="phase"><span class="n">Giai đoạn 4 · tuần 11–12</span><h4>Chạy song song và chốt</h4>
+<ul><li>2 tuần ghi cả giấy lẫn máy tại Phong Điền, đối chiếu hằng ngày</li><li>Chỉnh ngưỡng, sửa lỗi, đào tạo lại</li><li>BGĐ duyệt bỏ sổ giấy cho kho NVL và hàng chèn</li></ul>
+<span class="out">Đầu ra: go-live Phong Điền; kế hoạch nhân rộng Tân Lâm, Lào (mỗi nơi 2 tuần)</span></div>
+</div>
+<div class="callout" style="margin-top: 14px">Thứ tự này để sổ kho khô có số đúng trước khi làm xuất và hàng chèn. Nếu cần kết quả sớm cho hàng chèn, giai đoạn 3 có thể chạy song song giai đoạn 2 vì hai phần dùng bảng khác nhau.</div>
+</section>
+
+<section id="dulieu">
+<h2>5 · Dữ liệu &amp; kỹ thuật</h2>
+<h3>5.1 · Dùng lại nguyên</h3>
+<div class="tbl"><table>
+<thead><tr><th>Thành phần</th><th>Ở đâu</th><th>Dùng cho</th></tr></thead>
+<tbody>
+<tr><td>App cân 3 trạm, phiếu cân, DRC tại cân, camera, in phiếu</td><td><span class="mono">apps/weighbridge</span>, bảng <span class="mono">weighbridge_tickets</span>, <span class="mono">weighbridge_ticket_items</span>, <span class="mono">drc_lookup</span></td><td>Cửa vào duy nhất của kho</td></tr>
+<tr><td>Lô nguyên liệu</td><td><span class="mono">stock_batches</span> (initial_drc, latest_drc, dry_weight, current_weight, weight_loss, storage_days, qc_status)</td><td>Thực thể lô; thêm bút toán sổ khô tham chiếu tới lô</td></tr>
+<tr><td>Nhập kho từ phiếu cân</td><td><span class="mono">stockInService.createFromWeighbridgeTicket</span></td><td>Sửa để tách theo dòng lô và chặn khi thiếu DRC</td></tr>
+<tr><td>QC, chuẩn chất lượng, cân lại</td><td><span class="mono">batch_qc_results</span>, <span class="mono">material_qc_standards</span>, <span class="mono">weight_check_logs</span></td><td>Kiểm tra DRC định kỳ, điều chỉnh khô</td></tr>
+<tr><td>Lệnh sản xuất, 5 công đoạn</td><td><span class="mono">production_orders</span>, <span class="mono">production_order_items.source_batch_id</span>, <span class="mono">production_stage_progress</span></td><td>Đích của lệnh xuất, truy xuất lô SVR ← lô NVL</td></tr>
+<tr><td>Sổ ca ép bành, ba chữ ký, tồn thành phẩm</td><td><span class="mono">shift_production_reports/lines</span>, <span class="mono">fn_shift_book_duoc_ky</span>, <span class="mono">shift_book_thu_kho</span></td><td>Khuôn chữ ký cho lệnh xuất và phiếu chèn; dòng CHÈN tự điền</td></tr>
+<tr><td>Sổ QC hàng không đạt, vòng tái chế</td><td><span class="mono">qc_reject_log.tinh_trang_xu_ly</span>, <span class="mono">v_vong_tai_che</span></td><td>Quyết định trộn / chạy lại; view thêm kg chèn tiêu hao</td></tr>
+<tr><td>Chuyển kho liên nhà máy (ngưỡng hao 0,5 %), chấm điểm NCC, dashboard bãi NVL</td><td><span class="mono">inter_facility_transfers</span>, supplier scoring, <span class="mono">nvlDashboardService</span></td><td>Ngưỡng và báo cáo</td></tr>
+</tbody></table></div>
+
+<h3>5.2 · Bảng và view mới</h3>
+<div class="tbl"><table>
+<thead><tr><th>Đối tượng</th><th>Cột chính</th><th>Ghi chú</th></tr></thead>
+<tbody>
+<tr><td><span class="mono">raw_stock_ledger</span> <span class="pill new">mới</span></td><td>facility_id, batch_id, rubber_type, txn_type (in · out_production · recheck_adjust · transfer_in · transfer_out · stocktake_adjust), wet_kg, drc_pct, dry_kg, ref_type, ref_id, signed_at, created_by</td><td>Sổ kho khô, chỉ thêm dòng, không sửa; view <span class="mono">v_raw_stock_balance</span> cộng theo nhà máy × loại × lô</td></tr>
+<tr><td><span class="mono">raw_issue_orders</span> + <span class="mono">raw_issue_lines</span> <span class="pill new">mới</span></td><td>production_order_id, status (draft · picking · weighed · submitted · qc_confirmed · received), line: batch_id, planned_dry_kg, actual_wet_kg, drc_pct, actual_dry_kg, weighed_at</td><td>Lệnh xuất NVL; chữ ký thứ ba sinh dòng sổ khô</td></tr>
+<tr><td><span class="mono">raw_stocktakes</span> + lines <span class="pill new">mới</span></td><td>period, batch_id, counted_wet_kg, drc_pct, counted_dry_kg, book_dry_kg, diff, reason, approved_by</td><td>Kiểm kê tháng; duyệt mới sinh bút toán điều chỉnh</td></tr>
+<tr><td><span class="mono">mix_lots</span> <span class="pill new">mới</span></td><td>code CH-…, facility_id, source_type (loi · dkl · std · mua_ngoai), source_ref (qc_reject_log / stock_batch / ticket), grade, kg_in, po, mooney, pri, qc_allow (tron_max_pct, chay_lai), metal_cleared, status (available · in_use · depleted)</td><td>Kho chèn</td></tr>
+<tr><td><span class="mono">mix_issues</span> <span class="pill new">mới</span></td><td>shift_report_id, mix_lot_id, purpose (chay_lai · nang_chi_so), target_index, target_value, kg_out, out_at, kg_return, return_at, kg_used, output_batch_id, handover_to_shift, status + 3 mốc ký</td><td>Phiếu chèn theo ca; view <span class="mono">v_mix_balance</span>; trigger điền <span class="mono">shift_production_lines</span> mã CHÈN</td></tr>
+<tr><td><span class="mono">raw_photos</span> <span class="pill new">mới</span></td><td>ref_type (mix_issue_out · mix_issue_return · raw_issue · stocktake), ref_id, kind (toan_canh · man_hinh_can · bo_sung), storage_path, taken_at, gps, taken_by</td><td>Bucket Storage riêng; ràng buộc tối thiểu 2 ảnh/kind khi gửi ký</td></tr>
+<tr><td><span class="mono">raw_store_keepers</span> <span class="pill new">mới</span></td><td>employee_id, facility_id, is_active</td><td>Ai được ký "thủ kho nhận" cho kho NVL và kho chèn, chép khuôn <span class="mono">shift_book_thu_kho</span></td></tr>
+<tr><td>Sửa <span class="mono">qc_reject_log.tinh_trang_xu_ly</span></td><td>Giá trị chuẩn: TRON · CHAY_LAI · LOAI (+ ghi chú tự do)</td><td>Cột đã có, chỉ chuẩn hóa giá trị</td></tr>
+<tr><td>Sửa <span class="mono">v_vong_tai_che</span></td><td>Thêm chen_tieu_hao_kg, dat_tu_nvl_moi_kg</td><td>Giữ cờ cũ cho ngày chưa có phiếu chèn</td></tr>
+</tbody></table></div>
+
+<h3>5.3 · Màn hình</h3>
+<p>Theo mockup: tổng quan, nhập kho từ phiếu cân, chi tiết lô, xuất sản xuất, cân đối và hao hụt, hàng chèn theo ca, phiếu chèn, tồn kho chèn, mobile thủ kho, mobile lấy / trả hàng chèn. Menu đặt trong nhóm KHO (WMS) hiện có; mobile đi qua các trang <span class="mono">src/pages/mobile</span> và camera Capacitor đã có trong dự án.</p>
+</section>
+
+<section id="phanquyen">
+<h2>6 · Vai trò &amp; chữ ký</h2>
+<div class="tbl"><table>
+<thead><tr><th>Vai trò</th><th>Làm gì</th><th>Ký gì</th><th>Quyền hệ thống</th></tr></thead>
+<tbody>
+<tr><td>Thủ cân</td><td>Cân vào / ra, chụp ảnh, hoàn tất phiếu</td><td>Phiếu cân</td><td>App cân (PIN như hiện nay)</td></tr>
+<tr><td>KTV lab / QC</td><td>DRC đầu vào, kiểm tra lại, quyết định xử lý hàng lỗi, duyệt tỷ lệ chèn vượt giới hạn</td><td>Kết quả QC, sổ QC</td><td>QC pages; sửa <span class="mono">tinh_trang_xu_ly</span></td></tr>
+<tr><td>Thủ kho NVL</td><td>Nhập kho, in tem, cân lại, kiểm kê, nhận lệnh xuất, nhận trả hàng chèn</td><td>Chữ ký "thủ kho nhận" (thứ ba)</td><td>Bảng <span class="mono">raw_store_keepers</span>; mobile</td></tr>
+<tr><td>Trưởng ca sản xuất</td><td>Lập lệnh xuất, lấy / trả hàng chèn, chụp ảnh</td><td>Bên giao (thứ nhất)</td><td>Theo ca và dây chuyền</td></tr>
+<tr><td>Giám sát chất lượng (QS)</td><td>Xác nhận số cân và ảnh</td><td>Thứ hai</td><td>Như sổ ca</td></tr>
+<tr><td>Kế toán</td><td>Đề nghị thanh toán, xem cân đối tháng, giá trị tồn</td><td>Duyệt thanh toán</td><td>Xem toàn bộ kho</td></tr>
+<tr><td>BGĐ</td><td>Duyệt bút toán điều chỉnh sau kiểm kê, chốt ngưỡng, cấp quyền thủ kho</td><td>Duyệt điều chỉnh</td><td>Admin</td></tr>
+</tbody></table></div>
+<p style="margin-top: 10px">Tài khoản <span class="mono">tannv@huyanhrubber.com</span> (mua mủ) hiện chưa có quyền WMS; cần cấp quyền xem kho NVL và chấm điểm nhà cung cấp.</p>
+</section>
+
+<section id="kpi">
+<h2>7 · Chỉ số kiểm soát</h2>
+<div class="tbl"><table>
+<thead><tr><th>Chỉ số</th><th>Mục tiêu</th><th>Đo ở đâu</th></tr></thead>
+<tbody>
+<tr><td>Lệch sổ so với kiểm kê (kg khô)</td><td class="num">≤ 0,5 % / tháng</td><td>Báo cáo cân đối</td></tr>
+<tr><td>Lô có phiếu cân gốc và DRC</td><td class="num">100 %</td><td>Sổ kho khô</td></tr>
+<tr><td>Thời gian từ cân ra đến nhập kho</td><td class="num">≤ 30 phút (mủ đông/tạp/chén), ≤ 15 phút (mủ nước)</td><td>Hàng đợi nhập kho</td></tr>
+<tr><td>Lô tồn quá 20 ngày</td><td class="num">0 lô cuối tháng</td><td>Tổng quan</td></tr>
+<tr><td>Chuyển động hàng chèn có đủ 2 ảnh</td><td class="num">100 %</td><td>Sổ chuyển động kho chèn</td></tr>
+<tr><td>Phiếu chèn khép (lấy − trả − tiêu hao = 0)</td><td class="num">100 % trước khi ký thủ kho</td><td>Phiếu chèn</td></tr>
+<tr><td>Ca có chèn tách được sản lượng từ NVL mới</td><td class="num">100 % ca</td><td>View vòng tái chế</td></tr>
+<tr><td>DRC thực so với NCC khai báo</td><td class="num">Lệch bình quân ≤ 2 điểm; cảnh báo NCC &gt; 3 điểm ở 3 phiếu liên tiếp</td><td>Chấm điểm NCC</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="quyetdinh">
+<h2>8 · Quyết định cần chốt &amp; rủi ro</h2>
+<h3>Cần chốt trước giai đoạn 1</h3>
+<ol>
+<li>Ngưỡng tuổi lô cảnh báo: đề xuất 20 ngày cho mủ đông, tạp, chén.</li>
+<li>Chu kỳ cân lại và kiểm tra DRC: đề xuất 7 ngày, và trước khi xuất nếu quá 3 ngày.</li>
+<li>Ngưỡng lệch khô: 0,5 % cho lô và cho tổng tháng.</li>
+<li>Giới hạn tỷ lệ chèn theo grade: đề xuất SVR 10: 20 %, SVR 3L: 10 %, SVR CV: 0 %.</li>
+<li>Hàng chèn dùng dở: cho phép bàn giao ca sau hay bắt buộc trả về kho.</li>
+<li>Ai là thủ kho NVL từng nhà máy và ai ký QS cho phiếu chèn.</li>
+</ol>
+<h3>Rủi ro và cách giảm</h3>
+<div class="tbl"><table>
+<thead><tr><th>Rủi ro</th><th>Ảnh hưởng</th><th>Giảm thiểu</th></tr></thead>
+<tbody>
+<tr><td>Tồn đầu sai do kiểm kê mở sổ thiếu DRC</td><td>Cân đối tháng đầu lệch</td><td>Lấy mẫu DRC mọi lô khi mở sổ; đánh dấu "tồn đầu ước" cho lô không lấy được mẫu</td></tr>
+<tr><td>Thủ kho bỏ bước cân khi xuất</td><td>Sổ trừ theo kế hoạch, lệch thật</td><td>Lệnh xuất không ký được khi thiếu kg cân; ảnh cân bắt buộc với hàng chèn</td></tr>
+<tr><td>Mã loại mủ không thống nhất giữa bảng cũ</td><td>Báo cáo gộp sai</td><td>Chuẩn hóa ở giai đoạn 0, view ánh xạ, kiểm tra bằng truy vấn đối chiếu</td></tr>
+<tr><td>Mạng yếu ở bãi, mobile không gửi được ảnh</td><td>Ùn phiếu chèn</td><td>Lưu nháp ngoại tuyến, gửi khi có mạng; ảnh nén trước khi tải</td></tr>
+<tr><td>Hai nguồn sự thật trong thời gian chạy song song</td><td>Tranh cãi số liệu</td><td>Quy định rõ: 2 tuần đầu giấy là chuẩn, máy là đối chiếu; sau đó ngược lại</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="golive">
+<h2>9 · Checklist go-live Phong Điền</h2>
+<ol>
+<li>Biên bản chốt 6 quyết định ở mục 8, ký BGĐ.</li>
+<li>Bảng mã loại mủ thống nhất, đã chạy view ánh xạ, kiểm tra 3 bảng cũ.</li>
+<li>Kiểm kê mở sổ: toàn bộ lô tồn cân lại, có DRC, in tem QR; tồn đầu khô nhập vào sổ.</li>
+<li>Danh sách thủ kho NVL, trưởng ca, QS đã cấp quyền và đăng nhập thử.</li>
+<li>Cấu hình ngưỡng: tuổi lô, chu kỳ cân lại, lệch khô, tỷ lệ chèn theo grade.</li>
+<li>Đào tạo 1 buổi cho mỗi vai trò, có tờ hướng dẫn 1 trang kèm ảnh màn hình.</li>
+<li>Chạy song song 2 tuần, đối chiếu mỗi sáng; ghi lại mọi lệch và nguyên nhân.</li>
+<li>Báo cáo cân đối tháng đầu đạt ngưỡng; BGĐ duyệt bỏ sổ giấy.</li>
+<li>Kế hoạch nhân rộng Tân Lâm, Lào: mỗi nơi 2 tuần, bắt đầu bằng kiểm kê mở sổ.</li>
+</ol>
+</section>
+
+<footer>Tài liệu kèm: <a href="KHO_NGUYEN_LIEU_MOCKUP.html">mockup giao diện</a> (12 màn). Số liệu trong mockup là minh họa. Phần ô bãi, bể chứa, lab mủ nước và EUDR để đợt sau.</footer>
+</main>
+</div>
+</body>
+</html>

@@ -34,22 +34,26 @@ export const SALES_CONFIG = {
   /** Whitelist email được ký HĐ. Đồng bộ với
    *  docs/migrations/sales_contract_workflow_v3_signers.sql
    *  + docs/migrations/sales_contract_workflow_v16_signer_minhld.sql
-   *  + docs/migrations/sales_contract_workflow_v17_add_minhanh.sql */
+   *  + docs/migrations/sales_contract_workflow_v17_add_minhanh.sql
+   *  + docs/migrations/sales_contract_workflow_v21_sales_full_rights.sql */
   SIGNER_EMAILS: [
     'trunglxh@huyanhrubber.com',  // Mr. Trung
     'huylv@huyanhrubber.com',     // Mr. Huy
     'minhld@huyanhrubber.com',    // Minh LD — thêm để test bước trình ký (2026-05-21)
     'logistics@huyanhrubber.com', // Trần Thị Minh Anh — toàn quyền Đơn hàng bán (2026-05-22)
+    'sales@huyanhrubber.com',     // Hồ Thị Liễu — toàn quyền Đơn hàng bán (2026-10-29)
   ],
 
   /** Whitelist email được xóa file HĐ (hard delete). Đồng bộ với
-   *  docs/migrations/sales_contract_files_multi_v4.sql */
+   *  docs/migrations/sales_contract_files_multi_v4.sql
+   *  + docs/migrations/sales_contract_workflow_v21_sales_full_rights.sql */
   DELETE_PERMISSION_EMAILS: [
     'minhld@huyanhrubber.com',
     'thuyht@huyanhrubber.com',
     'huylv@huyanhrubber.com',
     'trunglxh@huyanhrubber.com',
     'logistics@huyanhrubber.com', // Trần Thị Minh Anh — toàn quyền Đơn hàng bán (2026-05-22)
+    'sales@huyanhrubber.com',     // Hồ Thị Liễu — toàn quyền Đơn hàng bán (2026-10-29)
   ],
 
   /** Supabase Storage bucket cho file HĐ (cả legacy upload + workflow PDF đã ký). */

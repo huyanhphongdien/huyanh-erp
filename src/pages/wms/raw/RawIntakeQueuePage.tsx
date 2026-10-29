@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Alert, Button, Card, Col, Descriptions, Empty, Input, Modal, Row, Select, Space, Table, Tag, Typography, message,
+  Alert, Button, Card, Col, Descriptions, Empty, Input, InputNumber, Modal, Row, Select, Space, Table, Tag, Typography, message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { ReloadOutlined, SearchOutlined, CheckCircleOutlined, PrinterOutlined, ArrowLeftOutlined } from '@ant-design/icons'
@@ -18,6 +18,7 @@ import { rawStockService, type RawIntakeQueueRow, type NhapKhoResult } from '../
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_LOT_SOURCE_LABELS, RAW_SETTINGS_DEFAULT, type RawLotSource, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
+import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import { ticketTypeLabel } from '../../../services/wms/wms.types'
 
 const { Title, Text } = Typography
@@ -32,7 +33,11 @@ type Filter = 'cho_nhap' | 'da_nhap' | 'tat_ca'
 export default function RawIntakeQueuePage() {
   const navigate = useNavigate()
   const rawRole = useRawRole()
+  const { data: facilities } = useActiveFacilities()
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined)
+  const [facilityInit, setFacilityInit] = useState(false)
+  const [drcInput, setDrcInput] = useState<number | null>(null)
+  const [drcSaving, setDrcSaving] = useState(false)
   const [filter, setFilter] = useState<Filter>('cho_nhap')
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<RawIntakeQueueRow[]>([])
@@ -58,7 +63,28 @@ export default function RawIntakeQueuePage() {
     } finally { setLoading(false) }
   }, [facilityId, filter])
 
+  // Tập trung Phong Điền: mặc định chọn PD khi có danh sách nhà máy
+  useEffect(() => {
+    if (facilityInit || !facilities?.length) return
+    const pd = facilities.find((f) => f.code.toUpperCase() === 'PD')
+    if (pd) setFacilityId(pd.id)
+    setFacilityInit(true)
+  }, [facilities, facilityInit])
+
   useEffect(() => { load() }, [load])
+
+  const canGhiDrc = rawRole.isQC || rawRole.isKeeper || rawRole.isBGD
+  const handleGhiDrc = async () => {
+    if (!selected || drcInput === null) return
+    setDrcSaving(true)
+    try {
+      await rawStockService.ghiDrcPhieu(selected.ticket_id, drcInput)
+      message.success(`Đã ghi DRC ${drcInput} % vào phiếu ${selected.code}`)
+      setDrcInput(null)
+      await load()
+    } catch (e: any) { message.error(e?.message || 'Không ghi được DRC') }
+    finally { setDrcSaving(false) }
+  }
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase()
@@ -197,6 +223,16 @@ export default function RawIntakeQueuePage() {
                   <Descriptions.Item label="Quy khô dự kiến"><Text strong style={{ color: '#1B4D3E' }}>{fmtKg(selected.dry_kg_du_kien)} kg</Text></Descriptions.Item>
                 </Descriptions>
 
+                {!selected.da_nhap && selected.ly_do_cho === 'cho_drc' && (
+                  <div style={{ marginTop: 12, padding: '10px 12px', background: '#FEF3C7', borderRadius: 8 }}>
+                    <Text strong>Ghi DRC đo cho phiếu này</Text>
+                    <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Lab đo mẫu rồi ghi tại đây (QC, thủ kho hoặc BGĐ). Phiếu có DRC sẽ chuyển sang "chờ nhập kho".</div>
+                    <Space.Compact style={{ width: '100%' }}>
+                      <InputNumber style={{ flex: 1 }} min={1} max={100} step={0.1} placeholder="DRC %" value={drcInput} onChange={(v) => setDrcInput(v === null || v === undefined ? null : Number(v))} disabled={!canGhiDrc} />
+                      <Button type="primary" onClick={handleGhiDrc} loading={drcSaving} disabled={!canGhiDrc || drcInput === null}>Ghi DRC</Button>
+                    </Space.Compact>
+                  </div>
+                )}
                 {!selected.da_nhap && (
                   <div style={{ marginTop: 12 }}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Nguồn hàng của lô</Text>

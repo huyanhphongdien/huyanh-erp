@@ -166,6 +166,7 @@ const WeighbridgeListPage = lazy(() => import('./pages/wms/weighbridge/Weighbrid
 const RawOverviewPage = lazy(() => import('./pages/wms/raw/RawOverviewPage'));
 const RawIntakeQueuePage = lazy(() => import('./pages/wms/raw/RawIntakeQueuePage'));
 const RawBatchDetailPage = lazy(() => import('./pages/wms/raw/RawBatchDetailPage'));
+const RawOpeningStockPage = lazy(() => import('./pages/wms/raw/RawOpeningStockPage'));
 const WeighbridgeDetailPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeDetailPage'));
 
 // ===== Rubber Supply Chain (lazy) =====
@@ -562,6 +563,7 @@ function App() {
                 <Route path="nvl" element={<RawOverviewPage />} />
                 <Route path="nvl/nhap" element={<RawIntakeQueuePage />} />
                 <Route path="nvl/lo/:batchId" element={<RawBatchDetailPage />} />
+                <Route path="nvl/ton-dau" element={<RawOpeningStockPage />} />
                 {/* Trang cân chuyển sang can.huyanhrubber.vn — ERP chỉ giữ lịch sử + chi tiết */}
                 <Route path="weighbridge" element={<WeighbridgeListPage />} />
                 <Route path="weighbridge/list" element={<WeighbridgeListPage />} />

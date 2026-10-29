@@ -15,6 +15,7 @@ import { rawStockService, type RawAlert, type RawBatchBalance, type RawDailyFlow
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_RUBBER_GROUP_LABELS, RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
+import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 
 const { Title, Text } = Typography
 
@@ -31,7 +32,9 @@ const ALERT_LABEL: Record<RawAlert['loai'], string> = {
 export default function RawOverviewPage() {
   const navigate = useNavigate()
   const rawRole = useRawRole()
+  const { data: facilities } = useActiveFacilities()
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined)
+  const [facilityInit, setFacilityInit] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [byType, setByType] = useState<RawStockByType[]>([])
@@ -57,6 +60,14 @@ export default function RawOverviewPage() {
       setError(e?.message || 'Không tải được dữ liệu kho nguyên liệu')
     } finally { setLoading(false) }
   }, [facilityId])
+
+  // Tập trung Phong Điền: mặc định chọn PD
+  useEffect(() => {
+    if (facilityInit || !facilities?.length) return
+    const pd = facilities.find((f) => f.code.toUpperCase() === 'PD')
+    if (pd) setFacilityId(pd.id)
+    setFacilityInit(true)
+  }, [facilities, facilityInit])
 
   useEffect(() => { load() }, [load])
 
@@ -115,6 +126,7 @@ export default function RawOverviewPage() {
             <Space wrap>
               <FacilityPicker value={facilityId} onChange={setFacilityId} allowAll placeholder="Tất cả nhà máy" style={{ minWidth: 200 }} />
               <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>Làm mới</Button>
+              <Button onClick={() => navigate('/wms/nvl/ton-dau')}>Tồn đầu / mở sổ</Button>
               <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/wms/nvl/nhap')}>Nhập từ phiếu cân</Button>
             </Space>
           </Col>

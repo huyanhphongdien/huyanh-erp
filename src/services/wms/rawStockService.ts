@@ -158,6 +158,35 @@ export interface RawDailyFlow {
   so_dong: number
 }
 
+export interface OpeningStagingRow {
+  id: string
+  facility_code: string
+  batch_code: string
+  rubber_type: string
+  ma_chuan: string
+  wet_kg: number
+  drc_pct: number | null
+  drc_estimated: boolean
+  intake_date: string | null
+  dry_kg: number
+  loi: string[]
+  processed_at: string | null
+  batch_id?: string | null
+}
+
+export interface OpeningRowInput {
+  facility_code: string
+  batch_code: string | null
+  rubber_type: string
+  wet_kg: number
+  drc_pct: number | null
+  drc_estimated: boolean
+  intake_date: string | null
+  supplier_name: string | null
+  ticket_code: string | null
+  note: string | null
+}
+
 export interface NhapKhoResult {
   batch_id: string
   batch_no: string
@@ -170,7 +199,7 @@ export interface NhapKhoResult {
 /** Mã lỗi hàm DB → câu tiếng Việt cho người dùng */
 export function dichLoiNhapKho(err: unknown): string {
   const msg = String((err as any)?.message ?? err ?? '')
-  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO)(?::([^\n"]*))?/)
+  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO)(?::([^\n"]*))?/)
   if (!m) return msg || 'Lỗi không xác định'
   const chi_tiet = m[2] ? ` (${m[2]})` : ''
   switch (m[1]) {
@@ -185,6 +214,9 @@ export function dichLoiNhapKho(err: unknown): string {
     case 'THIEU_KHOI_LUONG': return `Thiếu khối lượng${chi_tiet}`
     case 'THIEU_DRC': return `Thiếu DRC, chưa nhập kho được${chi_tiet}`
     case 'TRUOC_NGAY_MO_SO': return `Phiếu cân trước ngày mở sổ, hàng đã nằm trong tồn đầu${chi_tiet}`
+    case 'KHONG_CO_QUYEN_GHI_DRC': return 'Chỉ QC, thủ kho NVL hoặc BGĐ mới ghi DRC vào phiếu'
+    case 'DRC_KHONG_HOP_LE': return `DRC không hợp lệ${chi_tiet}`
+    case 'DA_GHI_SO': return `Dòng đã ghi sổ, không xóa được${chi_tiet}`
     default: return msg
   }
 }
@@ -315,10 +347,50 @@ export const rawStockService = {
     return { so_lo: num((data as any)?.so_lo), kho_kg: num((data as any)?.kho_kg) }
   },
 
-  async getOpeningStaging(): Promise<Array<{ id: string; facility_code: string; batch_code: string; rubber_type: string; ma_chuan: string; wet_kg: number; drc_pct: number | null; drc_estimated: boolean; intake_date: string | null; dry_kg: number; loi: string[]; processed_at: string | null }>> {
-    const { data, error } = await supabase.from('v_raw_opening_stock_check').select('*').order('facility_code').order('batch_code')
+  async getOpeningStaging(): Promise<OpeningStagingRow[]> {
+    const [{ data, error }, { data: ids }] = await Promise.all([
+      supabase.from('v_raw_opening_stock_check').select('*').order('facility_code').order('batch_code'),
+      supabase.from('raw_opening_stock_staging').select('id, batch_id'),
+    ])
     if (error) throw error
-    return (data ?? []).map((r: any) => ({ ...r, wet_kg: num(r.wet_kg), drc_pct: numOrNull(r.drc_pct), dry_kg: num(r.dry_kg), loi: Array.isArray(r.loi) ? r.loi : [] }))
+    const batchById = new Map<string, string | null>((ids ?? []).map((r: any) => [r.id, r.batch_id ?? null]))
+    return (data ?? []).map((r: any): OpeningStagingRow => ({
+      ...r, wet_kg: num(r.wet_kg), drc_pct: numOrNull(r.drc_pct), dry_kg: num(r.dry_kg),
+      drc_estimated: !!r.drc_estimated, loi: Array.isArray(r.loi) ? r.loi : [], batch_id: batchById.get(r.id) ?? null,
+    }))
+  },
+
+  /** Thêm một dòng tồn đầu (chưa ghi sổ). Mã lô trống → DB tự đặt TD-<NM>-<loại>-<yymmdd>-<n>. */
+  async addOpeningRow(input: OpeningRowInput): Promise<void> {
+    let batchCode = input.batch_code
+    if (!batchCode) {
+      const { data, error } = await supabase.rpc('fn_nvl_ma_lo_ton_dau', { p_facility_code: input.facility_code, p_rubber_type: input.rubber_type })
+      if (error) throw new Error(dichLoiNhapKho(error))
+      batchCode = String(data)
+    }
+    const { data: { user } } = await supabase.auth.getUser()
+    let createdBy: string | null = null
+    if (user) {
+      const { data: me } = await supabase.from('employees').select('id').eq('user_id', user.id).maybeSingle()
+      createdBy = me?.id ?? null
+    }
+    const { error } = await supabase.from('raw_opening_stock_staging').insert({
+      facility_code: input.facility_code.toUpperCase(), batch_code: batchCode, rubber_type: input.rubber_type,
+      wet_kg: input.wet_kg, drc_pct: input.drc_pct, drc_estimated: input.drc_estimated, intake_date: input.intake_date,
+      supplier_name: input.supplier_name, ticket_code: input.ticket_code, note: input.note, created_by: createdBy,
+    })
+    if (error) throw new Error(dichLoiNhapKho(error))
+  },
+
+  async deleteOpeningRow(id: string): Promise<void> {
+    const { error } = await supabase.rpc('fn_nvl_xoa_dong_ton_dau', { p_id: id })
+    if (error) throw new Error(dichLoiNhapKho(error))
+  },
+
+  /** Lab / thủ kho / BGĐ ghi DRC đo vào phiếu cân chưa vào sổ (PD chưa có thói quen ghi DRC tại cân). */
+  async ghiDrcPhieu(ticketId: string, drc: number, note?: string | null): Promise<void> {
+    const { error } = await supabase.rpc('fn_nvl_ghi_drc_phieu', { p_ticket_id: ticketId, p_drc: drc, p_note: note ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
   },
 
   async getAlerts(facilityId?: string | null): Promise<RawAlert[]> {

@@ -1,0 +1,437 @@
+// ============================================================================
+// KHO NGUYÊN LIỆU MỦ — sổ kho khô, nhập kho từ phiếu cân, tồn, cảnh báo (GĐ1)
+// File: src/services/wms/rawStockService.ts
+//
+// Mọi con số kg khô TÍNH Ở DB (raw_stock_ledger + view); service chỉ đọc view
+// và gọi hàm. Nhập kho = fn_nhap_kho_tu_phieu_can (một giao dịch, tách lô theo
+// dòng phiếu, từ chối khi thiếu DRC). Sau khi DB nhập xong, service ghi thêm
+// stock_in_orders + inventory_transactions như luồng cũ để các báo cáo WMS
+// đang có không bị thiếu (best-effort, không chặn).
+// Cột numeric về client là CHUỖI → bọc num().
+// ============================================================================
+
+import { supabase } from '../../lib/supabase'
+import { recordInventoryMove } from './inventorySync'
+import type { RawRubberType, RawRubberGroup, RawLotSource } from './raw.types'
+
+const num = (v: unknown): number => {
+  const n = typeof v === 'number' ? v : Number(v ?? 0)
+  return Number.isFinite(n) ? n : 0
+}
+const numOrNull = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+// ----------------------------------------------------------------------------
+// TYPES (khớp view)
+// ----------------------------------------------------------------------------
+export interface RawStockByType {
+  facility_id: string
+  facility_code: string | null
+  rubber_type: RawRubberType
+  rubber_type_name: string
+  nhom: RawRubberGroup
+  so_lo: number
+  wet_kg: number
+  dry_kg: number
+  drc_pct: number | null
+  tuoi_bq_ngay: number | null
+  tuoi_max_ngay: number | null
+  so_lo_qua_tuoi: number
+  so_lo_ton_dau_uoc: number
+}
+
+export interface RawBatchBalance {
+  batch_id: string
+  batch_no: string
+  facility_id: string
+  facility_code: string | null
+  rubber_type: RawRubberType
+  rubber_type_name: string
+  nhom: RawRubberGroup
+  supplier_name: string | null
+  nguon_hang: RawLotSource | null
+  ton_dau_uoc: boolean
+  batch_status: string
+  qc_status: string | null
+  received_date: string | null
+  weighbridge_ticket_id: string | null
+  ticket_line_no: number | null
+  warehouse_id: string | null
+  wet_kg: number
+  dry_kg: number
+  drc_pct: number | null
+  tuoi_ngay: number
+  ngay_can_lai: string | null
+  ngay_tu_lan_do: number
+  so_dong_so: number
+  cap_nhat: string
+}
+
+export type RawLedgerTxnType =
+  | 'opening' | 'in' | 'in_transfer'
+  | 'out_production' | 'out_sale' | 'out_transfer'
+  | 'recheck_adjust' | 'stocktake_adjust'
+
+export const RAW_TXN_LABELS: Record<RawLedgerTxnType, string> = {
+  opening: 'Tồn đầu mở sổ',
+  in: 'Nhập từ phiếu cân',
+  in_transfer: 'Nhận chuyển kho',
+  out_production: 'Xuất sản xuất',
+  out_sale: 'Xuất bán',
+  out_transfer: 'Chuyển kho đi',
+  recheck_adjust: 'Cân lại / DRC lại',
+  stocktake_adjust: 'Điều chỉnh kiểm kê',
+}
+
+export interface RawLedgerRow {
+  id: string
+  facility_id: string
+  batch_id: string
+  rubber_type: RawRubberType
+  txn_type: RawLedgerTxnType
+  txn_date: string
+  wet_kg: number
+  drc_pct: number | null
+  dry_kg: number
+  ref_type: string | null
+  ref_id: string | null
+  ref_line: number | null
+  note: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface RawIntakeQueueRow {
+  ticket_id: string
+  code: string
+  facility_id: string | null
+  facility_code: string | null
+  ticket_type: string
+  status: string
+  completed_at: string | null
+  vehicle_plate: string | null
+  driver_name: string | null
+  supplier_name: string | null
+  source_type: string | null
+  rubber_type_goc: string | null
+  rubber_type: RawRubberType
+  rubber_type_name: string | null
+  nhom: RawRubberGroup | null
+  net_weight: number
+  expected_drc: number | null
+  qc_actual_drc: number | null
+  qc_status: string | null
+  drc_dung: number | null
+  so_dong_lo: number
+  wet_kg_dong: number | null
+  san_sang: boolean
+  ly_do_cho: 'ok' | 'cho_drc' | 'loai_mu_la'
+  dry_kg_du_kien: number | null
+  lech_drc_ncc: number | null
+  da_nhap: boolean
+  batch_no: string | null
+}
+
+export interface RawAlert {
+  facility_id: string | null
+  loai: 'qua_tuoi' | 'cho_drc' | 'loai_mu_la' | 'lech_drc_ncc' | 'ton_dau_uoc'
+  muc: 'cao' | 'vua' | 'thap'
+  batch_id: string | null
+  batch_no: string | null
+  ticket_id: string | null
+  ticket_code: string | null
+  tieu_de: string
+  chi_tiet: string | null
+  gia_tri: number | null
+}
+
+export interface RawDailyFlow {
+  facility_id: string
+  txn_date: string
+  nhap_kho_kg: number
+  mo_so_kho_kg: number
+  xuat_kho_kg: number
+  dieu_chinh_kho_kg: number
+  so_dong: number
+}
+
+export interface NhapKhoResult {
+  batch_id: string
+  batch_no: string
+  rubber_type: RawRubberType
+  wet_kg: number
+  drc_pct: number
+  dry_kg: number
+}
+
+/** Mã lỗi hàm DB → câu tiếng Việt cho người dùng */
+export function dichLoiNhapKho(err: unknown): string {
+  const msg = String((err as any)?.message ?? err ?? '')
+  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC)(?::([^\n"]*))?/)
+  if (!m) return msg || 'Lỗi không xác định'
+  const chi_tiet = m[2] ? ` (${m[2]})` : ''
+  switch (m[1]) {
+    case 'KHONG_TIM_THAY_PHIEU': return 'Không tìm thấy phiếu cân'
+    case 'PHIEU_CHUA_HOAN_TAT': return `Phiếu cân chưa hoàn tất${chi_tiet}`
+    case 'PHIEU_KHONG_PHAI_NHAP': return `Phiếu không phải phiếu nhập${chi_tiet}`
+    case 'THIEU_NHA_MAY': return `Phiếu chưa gắn nhà máy${chi_tiet}`
+    case 'DA_NHAP': return `Phiếu đã nhập kho rồi${chi_tiet}`
+    case 'KHONG_CO_QUYEN_NHAN': return 'Bạn không có quyền "thủ kho nhận" ở nhà máy này'
+    case 'THIEU_KHO_NVL': return 'Nhà máy chưa có kho nguyên liệu (warehouse type raw)'
+    case 'LOAI_MU_LA': return `Loại mủ lạ, không nhập được${chi_tiet}`
+    case 'THIEU_KHOI_LUONG': return `Thiếu khối lượng${chi_tiet}`
+    case 'THIEU_DRC': return `Thiếu DRC, chưa nhập kho được${chi_tiet}`
+    default: return msg
+  }
+}
+
+// ----------------------------------------------------------------------------
+// SERVICE
+// ----------------------------------------------------------------------------
+export const rawStockService = {
+  /** Tồn theo loại (nhà máy = undefined → mọi nhà máy, cộng theo loại) */
+  async getBalanceByType(facilityId?: string | null): Promise<RawStockByType[]> {
+    let q = supabase.from('v_raw_stock_by_type').select('*')
+    if (facilityId) q = q.eq('facility_id', facilityId)
+    const { data, error } = await q
+    if (error) throw error
+    const rows = (data ?? []).map((r: any): RawStockByType => ({
+      ...r,
+      so_lo: num(r.so_lo), wet_kg: num(r.wet_kg), dry_kg: num(r.dry_kg), drc_pct: numOrNull(r.drc_pct),
+      tuoi_bq_ngay: numOrNull(r.tuoi_bq_ngay), tuoi_max_ngay: numOrNull(r.tuoi_max_ngay),
+      so_lo_qua_tuoi: num(r.so_lo_qua_tuoi), so_lo_ton_dau_uoc: num(r.so_lo_ton_dau_uoc),
+    }))
+    if (facilityId) return rows
+    // Gộp nhiều nhà máy về một dòng / loại
+    const byType = new Map<string, RawStockByType>()
+    for (const r of rows) {
+      const cur = byType.get(r.rubber_type)
+      if (!cur) { byType.set(r.rubber_type, { ...r, facility_id: '', facility_code: null }); continue }
+      const wet = cur.wet_kg + r.wet_kg, dry = cur.dry_kg + r.dry_kg
+      byType.set(r.rubber_type, {
+        ...cur, so_lo: cur.so_lo + r.so_lo, wet_kg: wet, dry_kg: dry,
+        drc_pct: wet > 0 ? Math.round((100 * dry / wet) * 100) / 100 : null,
+        tuoi_bq_ngay: cur.so_lo + r.so_lo > 0
+          ? Math.round(((cur.tuoi_bq_ngay ?? 0) * cur.so_lo + (r.tuoi_bq_ngay ?? 0) * r.so_lo) / (cur.so_lo + r.so_lo) * 10) / 10
+          : null,
+        tuoi_max_ngay: Math.max(cur.tuoi_max_ngay ?? 0, r.tuoi_max_ngay ?? 0),
+        so_lo_qua_tuoi: cur.so_lo_qua_tuoi + r.so_lo_qua_tuoi,
+        so_lo_ton_dau_uoc: cur.so_lo_ton_dau_uoc + r.so_lo_ton_dau_uoc,
+      })
+    }
+    return Array.from(byType.values())
+  },
+
+  /** Lô còn hàng (mặc định) hoặc cả lô đã hết */
+  async getBatches(opts: {
+    facilityId?: string | null
+    rubberType?: RawRubberType | null
+    includeEmpty?: boolean
+    search?: string
+    limit?: number
+  } = {}): Promise<RawBatchBalance[]> {
+    let q = supabase.from('v_raw_stock_balance').select('*').order('received_date', { ascending: true })
+    if (opts.facilityId) q = q.eq('facility_id', opts.facilityId)
+    if (opts.rubberType) q = q.eq('rubber_type', opts.rubberType)
+    if (!opts.includeEmpty) q = q.gt('dry_kg', 0.005)
+    if (opts.search?.trim()) {
+      const s = opts.search.trim()
+      q = q.or(`batch_no.ilike.%${s}%,supplier_name.ilike.%${s}%`)
+    }
+    if (opts.limit) q = q.limit(opts.limit)
+    const { data, error } = await q
+    if (error) throw error
+    return (data ?? []).map(normalizeBatch)
+  },
+
+  async getBatch(batchId: string): Promise<RawBatchBalance | null> {
+    const { data, error } = await supabase.from('v_raw_stock_balance').select('*').eq('batch_id', batchId).maybeSingle()
+    if (error) throw error
+    return data ? normalizeBatch(data) : null
+  },
+
+  async getLedger(batchId: string): Promise<RawLedgerRow[]> {
+    const { data, error } = await supabase
+      .from('raw_stock_ledger').select('*').eq('batch_id', batchId)
+      .order('txn_date', { ascending: true }).order('created_at', { ascending: true })
+    if (error) throw error
+    return (data ?? []).map((r: any): RawLedgerRow => ({
+      ...r, wet_kg: num(r.wet_kg), drc_pct: numOrNull(r.drc_pct), dry_kg: num(r.dry_kg),
+    }))
+  },
+
+  /** Phiếu cân vào đã hoàn tất — mặc định chỉ phiếu chưa vào sổ */
+  async getIntakeQueue(opts: {
+    facilityId?: string | null
+    includeDone?: boolean
+    fromDate?: string
+    toDate?: string
+    limit?: number
+  } = {}): Promise<RawIntakeQueueRow[]> {
+    let q = supabase.from('v_raw_intake_queue').select('*').order('completed_at', { ascending: false })
+    if (opts.facilityId) q = q.eq('facility_id', opts.facilityId)
+    if (!opts.includeDone) q = q.eq('da_nhap', false)
+    if (opts.fromDate) q = q.gte('completed_at', opts.fromDate)
+    if (opts.toDate) q = q.lte('completed_at', opts.toDate)
+    q = q.limit(opts.limit ?? 200)
+    const { data, error } = await q
+    if (error) throw error
+    return (data ?? []).map((r: any): RawIntakeQueueRow => ({
+      ...r,
+      net_weight: num(r.net_weight), expected_drc: numOrNull(r.expected_drc), qc_actual_drc: numOrNull(r.qc_actual_drc),
+      drc_dung: numOrNull(r.drc_dung), so_dong_lo: num(r.so_dong_lo), wet_kg_dong: numOrNull(r.wet_kg_dong),
+      dry_kg_du_kien: numOrNull(r.dry_kg_du_kien), lech_drc_ncc: numOrNull(r.lech_drc_ncc),
+      san_sang: !!r.san_sang, da_nhap: !!r.da_nhap,
+    }))
+  },
+
+  /**
+   * NHẬP KHO: gọi hàm DB (một giao dịch). Trả danh sách lô đã tạo.
+   * Sau đó ghi stock_in_orders + inventory_transactions như luồng cũ (best-effort).
+   */
+  async nhapKho(ticketId: string, opts: { warehouseId?: string | null; nguonHang?: RawLotSource | null } = {}): Promise<NhapKhoResult[]> {
+    const { data, error } = await supabase.rpc('fn_nhap_kho_tu_phieu_can', {
+      p_ticket_id: ticketId,
+      p_warehouse_id: opts.warehouseId ?? null,
+      p_nguon_hang: opts.nguonHang ?? null,
+    })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    const batches: NhapKhoResult[] = ((data ?? []) as any[]).map((b) => ({
+      batch_id: b.batch_id, batch_no: b.batch_no, rubber_type: b.rubber_type,
+      wet_kg: num(b.wet_kg), drc_pct: num(b.drc_pct), dry_kg: num(b.dry_kg),
+    }))
+    try { await legacySyncAfterIntake(ticketId, batches) } catch (e) { console.warn('[rawStock] legacy sync failed:', e) }
+    return batches
+  },
+
+  /** Mở sổ tồn đầu từ raw_opening_stock_staging (dòng không lỗi, chưa xử lý) */
+  async moSoTonDau(facilityCode?: string | null): Promise<{ so_lo: number; kho_kg: number }> {
+    const { data, error } = await supabase.rpc('fn_mo_so_ton_dau', { p_facility_code: facilityCode ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    return { so_lo: num((data as any)?.so_lo), kho_kg: num((data as any)?.kho_kg) }
+  },
+
+  async getOpeningStaging(): Promise<Array<{ id: string; facility_code: string; batch_code: string; rubber_type: string; ma_chuan: string; wet_kg: number; drc_pct: number | null; drc_estimated: boolean; intake_date: string | null; dry_kg: number; loi: string[]; processed_at: string | null }>> {
+    const { data, error } = await supabase.from('v_raw_opening_stock_check').select('*').order('facility_code').order('batch_code')
+    if (error) throw error
+    return (data ?? []).map((r: any) => ({ ...r, wet_kg: num(r.wet_kg), drc_pct: numOrNull(r.drc_pct), dry_kg: num(r.dry_kg), loi: Array.isArray(r.loi) ? r.loi : [] }))
+  },
+
+  async getAlerts(facilityId?: string | null): Promise<RawAlert[]> {
+    let q = supabase.from('v_raw_alerts').select('*')
+    if (facilityId) q = q.eq('facility_id', facilityId)
+    const { data, error } = await q
+    if (error) throw error
+    const order: Record<string, number> = { cao: 0, vua: 1, thap: 2 }
+    return ((data ?? []) as any[])
+      .map((r) => ({ ...r, gia_tri: numOrNull(r.gia_tri) }) as RawAlert)
+      .sort((a, b) => (order[a.muc] ?? 9) - (order[b.muc] ?? 9))
+  },
+
+  async getDailyFlow(facilityId: string | null | undefined, days = 14): Promise<RawDailyFlow[]> {
+    const from = new Date(); from.setDate(from.getDate() - (days - 1))
+    const fromStr = from.toISOString().slice(0, 10)
+    let q = supabase.from('v_raw_daily_flow').select('*').gte('txn_date', fromStr).order('txn_date')
+    if (facilityId) q = q.eq('facility_id', facilityId)
+    const { data, error } = await q
+    if (error) throw error
+    // Gộp theo ngày (nhiều nhà máy) + điền ngày trống
+    const byDay = new Map<string, RawDailyFlow>()
+    for (const r of (data ?? []) as any[]) {
+      const cur = byDay.get(r.txn_date) ?? { facility_id: facilityId ?? '', txn_date: r.txn_date, nhap_kho_kg: 0, mo_so_kho_kg: 0, xuat_kho_kg: 0, dieu_chinh_kho_kg: 0, so_dong: 0 }
+      cur.nhap_kho_kg += num(r.nhap_kho_kg); cur.mo_so_kho_kg += num(r.mo_so_kho_kg)
+      cur.xuat_kho_kg += num(r.xuat_kho_kg); cur.dieu_chinh_kho_kg += num(r.dieu_chinh_kho_kg); cur.so_dong += num(r.so_dong)
+      byDay.set(r.txn_date, cur)
+    }
+    const out: RawDailyFlow[] = []
+    for (let i = 0; i < days; i++) {
+      const d = new Date(from); d.setDate(from.getDate() + i)
+      const key = d.toISOString().slice(0, 10)
+      out.push(byDay.get(key) ?? { facility_id: facilityId ?? '', txn_date: key, nhap_kho_kg: 0, mo_so_kho_kg: 0, xuat_kho_kg: 0, dieu_chinh_kho_kg: 0, so_dong: 0 })
+    }
+    return out
+  },
+
+  /** Tổng hợp nhanh cho thẻ chỉ số của tổng quan */
+  async getOverviewStats(facilityId?: string | null): Promise<{
+    dry_kg: number; wet_kg: number; so_lo: number; drc_pct: number | null; tuoi_bq: number | null;
+    so_lo_qua_tuoi: number; nhap_hom_nay_kho_kg: number; nhap_hom_nay_so_phieu: number; cho_nhap_so_phieu: number; cho_drc_so_phieu: number
+  }> {
+    const [byType, queue, flow] = await Promise.all([
+      this.getBalanceByType(facilityId),
+      this.getIntakeQueue({ facilityId, includeDone: true, fromDate: new Date().toISOString().slice(0, 10) }),
+      this.getDailyFlow(facilityId, 1),
+    ])
+    const wet = byType.reduce((s, r) => s + r.wet_kg, 0)
+    const dry = byType.reduce((s, r) => s + r.dry_kg, 0)
+    const soLo = byType.reduce((s, r) => s + r.so_lo, 0)
+    const tuoiW = byType.reduce((s, r) => s + (r.tuoi_bq_ngay ?? 0) * r.so_lo, 0)
+    return {
+      dry_kg: dry, wet_kg: wet, so_lo: soLo,
+      drc_pct: wet > 0 ? Math.round((100 * dry / wet) * 10) / 10 : null,
+      tuoi_bq: soLo > 0 ? Math.round(tuoiW / soLo) : null,
+      so_lo_qua_tuoi: byType.reduce((s, r) => s + r.so_lo_qua_tuoi, 0),
+      nhap_hom_nay_kho_kg: flow[0]?.nhap_kho_kg ?? 0,
+      nhap_hom_nay_so_phieu: queue.filter((q) => q.da_nhap).length,
+      cho_nhap_so_phieu: queue.filter((q) => !q.da_nhap && q.san_sang).length,
+      cho_drc_so_phieu: queue.filter((q) => !q.da_nhap && !q.san_sang).length,
+    }
+  },
+}
+
+function normalizeBatch(r: any): RawBatchBalance {
+  return {
+    ...r,
+    wet_kg: num(r.wet_kg), dry_kg: num(r.dry_kg), drc_pct: numOrNull(r.drc_pct),
+    tuoi_ngay: num(r.tuoi_ngay), ngay_tu_lan_do: num(r.ngay_tu_lan_do), so_dong_so: num(r.so_dong_so),
+    ticket_line_no: numOrNull(r.ticket_line_no), ton_dau_uoc: !!r.ton_dau_uoc,
+  }
+}
+
+/**
+ * Giữ các báo cáo WMS cũ: một stock_in_orders cho phiếu + inventory_transactions
+ * cho từng lô. Không chặn nếu lỗi — sổ kho khô mới là nguồn sự thật của kho NVL.
+ */
+async function legacySyncAfterIntake(ticketId: string, batches: NhapKhoResult[]): Promise<void> {
+  if (!batches.length) return
+  const { data: ticket } = await supabase
+    .from('weighbridge_tickets').select('id, code, net_weight, deal_id, vehicle_plate, driver_name, supplier_name').eq('id', ticketId).maybeSingle()
+  if (!ticket) return
+  const { data: b0 } = await supabase.from('stock_batches').select('id, warehouse_id, material_id').eq('id', batches[0].batch_id).maybeSingle()
+  if (!b0?.warehouse_id) return
+
+  // Đã có phiếu nhập cho ticket này (luồng cũ) thì thôi
+  const { data: existing } = await supabase.from('stock_in_orders').select('id').like('notes', `%phiếu cân ${ticket.code}%`).limit(1)
+  let stockInId: string | null = existing?.[0]?.id ?? null
+  if (!stockInId) {
+    const now = new Date()
+    const prefix = `NK-NVL-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
+    const { data: last } = await supabase.from('stock_in_orders').select('code').like('code', `${prefix}-%`).order('code', { ascending: false }).limit(1)
+    const seq = last?.[0]?.code ? Number(String(last[0].code).split('-').pop()) + 1 : 1
+    const code = `${prefix}-${String(Number.isFinite(seq) ? seq : 1).padStart(3, '0')}`
+    const totalWet = batches.reduce((s, b) => s + b.wet_kg, 0)
+    const { data: si } = await supabase.from('stock_in_orders').insert({
+      code, type: 'raw', warehouse_id: b0.warehouse_id, source_type: 'purchase', deal_id: ticket.deal_id ?? null,
+      status: 'confirmed', total_quantity: batches.length, total_weight: totalWet, confirmed_at: now.toISOString(),
+      notes: `Nhập từ phiếu cân ${ticket.code} · sổ kho khô · ${batches.map((b) => b.batch_no).join(', ')}`,
+    }).select('id').maybeSingle()
+    stockInId = si?.id ?? null
+  }
+  for (const b of batches) {
+    if (stockInId) {
+      await supabase.from('stock_in_details').insert({
+        stock_in_id: stockInId, material_id: b0.material_id, batch_id: b.batch_id, quantity: 1, weight: b.wet_kg, unit: 'kg',
+      })
+    }
+    await recordInventoryMove({
+      material_id: b0.material_id, warehouse_id: b0.warehouse_id, batch_id: b.batch_id,
+      delta_kg: b.wet_kg, type: 'weighbridge_in', reference_type: 'stock_in', reference_id: stockInId ?? ticketId,
+      notes: `Nhập NVL từ phiếu cân ${ticket.code} (${b.batch_no})`,
+    })
+  }
+}
+
+export default rawStockService

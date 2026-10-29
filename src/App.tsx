@@ -162,6 +162,10 @@ const InventoryDetailPage = lazy(() => import('./pages/wms/InventoryDetailPage')
 const BatchQCHistoryPage = lazy(() => import('./pages/wms/qc/BatchQCHistoryPage'));
 const BatchLabelPage = lazy(() => import('./pages/wms/BatchLabelPage'));
 const WeighbridgeListPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeListPage'));
+// Kho nguyên liệu mủ (GĐ1): sổ kho khô, nhập từ phiếu cân, chi tiết lô
+const RawOverviewPage = lazy(() => import('./pages/wms/raw/RawOverviewPage'));
+const RawIntakeQueuePage = lazy(() => import('./pages/wms/raw/RawIntakeQueuePage'));
+const RawBatchDetailPage = lazy(() => import('./pages/wms/raw/RawBatchDetailPage'));
 const WeighbridgeDetailPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeDetailPage'));
 
 // ===== Rubber Supply Chain (lazy) =====
@@ -554,6 +558,10 @@ function App() {
                 <Route path="qc/batch/:batchId" element={<BatchQCHistoryPage />} />
                 {/* Batch Label — In nhãn QR */}
                 <Route path="batch/:batchId/label" element={<BatchLabelPage />} />
+                {/* Kho nguyên liệu mủ — GĐ1 (sổ kho khô) */}
+                <Route path="nvl" element={<RawOverviewPage />} />
+                <Route path="nvl/nhap" element={<RawIntakeQueuePage />} />
+                <Route path="nvl/lo/:batchId" element={<RawBatchDetailPage />} />
                 {/* Trang cân chuyển sang can.huyanhrubber.vn — ERP chỉ giữ lịch sử + chi tiết */}
                 <Route path="weighbridge" element={<WeighbridgeListPage />} />
                 <Route path="weighbridge/list" element={<WeighbridgeListPage />} />

@@ -428,6 +428,9 @@ const getMenuGroups = (
     rawKeeperAllowed: true,   // GĐ0 kho NVL: thủ kho / QC theo raw_store_keepers
     items: [
       { path: '/wms', label: 'Tồn kho', icon: <Warehouse size={18} /> }, // tabs: overview | nvl | alerts | stock-check
+      // Kho nguyên liệu mủ (GĐ1) — sổ kho khô; thủ kho NVL thấy nhờ rawKeeperAllowed của group
+      { path: '/wms/nvl', label: 'Kho NVL mủ', icon: <Warehouse size={18} />, extraActivePaths: ['/wms/nvl/lo'] },
+      { path: '/wms/nvl/nhap', label: 'Nhập NVL (phiếu cân)', icon: <PackagePlus size={18} /> },
       { path: '/wms/stock-in', label: 'Nhập kho', icon: <PackagePlus size={18} /> },
       { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
       { path: '/wms/transfer', label: 'Chuyển kho NM', icon: <PackageMinus size={18} /> },

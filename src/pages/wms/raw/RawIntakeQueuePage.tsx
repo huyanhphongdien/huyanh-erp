@@ -127,7 +127,7 @@ export default function RawIntakeQueuePage() {
               <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/nvl')} />
               <div>
                 <Title level={3} style={{ margin: 0 }}>Nhập kho từ phiếu cân</Title>
-                <Text type="secondary">Phiếu cân vào đã hoàn tất · mỗi dòng lô trên phiếu = 1 lô · không nhập được khi thiếu DRC</Text>
+                <Text type="secondary">Phiếu cân vào đã hoàn tất từ ngày mở sổ {settings.ngay_mo_so ? settings.ngay_mo_so.split('-').reverse().join('/') : ''} · mỗi dòng lô trên phiếu = 1 lô · không nhập được khi thiếu DRC</Text>
               </div>
             </Space>
           </Col>

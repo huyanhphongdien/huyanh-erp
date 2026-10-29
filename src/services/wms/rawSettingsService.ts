@@ -30,6 +30,7 @@ function normalize(row: any): RawSettings {
       : d.gioi_han_chen_pct,
     chen_ban_giao_ca: row?.chen_ban_giao_ca ?? d.chen_ban_giao_ca,
     anh_bat_buoc: Array.isArray(row?.anh_bat_buoc) ? row.anh_bat_buoc.map(String) : d.anh_bat_buoc,
+    ngay_mo_so: row?.ngay_mo_so ? String(row.ngay_mo_so).slice(0, 10) : null,
     notes: row?.notes ?? null,
     updated_at: row?.updated_at ?? '',
   }

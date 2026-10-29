@@ -170,7 +170,7 @@ export interface NhapKhoResult {
 /** Mã lỗi hàm DB → câu tiếng Việt cho người dùng */
 export function dichLoiNhapKho(err: unknown): string {
   const msg = String((err as any)?.message ?? err ?? '')
-  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC)(?::([^\n"]*))?/)
+  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO)(?::([^\n"]*))?/)
   if (!m) return msg || 'Lỗi không xác định'
   const chi_tiet = m[2] ? ` (${m[2]})` : ''
   switch (m[1]) {
@@ -184,6 +184,7 @@ export function dichLoiNhapKho(err: unknown): string {
     case 'LOAI_MU_LA': return `Loại mủ lạ, không nhập được${chi_tiet}`
     case 'THIEU_KHOI_LUONG': return `Thiếu khối lượng${chi_tiet}`
     case 'THIEU_DRC': return `Thiếu DRC, chưa nhập kho được${chi_tiet}`
+    case 'TRUOC_NGAY_MO_SO': return `Phiếu cân trước ngày mở sổ, hàng đã nằm trong tồn đầu${chi_tiet}`
     default: return msg
   }
 }

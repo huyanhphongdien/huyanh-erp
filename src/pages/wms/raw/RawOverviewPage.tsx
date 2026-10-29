@@ -107,7 +107,7 @@ export default function RawOverviewPage() {
           <Col>
             <Title level={3} style={{ margin: 0 }}>Kho nguyên liệu mủ</Title>
             <Text type="secondary">
-              Sổ kho khô · kg khô = kg ướt × DRC · ngưỡng tuổi lô {settings.tuoi_lo_canh_bao_ngay} ngày, cân lại mỗi {settings.chu_ky_can_lai_ngay} ngày
+              Sổ kho khô · kg khô = kg ướt × DRC · mở sổ từ {settings.ngay_mo_so ? settings.ngay_mo_so.split('-').reverse().join('/') : '—'} · ngưỡng tuổi lô {settings.tuoi_lo_canh_bao_ngay} ngày, cân lại mỗi {settings.chu_ky_can_lai_ngay} ngày
               {!rawRole.perms.co_thu_kho && ' · chưa chỉ định thủ kho, bước "nhận" đang mở'}
             </Text>
           </Col>

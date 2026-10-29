@@ -132,6 +132,8 @@ export interface RawSettings {
   chen_ban_giao_ca: boolean
   /** ['toan_canh','man_hinh_can'] */
   anh_bat_buoc: string[]
+  /** Sổ kho khô bắt đầu từ ngày này (YYYY-MM-DD); phiếu cân trước đó không vào hàng đợi */
+  ngay_mo_so: string | null
   notes: string | null
   updated_at: string
 }
@@ -148,6 +150,7 @@ export const RAW_SETTINGS_DEFAULT: RawSettings = {
   gioi_han_chen_pct: { SVR_10: 20, SVR_20: 20, SVR_3L: 10, SVR_L: 10, SVR_5: 10, SVR_CV50: 0, SVR_CV60: 0 },
   chen_ban_giao_ca: true,
   anh_bat_buoc: ['toan_canh', 'man_hinh_can'],
+  ngay_mo_so: null,
   notes: null,
   updated_at: '',
 }

@@ -51,3 +51,32 @@ Việc 1–7 khoảng 3–4 ngày làm, không đụng sổ đã ghi: các lô x
 2. Phiếu cân không có mã (24 % kg): thủ kho gán mã lúc nhập kho (đề xuất), về sau app cân bắt buộc nhập.
 3. Xuất sản xuất cân **theo mã** (một số), máy chia về từng xe; không cân từng xe.
 4. Một ca chạy **một mã**; chạy hai mã thì tách hai phiếu ca.
+
+## 4. Tầng còn thiếu để đi hết đến xuất kho thành phẩm: LÔ THÀNH PHẨM (30/10, từ 2 cuốn sổ giấy)
+
+Hai cuốn sổ chủ doanh nghiệp đưa:
+
+- **Sổ QC hàng không đạt**: mỗi dòng là một *số lô thành phẩm* (S2308AB, S2309AB, S2324AB, CV2622A/B…) kèm *mã nguyên liệu* (TMHG-26, S1-25, TMNH-01, TNTV 18-19), tình trạng CXL/LOẠI, lý do (Po 263–284, MV↓), ghi chú "xuất chèn 22/8", "Kalamo 22/8". Một ca (14/8 Đen) ra 5 số lô.
+- **Sổ ca ép bành** (24/10): tồn kho theo *chủng loại* (SVR10 35KG STD 5.029 bành · 176.015 kg; SVR10 MIX 1502 35KG 1.025 · 35.875; SVL3L 1.253 · 43.855; SVR10CV60 1.035 · 36.225; BÀNH 1502 1.620 · 56.700; HÀNG DKL 318 · 11.130; RSS3 nhập 55 · 1.925, tồn 406 · 14.210; SẢN PHẨM LỖI 1.114 · 38.990 CXL…). Sổ ca **không ghi số lô**, chỉ ghi tổng bành theo chủng loại.
+
+Vậy sợi dây đầy đủ nhà máy đang có trên giấy là:
+
+```
+MÃ NGUYÊN LIỆU (TMHG-26)  →  ca / tổ ép  →  SỐ LÔ THÀNH PHẨM (S2308AB, 35 kg/bành × N bành, chủng loại)
+       │                                            │
+   phiếu chèn (lấy SBR-1502, hàng lỗi…)             ├─ QC đạt  → tồn TP theo chủng loại → lệnh điều xe (xuất theo số lô / mã hàng)
+                                                    └─ QC CXL / LOẠI → "SẢN PHẨM LỖI", "HÀNG DKL" → xuất chèn → chạy lại thành số lô mới
+```
+
+Phần mềm hiện có: mã NVL (đề xuất GĐ6 ở trên), phiếu chèn, sổ ca theo chủng loại, lệnh điều xe có mã hàng. **Thiếu đúng một thực thể: lô thành phẩm.** Thêm nó (GĐ7) thì toàn bộ chuỗi khép:
+
+| # | Việc | Ghi chú |
+|---|---|---|
+| 1 | Bảng `fg_lots` (lô thành phẩm): số lô (S2308AB), nhà máy, ngày SX, ca, tổ, chủng loại (material), số bành, kg/bành → kg, **mã NVL** (một hoặc nhiều), có chèn hay không (từ phiếu chèn của ca), kết quả QC (Po, MV, PRI, đạt / CXL / LOẠI, lý do), trạng thái (tồn · đã xuất · đã chuyển chèn · đã chạy lại), ghi chú | tồn TP theo chủng loại = Σ lô; "SẢN PHẨM LỖI" = Σ lô CXL/LOẠI; đúng hai dòng cuối của sổ ca |
+| 2 | **Sổ ca** giữ nguyên tờ giấy, chỉ thêm dưới mỗi dòng nhập: danh sách số lô nhập trong ca (số lô + số bành); tổng bành tự cộng lên dòng chủng loại | tổ ép gõ số lô ngay lúc nhập kho, trên điện thoại |
+| 3 | **Sổ QC hàng không đạt**: chọn số lô từ danh sách thay vì gõ, mã NVL tự hiện; CXL/LOẠI đổi trạng thái lô → tồn "SẢN PHẨM LỖI" tự đúng | |
+| 4 | **Hàng chèn**: nguồn "hàng lỗi" chọn số lô CXL/LOẠI (thay cho dòng LOI tổng); lô chạy lại ra số lô mới ghi "từ lô S2308AB" | truy ngược hai chiều |
+| 5 | **Xuất kho TP**: lệnh điều xe chọn số lô (bành cụ thể) thay vì chỉ mã hàng; tồn giảm theo lô; đối chiếu xuất kho giữ như cũ | |
+| 6 | **Truy xuất**: từ container đã giao → số lô → ca → mã NVL → phiếu cân → nhà cung cấp; và ngược lại từ mã NVL → mọi số lô, hiệu suất, tỷ lệ lỗi của mã đó | đây là câu trả lời cho "mã nào hay hỏng" |
+
+Cần chốt thêm: quy ước **số lô thành phẩm** (S2308AB nghĩa là gì: S = SVR10? 23 = ? 08 = thứ tự? AB = máy ép A và B?) để máy tự đề xuất số lô kế tiếp cho tổ ép.

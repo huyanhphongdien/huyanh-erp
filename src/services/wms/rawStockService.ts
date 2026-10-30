@@ -137,7 +137,7 @@ export interface RawIntakeQueueRow {
 
 export interface RawAlert {
   facility_id: string | null
-  loai: 'qua_tuoi' | 'cho_drc' | 'loai_mu_la' | 'lech_drc_ncc' | 'ton_dau_uoc'
+  loai: 'qua_tuoi' | 'cho_drc' | 'loai_mu_la' | 'lech_drc_ncc' | 'ton_dau_uoc' | 'den_han_can_lai' | 'lech_kho'
   muc: 'cao' | 'vua' | 'thap'
   batch_id: string | null
   batch_no: string | null
@@ -199,7 +199,7 @@ export interface NhapKhoResult {
 /** Mã lỗi hàm DB → câu tiếng Việt cho người dùng */
 export function dichLoiNhapKho(err: unknown): string {
   const msg = String((err as any)?.message ?? err ?? '')
-  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO)(?::([^\n"]*))?/)
+  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|KHONG_CO_QUYEN|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO|LENH_TRONG|KHONG_TIM_THAY_LO|LO_KHAC_NHA_MAY|LO_DA_HET|VUOT_TON|KHONG_TIM_THAY_DONG|LENH_DA_GUI_KY|KHONG_TIM_THAY_LENH|SAI_TRANG_THAI|THIEU_KG_CAN|DA_TRU_SO|BUOC_KHONG_HOP_LE|CAN_LY_DO)(?::([^\n"]*))?/)
   if (!m) return msg || 'Lỗi không xác định'
   const chi_tiet = m[2] ? ` (${m[2]})` : ''
   switch (m[1]) {
@@ -217,6 +217,20 @@ export function dichLoiNhapKho(err: unknown): string {
     case 'KHONG_CO_QUYEN_GHI_DRC': return 'Chỉ QC, thủ kho NVL hoặc BGĐ mới ghi DRC vào phiếu'
     case 'DRC_KHONG_HOP_LE': return `DRC không hợp lệ${chi_tiet}`
     case 'DA_GHI_SO': return `Dòng đã ghi sổ, không xóa được${chi_tiet}`
+    case 'KHONG_CO_QUYEN': return `Bạn không có quyền thực hiện bước này${chi_tiet}`
+    case 'LENH_TRONG': return 'Lệnh xuất chưa có lô nào'
+    case 'KHONG_TIM_THAY_LO': return `Không tìm thấy lô${chi_tiet}`
+    case 'LO_KHAC_NHA_MAY': return `Lô thuộc nhà máy khác${chi_tiet}`
+    case 'LO_DA_HET': return `Lô đã hết hàng${chi_tiet}`
+    case 'VUOT_TON': return `Lấy nhiều hơn tồn của lô${chi_tiet}`
+    case 'KHONG_TIM_THAY_DONG': return 'Không tìm thấy dòng lệnh xuất'
+    case 'LENH_DA_GUI_KY': return `Lệnh đã gửi ký, không sửa kg cân nữa${chi_tiet}`
+    case 'KHONG_TIM_THAY_LENH': return 'Không tìm thấy lệnh xuất'
+    case 'SAI_TRANG_THAI': return `Lệnh không ở trạng thái phù hợp cho bước này${chi_tiet}`
+    case 'THIEU_KG_CAN': return `Còn dòng chưa ghi kg cân thực${chi_tiet}`
+    case 'DA_TRU_SO': return `Lệnh đã trừ sổ, không hủy được${chi_tiet}`
+    case 'BUOC_KHONG_HOP_LE': return `Bước ký không hợp lệ${chi_tiet}`
+    case 'CAN_LY_DO': return `Lệch khô vượt ngưỡng, phải ghi lý do${chi_tiet}`
     default: return msg
   }
 }

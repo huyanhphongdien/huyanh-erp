@@ -27,6 +27,7 @@ const fmtPct = (n: number | null | undefined) => (n === null || n === undefined 
 const ALERT_COLOR: Record<RawAlert['muc'], string> = { cao: 'red', vua: 'orange', thap: 'default' }
 const ALERT_LABEL: Record<RawAlert['loai'], string> = {
   qua_tuoi: 'Quá tuổi', cho_drc: 'Chờ DRC', loai_mu_la: 'Loại mủ lạ', lech_drc_ncc: 'DRC lệch NCC', ton_dau_uoc: 'Tồn đầu ước',
+  den_han_can_lai: 'Đến hạn cân lại', lech_kho: 'Lệch khô',
 }
 
 export default function RawOverviewPage() {
@@ -180,7 +181,8 @@ export default function RawOverviewPage() {
                         <Tag color={ALERT_COLOR[a.muc]}>{ALERT_LABEL[a.loai]}</Tag>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 500 }}>
-                            {a.batch_id ? <a onClick={() => navigate(`/wms/nvl/lo/${a.batch_id}`)}>{a.tieu_de}</a>
+                            {a.loai === 'den_han_can_lai' ? <a onClick={() => navigate('/wms/nvl/can-lai')}>{a.tieu_de}</a>
+                              : a.batch_id ? <a onClick={() => navigate(`/wms/nvl/lo/${a.batch_id}`)}>{a.tieu_de}</a>
                               : a.ticket_id ? <a onClick={() => navigate('/wms/nvl/nhap')}>{a.tieu_de}</a> : a.tieu_de}
                           </div>
                           {a.chi_tiet && <Text type="secondary" style={{ fontSize: 12 }}>{a.chi_tiet}</Text>}
@@ -212,7 +214,7 @@ export default function RawOverviewPage() {
               )
             })}
           </div>
-          <Text type="secondary" style={{ fontSize: 12 }}>Xuất sản xuất bắt đầu ghi từ GĐ 2; hiện cột xuất bằng 0 là đúng.</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>Cột xuất = lệnh xuất đã được thủ kho nhận (trừ sổ theo kg cân thực).</Text>
         </Card>
 
         <Card size="small" title="Lô cần xử lý" extra={<Button type="link" size="small" onClick={() => navigate('/wms/nvl/nhap')}>Hàng đợi nhập kho <RightOutlined /></Button>}>

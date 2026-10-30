@@ -101,12 +101,14 @@ export default function RawBatchDetailPage() {
             <Space wrap>
               <Button icon={<ReloadOutlined />} onClick={load}>Làm mới</Button>
               <Button icon={<PrinterOutlined />} onClick={() => navigate(`/wms/batch/${batch.batch_id}/label`)}>In tem QR</Button>
+              <Button onClick={() => navigate('/wms/nvl/can-lai')}>Cân lại / DRC</Button>
+              <Button type="primary" onClick={() => navigate('/wms/nvl/xuat/new')} disabled={batch.dry_kg <= 0.005}>Xuất cho sản xuất</Button>
               {batch.weighbridge_ticket_id && <Button onClick={() => navigate(`/wms/weighbridge/${batch.weighbridge_ticket_id}`)}>Phiếu cân gốc</Button>}
             </Space>
           </Col>
         </Row>
 
-        {den_han_can_lai && <Alert type="warning" showIcon message={`Đã ${batch.ngay_tu_lan_do} ngày kể từ lần đo gần nhất (chu kỳ ${settings.chu_ky_can_lai_ngay} ngày) — cân lại và lấy mẫu DRC (chức năng ở GĐ 2).`} />}
+        {den_han_can_lai && <Alert type="warning" showIcon message={`Đã ${batch.ngay_tu_lan_do} ngày kể từ lần đo gần nhất (chu kỳ ${settings.chu_ky_can_lai_ngay} ngày) — cân lại và lấy mẫu DRC.`} action={<Button size="small" onClick={() => navigate('/wms/nvl/can-lai')}>Cân lại</Button>} />}
 
         <Row gutter={[12, 12]}>
           <Col xs={24} md={8}>

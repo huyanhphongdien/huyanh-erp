@@ -9,9 +9,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../../stores/authStore'
 import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot } from '../../../services/wms/mixService'
 import { useMixRole } from '../../../hooks/useMixRole'
-import { rawLotService, type RawLotChen } from '../../../services/wms/rawLotService'
+import { rawLotService, type RawLotBalance, type RawLotChen, type RawLotRun } from '../../../services/wms/rawLotService'
 import { firstName } from '../opsUtil'
-import { FacilitySelect, fmtD, fmtKg, todayLocal, useKhoFacility } from './khoCommon'
+import { FacilitySelect, fmtD, fmtDt, fmtKg, todayLocal, useKhoFacility } from './khoCommon'
 import { I } from './khoMixUtil'
 import './khoMix.css'
 
@@ -35,6 +35,12 @@ export default function KhoMix() {
   const [done, setDone] = useState<MixIssue[]>([])
   const [lots, setLots] = useState<MixLot[]>([])
   const [chenMa, setChenMa] = useState<Map<string, RawLotChen>>(new Map())   // tổng chèn đã nhận theo mã gốc
+  // sổ mã đang chạy (một mã chạy nhiều ca; khai một lần, kết thúc khi xong)
+  const [runs, setRuns] = useState<RawLotRun[]>([])
+  const [maMo, setMaMo] = useState<RawLotBalance[]>([])
+  const [chonMa, setChonMa] = useState(false)
+  const [busyMa, setBusyMa] = useState<string | null>(null)
+  const [msgMa, setMsgMa] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const now = useMemo(() => new Date(), [])
@@ -43,15 +49,17 @@ export default function KhoMix() {
     if (!facilityId) return
     setLoading(true); setErr(null)
     try {
-      const [b, o, t, d, l, c] = await Promise.all([
+      const [b, o, t, d, l, c, r, m] = await Promise.all([
         mixService.balance(facilityId),
         mixService.listIssues({ facilityId, status: ['issued', 'returned', 'submitted', 'qc_confirmed'] }),
         mixService.listIssues({ facilityId, date: todayLocal(), limit: 100 }),
         mixService.listIssues({ facilityId, status: ['received'], limit: 3 }),
         mixService.listLots(facilityId),
         rawLotService.chen(facilityId).catch(() => [] as RawLotChen[]),
+        rawLotService.runs(facilityId).catch(() => [] as RawLotRun[]),
+        rawLotService.list(facilityId).catch(() => [] as RawLotBalance[]),
       ])
-      setBal(b); setOpen(o); setToday(t.filter((x) => x.status !== 'cancelled')); setDone(d); setLots(l); setChenMa(new Map(c.map((x) => [x.ma, x])))
+      setBal(b); setOpen(o); setToday(t.filter((x) => x.status !== 'cancelled')); setDone(d); setLots(l); setChenMa(new Map(c.map((x) => [x.ma, x]))); setRuns(r); setMaMo(m)
     } catch (e: any) { setErr(e?.message || 'Không tải được hàng chèn') }
     finally { setLoading(false) }
   }, [facilityId])
@@ -86,6 +94,19 @@ export default function KhoMix() {
     dayChuyen: curIssued.reduce((s, i) => s + i.kg_out, 0),
   } : null
   const lanKe = (cur?.items.length ?? 0) + 1
+  const maChuaChay = maMo.filter((x) => !runs.some((r) => r.raw_lot_id === x.raw_lot_id)).sort((a, b) => (b.ngay_cuoi ?? '').localeCompare(a.ngay_cuoi ?? '')).slice(0, 8)
+  async function batDau(m: RawLotBalance) {
+    setBusyMa(m.raw_lot_id); setMsgMa(null)
+    try { const r = await rawLotService.batDauChay(m.raw_lot_id); setMsgMa(r.da_chay ? `${r.ma} đã đang chạy rồi` : `Đã khai ${r.ma} bắt đầu chạy`); setChonMa(false); await load() }
+    catch (e: any) { setMsgMa(e?.message || 'Không khai được') }
+    finally { setBusyMa(null) }
+  }
+  async function ketThuc(r: RawLotRun) {
+    setBusyMa(r.id); setMsgMa(null)
+    try { await rawLotService.ketThucChay(r.raw_lot_id); setMsgMa(`${r.ma} đã kết thúc chạy`); await load() }
+    catch (e: any) { setMsgMa(e?.message || 'Không kết thúc được') }
+    finally { setBusyMa(null) }
+  }
   // gom các lần của ca theo MÃ GỐC đang chạy (số L vẫn đếm theo ca)
   const nhomMa = useMemo(() => {
     if (!cur) return []
@@ -117,6 +138,26 @@ export default function KhoMix() {
         <div className="kmx-inner">
           {err && <div className="kmx-msg err">{err}</div>}
           {loading && !open.length && !lots.length && <><div className="kmx-skel" /><div className="kmx-skel" /></>}
+
+          <section className="kmx-card" aria-label="Mã đang chạy" style={{ gap: 8, borderColor: runs.length ? '#E5E7EB' : '#FDE68A' }}>
+            <div className="kmx-row">
+              <span className="kmx-strong" style={{ fontSize: 13 }}>Mã nguyên liệu đang chạy</span>
+              {canTake && <button type="button" className="kmx-pill sm" onClick={() => setChonMa((v) => !v)}>{chonMa ? 'Đóng' : 'Bắt đầu mã…'}</button>}
+            </div>
+            {msgMa && <span className="kmx-sm" style={{ color: '#1B4D3E', fontWeight: 600 }}>{msgMa}</span>}
+            {runs.length ? runs.map((r) => (
+              <div key={r.id} className="kmx-row" style={{ alignItems: 'center' }}>
+                <span className="kmx-col" style={{ gap: 1 }}><span className="kmx-mono" style={{ fontSize: 16, fontWeight: 800, color: '#0D2E25' }}>{r.ma}</span><span className="kmx-sm">chạy từ {fmtDt(r.started_at)}{r.started_name ? ` · ${firstName(r.started_name)}` : ''}</span></span>
+                {canTake && <button type="button" className="kmx-pill sm" disabled={busyMa === r.id} onClick={() => ketThuc(r)}>{busyMa === r.id ? '…' : 'Kết thúc'}</button>}
+              </div>
+            )) : <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Chưa khai mã đang chạy. Khai một lần, mọi ca sau tự theo mã này (phiếu ca, phiếu chèn, lô thành phẩm).</span>}
+            {chonMa && (
+              <div className="kmx-col" style={{ gap: 6 }}>
+                {maChuaChay.length ? <div className="kmx-seg">{maChuaChay.map((m) => <button key={m.raw_lot_id} type="button" disabled={busyMa === m.raw_lot_id} onClick={() => batDau(m)}>{m.ma}</button>)}</div> : <span className="kmx-sm">Không còn mã nào chưa chạy. Mã mới sinh ra khi nhận phiếu cân vào kho.</span>}
+                {runs.length > 0 && <span className="kmx-sm">Chạm mã = chạy chung với mã đang chạy. Muốn thay thế thì bấm Kết thúc mã cũ trước.</span>}
+              </div>
+            )}
+          </section>
 
           {cur && tong ? (
             <section className="kmx-card hero" aria-label="Các lần chèn của ca" style={{ gap: 10 }}>

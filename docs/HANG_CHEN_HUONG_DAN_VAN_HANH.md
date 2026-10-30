@@ -6,7 +6,7 @@ Dành cho QS tại xưởng, QC, thủ kho và chủ doanh nghiệp. Điện tho
 
 | Việc | Ở đâu | Ghi chú |
 |---|---|---|
-| Chạy SQL theo thứ tự p4 → p5 → p6 → p7 → p8 → p9 | Supabase SQL Editor | p4–p7 đã chạy 30/10; **p8** (`wms_mix_p8_sua_can_lay.sql`) và **p9** (`wms_mix_p9_tra_bi_pallet.sql`) chạy tiếp theo thứ tự |
+| Chạy SQL theo thứ tự p4 → p5 → p6 → p7 → p8 → p9 → p10 | Supabase SQL Editor | p4–p7 đã chạy 30/10; **p8** (`wms_mix_p8_sua_can_lay.sql`), **p9** (`wms_mix_p9_tra_bi_pallet.sql`), **p10** (`wms_nvl_p10_ma_dang_chay.sql`) chạy tiếp theo thứ tự |
 | Phân công | Máy tính: Hàng chèn → tab **Phân công** | Bước 1 QS khai báo · Bước 2 QC duyệt (Lê Thành Nhân, Lê Thị Lệ Trinh, chủ DN) · Bước 3 Thủ kho nhận (tạm: chủ DN). Gõ tên → Thêm; Thu để bỏ. BGĐ level ≤ 3 làm được mọi bước |
 | Cỡ bành | Danh mục chủng loại (`weight_per_unit`) | mặc định 35 kg/bành; lô TP / hàng chuẩn lấy cỡ bành của chủng loại |
 | Bì pallet | Không cần cấu hình | lúc lấy chỉ là số tạm (15); **khai chính xác ở lần trả**: dùng hết thì cân pallet rỗng, số trên cân chính là bì |
@@ -29,9 +29,10 @@ Quy tắc: không có số lô thì không nhập được. Lô **DKL** phải b
 
 ## 2. Khai báo mã nguyên liệu đang chạy
 
-- Máy tính: Sản xuất → **Sổ ca ép bành** → phiếu ca của ca đó → ô **Mã nguyên liệu đang chạy**. Đây là nguồn máy dùng để tự gắn mã cho phiếu chèn và lô thành phẩm.
-- Chưa có phiếu ca: lúc lấy đầu ca, thẻ "Chèn vào mã" tự chọn nếu kho chỉ có một mã đang chạy, còn lại QS chạm chọn (chọn được nhiều mã nếu ca chạy chung, kg chia đều khi gom).
-- Mã "Đang chạy" ở tab Lô NVL bật khi kho đã xuất NVL của mã đó bằng lệnh xuất theo mã.
+- **Khai một lần, không chọn trên từng phiếu ca:** điện thoại tab Chèn, thẻ đầu **"Mã nguyên liệu đang chạy"** → Bắt đầu mã… → chạm mã. Mã chạy nhiều ngày, nhiều ca thì vẫn một dòng; xong thì bấm **Kết thúc**. Chạy chung hai mã thì bắt đầu cả hai.
+- Từ đó phiếu ca mới (sổ ca ép bành), phiếu chèn và lô thành phẩm tự gắn mã đang chạy; ô mã trên sổ ca vẫn đổi được nếu ca đó chạy khác.
+- Hai mã cùng chạy: phiếu ca mới không tự điền (chọn tay), phiếu chèn gắn cả hai (kg chia đều khi gom).
+- Chip "Đang chạy" ở tab Lô NVL theo sổ này.
 
 ## 3. Lấy hàng chèn — mỗi pallet một lần (QS)
 
@@ -92,4 +93,4 @@ Nhiều phiếu một ca: thẻ đầu trang **"Ký tất cả N phiếu · ngà
 - Bì pallet: lúc lấy tạm, lúc trả chính xác; máy tự tính lại kg lấy theo bì lúc trả.
 - 2 ảnh lúc lấy và 2 ảnh lúc trả luôn bắt buộc, kể cả dùng hết (ảnh pallet rỗng trên cân là bằng chứng bì).
 - Kho chèn, sổ ca, gom theo mã chỉ thay đổi ở bước thủ kho nhận.
-- Chi tiết kiểm thử từng màn: `docs/HANG_CHEN_TEST_TU_DAU_TOI_CUOI.md` (mục 14–21).
+- Chi tiết kiểm thử từng màn: `docs/HANG_CHEN_TEST_TU_DAU_TOI_CUOI.md` (mục 14–22).

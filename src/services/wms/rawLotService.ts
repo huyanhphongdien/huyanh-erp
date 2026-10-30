@@ -39,8 +39,13 @@ export interface RawLotBalance {
   xuat_sx_kho_kg: number | null
   dieu_chinh_kho_kg: number | null
   trang_thai: RawLotTrangThai
+  /** đang chạy theo sổ mã đang chạy từ lúc nào (null = không ghi sổ) */
+  dang_chay_tu: string | null
   created_at: string
 }
+
+/** Sổ mã đang chạy (v_raw_lot_runs): một dòng cho mỗi đợt chạy, ended_at null = đang chạy */
+export interface RawLotRun { id: string; facility_id: string; raw_lot_id: string; ma: string; nguon: string; started_at: string; ended_at: string | null; note: string | null; started_name: string | null; ended_name: string | null; dang_chay: boolean }
 
 export interface MaGoiY { ticket_id: string; ma_goc: string | null; ma: string | null; nguon: string | null; so: number | null; xe: string | null; raw_lot_id: string | null; raw_lot_status: string | null }
 export interface MaParse { ma: string; nguon: string; so: number | null; xe: string | null }
@@ -85,6 +90,30 @@ export const rawLotService = {
     const { data, error } = await supabase.from('v_raw_lot_balance').select('*').eq('raw_lot_id', id).maybeSingle()
     if (error) throw error
     return data ? normLot(data) : null
+  },
+
+  /** Sổ mã đang chạy của nhà máy (mặc định chỉ dòng đang chạy) */
+  async runs(facilityId: string, opts: { all?: boolean; limit?: number } = {}): Promise<RawLotRun[]> {
+    let q = supabase.from('v_raw_lot_runs').select('*').eq('facility_id', facilityId).order('started_at', { ascending: false }).limit(opts.limit ?? 50)
+    if (!opts.all) q = q.is('ended_at', null)
+    const { data, error } = await q
+    if (error) throw error
+    return ((data ?? []) as any[]).map((r) => ({ ...r, dang_chay: !!r.dang_chay }))
+  },
+  /** id các mã đang chạy lúc này */
+  async dangChay(facilityId: string): Promise<string[]> {
+    return (await this.runs(facilityId)).map((r) => r.raw_lot_id)
+  },
+  /** Khai mã bắt đầu chạy; thayThe = kết thúc các mã khác đang chạy */
+  async batDauChay(rawLotId: string, thayThe = false, note?: string | null): Promise<{ ma: string; da_chay: boolean }> {
+    const { data, error } = await supabase.rpc('fn_nvl_bat_dau_chay', { p_raw_lot_id: rawLotId, p_thay_the: thayThe, p_note: note ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    const d: any = data ?? {}
+    return { ma: String(d.ma ?? ''), da_chay: !!d.da_chay }
+  },
+  async ketThucChay(rawLotId: string, note?: string | null): Promise<void> {
+    const { error } = await supabase.rpc('fn_nvl_ket_thuc_chay', { p_raw_lot_id: rawLotId, p_note: note ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
   },
 
   /** Chuẩn hoá chữ gõ → mã (gọi DB để dùng chung bảng bí danh) */

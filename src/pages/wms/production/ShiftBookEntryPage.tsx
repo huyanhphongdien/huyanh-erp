@@ -109,6 +109,11 @@ export default function ShiftBookEntryPage() {
   const [rawLotId, setRawLotId] = useState<string | undefined>(undefined)
   const [rawLots, setRawLots] = useState<RawLotBalance[]>([])
   useEffect(() => { if (facilityId) rawLotService.list(facilityId, { includeClosed: true }).then(setRawLots).catch(() => setRawLots([])) }, [facilityId])
+  // GĐ6b: phiếu mới tự theo sổ mã đang chạy (đúng một mã) — người dùng vẫn đổi được
+  useEffect(() => {
+    if (!facilityId || (id && id !== 'new')) return
+    rawLotService.dangChay(facilityId).then((ids) => { if (ids.length === 1) setRawLotId((cur) => cur ?? ids[0]) }).catch(() => { /* bỏ qua */ })
+  }, [facilityId, id])
   const [soNguoi, setSoNguoi] = useState<number | null>(null)
   const [suCo, setSuCo] = useState<string>('')
 
@@ -555,7 +560,7 @@ export default function ShiftBookEntryPage() {
             />
           </Col>
           <Col xs={24} md={5}>
-            <Text type="secondary" style={{ fontSize: 12 }}>Mã nguyên liệu đang chạy</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>Mã nguyên liệu · tự theo sổ mã đang chạy</Text>
             <Select
               value={rawLotId} onChange={(v) => { setRawLotId(v); setDirty(true) }} disabled={daKhoa} allowClear showSearch optionFilterProp="label"
               placeholder="TMHG-40…" style={{ width: '100%' }}

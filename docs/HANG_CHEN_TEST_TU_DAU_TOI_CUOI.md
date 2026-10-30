@@ -282,6 +282,19 @@ Quy trình chốt 30/10: **Bước 1 QS khai báo** (nhập lô chèn, lấy đ�
 | 21.6 | Ký khai báo khi thiếu ảnh trả dù trả 0 kg | báo thiếu ảnh (THIEU_ANH), không ký được |
 | 21.7 | Máy tính /wms/chen/phieu/:id | ô "Dùng hết · cân pallet rỗng" + cân pallet rỗng, hoặc hàng + pallet · bì · kg trả tự tính; dòng "Kg lấy tính lại · trả · tiêu hao" |
 
+## 22. Sổ mã đang chạy (sau SQL `wms_nvl_p10_ma_dang_chay.sql`, chạy SAU p9, 30/10)
+
+| # | Việc | Kỳ vọng |
+|---|---|---|
+| 22.1 | Chạy SQL → kiểm chứng | 4 hàm/view khác null, `trg_phieu_ca` = 1, `cot_dang_chay_tu` = 1 |
+| 22.2 | Điện thoại tab Chèn, thẻ đầu "Mã nguyên liệu đang chạy" | chưa khai → chữ vàng; bấm **Bắt đầu mã…** → chạm TMHG-40 → "Đã khai TMHG-40 bắt đầu chạy · chạy từ ngày giờ · ai" |
+| 22.3 | Tab Lô NVL | thẻ TMHG-40 chip **Đang chạy** dù chưa xuất NVL |
+| 22.4 | Máy tính Sổ ca ép bành → tạo phiếu ca mới | ô "Mã nguyên liệu · tự theo sổ mã đang chạy" đã điền TMHG-40; đổi được |
+| 22.5 | Lấy đầu ca (không có phiếu ca) | chip TMHG-40 tự sáng "mã đang chạy"; thủ kho nhận → phiếu gắn TMHG-40 |
+| 22.6 | Thêm lô thành phẩm không chọn mã | lô gắn TMHG-40 |
+| 22.7 | Bắt đầu mã thứ hai | hai mã cùng "đang chạy"; phiếu ca mới không tự điền (vì không rõ), phiếu chèn tự gắn cả hai (chèn chung); chạm Kết thúc một mã để còn một |
+| 22.8 | Kết thúc mã | chip về Sẵn sàng / Đã chạy xong tùy tồn; phiếu đã gắn mã không đổi |
+
 ## Lỗi hay gặp
 
 | Màn hình báo | Nguyên nhân | Làm gì |

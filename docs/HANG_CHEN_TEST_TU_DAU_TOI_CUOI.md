@@ -145,6 +145,22 @@ SELECT fn_mix_don_anh_mo_coi();   -- 0 vì đã xóa hết ở trên
 
 Ảnh trong bucket `raw-photos` vẫn còn trên Storage, không ảnh hưởng gì; xóa tay trong Supabase → Storage nếu muốn.
 
+## 12. Khép vòng (sau SQL `wms_khep_vong_p1.sql`, 30/10)
+
+| # | Việc | Kỳ vọng |
+|---|---|---|
+| 12.1 | Sổ ca ép bành (máy tính) → tạo phiếu ca hôm nay, Ca 1, ô **Lệnh sản xuất** chọn 1 lệnh đang mở → lưu nháp | phiếu ca lưu được, mở lại vẫn thấy lệnh SX |
+| 12.2 | Điện thoại → Hàng chèn → Kho chèn → **Nhập lô chèn** → chọn **Hàng chuẩn** → chạm một chủng loại còn trong kho TP → gõ 70 kg | máy báo "= 2 bành × 35 kg = 70 kg"; ca tự nhận; bấm chuyển |
+| 12.3 | Kỳ vọng sau 12.2 | kho chèn có lô `std` 70 kg; phiếu ca nháp của ca đó có dòng chủng loại ấy **xuất 2 bành**, note "Chuyển 2 bành sang kho chèn"; nếu phiếu ca chưa mở → báo "Tổ chưa mở phiếu ca của ca này" |
+| 12.4 | Nhập lô chèn → **Hàng lỗi** → tab "Từ sổ ca" | liệt kê dòng LOI của các phiếu ca đã ký 3 bước, kg chưa chuyển; chạm → kg mặc định = phần chưa chuyển → chuyển; chạm lại dòng đó lần nữa phải thấy "đã chuyển" giảm phần còn lại |
+| 12.5 | Nhập lô chèn → Hàng lỗi → tab "Từ sổ QC" | dòng sổ QC hàng không đạt; chạm, gõ kg, chuyển → dòng đó chuyển sang chip "đã chuyển CH-…" |
+| 12.6 | Phiếu bàn giao (bước 7 ở trên) → **Trả cuối ca** | có thêm thẻ "Ca nhận bàn giao · bắt buộc" tự nhận theo chấm công; chưa chọn ca thì nút trả mờ |
+| 12.7 | Kho chèn → lô bất kỳ → **Kiểm kê lô này** → gõ số lệch 20 kg | bắt chọn lý do; ghi xong sổ chuyển động có dòng "Kiểm kê" đỏ, tồn lô = số cân thực |
+| 12.8 | Kiểm kê NVL (điện thoại hoặc máy tính) khi còn phiếu cân sẵn sàng chưa nhập | báo "Còn N phiếu cân sẵn sàng chưa nhập kho", có nút "Vẫn tạo" |
+| 12.9 | Máy tính → Kho NVL mủ → tab **Cân đối & hao hụt** | bảng "Cân đối NVL khô → thành phẩm theo ngày" có số NVL xuất SX, chèn tiêu hao, TP đạt, LOI/DKL, hao hụt, hiệu suất % |
+| 12.10 | Máy tính → Lệnh sản xuất có dòng NVL từ lệnh xuất → **Bắt đầu sản xuất** | không còn báo "không đủ NVL"; lệnh sang Đang sản xuất |
+| 12.11 | Thử sửa tay một lô NVL ở trang vật tư cũ `/wms/vat-tu` (xuất kho / kiểm kho) | báo "Lô NVL chỉ sửa được qua sổ kho" |
+
 ## Lỗi hay gặp
 
 | Màn hình báo | Nguyên nhân | Làm gì |

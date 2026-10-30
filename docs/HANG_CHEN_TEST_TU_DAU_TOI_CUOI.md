@@ -241,6 +241,15 @@ Quy trình chốt 30/10: **Bước 1 QS khai báo** (nhập lô chèn, lấy đ�
 | 17.8 | Đăng nhập người ở bước `nhan_kho` (tạm: chủ DN) → Chờ ký | nút "Nhận · trừ kho chèn"; ký cả ca → kho chèn trừ, sổ ca dòng CHÈN điền tổng |
 | 17.9 | Nhãn | phiếu: "Chờ QS ký / Chờ QC duyệt / Chờ thủ kho nhận / Đã nhận"; máy tính Steps: QS ký khai báo → QC duyệt → Thủ kho nhận |
 
+## 18. Số lần chèn trong ca (L1, L2…) — không cần SQL, 30/10
+
+| # | Việc | Kỳ vọng |
+|---|---|---|
+| 18.1 | Trang chính /m/kho/chen khi ca đã có phiếu | thẻ "Ca này · đã chèn n lần": 3 ô Đã lấy / Dây chuyền / Tiêu hao, rồi từng dòng **L1, L2…** (bành · số lô · bể/máy · cả pallet − bì = kg · trạng thái); lần còn ở dây chuyền có nút **Trả L2** riêng; nút chính **Lấy lần n+1** |
+| 18.2 | Lấy đầu ca | tiêu đề "Lấy lần 3 · ca · tổ"; màn chọn lô có thẻ xám liệt kê L1, L2 đã lấy (kg, cả pallet − bì) để đối chiếu sổ; màn xong "Đã ghi lần 3", nút "Lấy lần 4" |
+| 18.3 | Mở phiếu | tiêu đề "Trả lần 2" / "Lần 2 · PC-… · ca" |
+| 18.4 | Kho chèn trên trang chính | mỗi lô hiện số lô to, mã CH nhỏ, "kg · N b" |
+
 ## Lỗi hay gặp
 
 | Màn hình báo | Nguyên nhân | Làm gì |

@@ -43,6 +43,7 @@ export default function KhoMixIssue() {
   const [maList, setMaList] = useState<RawLotBalance[] | null>(null)
   const [maChon, setMaChon] = useState<string[]>([])
   const [doiMa, setDoiMa] = useState(false)
+  const [lan, setLan] = useState<number | null>(null)   // lần chèn thứ mấy trong ca
   const [viTriChon, setViTriChon] = useState<MixViTri | null>(null)
   const [handover, setHandover] = useState(false)
   const [note, setNote] = useState('')
@@ -69,6 +70,9 @@ export default function KhoMixIssue() {
       if (!x) { setErr('Không tìm thấy phiếu'); return }
       const [a, b, s] = await Promise.all([rawPhotoService.list('mix_issue_out', x.id), rawPhotoService.list('mix_issue_return', x.id), rawSettingsService.getForFacility(x.facility_id)])
       setI(x); setPOut(a); setPRet(b); setSettings(s)
+      mixService.listIssues({ facilityId: x.facility_id, date: x.shift_date, limit: 100 })
+        .then((list) => { const same = list.filter((y) => y.status !== 'cancelled' && y.shift_id === x.shift_id).sort((p, q) => p.out_at.localeCompare(q.out_at)); const k = same.findIndex((y) => y.id === x.id); setLan(k >= 0 ? k + 1 : null) })
+        .catch(() => { /* bỏ qua */ })
     } catch (e: any) { setErr(e?.message || 'Không tải được phiếu') }
   }, [id])
   useEffect(() => { load() }, [load])
@@ -181,7 +185,7 @@ export default function KhoMixIssue() {
       <div className="kmx">
         <header className="kmx-hd">
           <button type="button" className="kmx-back" aria-label="Về trang chính" onClick={() => nav('/m/kho/chen')}>{I.back}</button>
-          <div className="kmx-hd-txt"><span className="kmx-eyebrow">{i.code} · {caTo}</span><span className="kmx-title">Trả cuối ca</span></div>
+          <div className="kmx-hd-txt"><span className="kmx-eyebrow">{lan ? `Lần ${lan} · ` : ''}{i.code} · {caTo}</span><span className="kmx-title">{lan ? `Trả lần ${lan}` : 'Trả cuối ca'}</span></div>
         </header>
         <div className="kmx-body"><div className="kmx-inner">
           {msg && <div className={`kmx-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>}
@@ -291,7 +295,7 @@ export default function KhoMixIssue() {
     <div className="kmx">
       <header className="kmx-hd">
         <button type="button" className="kmx-back" aria-label="Về trang chính" onClick={() => nav('/m/kho/chen')}>{I.back}</button>
-        <div className="kmx-hd-txt"><span className="kmx-eyebrow">Phiếu chèn · {caTo}</span><span className="kmx-title kmx-mono" style={{ fontSize: 19 }}>{i.code}</span></div>
+        <div className="kmx-hd-txt"><span className="kmx-eyebrow">{lan ? `Lần ${lan} · ` : 'Phiếu chèn · '}{caTo}</span><span className="kmx-title kmx-mono" style={{ fontSize: 19 }}>{i.code}</span></div>
         <span className={`kmx-chip ${chip.cls}`} style={{ flex: '0 0 auto' }}>{chip.text}</span>
       </header>
       <div className="kmx-body"><div className="kmx-inner">

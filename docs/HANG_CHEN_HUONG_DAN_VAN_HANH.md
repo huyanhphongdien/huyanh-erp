@@ -48,9 +48,10 @@ Trang chính tab Chèn → nút **Lấy lần n** (máy đếm theo ca).
 
 ## 4. Trả cuối ca (QS)
 
-Trang chính, dòng **L1 · Trả L1** (từng lần có nút riêng). Bì pallet khai ở bước này mới là số chính xác.
-- **Dùng hết** (mặc định): đặt pallet rỗng lên cân, gõ số trên cân → đó là bì; trả 0 kg. Máy tính lại kg lấy = cân tổng lúc lấy − bì. Chụp 2 ảnh pallet rỗng trên cân → **Ghi trả và ký khai báo** (một chạm = ghi trả + chữ ký bước 1).
-- **Còn hàng dư:** gõ bì pallet chính xác và số trên cân "Hàng trả + pallet" → kg trả = cân − bì, kg lấy cũng tính lại theo bì này. Chụp 2 ảnh phần trả, rồi ghi và ký.
+Trang chính, dòng **L1 · Trả L1** (từng lần có nút riêng). Lần trả nhập đúng 2 số:
+1. **Khối lượng pallet (kg):** cân pallet rỗng rồi gõ; mặc định 15.
+2. **Hàng trả + pallet:** số trên cân khi trả. Dùng hết thì bấm nút **"Dùng hết · chỉ còn pallet"** (máy điền số cân bằng bì → hàng trả 0 kg).
+Máy tính: hàng trả = cân − bì; kg lấy = cân tổng lúc lấy − bì; tiêu hao = kg lấy − hàng trả. Chụp 2 ảnh (pallet rỗng nếu dùng hết) → **Ghi trả và ký khai báo** (một chạm = ghi trả + chữ ký bước 1).
 - Để phần dư lại dây chuyền cho ca sau: tick "Để lại dây chuyền cho ca sau" (máy tự mở phiếu lấy cho ca kế khi thủ kho nhận; ca kế phải chọn ca khi trả).
 
 Tiêu hao = cân lúc lấy − cân lúc trả (bì triệt tiêu). Kho chèn chỉ trừ khi thủ kho nhận.

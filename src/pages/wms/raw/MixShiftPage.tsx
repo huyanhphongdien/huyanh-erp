@@ -246,12 +246,12 @@ export default function MixShiftPage() {
             summary={() => maRows.length ? (
               <Table.Summary fixed>
                 <Table.Summary.Row style={{ background: '#F6FBF8' }}>
-                  <Table.Summary.Cell index={0} colSpan={luyKeIdx - 2}><Text strong>Tổng {tongMa.lan} lần · {tongMa.ca.size} ca</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={luyKeIdx - 2} align="right"><Text strong>{fmtKg(tongMa.lay)}</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={luyKeIdx - 1} align="right"><Text strong>{fmtKg(tongMa.tra)}</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={luyKeIdx} align="right"><Text strong style={{ color: '#1B4D3E' }}>{fmtKg(tongMa.tieuHao)}</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={luyKeIdx + 1} align="right"><Text type="secondary">lũy kế</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={luyKeIdx + 2} colSpan={3} />
+                  <Table.Summary.Cell index={0} colSpan={luyKeIdx - 3}><Text strong>Tổng {tongMa.lan} lần · {tongMa.ca.size} ca</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={luyKeIdx - 3} align="right"><Text strong>{fmtKg(tongMa.lay)}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={luyKeIdx - 2} align="right"><Text strong>{fmtKg(tongMa.tra)}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={luyKeIdx - 1} align="right"><Text strong style={{ color: '#1B4D3E' }}>{fmtKg(tongMa.tieuHao)}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={luyKeIdx} align="right"><Text type="secondary">{fmtKg(tongMa.tieuHao)}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={luyKeIdx + 1} colSpan={3} />
                 </Table.Summary.Row>
               </Table.Summary>
             ) : null} />

@@ -8,7 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Alert, Button, Card, Checkbox, Col, Descriptions, Input, InputNumber, Modal, Row, Select, Space, Steps, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined, CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons'
 import RawPhotoTiles from '../../../components/wms/RawPhotoTiles'
-import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, type MixIssue, type ShiftLite } from '../../../services/wms/mixService'
+import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue, type ShiftLite } from '../../../services/wms/mixService'
 import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
@@ -137,6 +137,10 @@ export default function MixIssueDetailPage() {
                 <Descriptions.Item label="Tổ">{issue.team || '—'}</Descriptions.Item>
                 <Descriptions.Item label="Mục đích">{MIX_PURPOSE_LABELS[issue.purpose]}{issue.target_index ? ` · ${issue.target_index} → ${issue.target_value ?? ''}` : ''}</Descriptions.Item>
                 <Descriptions.Item label="Lệnh SX">{issue.production_code || '—'}</Descriptions.Item>
+                <Descriptions.Item label="Chèn vào">{issue.vi_tri ? <Tag color={issue.vi_tri === 'be_slap' ? 'cyan' : 'purple'}>Chèn {MIX_VI_TRI_LABELS[issue.vi_tri]}</Tag> : <Text type="secondary">—</Text>}</Descriptions.Item>
+                <Descriptions.Item label="Mã NVL gốc">{issue.ma_goc_all ? <Tag color="geekblue">{issue.ma_goc_all}</Tag> : <Text type="secondary">chưa gắn · lấy theo phiếu ca khi thủ kho nhận</Text>}</Descriptions.Item>
+                {(issue.so_banh !== null || issue.gross_kg !== null) && <Descriptions.Item label="Cân lúc lấy">{issue.so_banh !== null ? `${issue.so_banh} bành` : ''}{issue.gross_kg !== null ? `${issue.so_banh !== null ? ' · ' : ''}cả pallet ${fmtKg(issue.gross_kg, 1)} − bì ${fmtKg(issue.pallet_kg ?? 0, 1)} kg` : ''}</Descriptions.Item>}
+                {(issue.so_banh_tra !== null || issue.return_gross_kg !== null) && <Descriptions.Item label="Cân lúc trả">{issue.so_banh_tra !== null ? `còn ${issue.so_banh_tra} bành` : ''}{issue.return_gross_kg !== null ? `${issue.so_banh_tra !== null ? ' · ' : ''}cả pallet ${fmtKg(issue.return_gross_kg, 1)} − bì ${fmtKg(issue.return_pallet_kg ?? 0, 1)} kg` : ''}</Descriptions.Item>}
                 <Descriptions.Item label="Chỉ số lô">Po {issue.po ?? '—'} · Mooney {issue.mooney ?? '—'} · PRI {issue.pri ?? '—'}</Descriptions.Item>
                 <Descriptions.Item label="Tiêu hao">
                   <Text strong style={{ fontSize: 18 }}>{fmtKg(issue.kg_used)} kg</Text>

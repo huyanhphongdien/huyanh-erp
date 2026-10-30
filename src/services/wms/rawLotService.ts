@@ -51,6 +51,20 @@ export interface RawLotYield {
   so_ca: number; tp_dat_kg: number; loi_dkl_kg: number; chen_tieu_hao_kg: number; hieu_suat_pct: number | null; ty_le_loi_pct: number | null
 }
 
+/** Hàng chèn đã vào từng mã gốc (v_raw_lot_chen): chỉ phiếu thủ kho đã nhận; phiếu chèn chung nhiều mã thì kg chia đều */
+export interface RawLotChenChiTiet { lot_code: string; vi_tri: 'be_slap' | 'may_mix' | null; source_type: string; grade: string | null; desc: string | null; kg: number; so_banh: number | null; so_phieu: number; co_chung: boolean }
+export interface RawLotChen {
+  raw_lot_id: string; facility_id: string; ma: string; rubber_type_name: string; trang_thai: RawLotTrangThai; xuat_sx_kho_kg: number | null
+  chen_kg: number; so_phieu_chen: number; so_banh_chen: number; chen_be_kg: number; chen_mix_kg: number; chen_loi_kg: number; chen_dkl_kg: number; chen_chuan_kg: number; chen_khac_kg: number; ty_le_chen_pct: number | null
+  chi_tiet: RawLotChenChiTiet[]
+}
+
+const normChen = (r: any): RawLotChen => ({
+  ...r, xuat_sx_kho_kg: numOrNull(r.xuat_sx_kho_kg), chen_kg: num(r.chen_kg), so_phieu_chen: num(r.so_phieu_chen), so_banh_chen: num(r.so_banh_chen),
+  chen_be_kg: num(r.chen_be_kg), chen_mix_kg: num(r.chen_mix_kg), chen_loi_kg: num(r.chen_loi_kg), chen_dkl_kg: num(r.chen_dkl_kg), chen_chuan_kg: num(r.chen_chuan_kg), chen_khac_kg: num(r.chen_khac_kg), ty_le_chen_pct: numOrNull(r.ty_le_chen_pct),
+  chi_tiet: (Array.isArray(r.chi_tiet) ? r.chi_tiet : []).map((d: any) => ({ ...d, kg: num(d.kg), so_banh: numOrNull(d.so_banh), so_phieu: num(d.so_phieu), co_chung: !!d.co_chung })),
+})
+
 const normLot = (r: any): RawLotBalance => ({
   ...r, so: numOrNull(r.so), so_xe: num(r.so_xe), so_xe_con_hang: num(r.so_xe_con_hang), wet_kg: num(r.wet_kg), dry_kg: num(r.dry_kg), drc_pct: numOrNull(r.drc_pct),
   tuoi_ngay: numOrNull(r.tuoi_ngay), ngay_tu_lan_do_max: numOrNull(r.ngay_tu_lan_do_max), nhap_kho_kg: numOrNull(r.nhap_kho_kg), xuat_sx_kho_kg: numOrNull(r.xuat_sx_kho_kg), dieu_chinh_kho_kg: numOrNull(r.dieu_chinh_kho_kg),
@@ -130,6 +144,22 @@ export const rawLotService = {
     if (error) throw new Error(dichLoiNhapKho(error))
     const d: any = data ?? {}
     return { code: String(d.code ?? ''), so_dong: num(d.so_dong), tong_wet_kg: num(d.tong_wet_kg), ton_truoc_kg: num(d.ton_truoc_kg) }
+  },
+
+  /** Chèn gom theo mã gốc (kg, số bành, theo loại lô chèn, % chèn, chi tiết từng lô); mặc định chỉ mã đã có chèn */
+  async chen(facilityId: string, opts: { all?: boolean } = {}): Promise<RawLotChen[]> {
+    let q = supabase.from('v_raw_lot_chen').select('*').eq('facility_id', facilityId).order('chen_kg', { ascending: false })
+    if (!opts.all) q = q.gt('chen_kg', 0)
+    const { data, error } = await q
+    if (error) throw error
+    return ((data ?? []) as any[]).map(normChen)
+  },
+
+  /** Mã có thể chèn vào: đang mở, ưu tiên đang chạy rồi sẵn sàng */
+  async maDangChay(facilityId: string): Promise<RawLotBalance[]> {
+    const l = await this.list(facilityId)
+    const rank: Record<string, number> = { dang_chay: 0, san_sang: 1, da_chay_xong: 2 }
+    return l.filter((x) => x.trang_thai in rank).sort((a, b) => rank[a.trang_thai] - rank[b.trang_thai] || (b.ngay_cuoi ?? '').localeCompare(a.ngay_cuoi ?? ''))
   },
 
   async yield(facilityId: string, limit = 60): Promise<RawLotYield[]> {

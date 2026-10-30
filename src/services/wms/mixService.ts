@@ -85,6 +85,17 @@ export interface MixIssue {
   kg_used: number | null
   handover_to_next: boolean
   handover_from_issue_id: string | null
+  raw_lot_id: string | null
+  raw_lot_ids: string[] | null
+  vi_tri: MixViTri | null
+  ma_goc: string | null
+  ma_goc_all: string | null
+  so_banh: number | null
+  gross_kg: number | null
+  pallet_kg: number | null
+  so_banh_tra: number | null
+  return_gross_kg: number | null
+  return_pallet_kg: number | null
   production_order_id: string | null
   production_code: string | null
   output_batch_id: string | null
@@ -103,6 +114,10 @@ export interface MixIssue {
   thieu_anh: string | null
   created_at: string
 }
+
+/** Vị trí chèn: chèn bể slap hay chèn máy mix (sổ tay tổ ép có 2 bảng riêng) */
+export type MixViTri = 'be_slap' | 'may_mix'
+export const MIX_VI_TRI_LABELS: Record<MixViTri, string> = { be_slap: 'Bể Slap', may_mix: 'Máy Mix' }
 
 export interface MixBalance {
   facility_id: string
@@ -153,6 +168,9 @@ const normIssue = (r: any): MixIssue => ({
   ...r, po: numOrNull(r.po), mooney: numOrNull(r.mooney), pri: numOrNull(r.pri), target_value: numOrNull(r.target_value),
   kg_out: num(r.kg_out), kg_return: numOrNull(r.kg_return), kg_used: numOrNull(r.kg_used), handover_to_next: !!r.handover_to_next,
   so_anh_lay: num(r.so_anh_lay), so_anh_tra: num(r.so_anh_tra),
+  so_banh: numOrNull(r.so_banh), gross_kg: numOrNull(r.gross_kg), pallet_kg: numOrNull(r.pallet_kg),
+  so_banh_tra: numOrNull(r.so_banh_tra), return_gross_kg: numOrNull(r.return_gross_kg), return_pallet_kg: numOrNull(r.return_pallet_kg),
+  raw_lot_ids: Array.isArray(r.raw_lot_ids) ? r.raw_lot_ids : null, ma_goc: r.ma_goc ?? null, ma_goc_all: r.ma_goc_all ?? null,
 })
 
 export const mixService = {
@@ -215,11 +233,20 @@ export const mixService = {
     return data ? normIssue(data) : null
   },
 
-  async lay(input: { id?: string | null; lotId: string; kg: number; shiftDate?: string | null; shiftId?: string | null; team?: string | null; purpose: MixPurpose; targetIndex?: string | null; targetValue?: number | null; productionOrderId?: string | null; note?: string | null }): Promise<string> {
+  /**
+   * Lấy đầu ca theo sổ tay tổ ép: một phiếu = một pallet (số bành, cân cả pallet, bì pallet → kg hàng chèn = cân − bì)
+   * và mang mã nguyên liệu gốc đang chạy (một hay nhiều mã, ví dụ KHMN-15 + 17). Không có mã → máy lấy theo phiếu ca.
+   */
+  async lay(input: {
+    id?: string | null; lotId: string; kg: number | null; shiftDate?: string | null; shiftId?: string | null; team?: string | null; purpose: MixPurpose
+    targetIndex?: string | null; targetValue?: number | null; productionOrderId?: string | null; note?: string | null
+    rawLotIds?: string[] | null; soBanh?: number | null; grossKg?: number | null; palletKg?: number | null; viTri?: MixViTri | null
+  }): Promise<string> {
     const { data, error } = await supabase.rpc('fn_mix_lay', {
-      p_lot_id: input.lotId, p_kg: input.kg, p_shift_date: input.shiftDate ?? null, p_shift_id: input.shiftId ?? null, p_team: input.team ?? null,
+      p_lot_id: input.lotId, p_kg: input.kg ?? null, p_shift_date: input.shiftDate ?? null, p_shift_id: input.shiftId ?? null, p_team: input.team ?? null,
       p_purpose: input.purpose, p_target_index: input.targetIndex ?? null, p_target_value: input.targetValue ?? null,
       p_production_order_id: input.productionOrderId ?? null, p_note: input.note ?? null, p_id: input.id ?? null,
+      p_raw_lot_ids: input.rawLotIds?.length ? input.rawLotIds : null, p_so_banh: input.soBanh ?? null, p_gross_kg: input.grossKg ?? null, p_pallet_kg: input.palletKg ?? null, p_vi_tri: input.viTri ?? null,
     })
     if (error) throw new Error(dichLoiNhapKho(error))
     return String(data)
@@ -239,10 +266,20 @@ export const mixService = {
     return [...count.entries()].sort((x, y) => y[1] - x[1]).map(([n]) => n).slice(0, 6)
   },
 
-  async tra(issueId: string, kgReturn: number, handover: boolean, note?: string | null, outputBatchId?: string | null, shiftId?: string | null, team?: string | null): Promise<{ kg_used: number }> {
-    const { data, error } = await supabase.rpc('fn_mix_tra', { p_issue_id: issueId, p_kg_return: kgReturn, p_handover: handover, p_note: note ?? null, p_output_batch_id: outputBatchId ?? null, p_shift_id: shiftId ?? null, p_team: team ?? null })
+  async tra(issueId: string, kgReturn: number, handover: boolean, note?: string | null, outputBatchId?: string | null, shiftId?: string | null, team?: string | null,
+    can?: { grossKg?: number | null; palletKg?: number | null; soBanhTra?: number | null } | null): Promise<{ kg_used: number }> {
+    const { data, error } = await supabase.rpc('fn_mix_tra', {
+      p_issue_id: issueId, p_kg_return: kgReturn, p_handover: handover, p_note: note ?? null, p_output_batch_id: outputBatchId ?? null, p_shift_id: shiftId ?? null, p_team: team ?? null,
+      p_gross_kg: can?.grossKg ?? null, p_pallet_kg: can?.palletKg ?? null, p_so_banh_tra: can?.soBanhTra ?? null,
+    })
     if (error) throw new Error(dichLoiNhapKho(error))
     return { kg_used: num((data as any)?.kg_used) }
+  },
+
+  /** Đổi mã nguyên liệu gốc của phiếu chèn (một hay nhiều mã; rỗng = bỏ, máy lấy theo phiếu ca) — trước khi thủ kho nhận */
+  async doiMaGoc(issueId: string, rawLotIds: string[], viTri?: MixViTri | null): Promise<void> {
+    const { error } = await supabase.rpc('fn_mix_doi_ma_goc', { p_issue_id: issueId, p_raw_lot_ids: rawLotIds.length ? rawLotIds : null, p_vi_tri: viTri ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
   },
 
   async ky(issueId: string, buoc: 'submit' | 'qc_confirm' | 'receive' | 'cancel', note?: string | null): Promise<{ next_issue_id: string | null }> {

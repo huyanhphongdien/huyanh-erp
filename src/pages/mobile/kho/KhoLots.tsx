@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { rawStockService, type RawBatchBalance } from '../../../services/wms/rawStockService'
-import { rawLotService, RAW_LOT_TRANG_THAI_CHIP, RAW_LOT_TRANG_THAI_LABELS, type RawLotBalance } from '../../../services/wms/rawLotService'
+import { rawLotService, RAW_LOT_TRANG_THAI_CHIP, RAW_LOT_TRANG_THAI_LABELS, type RawLotBalance, type RawLotChen } from '../../../services/wms/rawLotService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
@@ -18,6 +18,7 @@ export default function KhoLots() {
   const role = useRawRole(facilityId)
   const [lots, setLots] = useState<RawLotBalance[]>([])
   const [rows, setRows] = useState<RawBatchBalance[]>([])
+  const [chen, setChen] = useState<Map<string, RawLotChen>>(new Map())
   const [settings, setSettings] = useState<RawSettings>(RAW_SETTINGS_DEFAULT)
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<'all' | 'due' | 'done'>('all')
@@ -31,8 +32,8 @@ export default function KhoLots() {
     if (!facilityId) return
     setLoading(true)
     try {
-      const [l, b, s] = await Promise.all([rawLotService.list(facilityId, { includeClosed: true }), rawStockService.getBatches({ facilityId, limit: 1000 }), rawSettingsService.getForFacility(facilityId)])
-      setLots(l); setRows(b); setSettings(s)
+      const [l, b, s, c] = await Promise.all([rawLotService.list(facilityId, { includeClosed: true }), rawStockService.getBatches({ facilityId, limit: 1000 }), rawSettingsService.getForFacility(facilityId), rawLotService.chen(facilityId).catch(() => [] as RawLotChen[])])
+      setLots(l); setRows(b); setSettings(s); setChen(new Map(c.map((x) => [x.raw_lot_id, x])))
     } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không tải được lô' }) }
     finally { setLoading(false) }
   }, [facilityId])
@@ -110,6 +111,18 @@ export default function KhoLots() {
                     <button type="button" className="ops-chip mut" style={{ border: 0, cursor: 'pointer', padding: '7px 11px', fontSize: 12 }} onClick={() => setOpen(isOpen ? null : l.raw_lot_id)}>{isOpen ? 'Thu gọn' : `${xe.length} xe ›`}</button>
                   </span>
                 </div>
+                {(() => {
+                  const c = chen.get(l.raw_lot_id)
+                  if (!c || c.chen_kg <= 0) return null
+                  const loai = [c.chen_be_kg > 0 ? `bể Slap ${fmtKg(c.chen_be_kg)}` : '', c.chen_mix_kg > 0 ? `máy Mix ${fmtKg(c.chen_mix_kg)}` : '', c.chen_loi_kg > 0 ? `lỗi ${fmtKg(c.chen_loi_kg)}` : '', c.chen_dkl_kg > 0 ? `DKL ${fmtKg(c.chen_dkl_kg)}` : '', c.chen_chuan_kg > 0 ? `chuẩn ${fmtKg(c.chen_chuan_kg)}` : '', c.chen_khac_kg > 0 ? `khác ${fmtKg(c.chen_khac_kg)}` : ''].filter(Boolean).join(' · ')
+                  return (
+                    <div className="ops-sm" style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '6px 8px', background: 'var(--tint, #FFF7E6)', borderRadius: 8 }}>
+                      <span><b>Chèn vào mã:</b> <span className="ops-mono">{fmtKg(c.chen_kg)} kg</span>{c.so_banh_chen ? ` · ${c.so_banh_chen} bành` : ''} · {c.so_phieu_chen} phiếu{c.ty_le_chen_pct !== null ? ` · ${c.ty_le_chen_pct} % hàng vào máy` : ''}</span>
+                      {loai && <span>{loai} kg</span>}
+                      {isOpen && c.chi_tiet.map((d, k) => <span key={`${d.lot_code}-${d.vi_tri}-${k}`} className="ops-mono">· {d.lot_code}{d.vi_tri ? ` ${d.vi_tri === 'be_slap' ? 'bể Slap' : 'máy Mix'}` : ''}{d.desc ? ` (${d.desc})` : ''} {fmtKg(d.kg)} kg{d.so_banh ? ` · ${d.so_banh} bành` : ''}{d.co_chung ? ' · chèn chung mã khác' : ''}</span>)}
+                    </div>
+                  )
+                })()}
                 {isOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{xe.map((r) => <XeCard key={r.batch_id} r={r} />)}{!xe.length && <span className="ops-sm">Mã chưa có lô xe còn hàng</span>}</div>}
               </div>
             )

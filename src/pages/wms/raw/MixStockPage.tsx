@@ -10,7 +10,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { ArrowLeftOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { mixService, MIX_LOT_STATUS_COLORS, MIX_LOT_STATUS_LABELS, MIX_SOURCE_LABELS, type MixBalance, type MixLot, type MixMovement, type MixSourceType } from '../../../services/wms/mixService'
-import { useRawRole } from '../../../hooks/useRawRole'
+import { useMixRole } from '../../../hooks/useMixRole'
 import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 
@@ -33,7 +33,7 @@ export default function MixStockPage() {
   const { data: facilities } = useActiveFacilities()
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined)
   const [facilityInit, setFacilityInit] = useState(false)
-  const rawRole = useRawRole(facilityId ?? null)
+  const mixRole = useMixRole(facilityId ?? null)
   const [lots, setLots] = useState<MixLot[]>([])
   const [balance, setBalance] = useState<MixBalance | null>(null)
   const [moves, setMoves] = useState<MixMovement[]>([])
@@ -62,7 +62,7 @@ export default function MixStockPage() {
 
   useEffect(() => { load() }, [load])
 
-  const canWrite = rawRole.isKeeper || rawRole.isQC || rawRole.isBGD
+  const canWrite = mixRole.khaiBao
   const facilityCode = useMemo(() => facilities?.find((f) => f.id === facilityId)?.code ?? '', [facilities, facilityId])
 
   const submit = async () => {
@@ -131,7 +131,7 @@ export default function MixStockPage() {
           </Col>
         </Row>
         {error && <Alert type="error" showIcon message={error} />}
-        {!canWrite && !rawRole.loading && <Alert type="warning" showIcon message="Chỉ thủ kho NVL, QC hoặc BGĐ mới nhập lô chèn." />}
+        {!canWrite && !mixRole.loading && <Alert type="warning" showIcon message="Chỉ QS được phân công (hoặc BGĐ) mới nhập lô chèn. Phân công ở tab Phân công." />}
 
         <Row gutter={[12, 12]}>
           <Col xs={12} md={6}><Card size="small"><Statistic title="Tại kho chèn (kg)" value={balance?.tai_kho_kg ?? 0} precision={0} /></Card></Col>

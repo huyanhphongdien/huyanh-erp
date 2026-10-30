@@ -12,7 +12,7 @@ import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPurpose, type MixViTri, type ShiftLite } from '../../../services/wms/mixService'
 import { rawIssueService, type ProductionOrderLite } from '../../../services/wms/rawIssueService'
 import { rawLotService, type RawLotBalance } from '../../../services/wms/rawLotService'
-import { useRawRole } from '../../../hooks/useRawRole'
+import { useMixRole } from '../../../hooks/useMixRole'
 import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 
@@ -29,7 +29,7 @@ export default function MixShiftPage() {
   const { data: facilities } = useActiveFacilities()
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined)
   const [facilityInit, setFacilityInit] = useState(false)
-  const rawRole = useRawRole(facilityId ?? null)
+  const mixRole = useMixRole(facilityId ?? null)
   const [date, setDate] = useState(todayLocal())
   const [openIssues, setOpenIssues] = useState<MixIssue[]>([])
   const [dayIssues, setDayIssues] = useState<MixIssue[]>([])
@@ -72,7 +72,7 @@ export default function MixShiftPage() {
   useEffect(() => { if (open && !pos.length) rawIssueService.listProductionOrders().then(setPos).catch(() => setPos([])) }, [open, pos.length])
   useEffect(() => { if (open && facilityId) rawLotService.maDangChay(facilityId).then(setMaList).catch(() => setMaList([])) }, [open, facilityId])
 
-  const canWrite = rawRole.isKeeper || rawRole.isQC || rawRole.isBGD || rawRole.perms.submit
+  const canWrite = mixRole.khaiBao
   const tieuHaoNgay = useMemo(() => dayIssues.filter((i) => i.status === 'received').reduce((s, i) => s + (i.kg_used ?? 0), 0), [dayIssues])
   const choKyNgay = useMemo(() => dayIssues.filter((i) => ['returned', 'submitted', 'qc_confirmed'].includes(i.status)).reduce((s, i) => s + (i.kg_used ?? 0), 0), [dayIssues])
   const lotsCoHang = useMemo(() => lots.filter((l) => l.ton_kg > 0.005), [lots])
@@ -116,7 +116,7 @@ export default function MixShiftPage() {
           <Col>
             <div>
               <Title level={3} style={{ margin: 0 }}>Hàng chèn theo ca</Title>
-              <Text type="secondary">Lấy đầu ca → trả cuối ca → ký 3 bước · tiêu hao = lấy − trả · mỗi lần lấy/trả 2 ảnh bắt buộc · dòng CHÈN sổ ca tự điền</Text>
+              <Text type="secondary">QS lấy đầu ca → trả cuối ca → QS ký → QC duyệt → thủ kho nhận · tiêu hao = lấy − trả · 2 ảnh lúc lấy (trả 0 kg không cần ảnh) · dòng CHÈN sổ ca tự điền</Text>
             </div>
           </Col>
           <Col>

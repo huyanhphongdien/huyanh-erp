@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../../stores/authStore'
 import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, type MixBalance, type MixIssue, type MixLot } from '../../../services/wms/mixService'
-import { useRawRole } from '../../../hooks/useRawRole'
+import { useMixRole } from '../../../hooks/useMixRole'
 import { firstName } from '../opsUtil'
 import { FacilitySelect, fmtD, fmtKg, useKhoFacility } from './khoCommon'
 import { I } from './khoMixUtil'
@@ -18,7 +18,7 @@ const hm = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleTime
 export default function KhoMix() {
   const nav = useNavigate()
   const { facilities, facilityId, facility, setFacilityId } = useKhoFacility()
-  const role = useRawRole(facilityId)
+  const role = useMixRole(facilityId)
   const user = useAuthStore((s) => s.user)
   const [bal, setBal] = useState<MixBalance | null>(null)
   const [open, setOpen] = useState<MixIssue[]>([])
@@ -50,7 +50,7 @@ export default function KhoMix() {
   const others = active.slice(1)
   const choKy = useMemo(() => open.filter((i) => i.status !== 'issued'), [open])
   const lotsCoHang = lots.filter((l) => l.ton_kg > 0.005)
-  const canTake = role.perms.submit || role.isKeeper || role.isBGD
+  const canTake = role.khaiBao
 
   return (
     <div className="kmx">
@@ -76,7 +76,7 @@ export default function KhoMix() {
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}><span className="kmx-num xl">{fmtKg(hero.kg_out)}</span><span className="kmx-unit">kg</span></div>
               <span className="kmx-md">Lấy lúc <b>{hm(hero.out_at)}</b>{fmtD(hero.shift_date) !== fmtD(now.toISOString()) ? ` ngày ${fmtD(hero.shift_date)}` : ''} từ lô <span className="kmx-mono" style={{ fontWeight: 600, color: '#0D2E25' }}>{hero.lot_code}</span> · {MIX_SOURCE_LABELS[hero.source_type].toLowerCase()} · {MIX_PURPOSE_LABELS[hero.purpose].toLowerCase()}{hero.out_by && hero.out_by !== me && hero.out_name ? ` · ${hero.out_name}` : ''}</span>
               <Link to={`/m/kho/chen/phieu/${hero.id}`} className="kmx-btn">{I.lines}Trả cuối ca</Link>
-              <span className="kmx-sm kmx-center">Cuối ca: cân phần còn lại, chụp 2 ảnh, một chạm là xong</span>
+              <span className="kmx-sm kmx-center">Cuối ca: cân phần còn lại (dùng hết thì không cần ảnh), một chạm là xong</span>
             </section>
           ) : (
             <section className="kmx-card hero" aria-label="Việc tiếp theo">
@@ -84,8 +84,8 @@ export default function KhoMix() {
               <span className="kmx-strong" style={{ fontSize: 18 }}>Chưa lấy hàng chèn ca này</span>
               <span className="kmx-md">Chọn lô, đọc số cân, chụp 2 ảnh. Ba bước, xong trong một phút.</span>
               <Link to="/m/kho/chen/lay" className="kmx-btn" aria-disabled={!canTake || !lotsCoHang.length} onClick={(e) => { if (!canTake || !lotsCoHang.length) e.preventDefault() }} style={!canTake || !lotsCoHang.length ? { opacity: 0.45 } : undefined}>{I.plus}Lấy đầu ca</Link>
-              {!lotsCoHang.length && !loading && <span className="kmx-sm kmx-center">Kho chèn chưa có lô. Nhờ thủ kho nhập lô trên máy tính, mục Kho chèn.</span>}
-              {!canTake && !role.loading && <span className="kmx-sm kmx-center">Tài khoản này chưa được phép lấy hàng chèn.</span>}
+              {!lotsCoHang.length && !loading && <span className="kmx-sm kmx-center">Kho chèn chưa có lô. QS vào Kho chèn → Nhập lô chèn.</span>}
+              {!canTake && !role.loading && <span className="kmx-sm kmx-center">Tài khoản này chưa được phân công khai báo hàng chèn (QS). BGĐ phân công ở máy tính: Hàng chèn → Phân công.</span>}
             </section>
           )}
 

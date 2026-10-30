@@ -20,7 +20,7 @@ export const MIX_SOURCE_LABELS: Record<MixSourceType, string> = {
 export const MIX_LOT_STATUS_LABELS: Record<MixLotStatus, string> = { available: 'Sẵn sàng', in_use: 'Đang dùng dở', depleted: 'Đã hết', cancelled: 'Đã hủy' }
 export const MIX_LOT_STATUS_COLORS: Record<MixLotStatus, string> = { available: 'green', in_use: 'blue', depleted: 'default', cancelled: 'red' }
 export const MIX_ISSUE_STATUS_LABELS: Record<MixIssueStatus, string> = {
-  issued: 'Đã lấy · đang ở dây chuyền', returned: 'Đã trả · chờ ký', submitted: 'Bên giao đã ký', qc_confirmed: 'QS đã xác nhận', received: 'Thủ kho đã nhận', cancelled: 'Đã hủy',
+  issued: 'Đã lấy · đang ở dây chuyền', returned: 'Đã trả · chờ ký', submitted: 'QS đã ký khai báo', qc_confirmed: 'QC đã duyệt', received: 'Thủ kho đã nhận', cancelled: 'Đã hủy',
 }
 export const MIX_ISSUE_STATUS_COLORS: Record<MixIssueStatus, string> = { issued: 'blue', returned: 'gold', submitted: 'cyan', qc_confirmed: 'purple', received: 'green', cancelled: 'red' }
 export const MIX_PURPOSE_LABELS: Record<MixPurpose, string> = { chay_lai: 'Chạy lại', nang_chi_so: 'Nâng chỉ số' }
@@ -124,6 +124,19 @@ export interface MixIssue {
 /** Vị trí chèn: chèn bể slap hay chèn máy mix (sổ tay tổ ép có 2 bảng riêng) */
 export type MixViTri = 'be_slap' | 'may_mix'
 export const MIX_VI_TRI_LABELS: Record<MixViTri, string> = { be_slap: 'Bể Slap', may_mix: 'Máy Mix' }
+
+/** Quy trình ký hàng chèn (30/10): bước 1 khai báo = QS · bước 2 duyệt QC · bước 3 thủ kho nhận (tạm thời chủ DN) */
+export type MixBuoc = 'khai_bao' | 'duyet_qc' | 'nhan_kho'
+export const MIX_BUOC_LABELS: Record<MixBuoc, string> = { khai_bao: 'Bước 1 · QS khai báo', duyet_qc: 'Bước 2 · QC duyệt', nhan_kho: 'Bước 3 · Thủ kho nhận' }
+export const MIX_BUOC_MO_TA: Record<MixBuoc, string> = {
+  khai_bao: 'Nhập lô chèn, lấy đầu ca, trả cuối ca, ký khai báo. Thường là QS tại xưởng.',
+  duyet_qc: 'Kiểm số lấy / trả / tiêu hao và ảnh, duyệt bước 2. Phòng QC.',
+  nhan_kho: 'Nhận cuối: kho chèn trừ tiêu hao, sổ ca tự điền dòng CHÈN. Thủ kho được phân công (tạm thời chủ DN); BGĐ level ≤ 3 luôn có quyền.',
+}
+export interface MixQuyen { khai_bao: boolean; duyet_qc: boolean; nhan_kho: boolean; la_bgd: boolean; da_phan_cong: { khai_bao: number; duyet_qc: number; nhan_kho: number } }
+export const MIX_QUYEN_NONE: MixQuyen = { khai_bao: false, duyet_qc: false, nhan_kho: false, la_bgd: false, da_phan_cong: { khai_bao: 0, duyet_qc: 0, nhan_kho: 0 } }
+export interface MixSigner { id: string; employee_id: string; full_name: string; email: string | null; buoc: MixBuoc; facility_id: string | null; facility_code: string | null; is_active: boolean; granted_at: string; revoked_at: string | null; notes: string | null; granted_name: string | null }
+export interface NhanVienLite { id: string; full_name: string; email: string | null }
 
 export interface MixBalance {
   facility_id: string
@@ -289,6 +302,52 @@ export const mixService = {
   async doiMaGoc(issueId: string, rawLotIds: string[], viTri?: MixViTri | null): Promise<void> {
     const { error } = await supabase.rpc('fn_mix_doi_ma_goc', { p_issue_id: issueId, p_raw_lot_ids: rawLotIds.length ? rawLotIds : null, p_vi_tri: viTri ?? null })
     if (error) throw new Error(dichLoiNhapKho(error))
+  },
+
+  /** Quyền của người đang đăng nhập trong quy trình hàng chèn (DB quyết, xem fn_mix_duoc_ky) */
+  async quyen(facilityId?: string | null): Promise<MixQuyen> {
+    const { data, error } = await supabase.rpc('fn_mix_quyen', { p_facility_id: facilityId ?? null })
+    if (error) throw error
+    const d: any = data ?? {}
+    return { ...MIX_QUYEN_NONE, ...d, da_phan_cong: { ...MIX_QUYEN_NONE.da_phan_cong, ...(d.da_phan_cong ?? {}) } }
+  },
+
+  /** Ký nhiều phiếu một chạm (cả ca); phiếu lỗi trả về trong `loi`, phiếu khác vẫn ký */
+  async kyNhieu(ids: string[], buoc: 'submit' | 'qc_confirm' | 'receive'): Promise<{ so_ky: number; loi: { id: string; code: string | null; loi: string }[] }> {
+    const { data, error } = await supabase.rpc('fn_mix_ky_nhieu', { p_ids: ids, p_buoc: buoc })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    const d: any = data ?? {}
+    return { so_ky: num(d.so_ky), loi: (Array.isArray(d.loi) ? d.loi : []).map((x: any) => ({ id: String(x.id), code: x.code ?? null, loi: dichLoiNhapKho({ message: String(x.loi ?? '') }) })) }
+  },
+
+  async listSigners(includeRevoked = false): Promise<MixSigner[]> {
+    let q = supabase.from('v_mix_signers').select('*').order('buoc').order('full_name')
+    if (!includeRevoked) q = q.eq('is_active', true)
+    const { data, error } = await q
+    if (error) throw error
+    return (data ?? []) as MixSigner[]
+  },
+  async timNhanVien(q: string): Promise<NhanVienLite[]> {
+    let s = supabase.from('employees').select('id, full_name, email').order('full_name').limit(20)
+    if (q.trim()) s = s.ilike('full_name', `%${q.trim()}%`)
+    const { data, error } = await s
+    if (error) throw error
+    return (data ?? []) as NhanVienLite[]
+  },
+  /** BGĐ phân công (RLS: chỉ level ≤ 3 ghi được) */
+  async grantSigner(employeeId: string, buoc: MixBuoc, facilityId: string | null, notes?: string | null): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser()
+    let by: string | null = null
+    if (user) { const { data: me } = await supabase.from('employees').select('id').eq('user_id', user.id).maybeSingle(); by = me?.id ?? null }
+    const { error } = await supabase.from('mix_signers').insert({ employee_id: employeeId, buoc, facility_id: facilityId, granted_by: by, notes: notes ?? null })
+    if (error) throw error
+  },
+  async revokeSigner(id: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser()
+    let by: string | null = null
+    if (user) { const { data: me } = await supabase.from('employees').select('id').eq('user_id', user.id).maybeSingle(); by = me?.id ?? null }
+    const { error } = await supabase.from('mix_signers').update({ is_active: false, revoked_at: new Date().toISOString(), revoked_by: by }).eq('id', id)
+    if (error) throw error
   },
 
   async ky(issueId: string, buoc: 'submit' | 'qc_confirm' | 'receive' | 'cancel', note?: string | null): Promise<{ next_issue_id: string | null }> {

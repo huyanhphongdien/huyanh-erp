@@ -195,6 +195,7 @@ const RawBalanceReportPage = lazy(() => import('./pages/wms/raw/RawBalanceReport
 const MixShiftPage = lazy(() => import('./pages/wms/raw/MixShiftPage'));
 const MixIssueDetailPage = lazy(() => import('./pages/wms/raw/MixIssueDetailPage'));
 const MixStockPage = lazy(() => import('./pages/wms/raw/MixStockPage'));
+const MixSignersPage = lazy(() => import('./pages/wms/raw/MixSignersPage'));
 const RawReconcilePage = lazy(() => import('./pages/wms/raw/RawReconcilePage'));
 const WeighbridgeDetailPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeDetailPage'));
 
@@ -628,6 +629,7 @@ function App() {
                 <Route element={<HubLayout hub="chen" />}>
                   <Route path="chen" element={<MixShiftPage />} />
                   <Route path="chen/ton" element={<MixStockPage />} />
+                  <Route path="chen/phan-cong" element={<MixSignersPage />} />
                   <Route path="chen/phieu/:id" element={<MixIssueDetailPage />} />
                 </Route>
                 {/* Trang cân chuyển sang can.huyanhrubber.vn — ERP chỉ giữ lịch sử + chi tiết */}

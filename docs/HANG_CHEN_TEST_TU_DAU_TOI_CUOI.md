@@ -225,6 +225,22 @@ Sổ tay thực tế có **2 bảng**: *"Ca Vàng chèn vào KHMN-15 + 17 · L1:
 | 16.5 | Trả cuối ca | dòng "Số bành còn · tự tính" với − +; "Dùng hết · 0 kg" → 0 bành |
 | 16.6 | Kho chèn | mỗi lô hiện "kg · N bành"; phiếu cũ chưa có số bành đã được tính lại khi chạy SQL |
 
+## 17. Quy trình ký theo phân công + ký cả ca + trả 0 kg không ảnh (sau SQL `wms_mix_p7_quy_trinh_ky.sql`, chạy SAU p6, 30/10)
+
+Quy trình chốt 30/10: **Bước 1 QS khai báo** (nhập lô chèn, lấy đầu ca, trả cuối ca, ký) → **Bước 2 QC duyệt** (Lê Thành Nhân, Lệ Trinh, chủ DN) → **Bước 3 Thủ kho nhận** (kho chèn trừ, sổ ca điền CHÈN) — tạm thời chủ DN, sau phân công thủ kho thật.
+
+| # | Việc | Kỳ vọng |
+|---|---|---|
+| 17.1 | Chạy SQL → bảng phân công | thấy chủ DN ở `khai_bao` + `duyet_qc` + `nhan_kho`; Lê Thành Nhân, Lệ Trinh ở `duyet_qc` (nếu thiếu tên: bảng 3 liệt kê nhân viên tên gần giống để đối chiếu) |
+| 17.2 | Máy tính Hàng chèn → tab **Phân công** | 3 cột Bước 1 / 2 / 3; BGĐ gõ tên QS → Thêm (mọi nhà máy hoặc chọn nhà máy); Thu để bỏ |
+| 17.3 | Tài khoản không trong danh sách QS | trang chính điện thoại báo "chưa được phân công khai báo (QS)"; Lấy đầu ca mờ; Nhập lô chèn mờ |
+| 17.4 | Trả cuối ca → bấm "Dùng hết · 0 kg" | thẻ ảnh trả biến thành dòng xanh "không cần chụp ảnh trả"; nút ghi sáng ngay; ký khai báo không báo thiếu ảnh |
+| 17.5 | Trả còn hàng dư (> 0 kg) | vẫn bắt 2 ảnh trả như cũ |
+| 17.6 | Màn **Chờ ký** với 3 phiếu cùng ca | thẻ đầu "Ký một chạm cho cả ca" với nút "Ký tất cả 3 phiếu · ngày · ca · QS khai báo"; bấm → "Đã ký 3/3 phiếu"; phiếu thiếu ảnh bị bỏ qua và nhắc |
+| 17.7 | Đăng nhập QC (Nhân / Trinh) → Chờ ký | thấy bước 2/3 · QC, nút "Duyệt QC" và nút ký cả ca; không thấy nút bước 1, 3 |
+| 17.8 | Đăng nhập người ở bước `nhan_kho` (tạm: chủ DN) → Chờ ký | nút "Nhận · trừ kho chèn"; ký cả ca → kho chèn trừ, sổ ca dòng CHÈN điền tổng |
+| 17.9 | Nhãn | phiếu: "Chờ QS ký / Chờ QC duyệt / Chờ thủ kho nhận / Đã nhận"; máy tính Steps: QS ký khai báo → QC duyệt → Thủ kho nhận |
+
 ## Lỗi hay gặp
 
 | Màn hình báo | Nguyên nhân | Làm gì |

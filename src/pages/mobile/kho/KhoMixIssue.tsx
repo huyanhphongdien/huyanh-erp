@@ -11,7 +11,7 @@ import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoSe
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { rawLotService, type RawLotBalance } from '../../../services/wms/rawLotService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
-import { useRawRole } from '../../../hooks/useRawRole'
+import { useMixRole } from '../../../hooks/useMixRole'
 import { fmtD, fmtDt, fmtKg } from './khoCommon'
 import { detectShift, hhmm, I, KmxPhotoTiles, Lightbox, type ShiftPick } from './khoMixUtil'
 import { useAuthStore } from '../../../stores/authStore'
@@ -20,8 +20,8 @@ import './khoMix.css'
 
 const hm = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '')
 const STATUS_CHIP: Record<MixIssue['status'], { cls: string; text: string }> = {
-  issued: { cls: 'ok', text: 'Ở dây chuyền' }, returned: { cls: 'amb', text: 'Chờ bên giao ký' }, submitted: { cls: 'gold', text: 'Chờ QS' },
-  qc_confirmed: { cls: 'blue', text: 'Chờ thủ kho' }, received: { cls: 'ok', text: 'Đã nhận' }, cancelled: { cls: 'red', text: 'Đã hủy' },
+  issued: { cls: 'ok', text: 'Ở dây chuyền' }, returned: { cls: 'amb', text: 'Chờ QS ký' }, submitted: { cls: 'gold', text: 'Chờ QC duyệt' },
+  qc_confirmed: { cls: 'blue', text: 'Chờ thủ kho nhận' }, received: { cls: 'ok', text: 'Đã nhận' }, cancelled: { cls: 'red', text: 'Đã hủy' },
 }
 
 export default function KhoMixIssue() {
@@ -59,7 +59,7 @@ export default function KhoMixIssue() {
   const [team, setTeam] = useState('')
   const [teams, setTeams] = useState<string[]>(['Đen', 'Vàng'])
   const [big, setBig] = useState<{ src: string; cap: string } | null>(null)
-  const role = useRawRole(i?.facility_id ?? null)
+  const role = useMixRole(i?.facility_id ?? null)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -83,6 +83,8 @@ export default function KhoMixIssue() {
   const required = settings.anh_bat_buoc?.length ? settings.anh_bat_buoc : ['toan_canh', 'man_hinh_can']
   const missOut = rawPhotoService.missing(pOut, required)
   const missRet = rawPhotoService.missing(pRet, required)
+  // trả 0 kg (dùng hết) thì không bắt ảnh trả
+  const missRetEff = (i?.kg_return ?? 0) > 0.005 ? missRet : []
   const editable = !!i && ['issued', 'returned'].includes(i.status)
 
   async function run(key: string, fn: () => Promise<any>, ok: string) {
@@ -134,9 +136,9 @@ export default function KhoMixIssue() {
 
   const st = i.status
   const caTo = `${i.shift_name || fmtD(i.shift_date)}${i.team ? ` · Tổ ${i.team}` : ''}`
-  const canSubmit = role.perms.submit || role.isBGD
-  const canQc = role.isQC || role.isBGD
-  const canReceive = role.isKeeper || role.isBGD
+  const canSubmit = role.khaiBao
+  const canQc = role.duyetQc
+  const canReceive = role.nhanKho
   const pct = i.kg_used !== null && i.kg_out > 0 ? Math.round((100 * i.kg_used) / i.kg_out) : 0
 
   // ── màn "đã trả" ngay sau một chạm ──
@@ -156,8 +158,8 @@ export default function KhoMixIssue() {
           </section>
           <section className="kmx-card" aria-label="Tiến độ ký" style={{ gap: 0 }}>
             <h2 className="kmx-h2" style={{ marginBottom: 10 }}>{justDone.signed ? 'Còn 2 chữ ký nữa' : 'Còn 3 chữ ký'}</h2>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className={`kmx-tl-dot ${justDone.signed ? 'done' : 'now'}`} style={{ position: 'static' }}>{justDone.signed ? I.checkSm : '1'}</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong">{justDone.signed ? 'Bên giao đã ký' : 'Bên giao ký · chưa'}</span><span className="kmx-sm">{i.submitted_name || i.return_name || ''}{i.team ? ` · Tổ ${i.team}` : ''}{i.submitted_at ? ` · ${hm(i.submitted_at)}` : ''}</span></span></div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className={`kmx-tl-dot ${justDone.signed ? 'now' : 'todo'}`} style={{ position: 'static' }}>2</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong" style={{ color: justDone.signed ? '#B45309' : '#6B7280' }}>QS xác nhận · đang chờ</span><span className="kmx-sm">Phòng QC thấy phiếu trong mục Chờ ký</span></span></div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className={`kmx-tl-dot ${justDone.signed ? 'done' : 'now'}`} style={{ position: 'static' }}>{justDone.signed ? I.checkSm : '1'}</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong">{justDone.signed ? 'QS đã ký khai báo' : 'QS ký khai báo · chưa'}</span><span className="kmx-sm">{i.submitted_name || i.return_name || ''}{i.team ? ` · Tổ ${i.team}` : ''}{i.submitted_at ? ` · ${hm(i.submitted_at)}` : ''}</span></span></div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className={`kmx-tl-dot ${justDone.signed ? 'now' : 'todo'}`} style={{ position: 'static' }}>2</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong" style={{ color: justDone.signed ? '#B45309' : '#6B7280' }}>QC duyệt · đang chờ</span><span className="kmx-sm">QC thấy phiếu trong mục Chờ ký, ký được cả ca một chạm</span></span></div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className="kmx-tl-dot todo" style={{ position: 'static' }}>3</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong" style={{ color: '#6B7280' }}>Thủ kho nhận</span><span className="kmx-sm">Lúc này kho chèn mới trừ {fmtKg(i.kg_used)} kg, sổ ca tự điền dòng CHÈN</span></span></div>
           </section>
           <div className="kmx-note info">{I.info}<span>{justDone.signed ? 'Bạn không cần làm gì thêm. Có gì sai thì mở phiếu để sửa kg trả trước khi QS ký.' : 'Mở phiếu để chụp ảnh còn thiếu rồi bấm Ký bên giao.'}</span></div>
@@ -174,7 +176,7 @@ export default function KhoMixIssue() {
   if (st === 'issued') {
     const tieuHao = kgRetN !== null && Number.isFinite(kgRetN) ? Math.max(i.kg_out - kgRetN, 0) : null
     const p = tieuHao !== null && i.kg_out > 0 ? Math.round((100 * tieuHao) / i.kg_out) : 0
-    const ready = kgRetOk && missRet.length === 0 && missOut.length === 0 && (!!i.shift_id || !!shift)
+    const ready = kgRetOk && (kgRetN === 0 || missRet.length === 0) && missOut.length === 0 && (!!i.shift_id || !!shift)
     return (
       <div className="kmx">
         <header className="kmx-hd">
@@ -251,11 +253,11 @@ export default function KhoMixIssue() {
               </label>
             )}
           </section>
-          <section className="kmx-card" aria-label="Chụp ảnh lúc trả">
+          {kgRetN === 0 ? <div className="kmx-note ok">{I.info}<span><b>Dùng hết, trả 0 kg:</b> không cần chụp ảnh trả. Chỉ khi còn hàng dư mang về mới cần 2 ảnh.</span></div> : <section className="kmx-card" aria-label="Chụp ảnh lúc trả">
             <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Chụp 2 ảnh phần trả</span><span className={`kmx-chip ${missRet.length ? 'red' : 'ok'}`}>{required.length - missRet.length}/{required.length}{missRet.length ? ` · thiếu ${missRet.length}` : ' đã chụp'}</span></div>
             <KmxPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={required} facilityCode={i.facility_code || undefined} labels={{ toan_canh: 'Toàn cảnh phần trả', man_hinh_can: 'Màn hình cân' }} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />
             <span className="kmx-sm">Đủ 2 ảnh thì nút dưới mới sáng. Ảnh bổ sung không bắt buộc.</span>
-          </section>
+          </section>}
           <div className="kmx-col" style={{ gap: 6 }}>
             <label htmlFor="kmx-rnote" className="kmx-sm" style={{ fontWeight: 600 }}>Ghi chú (không bắt buộc)</label>
             <input id="kmx-rnote" className="kmx-text" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -304,7 +306,7 @@ export default function KhoMixIssue() {
           <span className="kmx-md">Lô <span className="kmx-mono" style={{ fontWeight: 700, color: '#0D2E25' }}>{i.lot_so_lo || i.lot_code}</span>{i.lot_so_lo ? <span className="kmx-sm kmx-mono"> {i.lot_code}</span> : null} · {MIX_SOURCE_LABELS[i.source_type].toLowerCase()}{i.lot_grade ? ` · ${i.lot_grade}` : ''}{i.po !== null ? ` · Po ${i.po}` : ''} · {MIX_PURPOSE_LABELS[i.purpose].toLowerCase()}{i.target_index ? ` ${i.target_index}${i.target_value !== null ? ' → ' + i.target_value : ''}` : ''}</span>
           <div className="kmx-row" style={{ alignItems: 'center' }}>
             <span className="kmx-md">{i.vi_tri ? <>Chèn <b>{MIX_VI_TRI_LABELS[i.vi_tri]}</b> · </> : null}Chèn vào mã: {i.ma_goc_all ? <b className="kmx-mono" style={{ color: '#0D2E25' }}>{i.ma_goc_all}</b> : <span style={{ color: '#B45309' }}>chưa gắn · lấy theo phiếu ca khi thủ kho nhận</span>}{i.so_banh !== null ? ` · ${i.so_banh} bành` : ''}{i.gross_kg !== null ? ` · cả pallet ${kgTxt(i.gross_kg)} − bì ${kgTxt(i.pallet_kg ?? 0)}` : ''}{i.so_banh_tra !== null ? ` · còn ${i.so_banh_tra} bành` : ''}</span>
-            {!['received', 'cancelled'].includes(st) && (role.perms.submit || role.isKeeper || role.isQC || role.isBGD) && <button type="button" className="kmx-pill sm" onClick={moDoiMa}>{doiMa ? 'Đóng' : 'Đổi mã'}</button>}
+            {!['received', 'cancelled'].includes(st) && (role.khaiBao || role.duyetQc || role.nhanKho) && <button type="button" className="kmx-pill sm" onClick={moDoiMa}>{doiMa ? 'Đóng' : 'Đổi mã'}</button>}
           </div>
           {doiMa && (
             <div className="kmx-col" style={{ gap: 8 }}>
@@ -328,16 +330,16 @@ export default function KhoMixIssue() {
           </div></div>
           <div className={`kmx-tl${i.return_at ? '' : ' todo'}`}><span className={`kmx-tl-dot ${i.return_at ? 'done' : 'todo'}`}>{i.return_at ? I.checkSm : '·'}</span><div className="kmx-tl-body">
             <span className="kmx-row"><span className="kmx-strong" style={i.return_at ? undefined : { color: '#6B7280' }}>Trả cuối ca{i.return_at ? ` · ${fmtKg(i.kg_return)} kg` : ''}</span><span className="kmx-sm">{hm(i.return_at)}</span></span>
-            {i.return_at && <span className="kmx-sm">{i.return_name || ''} · {i.handover_to_next ? 'để lại dây chuyền, bàn giao ca sau' : 'về kho, không bàn giao'}{missRet.length ? ` · thiếu ${missRet.length} ảnh` : ''}</span>}
+            {i.return_at && <span className="kmx-sm">{i.return_name || ''} · {i.handover_to_next ? 'để lại dây chuyền, bàn giao ca sau' : (i.kg_return ?? 0) <= 0.005 ? 'dùng hết, không cần ảnh trả' : 'về kho, không bàn giao'}{missRetEff.length ? ` · thiếu ${missRetEff.length} ảnh` : ''}</span>}
             {pRet.length > 0 && <div className="kmx-thumbs">{thumbs(pRet)}</div>}
           </div></div>
           <div className={`kmx-tl${i.submitted_at ? '' : ' todo'}`}><span className={`kmx-tl-dot ${i.submitted_at ? 'done' : st === 'returned' ? 'now' : 'todo'}`}>{i.submitted_at ? I.checkSm : '1'}</span><div className="kmx-tl-body">
-            <span className="kmx-row"><span className="kmx-strong" style={i.submitted_at ? undefined : { color: st === 'returned' ? '#B45309' : '#6B7280' }}>Bên giao ký{!i.submitted_at && st === 'returned' ? ' · đang chờ' : ''}</span><span className="kmx-sm">{hm(i.submitted_at)}</span></span>
-            <span className="kmx-sm">{i.submitted_name || (st === 'returned' ? 'Tổ sản xuất hoặc thủ kho' : '')}</span>
+            <span className="kmx-row"><span className="kmx-strong" style={i.submitted_at ? undefined : { color: st === 'returned' ? '#B45309' : '#6B7280' }}>QS ký khai báo{!i.submitted_at && st === 'returned' ? ' · đang chờ' : ''}</span><span className="kmx-sm">{hm(i.submitted_at)}</span></span>
+            <span className="kmx-sm">{i.submitted_name || (st === 'returned' ? 'QS được phân công' : '')}</span>
           </div></div>
           <div className={`kmx-tl${i.qc_confirmed_at ? '' : ' todo'}`}><span className={`kmx-tl-dot ${qsDot}`}>{i.qc_confirmed_at ? I.checkSm : '2'}</span><div className="kmx-tl-body">
-            <span className="kmx-row"><span className="kmx-strong" style={i.qc_confirmed_at ? undefined : { color: st === 'submitted' ? '#B45309' : '#6B7280' }}>QS xác nhận{st === 'submitted' ? ' · đang chờ' : ''}</span><span className="kmx-sm">{hm(i.qc_confirmed_at)}</span></span>
-            <span className="kmx-sm">{i.qc_confirmed_name || 'Phòng QC'}</span>
+            <span className="kmx-row"><span className="kmx-strong" style={i.qc_confirmed_at ? undefined : { color: st === 'submitted' ? '#B45309' : '#6B7280' }}>QC duyệt{st === 'submitted' ? ' · đang chờ' : ''}</span><span className="kmx-sm">{hm(i.qc_confirmed_at)}</span></span>
+            <span className="kmx-sm">{i.qc_confirmed_name || 'QC được phân công'}</span>
           </div></div>
           <div className="kmx-tl last todo"><span className={`kmx-tl-dot ${khoDot}`}>{i.received_at ? I.checkSm : '3'}</span><div className="kmx-tl-body">
             <span className="kmx-row"><span className="kmx-strong" style={i.received_at ? undefined : { color: st === 'qc_confirmed' ? '#B45309' : '#6B7280' }}>Thủ kho nhận · trừ kho chèn{st === 'qc_confirmed' ? ' · đang chờ' : ''}</span><span className="kmx-sm">{hm(i.received_at)}</span></span>
@@ -347,12 +349,12 @@ export default function KhoMixIssue() {
         </section>
 
         {st === 'returned' && (
-          <section className="kmx-card" aria-label="Ký bên giao" style={{ gap: 10 }}>
-            <h2 className="kmx-h2">Bước 1/3 · bên giao ký</h2>
-            {(missOut.length > 0 || missRet.length > 0) && <div className="kmx-note red" style={{ padding: '8px 10px' }}>{I.info}<span>Thiếu ảnh bắt buộc{missOut.length ? ` lúc lấy (${missOut.length})` : ''}{missRet.length ? ` lúc trả (${missRet.length})` : ''}. Chụp đủ rồi mới ký được.</span></div>}
+          <section className="kmx-card" aria-label="Ký khai báo" style={{ gap: 10 }}>
+            <h2 className="kmx-h2">Bước 1/3 · QS ký khai báo</h2>
+            {(missOut.length > 0 || missRetEff.length > 0) && <div className="kmx-note red" style={{ padding: '8px 10px' }}>{I.info}<span>Thiếu ảnh bắt buộc{missOut.length ? ` lúc lấy (${missOut.length})` : ''}{missRetEff.length ? ` lúc trả (${missRetEff.length})` : ''}. Chụp đủ rồi mới ký được.</span></div>}
             {missOut.length > 0 && <KmxPhotoTiles refType="mix_issue_out" refId={i.id} photos={pOut} required={required} facilityCode={i.facility_code || undefined} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />}
-            {missRet.length > 0 && <KmxPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={required} facilityCode={i.facility_code || undefined} labels={{ toan_canh: 'Toàn cảnh phần trả', man_hinh_can: 'Màn hình cân' }} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />}
-            <button type="button" className="kmx-btn md" disabled={!canSubmit || missOut.length > 0 || missRet.length > 0 || busy === 'submit'} onClick={() => ky('submit')}>{I.pen}Ký bên giao</button>
+            {missRetEff.length > 0 && <KmxPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={required} facilityCode={i.facility_code || undefined} labels={{ toan_canh: 'Toàn cảnh phần trả', man_hinh_can: 'Màn hình cân' }} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />}
+            <button type="button" className="kmx-btn md" disabled={!canSubmit || missOut.length > 0 || missRetEff.length > 0 || busy === 'submit'} onClick={() => ky('submit')}>{I.pen}Ký khai báo (QS)</button>
             {!editRet ? <button type="button" className="kmx-btn sec" onClick={() => { setKgRet(String(i.kg_return ?? '')); setHandover(i.handover_to_next); setEditRet(true) }}>Sửa kg trả</button> : (
               <div className="kmx-col" style={{ gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" type="number" inputMode="decimal" value={kgRet} onChange={(e) => { setKgRet(e.target.value); setRetSoBanh('') }} aria-label="Kg trả" /><span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span></div>
@@ -366,15 +368,15 @@ export default function KhoMixIssue() {
           </section>
         )}
         {st === 'submitted' && (
-          <section className="kmx-card" aria-label="QS xác nhận" style={{ gap: 8 }}>
-            <h2 className="kmx-h2">Bước 2/3 · QS xác nhận</h2>
-            {canQc ? <button type="button" className="kmx-btn md" disabled={busy === 'qc_confirm'} onClick={() => ky('qc_confirm')}>{I.check}Xác nhận QS</button> : <span className="kmx-md">Chờ phòng QC (hoặc người được chỉ định) xác nhận.</span>}
+          <section className="kmx-card" aria-label="QC duyệt" style={{ gap: 8 }}>
+            <h2 className="kmx-h2">Bước 2/3 · QC duyệt</h2>
+            {canQc ? <button type="button" className="kmx-btn md" disabled={busy === 'qc_confirm'} onClick={() => ky('qc_confirm')}>{I.check}Duyệt QC</button> : <span className="kmx-md">Chờ QC được phân công duyệt.</span>}
           </section>
         )}
         {st === 'qc_confirmed' && (
           <section className="kmx-card" aria-label="Thủ kho nhận" style={{ gap: 8 }}>
             <h2 className="kmx-h2">Bước 3/3 · thủ kho nhận</h2>
-            {canReceive ? <button type="button" className="kmx-btn md" disabled={busy === 'receive'} onClick={() => ky('receive')}>{I.intake}Nhận · trừ kho chèn {fmtKg(i.kg_used)} kg</button> : <span className="kmx-md">Chờ thủ kho NVL nhận. Sau bước này kho chèn mới trừ và sổ ca tự điền dòng CHÈN.</span>}
+            {canReceive ? <button type="button" className="kmx-btn md" disabled={busy === 'receive'} onClick={() => ky('receive')}>{I.intake}Nhận · trừ kho chèn {fmtKg(i.kg_used)} kg</button> : <span className="kmx-md">Chờ thủ kho được phân công nhận. Sau bước này kho chèn mới trừ và sổ ca tự điền dòng CHÈN.</span>}
           </section>
         )}
 

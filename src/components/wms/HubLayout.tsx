@@ -28,6 +28,7 @@ const HUBS: Record<string, Hub> = {
     tabs: [
       { to: '/wms/chen', label: 'Phiếu theo ca', end: true, also: ['/wms/chen/phieu'] },
       { to: '/wms/chen/ton', label: 'Kho chèn' },
+      { to: '/wms/chen/phan-cong', label: 'Phân công' },
     ],
   },
   kho: {

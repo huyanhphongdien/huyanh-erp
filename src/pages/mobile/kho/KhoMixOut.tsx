@@ -189,7 +189,7 @@ export default function KhoMixOut() {
             {maChon.length > 0 && <span>{maChon.length ? <>Chèn vào mã <b className="kmx-mono" style={{ color: '#fff' }}>{maLabel}</b></> : 'Mã gốc theo phiếu ca'}</span>}
             <span>{caTo} · {purpose === 'chay_lai' ? 'chạy lại' : `nâng ${targetIndex}${targetValue ? ' → ' + targetValue : ''}`} · {photos.length} ảnh · {firstName(user?.full_name) || ''}</span>
           </div>
-          <div className="kmx-note gold" style={{ width: '100%', boxSizing: 'border-box', textAlign: 'left' }}>{I.clock}<span><b>Việc tiếp theo, cuối ca:</b> mở trang chính, bấm <b>Trả cuối ca</b>, cân phần còn lại và chụp 2 ảnh.</span></div>
+          <div className="kmx-note gold" style={{ width: '100%', boxSizing: 'border-box', textAlign: 'left' }}>{I.clock}<span><b>Việc tiếp theo, cuối ca:</b> mở trang chính, bấm <b>Trả cuối ca</b>, cân phần còn lại (dùng hết thì một chạm, không cần ảnh).</span></div>
         </div>
         <div className="kmx-done-foot">
           <button type="button" className="kmx-btn white" onClick={() => nav('/m/kho/chen')}>Về trang chính</button>
@@ -209,7 +209,7 @@ export default function KhoMixOut() {
           {msg && <div className="kmx-msg err">{msg}</div>}
           <button type="button" className="kmx-btn" style={{ minHeight: 64, background: '#E8F5F0', color: '#0D2E25', border: '2px dashed #2D8B6E', fontSize: 16 }} onClick={() => setScan(true)}>{I.qr}Quét tem trên lô</button>
           <div className="kmx-divider">hoặc chạm chọn trong kho chèn</div>
-          {!lots.length && <div className="kmx-card muted kmx-center" style={{ fontSize: 13 }}>Kho chèn chưa có lô còn hàng. Nhờ thủ kho nhập lô trên máy tính, mục Kho chèn.</div>}
+          {!lots.length && <div className="kmx-card muted kmx-center" style={{ fontSize: 13 }}>Kho chèn chưa có lô còn hàng. QS vào Kho chèn → Nhập lô chèn.</div>}
           {lots.map((l) => {
             const khoa = l.source_type === 'dkl' && !l.metal_cleared
             const chip = l.source_type === 'loi' ? 'amb' : l.source_type === 'dkl' ? 'red' : l.source_type === 'std' ? 'blue' : 'mut'

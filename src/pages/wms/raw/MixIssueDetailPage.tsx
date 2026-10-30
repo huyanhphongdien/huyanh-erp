@@ -12,7 +12,7 @@ import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPO
 import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
-import { useRawRole } from '../../../hooks/useRawRole'
+import { useMixRole } from '../../../hooks/useMixRole'
 import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 
 const { Title, Text } = Typography
@@ -39,7 +39,7 @@ export default function MixIssueDetailPage() {
   const [busy, setBusy] = useState<string | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
-  const rawRole = useRawRole(issue?.facility_id ?? null)
+  const mixRole = useMixRole(issue?.facility_id ?? null)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -94,9 +94,9 @@ export default function MixIssueDetailPage() {
 
   const st = issue.status
   const isReceivedOrCancelled = st === 'received' || st === 'cancelled'
-  const canSubmit = st === 'returned' && (rawRole.perms.submit || rawRole.isBGD)
-  const canQc = st === 'submitted' && (rawRole.isQC || rawRole.isBGD)
-  const canReceive = st === 'qc_confirmed' && (rawRole.isKeeper || rawRole.isBGD)
+  const canSubmit = st === 'returned' && mixRole.khaiBao
+  const canQc = st === 'submitted' && mixRole.duyetQc
+  const canReceive = st === 'qc_confirmed' && mixRole.nhanKho
 
   return (
     <div style={{ padding: 16, background: '#f5f5f5', minHeight: '100%' }}>
@@ -123,8 +123,8 @@ export default function MixIssueDetailPage() {
           <Steps size="small" current={STEP_IDX[st]} status={st === 'cancelled' ? 'error' : st === 'received' ? 'finish' : 'process'} items={[
             { title: 'Lấy đầu ca', description: `${fmtKg(issue.kg_out)} kg · ${fmtDt(issue.out_at)} · ${issue.out_name || ''}` },
             { title: 'Trả cuối ca', description: issue.kg_return === null ? 'chưa trả' : `${fmtKg(issue.kg_return)} kg · ${fmtDt(issue.return_at)} · ${issue.return_name || ''}` },
-            { title: 'Bên giao ký', description: issue.submitted_at ? `${issue.submitted_name || ''} · ${fmtDt(issue.submitted_at)}` : '' },
-            { title: 'QS xác nhận', description: issue.qc_confirmed_at ? `${issue.qc_confirmed_name || ''} · ${fmtDt(issue.qc_confirmed_at)}` : '' },
+            { title: 'QS ký khai báo', description: issue.submitted_at ? `${issue.submitted_name || ''} · ${fmtDt(issue.submitted_at)}` : '' },
+            { title: 'QC duyệt', description: issue.qc_confirmed_at ? `${issue.qc_confirmed_name || ''} · ${fmtDt(issue.qc_confirmed_at)}` : '' },
             { title: 'Thủ kho nhận', description: issue.received_at ? `${issue.received_name || ''} · ${fmtDt(issue.received_at)}` : '' },
           ]} />
         </Card>
@@ -156,7 +156,7 @@ export default function MixIssueDetailPage() {
             <Card size="small" title={<Space>1 · Ảnh lúc lấy đầu ca{missOut.length ? <Tag color="red">thiếu {missOut.length} ảnh bắt buộc</Tag> : <Tag color="green">đủ</Tag>}</Space>}>
               <RawPhotoTiles refType="mix_issue_out" refId={issue.id} photos={photosOut} required={required} facilityCode={issue.facility_code || undefined} disabled={!canEditPhotos} onChange={load} size={120} />
             </Card>
-            <Card size="small" style={{ marginTop: 12 }} title={<Space>2 · Trả cuối ca{issue.kg_return !== null && (missRet.length ? <Tag color="red">thiếu {missRet.length} ảnh bắt buộc</Tag> : <Tag color="green">đủ ảnh</Tag>)}</Space>}>
+            <Card size="small" style={{ marginTop: 12 }} title={<Space>2 · Trả cuối ca{issue.kg_return !== null && issue.kg_return > 0.005 && (missRet.length ? <Tag color="red">thiếu {missRet.length} ảnh bắt buộc</Tag> : <Tag color="green">đủ ảnh</Tag>)}</Space>}>
               {st === 'issued' ? (
                 <Space direction="vertical" size={10} style={{ width: '100%' }}>
                   <Alert type="info" showIcon message="Cuối ca: cân phần còn lại, nhập kg trả (0 nếu dùng hết), chụp 2 ảnh rồi mới ký." />
@@ -190,16 +190,16 @@ export default function MixIssueDetailPage() {
           <Card size="small" title="3 · Ký phiếu">
             {issue.thieu_anh && st === 'returned' && <Alert type="error" showIcon style={{ marginBottom: 10 }} message={`Chưa ký được: thiếu ảnh ${issue.thieu_anh.replace('mix_issue_out:', 'lúc lấy · ').replace('mix_issue_return:', 'lúc trả · ').replace('toan_canh', 'toàn cảnh').replace('man_hinh_can', 'màn hình cân')}`} />}
             <Space wrap>
-              <Button type="primary" disabled={!canSubmit || !!issue.thieu_anh} loading={busy === 'submit'} onClick={() => ky('submit')}>Bên giao ký (tổ / thủ kho)</Button>
-              <Button type="primary" disabled={!canQc} loading={busy === 'qc_confirm'} onClick={() => ky('qc_confirm')}>QS xác nhận</Button>
+              <Button type="primary" disabled={!canSubmit || !!issue.thieu_anh} loading={busy === 'submit'} onClick={() => ky('submit')}>Ký khai báo (QS)</Button>
+              <Button type="primary" disabled={!canQc} loading={busy === 'qc_confirm'} onClick={() => ky('qc_confirm')}>Duyệt QC</Button>
               <Button type="primary" disabled={!canReceive} loading={busy === 'receive'} onClick={() => ky('receive')}>Thủ kho nhận · trừ kho chèn</Button>
             </Space>
             <div style={{ marginTop: 8 }}>
               <Text type="secondary">
                 {st === 'issued' && 'Ghi trả cuối ca trước đã.'}
-                {st === 'returned' && 'Bên giao (tổ sản xuất hoặc thủ kho) ký trước.'}
-                {st === 'submitted' && (canQc ? 'Đến lượt QS.' : 'Chờ QS xác nhận (phòng HAP-QC hoặc người được chỉ định).')}
-                {st === 'qc_confirmed' && (canReceive ? 'Đến lượt thủ kho nhận.' : 'Chờ thủ kho NVL nhận.')}
+                {st === 'returned' && 'QS được phân công ký khai báo trước.'}
+                {st === 'submitted' && (canQc ? 'Đến lượt QC duyệt.' : 'Chờ QC được phân công duyệt.')}
+                {st === 'qc_confirmed' && (canReceive ? 'Đến lượt thủ kho nhận.' : 'Chờ thủ kho được phân công nhận.')}
               </Text>
             </div>
           </Card>

@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { mixService, MIX_LOT_STATUS_LABELS, MIX_SOURCE_LABELS, type MixBalance, type MixLot, type MixMovement } from '../../../services/wms/mixService'
-import { useRawRole } from '../../../hooks/useRawRole'
+import { useMixRole } from '../../../hooks/useMixRole'
 import { FacilitySelect, fmtDt, fmtKg, useKhoFacility } from './khoCommon'
 import { I } from './khoMixUtil'
 import './khoMix.css'
@@ -17,7 +17,7 @@ export default function KhoMixStock() {
   const nav = useNavigate()
   const loc = useLocation()
   const { facilities, facilityId, facility, setFacilityId } = useKhoFacility()
-  const role = useRawRole(facilityId)
+  const role = useMixRole(facilityId)
   const [bal, setBal] = useState<MixBalance | null>(null)
   const [lots, setLots] = useState<MixLot[]>([])
   const [moves, setMoves] = useState<MixMovement[]>([])
@@ -40,7 +40,7 @@ export default function KhoMixStock() {
   }, [facilityId, all])
   useEffect(() => { load() }, [load])
 
-  const canWrite = role.isKeeper || role.isQC || role.isBGD
+  const canWrite = role.khaiBao
 
   async function kiemKe(l: MixLot) {
     const e = kk[l.id]; const n = e && e.kg !== '' ? Number(e.kg) : null
@@ -77,7 +77,7 @@ export default function KhoMixStock() {
           <div className="kmx-col kmx-center"><span className="kmx-lbl">Nhập tháng</span><span className="kmx-num md">{fmtKg(bal?.nhap_thang_kg)}</span></div>
         </section>
         <Link to="/m/kho/chen/kho/nhap" className="kmx-btn" onClick={(e) => { if (!canWrite) e.preventDefault() }} style={!canWrite ? { opacity: 0.45 } : undefined}>{I.plus}Nhập lô chèn</Link>
-        {!canWrite && !role.loading && <span className="kmx-sm kmx-center">Chỉ thủ kho NVL, QC hoặc BGĐ mới nhập / sửa lô chèn.</span>}
+        {!canWrite && !role.loading && <span className="kmx-sm kmx-center">Chỉ QS được phân công (hoặc BGĐ) mới nhập / sửa lô chèn.</span>}
 
         <div className="kmx-row" style={{ padding: '0 2px' }}>
           <h2 className="kmx-h2">Lô chèn · {lots.length}</h2>

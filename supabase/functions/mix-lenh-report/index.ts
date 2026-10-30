@@ -22,6 +22,9 @@ const APP_URL = 'https://huyanhrubber.vn'
 
 // ★ Luôn nhận thêm ngoài BGĐ trong Nhân sự (chủ DN 31/10: "thêm minhld@huyanhrubber.com vào danh sách gửi mail tự động")
 const MAIL_THEM: Array<{ name: string; email: string }> = [{ name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com' }]
+// ★ CHẾ ĐỘ THỬ (chủ DN 31/10: "thử với mail tôi trước đã, comment mail của BGĐ lại") — chỉ gửi MAIL_THEM, bỏ qua BGĐ trong Nhân sự và body.to.
+//   Thử xong: đổi thành false → gửi BGĐ (level ≤ 3 có email) + MAIL_THEM. Nhớ đổi cùng cờ CHE_DO_TEST trong src/services/wms/maTongKetMail.ts.
+const CHE_DO_TEST = true
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -199,9 +202,11 @@ serve(async (req) => {
 
     // 3) người nhận: BGĐ (level ≤ 3, active, có email) ∪ MAIL_THEM ∪ body.to
     const recipients = new Map<string, { name: string; email: string }>()
-    for (const b of Array.isArray(tk?.bgd) ? tk.bgd : []) if (b?.email) recipients.set(String(b.email).toLowerCase(), { name: b.name || b.email, email: b.email })
+    if (!CHE_DO_TEST) {   // BGĐ trong Nhân sự + người gọi thêm — tắt khi đang thử
+      for (const b of Array.isArray(tk?.bgd) ? tk.bgd : []) if (b?.email) recipients.set(String(b.email).toLowerCase(), { name: b.name || b.email, email: b.email })
+      for (const e of Array.isArray(body.to) ? body.to : []) if (typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) recipients.set(e.toLowerCase(), { name: e, email: e })
+    }
     for (const b of MAIL_THEM) recipients.set(b.email.toLowerCase(), b)
-    for (const e of Array.isArray(body.to) ? body.to : []) if (typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) recipients.set(e.toLowerCase(), { name: e, email: e })
     const to = [...recipients.values()]
 
     const { subject, html, preheader } = renderHtml(tk, phieu, String(body.nguoi_lap ?? ''))

@@ -189,10 +189,12 @@ export async function guiMailTongKet(to: string[], m: MailTongKet): Promise<{ ok
 
 /** Luôn nhận thêm ngoài BGĐ trong Nhân sự (chủ DN 31/10) — đồng bộ với MAIL_THEM trong supabase/functions/mix-lenh-report */
 export const MAIL_THEM_TU_DONG = ['minhld@huyanhrubber.com']
+/** ★ CHẾ ĐỘ THỬ (chủ DN 31/10): chỉ gửi MAIL_THEM_TU_DONG, bỏ qua BGĐ. Thử xong đổi thành false (và cờ CHE_DO_TEST trong supabase/functions/mix-lenh-report). */
+export const CHE_DO_TEST = true
 /** Danh sách người nhận tự động của một bản tổng kết (BGĐ level ≤ 3 có email + MAIL_THEM_TU_DONG) */
 export function nguoiNhanTuDong(tk: RawLotTongKet): string[] {
   const s = new Set<string>()
-  for (const b of tk.bgd) if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) s.add(b.email.toLowerCase())
+  if (!CHE_DO_TEST) for (const b of tk.bgd) if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) s.add(b.email.toLowerCase())   // BGĐ: tắt khi đang thử
   for (const e of MAIL_THEM_TU_DONG) s.add(e.toLowerCase())
   return [...s]
 }

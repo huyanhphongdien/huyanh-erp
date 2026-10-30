@@ -48,6 +48,7 @@ export default function MixShiftPage() {
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [chayBusy, setChayBusy] = useState(false)
   const [f, setF] = useState({ lotId: undefined as string | undefined, kg: null as number | null, shiftId: undefined as string | undefined, team: '', purpose: 'chay_lai' as MixPurpose, targetIndex: '', targetValue: null as number | null, poId: undefined as string | undefined, note: '', rawLotIds: [] as string[], soBanh: null as number | null, grossKg: null as number | null, palletKg: 15 as number | null, viTri: undefined as MixViTri | undefined })
 
   useEffect(() => {
@@ -104,6 +105,17 @@ export default function MixShiftPage() {
   const lotChon = lotsCoHang.find((l) => l.id === f.lotId)
   // kg hàng chèn: gõ thẳng, hoặc = hàng + pallet − bì (như sổ tay tổ ép)
   const kgNet = f.kg ?? (f.grossKg !== null ? Math.round((f.grossKg - (f.palletKg ?? 0)) * 100) / 100 : null)
+  // khai / kết thúc mã đang chạy ngay trên máy tính (sổ mã đang chạy, SQL p10)
+  const doiChay = async (batDau: boolean) => {
+    if (!maChon) return
+    setChayBusy(true)
+    try {
+      if (batDau) { const r = await rawLotService.batDauChay(maChon.raw_lot_id); message.success(r.da_chay ? `${r.ma} đã đang chạy` : `Đã khai ${r.ma} đang chạy — phiếu ca, phiếu chèn, lô TP từ giờ tự theo mã này`) }
+      else { await rawLotService.ketThucChay(maChon.raw_lot_id); message.success(`${maChon.ma} đã kết thúc chạy`) }
+      await load()
+    } catch (e: any) { message.error(e?.message || 'Không khai được (cần chạy SQL p10)') }
+    finally { setChayBusy(false) }
+  }
 
   const submit = async () => {
     if (!f.lotId) { message.warning('Chọn lô chèn'); return }
@@ -178,6 +190,9 @@ export default function MixShiftPage() {
             <Select style={{ minWidth: 260 }} showSearch optionFilterProp="label" value={maId} onChange={setMaId} placeholder="Chọn mã nguyên liệu"
               options={maAll.map((m) => ({ value: m.raw_lot_id, label: `${m.ma} · ${RAW_LOT_TRANG_THAI_LABELS[m.trang_thai]}${m.rubber_type_name ? ' · ' + m.rubber_type_name : ''}` }))} />
             {maChon && <Tag color={maChon.trang_thai === 'dang_chay' ? 'green' : maChon.trang_thai === 'san_sang' ? 'blue' : 'default'}>{RAW_LOT_TRANG_THAI_LABELS[maChon.trang_thai]}</Tag>}
+            {maChon && (maChon.dang_chay_tu
+              ? <Button size="small" loading={chayBusy} onClick={() => doiChay(false)}>Kết thúc chạy</Button>
+              : <Button size="small" type="primary" ghost loading={chayBusy} disabled={!canWrite} onClick={() => doiChay(true)}>Khai mã này đang chạy</Button>)}
             {maChon && <Text type="secondary">{maChon.ngay_dau ? `về ${new Date(maChon.ngay_dau).toLocaleDateString('vi-VN')}` : ''}{maChon.ngay_cuoi && maChon.ngay_cuoi !== maChon.ngay_dau ? ` → ${new Date(maChon.ngay_cuoi).toLocaleDateString('vi-VN')}` : ''} · {maChon.so_xe} xe · xuất SX {fmtKg(maChon.xuat_sx_kho_kg)} kg khô</Text>}
           </Space>}>
           {chenMa && chenMa.chen_kg > 0 && (

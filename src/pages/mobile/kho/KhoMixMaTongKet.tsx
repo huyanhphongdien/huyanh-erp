@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type RawLotTongKet } from '../../../services/wms/rawLotService'
 import { MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS } from '../../../services/wms/mixService'
-import { guiMailTongKet, mailtoTongKet, soanMailTongKet } from '../../../services/wms/maTongKetMail'
+import { guiMailTongKet, mailtoTongKet, soanMailTongKet, taiPhieuAnh, type PhieuAnh } from '../../../services/wms/maTongKetMail'
 import { fmtD, fmtDt, fmtKg } from './khoCommon'
 import { I } from './khoMixUtil'
 import './khoMix.css'
@@ -27,16 +27,18 @@ export default function KhoMixMaTongKet() {
   const [them, setThem] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [phieu, setPhieu] = useState<PhieuAnh[]>([])   // từng lần chèn + ảnh kèm trong mail
 
   useEffect(() => {
     if (!id) return
     let alive = true
     const req = laLenh ? rawLotService.tongKetLenh(id) : rawLotService.tongKetMa(id)
-    req.then((r) => { if (!alive) return; setTk(r); setTo(r.bgd.map((b) => b.email)) }).catch((e: any) => { if (alive) setErr(e?.message || 'Không tổng kết được (cần chạy SQL p12 + p13)') })
+    req.then((r) => { if (!alive) return; setTk(r); setTo(r.bgd.map((b) => b.email)); taiPhieuAnh(r).then((x) => { if (alive) setPhieu(x) }).catch(() => { if (alive) setPhieu([]) }) }).catch((e: any) => { if (alive) setErr(e?.message || 'Không tổng kết được (cần chạy SQL p12 + p13)') })
     return () => { alive = false }
   }, [id, laLenh])
 
-  const mail = useMemo(() => (tk ? soanMailTongKet(tk) : null), [tk])
+  const mail = useMemo(() => (tk ? soanMailTongKet(tk, phieu) : null), [tk, phieu])
+  const soAnh = phieu.reduce((s, r) => s + r.anhLay.length + r.anhTra.length, 0)
   const toOk = to.filter(okEmail)
   const toggle = (email: string) => setTo((cur) => (cur.includes(email) ? cur.filter((x) => x !== email) : [...cur, email]))
   const themEmail = () => { const e = them.trim().toLowerCase(); if (!okEmail(e)) { setMsg({ ok: false, text: 'Địa chỉ mail chưa đúng' }); return } if (!to.includes(e)) setTo([...to, e]); setThem('') }
@@ -126,7 +128,7 @@ export default function KhoMixMaTongKet() {
 
           <section className="kmx-card" style={{ gap: 8 }}>
             <span className="kmx-strong" style={{ fontSize: 13 }}>Mail báo cáo Ban Giám đốc</span>
-            <span className="kmx-sm">Chạm tên để bỏ / chọn người nhận.</span>
+            <span className="kmx-sm">Chạm tên để bỏ / chọn người nhận.{phieu.length > 0 ? ` Mail gửi qua hệ thống kèm ${phieu.length} lần chèn · ${soAnh} ảnh.` : ''}</span>
             <div className="kmx-row" style={{ gap: 6, flexWrap: 'wrap' }}>
               {tk.bgd.map((b) => <button key={b.email} type="button" className="kmx-pill sm" style={to.includes(b.email) ? chipOn : undefined} onClick={() => toggle(b.email)}>{b.name}{b.chuc_vu ? ` · ${b.chuc_vu}` : ''}</button>)}
               {to.filter((e) => !tk.bgd.some((b) => b.email === e)).map((e) => <button key={e} type="button" className="kmx-pill sm" style={chipOn} onClick={() => toggle(e)}>{e}</button>)}

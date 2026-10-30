@@ -241,13 +241,14 @@ export const mixService = {
     return String(data)
   },
 
-  async listIssues(opts: { facilityId?: string | null; date?: string | null; status?: MixIssueStatus[] | null; lotId?: string | null; rawLotId?: string | null; chuaMa?: boolean; limit?: number } = {}): Promise<MixIssue[]> {
+  async listIssues(opts: { facilityId?: string | null; date?: string | null; status?: MixIssueStatus[] | null; lotId?: string | null; rawLotId?: string | null; lenhId?: string | null; chuaMa?: boolean; limit?: number } = {}): Promise<MixIssue[]> {
     let q = supabase.from('v_mix_issues').select('*').order('out_at', { ascending: false }).limit(opts.limit ?? 200)
     if (opts.facilityId) q = q.eq('facility_id', opts.facilityId)
     if (opts.date) q = q.eq('shift_date', opts.date)
     if (opts.status?.length) q = q.in('status', opts.status)
     if (opts.lotId) q = q.eq('mix_lot_id', opts.lotId)
     if (opts.rawLotId) q = q.contains('raw_lot_ids', [opts.rawLotId])          // phiếu chèn vào mã này (kể cả chèn chung nhiều mã)
+    if (opts.lenhId) q = q.eq('lenh_id', opts.lenhId)                             // phiếu chèn của một lệnh (SQL p13)
     if (opts.chuaMa) q = q.is('raw_lot_id', null).neq('status', 'cancelled')
     const { data, error } = await q
     if (error) throw error

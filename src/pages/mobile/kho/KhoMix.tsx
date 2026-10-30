@@ -243,7 +243,7 @@ export default function KhoMix() {
                 )
               })}
               {btnLay('kmx-btn')}
-              <span className="kmx-sm kmx-center">Mỗi lần lấy = một pallet: chọn lô, cân cả pallet, máy trừ bì và tính bành. Cuối ca: dùng hết thì cân pallet rỗng (bì chính xác), còn dư thì cân hàng + pallet; chụp 2 ảnh.</span>
+              <span className="kmx-sm kmx-center">Mỗi lần lấy = một pallet: chạm nguồn + số lô, cân cả pallet (băng tải: số bành), bì khai lúc trả. Cuối ca: 3 lần cân, chụp 2 ảnh. "Tổng kết" xem báo cáo + mail bất cứ lúc nào; "Kết thúc" đóng lệnh (QS, thủ kho NVL, BGĐ).</span>
             </section>
           ) : (
             <section className="kmx-card hero" aria-label="Việc tiếp theo">

@@ -9,7 +9,7 @@ import { Alert, Button, Col, Input, Modal, Row, Select, Space, Statistic, Table,
 import { CopyOutlined, MailOutlined, SendOutlined } from '@ant-design/icons'
 import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type RawLotTongKet, type RawLotTongKetCa } from '../../services/wms/rawLotService'
 import { MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS } from '../../services/wms/mixService'
-import { guiMailTongKet, mailtoTongKet, soanMailTongKet } from '../../services/wms/maTongKetMail'
+import { guiMailTongKet, mailtoTongKet, soanMailTongKet, taiPhieuAnh, type PhieuAnh } from '../../services/wms/maTongKetMail'
 
 const { Text, Title } = Typography
 const fmtKg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
@@ -23,20 +23,22 @@ export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onC
   const [err, setErr] = useState<string | null>(null)
   const [to, setTo] = useState<string[]>([])
   const [sending, setSending] = useState(false)
+  const [phieu, setPhieu] = useState<PhieuAnh[]>([])   // từng lần chèn + ảnh kèm trong mail
 
   useEffect(() => {
     if (!open || (!rawLotId && !lenhId)) return
     let alive = true
-    setLoading(true); setErr(null); setTk(null)
+    setLoading(true); setErr(null); setTk(null); setPhieu([])
     const req = lenhId ? rawLotService.tongKetLenh(lenhId) : rawLotService.tongKetMa(rawLotId ?? '')
     req
-      .then((r) => { if (!alive) return; setTk(r); setTo(r.bgd.map((b) => b.email)) })
+      .then((r) => { if (!alive) return; setTk(r); setTo(r.bgd.map((b) => b.email)); taiPhieuAnh(r).then((x) => { if (alive) setPhieu(x) }).catch(() => { if (alive) setPhieu([]) }) })
       .catch((e: any) => { if (alive) setErr(e?.message || 'Không tổng kết được (cần chạy SQL p12 + p13)') })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [open, rawLotId, lenhId])
 
-  const mail = useMemo(() => (tk ? soanMailTongKet(tk) : null), [tk])
+  const mail = useMemo(() => (tk ? soanMailTongKet(tk, phieu) : null), [tk, phieu])
+  const soAnh = phieu.reduce((s, r) => s + r.anhLay.length + r.anhTra.length, 0)
   const toOk = to.filter(okEmail)
 
   const gui = async () => {
@@ -113,7 +115,7 @@ export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onC
 
           <div style={{ background: '#FAFAF7', border: '1px solid #E5E7EB', borderRadius: 8, padding: 12 }}>
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
-              <Space wrap><MailOutlined /><Text strong>Mail báo cáo Ban Giám đốc</Text><Text type="secondary">(soạn sẵn từ số trên, sửa người nhận nếu cần)</Text></Space>
+              <Space wrap><MailOutlined /><Text strong>Mail báo cáo Ban Giám đốc</Text><Text type="secondary">(soạn sẵn từ số trên, sửa người nhận nếu cần)</Text>{phieu.length > 0 && <Tag color="green">{phieu.length} lần chèn · {soAnh} ảnh kèm trong mail gửi qua hệ thống</Tag>}</Space>
               <Select mode="tags" style={{ width: '100%' }} value={to} onChange={setTo} placeholder="Địa chỉ nhận" tokenSeparators={[',', ';', ' ']}
                 options={tk.bgd.map((b) => ({ value: b.email, label: `${b.name}${b.chuc_vu ? ` · ${b.chuc_vu}` : ''} <${b.email}>` }))} />
               {!tk.bgd.length && <Text type="warning">Chưa tìm thấy nhân viên chức vụ Ban Giám đốc có email trong danh sách nhân sự — gõ địa chỉ nhận vào ô trên.</Text>}

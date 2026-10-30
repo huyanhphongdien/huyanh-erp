@@ -12,7 +12,7 @@ import { MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS } from '../../services/wms/mixServ
 import { guiMailTongKet, mailtoTongKet, soanMailTongKet, taiPhieuAnh, type PhieuAnh } from '../../services/wms/maTongKetMail'
 
 const { Text, Title } = Typography
-const fmtKg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
+const fmtKg = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: Math.max(d, 1), minimumFractionDigits: 0 }))   // không làm tròn kg (chủ DN 31/10): giữ số lẻ khi có
 const fmtD = (v: string | null | undefined) => (v ? new Date(v).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }) : '—')
 const fmtDt = (v: string | null | undefined) => (v ? new Date(v).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '—')
 const okEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
@@ -74,10 +74,10 @@ export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onC
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           {vuaKetThuc && <Alert type="success" showIcon message={`Đã kết thúc ${tk.lenh_code ? `lệnh ${tk.lenh_code} (${tk.ma})` : `chạy mã ${tk.ma}`}. Mail báo cáo (kèm ảnh) đã tự gửi cho Ban Giám đốc — bản dưới để xem lại hoặc gửi thêm.`} />}
           <Row gutter={[16, 8]}>
-            <Col xs={12} md={6}><Statistic title="Tiêu hao hàng chèn (kg)" value={tk.chen?.chen_kg ?? tk.phieu.tieu_hao_da_nhan} precision={0} valueStyle={{ color: '#1B4D3E', fontWeight: 700 }} suffix={tk.chen?.ty_le_pct !== null && tk.chen?.ty_le_pct !== undefined ? <Text type="secondary" style={{ fontSize: 12 }}>= {tk.chen.ty_le_pct} % hàng vào máy</Text> : undefined} /></Col>
+            <Col xs={12} md={6}><Statistic title="Tiêu hao hàng chèn (kg)" value={fmtKg(tk.chen?.chen_kg ?? tk.phieu.tieu_hao_da_nhan)} valueStyle={{ color: '#1B4D3E', fontWeight: 700 }} suffix={tk.chen?.ty_le_pct !== null && tk.chen?.ty_le_pct !== undefined ? <Text type="secondary" style={{ fontSize: 12 }}>= {tk.chen.ty_le_pct} % hàng vào máy</Text> : undefined} /></Col>
             <Col xs={12} md={6}><Statistic title="Số lần chèn" value={tk.phieu.tong} suffix={<Text type="secondary" style={{ fontSize: 12 }}>/ {tk.phieu.so_ca} ca · {tk.phieu.so_banh} bành</Text>} /></Col>
-            <Col xs={12} md={6}><Statistic title="NVL vào máy (kg khô)" value={tk.xuat_sx_kho_kg ?? 0} precision={0} suffix={<Text type="secondary" style={{ fontSize: 12 }}>nhập {fmtKg(tk.nhap_kho_kg ?? tk.dry_kg)} · {tk.so_xe} xe</Text>} /></Col>
-            <Col xs={12} md={6}><Statistic title="Thành phẩm đạt (kg)" value={tk.tp_dat_kg ?? 0} precision={0} suffix={<Text type="secondary" style={{ fontSize: 12 }}>{tk.hieu_suat_pct !== null ? `hiệu suất ${tk.hieu_suat_pct} %` : 'chưa có sổ ca'}</Text>} /></Col>
+            <Col xs={12} md={6}><Statistic title="NVL vào máy (kg khô)" value={fmtKg(tk.xuat_sx_kho_kg ?? 0)} suffix={<Text type="secondary" style={{ fontSize: 12 }}>nhập {fmtKg(tk.nhap_kho_kg ?? tk.dry_kg)} · {tk.so_xe} xe</Text>} /></Col>
+            <Col xs={12} md={6}><Statistic title="Thành phẩm đạt (kg)" value={fmtKg(tk.tp_dat_kg ?? 0)} suffix={<Text type="secondary" style={{ fontSize: 12 }}>{tk.hieu_suat_pct !== null ? `hiệu suất ${tk.hieu_suat_pct} %` : 'chưa có sổ ca'}</Text>} /></Col>
           </Row>
           <Space wrap size={[6, 4]}>
             <Tag color="cyan">bể Slap {fmtKg(tk.chen?.be_kg ?? tk.phieu.be_slap)} kg</Tag>

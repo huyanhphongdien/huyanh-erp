@@ -12,7 +12,7 @@ import type { RawPhoto } from './rawPhotoService'
 import { rawLotService, type RawLotTongKet } from './rawLotService'
 
 const APP_URL = 'https://huyanhrubber.vn'
-const kg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
+const kg = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: Math.max(d, 1), minimumFractionDigits: 0 }))   // không làm tròn kg (chủ DN 31/10): giữ số lẻ khi có
 const kg1 = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }))
 const pct = (n: number | null | undefined) => (n === null || n === undefined ? '—' : `${n.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} %`)
 const d = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString('vi-VN') : '—')

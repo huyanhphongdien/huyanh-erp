@@ -21,7 +21,7 @@ import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 
 const { Title, Text } = Typography
-const fmtKg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
+const fmtKg = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: Math.max(d, 1), minimumFractionDigits: 0 }))   // không làm tròn kg (chủ DN 31/10): giữ số lẻ khi có
 const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const OPEN: MixIssue['status'][] = ['issued', 'returned', 'submitted', 'qc_confirmed']
 
@@ -258,10 +258,10 @@ export default function MixShiftPage() {
         {!loading && !lotsCoHang.length && <Alert type="info" showIcon message="Kho chèn chưa có lô nào còn hàng." action={<Button size="small" onClick={() => navigate('/wms/chen/ton')}>Nhập lô chèn</Button>} />}
 
         <Row gutter={[12, 12]}>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="Tại kho chèn (kg)" value={balance?.tai_kho_kg ?? 0} precision={0} /></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="Đang ở dây chuyền (kg)" value={balance?.o_day_chuyen_kg ?? 0} precision={0} valueStyle={{ color: (balance?.o_day_chuyen_kg ?? 0) > 0 ? '#B7791F' : undefined }} /></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title={`Tiêu hao mã ${maChon?.ma ?? '—'} đã nhận (kg)`} value={chenMa?.chen_kg ?? tieuHaoMa} precision={0} suffix={chenMa?.ty_le_chen_pct !== null && chenMa?.ty_le_chen_pct !== undefined ? <Text type="secondary" style={{ fontSize: 13 }}>· {chenMa.ty_le_chen_pct} % hàng vào máy</Text> : undefined} /></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="Chờ ký (kg)" value={choKyKg} precision={0} valueStyle={{ color: choKyKg > 0 ? '#B7791F' : undefined }} /></Card></Col>
+          <Col xs={12} md={6}><Card size="small"><Statistic title="Tại kho chèn (kg)" value={fmtKg(balance?.tai_kho_kg ?? 0)} /></Card></Col>
+          <Col xs={12} md={6}><Card size="small"><Statistic title="Đang ở dây chuyền (kg)" value={fmtKg(balance?.o_day_chuyen_kg ?? 0)} valueStyle={{ color: (balance?.o_day_chuyen_kg ?? 0) > 0 ? '#B7791F' : undefined }} /></Card></Col>
+          <Col xs={12} md={6}><Card size="small"><Statistic title={`Tiêu hao mã ${maChon?.ma ?? '—'} đã nhận (kg)`} value={fmtKg(chenMa?.chen_kg ?? tieuHaoMa)} suffix={chenMa?.ty_le_chen_pct !== null && chenMa?.ty_le_chen_pct !== undefined ? <Text type="secondary" style={{ fontSize: 13 }}>· {chenMa.ty_le_chen_pct} % hàng vào máy</Text> : undefined} /></Card></Col>
+          <Col xs={12} md={6}><Card size="small"><Statistic title="Chờ ký (kg)" value={fmtKg(choKyKg)} valueStyle={{ color: choKyKg > 0 ? '#B7791F' : undefined }} /></Card></Col>
         </Row>
 
         {lotFilter && (
@@ -305,10 +305,10 @@ export default function MixShiftPage() {
             <div style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', background: '#FAFAF7' }}>
               <Row gutter={[16, 8]}>
                 <Col xs={12} md={4}><Statistic title="Số lần chèn" value={tongMa.lan} suffix={<Text type="secondary" style={{ fontSize: 12 }}>· {tongMa.ca.size} ca{tongMa.banh ? ` · ${tongMa.banh} bành` : ''}</Text>} /></Col>
-                <Col xs={12} md={4}><Statistic title="Đã lấy (kg)" value={tongMa.lay} precision={0} /></Col>
-                <Col xs={12} md={4}><Statistic title="Đã trả (kg)" value={tongMa.tra} precision={0} /></Col>
-                <Col xs={12} md={6}><Statistic title="Tiêu hao lũy kế (kg)" value={tongMa.tieuHao} precision={0} valueStyle={{ color: '#1B4D3E', fontWeight: 700 }} suffix={<Text type="secondary" style={{ fontSize: 12 }}>· đã nhận {fmtKg(tongMa.daNhan)}{tongMa.choKy > 0 ? ` · chờ ký ${fmtKg(tongMa.choKy)}` : ''}</Text>} /></Col>
-                <Col xs={12} md={6}><Statistic title="Đang ở dây chuyền (kg)" value={tongMa.dayChuyen} precision={0} valueStyle={{ color: tongMa.dayChuyen > 0 ? '#B7791F' : undefined }} suffix={<Text type="secondary" style={{ fontSize: 12 }}>chưa trả, chưa tính tiêu hao</Text>} /></Col>
+                <Col xs={12} md={4}><Statistic title="Đã lấy (kg)" value={fmtKg(tongMa.lay)} /></Col>
+                <Col xs={12} md={4}><Statistic title="Đã trả (kg)" value={fmtKg(tongMa.tra)} /></Col>
+                <Col xs={12} md={6}><Statistic title="Tiêu hao lũy kế (kg)" value={fmtKg(tongMa.tieuHao)} valueStyle={{ color: '#1B4D3E', fontWeight: 700 }} suffix={<Text type="secondary" style={{ fontSize: 12 }}>· đã nhận {fmtKg(tongMa.daNhan)}{tongMa.choKy > 0 ? ` · chờ ký ${fmtKg(tongMa.choKy)}` : ''}</Text>} /></Col>
+                <Col xs={12} md={6}><Statistic title="Đang ở dây chuyền (kg)" value={fmtKg(tongMa.dayChuyen)} valueStyle={{ color: tongMa.dayChuyen > 0 ? '#B7791F' : undefined }} suffix={<Text type="secondary" style={{ fontSize: 12 }}>chưa trả, chưa tính tiêu hao</Text>} /></Col>
               </Row>
               <Space wrap size={[8, 4]} style={{ marginTop: 6 }}>
                 {tongMa.be > 0 && <Tag color="cyan">bể Slap {fmtKg(tongMa.be)} kg</Tag>}

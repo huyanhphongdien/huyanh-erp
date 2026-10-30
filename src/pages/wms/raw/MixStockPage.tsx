@@ -15,7 +15,7 @@ import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 
 const { Title, Text } = Typography
-const fmtKg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
+const fmtKg = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: Math.max(d, 1), minimumFractionDigits: 0 }))   // không làm tròn kg (chủ DN 31/10): giữ số lẻ khi có
 const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
 const GRADES = ['SVR 3L', 'SVR 5', 'SVR 10', 'SVR 20', 'SVR CV50', 'SVR CV60', 'SVR L', 'RSS 3', 'SBR 1502', 'Khác']
@@ -132,9 +132,9 @@ export default function MixStockPage() {
         {!canWrite && !mixRole.loading && <Alert type="warning" showIcon message="Chỉ QS được phân công (hoặc BGĐ) mới nhập lô chèn. Phân công ở tab Phân công." />}
 
         <Row gutter={[12, 12]}>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="Tại kho chèn (kg)" value={balance?.tai_kho_kg ?? 0} precision={0} /></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="Đang ở dây chuyền (kg)" value={balance?.o_day_chuyen_kg ?? 0} precision={0} valueStyle={{ color: (balance?.o_day_chuyen_kg ?? 0) > 0 ? '#B7791F' : undefined }} /></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="Nhập trong tháng (kg)" value={balance?.nhap_thang_kg ?? 0} precision={0} /></Card></Col>
+          <Col xs={12} md={6}><Card size="small"><Statistic title="Tại kho chèn (kg)" value={fmtKg(balance?.tai_kho_kg ?? 0)} /></Card></Col>
+          <Col xs={12} md={6}><Card size="small"><Statistic title="Đang ở dây chuyền (kg)" value={fmtKg(balance?.o_day_chuyen_kg ?? 0)} valueStyle={{ color: (balance?.o_day_chuyen_kg ?? 0) > 0 ? '#B7791F' : undefined }} /></Card></Col>
+          <Col xs={12} md={6}><Card size="small"><Statistic title="Nhập trong tháng (kg)" value={fmtKg(balance?.nhap_thang_kg ?? 0)} /></Card></Col>
           <Col xs={12} md={6}><Card size="small"><Statistic title="Lô còn hàng" value={balance?.so_lo ?? 0} suffix={<Text type="secondary" style={{ fontSize: 13 }}>· tiêu hao tổng {fmtKg(balance?.tieu_hao_tong_kg)} kg</Text>} /></Card></Col>
         </Row>
 

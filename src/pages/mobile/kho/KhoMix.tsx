@@ -131,7 +131,7 @@ export default function KhoMix() {
   }, [cur])
   const tongMa = (ma: string) => ma.split(' + ').map((x) => chenMa.get(x.trim())).filter(Boolean) as RawLotChen[]
   const btnLay = (cls: string) => (
-    <Link to="/m/kho/chen/lay" className={cls} aria-disabled={!canTake || !lotsCoHang.length} onClick={(e) => { if (!canTake || !lotsCoHang.length) e.preventDefault() }} style={!canTake || !lotsCoHang.length ? { opacity: 0.45 } : undefined}>{I.plus}Lấy lần {lanKe}</Link>
+    <Link to="/m/kho/chen/lay" className={cls} aria-disabled={!canTake} onClick={(e) => { if (!canTake) e.preventDefault() }} style={!canTake ? { opacity: 0.45 } : undefined}>{I.plus}Lấy lần {lanKe}</Link>   // phương án B: không cần kho chèn có lô
   )
 
   return (
@@ -249,9 +249,9 @@ export default function KhoMix() {
             <section className="kmx-card hero" aria-label="Việc tiếp theo">
               <span className="kmx-lbl ok">Đầu ca</span>
               <span className="kmx-strong" style={{ fontSize: 18 }}>Chưa chèn lần nào ca này</span>
-              <span className="kmx-md">Chọn lô, cân cả pallet, chụp 2 ảnh. Ba bước, xong trong một phút. Các lần sau hiện thành dòng L1, L2… như sổ tay.</span>
+              <span className="kmx-md">Chạm nguồn (chuẩn / lỗi / DKL / SBR) + số lô trên bao, cân cả pallet, chụp 2 ảnh. Không cần nhập kho chèn trước. Các lần sau hiện thành dòng L1, L2… như sổ tay.</span>
               {btnLay('kmx-btn')}
-              {!lotsCoHang.length && !loading && <span className="kmx-sm kmx-center">Kho chèn chưa có lô. QS vào Kho chèn → Nhập lô chèn.</span>}
+              {!canTake && !loading && <span className="kmx-sm kmx-center">Chưa được phân công khai báo (QS) — xem Hàng chèn → Phân công.</span>}
               {!canTake && !role.loading && <span className="kmx-sm kmx-center">Tài khoản này chưa được phân công khai báo hàng chèn (QS). BGĐ phân công ở máy tính: Hàng chèn → Phân công.</span>}
             </section>
           )}

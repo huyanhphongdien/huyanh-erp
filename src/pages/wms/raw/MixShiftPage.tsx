@@ -11,7 +11,7 @@ import { DatabaseOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icon
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPurpose, type MixViTri, type ShiftLite } from '../../../services/wms/mixService'
 import { rawIssueService, type ProductionOrderLite } from '../../../services/wms/rawIssueService'
-import { rawLotService, type RawLotBalance } from '../../../services/wms/rawLotService'
+import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type RawLotBalance, type RawLotChen } from '../../../services/wms/rawLotService'
 import { useMixRole } from '../../../hooks/useMixRole'
 import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
@@ -32,7 +32,12 @@ export default function MixShiftPage() {
   const mixRole = useMixRole(facilityId ?? null)
   const [date, setDate] = useState(todayLocal())
   const [openIssues, setOpenIssues] = useState<MixIssue[]>([])
-  const [dayIssues, setDayIssues] = useState<MixIssue[]>([])
+  // theo mã hàng đang chạy (một mã chạy nhiều ngày → không xem theo ngày)
+  const [maAll, setMaAll] = useState<RawLotBalance[]>([])
+  const [chenAll, setChenAll] = useState<RawLotChen[]>([])
+  const [maId, setMaId] = useState<string | undefined>(undefined)
+  const [maIssues, setMaIssues] = useState<MixIssue[]>([])
+  const [chuaMa, setChuaMa] = useState<MixIssue[]>([])
   const [lotIssues, setLotIssues] = useState<MixIssue[]>([])
   const [balance, setBalance] = useState<MixBalance | null>(null)
   const [lots, setLots] = useState<MixLot[]>([])
@@ -55,26 +60,46 @@ export default function MixShiftPage() {
     if (!facilityId) return
     setLoading(true); setError(null)
     try {
-      const [o, d, b, l, s, li] = await Promise.all([
+      const [o, b, l, s, li, ma, ch, cm] = await Promise.all([
         mixService.listIssues({ facilityId, status: OPEN }),
-        mixService.listIssues({ facilityId, date }),
         mixService.balance(facilityId),
         mixService.listLots(facilityId),
         shifts.length ? Promise.resolve(shifts) : mixService.listShifts(),
         lotFilter ? mixService.listIssues({ facilityId, lotId: lotFilter, limit: 100 }) : Promise.resolve([] as MixIssue[]),
+        rawLotService.list(facilityId, { includeClosed: true }).catch(() => [] as RawLotBalance[]),
+        rawLotService.chen(facilityId, { all: true }).catch(() => [] as RawLotChen[]),
+        mixService.listIssues({ facilityId, chuaMa: true, limit: 50 }).catch(() => [] as MixIssue[]),
       ])
-      setOpenIssues(o); setDayIssues(d); setBalance(b); setLots(l); setShifts(s); setLotIssues(li)
+      setOpenIssues(o); setBalance(b); setLots(l); setShifts(s); setLotIssues(li); setChenAll(ch); setChuaMa(cm)
+      const rank: Record<string, number> = { dang_chay: 0, san_sang: 1, da_chay_xong: 2 }
+      const sorted = [...ma].sort((x, y) => (rank[x.trang_thai] ?? 3) - (rank[y.trang_thai] ?? 3) || (y.ngay_cuoi ?? '').localeCompare(x.ngay_cuoi ?? ''))
+      setMaAll(sorted)
+      setMaId((cur) => cur && sorted.some((x) => x.raw_lot_id === cur) ? cur : (sorted.find((x) => x.trang_thai === 'dang_chay') ?? sorted.find((x) => (ch.find((c) => c.raw_lot_id === x.raw_lot_id)?.chen_kg ?? 0) > 0) ?? sorted[0])?.raw_lot_id)
     } catch (e: any) { setError(e?.message || 'Không tải được phiếu chèn') }
     finally { setLoading(false) }
-  }, [facilityId, date, lotFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [facilityId, lotFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    if (!facilityId || !maId) { setMaIssues([]); return }
+    let alive = true
+    mixService.listIssues({ facilityId, rawLotId: maId, limit: 300 }).then((r) => { if (alive) setMaIssues(r.filter((i) => i.status !== 'cancelled')) }).catch(() => { if (alive) setMaIssues([]) })
+    return () => { alive = false }
+  }, [facilityId, maId, openIssues])
   useEffect(() => { if (open && !pos.length) rawIssueService.listProductionOrders().then(setPos).catch(() => setPos([])) }, [open, pos.length])
   useEffect(() => { if (open && facilityId) rawLotService.maDangChay(facilityId).then(setMaList).catch(() => setMaList([])) }, [open, facilityId])
 
   const canWrite = mixRole.khaiBao
-  const tieuHaoNgay = useMemo(() => dayIssues.filter((i) => i.status === 'received').reduce((s, i) => s + (i.kg_used ?? 0), 0), [dayIssues])
-  const choKyNgay = useMemo(() => dayIssues.filter((i) => ['returned', 'submitted', 'qc_confirmed'].includes(i.status)).reduce((s, i) => s + (i.kg_used ?? 0), 0), [dayIssues])
+  const choKyKg = useMemo(() => openIssues.filter((i) => ['returned', 'submitted', 'qc_confirmed'].includes(i.status)).reduce((s, i) => s + (i.kg_used ?? 0), 0), [openIssues])
+  const maChon = maAll.find((x) => x.raw_lot_id === maId)
+  const chenMa = chenAll.find((x) => x.raw_lot_id === maId)
+  // phiếu của mã: xếp theo ngày · ca, đánh số lần L1, L2… trong từng ca
+  const maRows = useMemo(() => {
+    const sorted = [...maIssues].sort((a, b) => b.shift_date.localeCompare(a.shift_date) || (a.shift_id ?? '').localeCompare(b.shift_id ?? '') || a.out_at.localeCompare(b.out_at))
+    const dem = new Map<string, number>()
+    return sorted.map((i) => { const k = `${i.shift_date}|${i.shift_id ?? ''}`; const n = (dem.get(k) ?? 0) + 1; dem.set(k, n); return { ...i, lan: n } })
+  }, [maIssues])
+  const tieuHaoMa = useMemo(() => maIssues.filter((i) => i.status === 'received').reduce((s, i) => s + (i.kg_used ?? 0), 0), [maIssues])
   const lotsCoHang = useMemo(() => lots.filter((l) => l.ton_kg > 0.005), [lots])
   const lotChon = lotsCoHang.find((l) => l.id === f.lotId)
   // kg hàng chèn: gõ thẳng, hoặc = hàng + pallet − bì (như sổ tay tổ ép)
@@ -115,14 +140,13 @@ export default function MixShiftPage() {
         <Row justify="space-between" align="middle" gutter={[12, 12]}>
           <Col>
             <div>
-              <Title level={3} style={{ margin: 0 }}>Hàng chèn theo ca</Title>
+              <Title level={3} style={{ margin: 0 }}>Hàng chèn</Title>
               <Text type="secondary">QS lấy đầu ca → trả cuối ca → QS ký → QC duyệt → thủ kho nhận · tiêu hao = lấy − trả · 2 ảnh lúc lấy (trả 0 kg không cần ảnh) · dòng CHÈN sổ ca tự điền</Text>
             </div>
           </Col>
           <Col>
             <Space wrap>
               <FacilityPicker value={facilityId} onChange={(id) => setFacilityId(id)} allowAll={false} style={{ minWidth: 180 }} />
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value || todayLocal())} style={{ width: 150 }} />
               <Button icon={<DatabaseOutlined />} onClick={() => navigate('/wms/chen/ton')}>Kho chèn</Button>
               <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>Làm mới</Button>
               <Button type="primary" icon={<PlusOutlined />} disabled={!canWrite || !lotsCoHang.length} onClick={() => setOpen(true)}>Lấy đầu ca</Button>
@@ -135,8 +159,8 @@ export default function MixShiftPage() {
         <Row gutter={[12, 12]}>
           <Col xs={12} md={6}><Card size="small"><Statistic title="Tại kho chèn (kg)" value={balance?.tai_kho_kg ?? 0} precision={0} /></Card></Col>
           <Col xs={12} md={6}><Card size="small"><Statistic title="Đang ở dây chuyền (kg)" value={balance?.o_day_chuyen_kg ?? 0} precision={0} valueStyle={{ color: (balance?.o_day_chuyen_kg ?? 0) > 0 ? '#B7791F' : undefined }} /></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title={`Tiêu hao ${new Date(date).toLocaleDateString('vi-VN')} (kg)`} value={tieuHaoNgay} precision={0} /></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="Chờ ký (kg)" value={choKyNgay} precision={0} valueStyle={{ color: choKyNgay > 0 ? '#B7791F' : undefined }} /></Card></Col>
+          <Col xs={12} md={6}><Card size="small"><Statistic title={`Tiêu hao mã ${maChon?.ma ?? '—'} đã nhận (kg)`} value={chenMa?.chen_kg ?? tieuHaoMa} precision={0} suffix={chenMa?.ty_le_chen_pct !== null && chenMa?.ty_le_chen_pct !== undefined ? <Text type="secondary" style={{ fontSize: 13 }}>· {chenMa.ty_le_chen_pct} % hàng vào máy</Text> : undefined} /></Card></Col>
+          <Col xs={12} md={6}><Card size="small"><Statistic title="Chờ ký (kg)" value={choKyKg} precision={0} valueStyle={{ color: choKyKg > 0 ? '#B7791F' : undefined }} /></Card></Col>
         </Row>
 
         {lotFilter && (
@@ -149,9 +173,36 @@ export default function MixShiftPage() {
           <Table<MixIssue> rowKey="id" columns={columns} dataSource={openIssues} size="small" loading={loading} pagination={false} locale={{ emptyText: 'Không có phiếu đang mở' }} />
         </Card>
 
-        <Card size="small" bodyStyle={{ padding: 0 }} title={`Phiếu ngày ${new Date(date).toLocaleDateString('vi-VN')}`}>
-          <Table<MixIssue> rowKey="id" columns={columns} dataSource={dayIssues} size="small" loading={loading} pagination={{ pageSize: 20, showSizeChanger: false }} locale={{ emptyText: 'Ngày này chưa có phiếu chèn' }} />
+        <Card size="small" bodyStyle={{ padding: 0 }}
+          title={<Space wrap>Phiếu theo mã hàng đang chạy
+            <Select style={{ minWidth: 260 }} showSearch optionFilterProp="label" value={maId} onChange={setMaId} placeholder="Chọn mã nguyên liệu"
+              options={maAll.map((m) => ({ value: m.raw_lot_id, label: `${m.ma} · ${RAW_LOT_TRANG_THAI_LABELS[m.trang_thai]}${m.rubber_type_name ? ' · ' + m.rubber_type_name : ''}` }))} />
+            {maChon && <Tag color={maChon.trang_thai === 'dang_chay' ? 'green' : maChon.trang_thai === 'san_sang' ? 'blue' : 'default'}>{RAW_LOT_TRANG_THAI_LABELS[maChon.trang_thai]}</Tag>}
+            {maChon && <Text type="secondary">{maChon.ngay_dau ? `về ${new Date(maChon.ngay_dau).toLocaleDateString('vi-VN')}` : ''}{maChon.ngay_cuoi && maChon.ngay_cuoi !== maChon.ngay_dau ? ` → ${new Date(maChon.ngay_cuoi).toLocaleDateString('vi-VN')}` : ''} · {maChon.so_xe} xe · xuất SX {fmtKg(maChon.xuat_sx_kho_kg)} kg khô</Text>}
+          </Space>}>
+          {chenMa && chenMa.chen_kg > 0 && (
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+              <Space wrap size={[14, 4]}>
+                <Text>Đã nhận <Text strong>{fmtKg(chenMa.chen_kg)} kg</Text>{chenMa.so_banh_chen ? ` · ${chenMa.so_banh_chen} bành` : ''} · {chenMa.so_phieu_chen} phiếu</Text>
+                {chenMa.chen_be_kg > 0 && <Tag color="cyan">bể Slap {fmtKg(chenMa.chen_be_kg)}</Tag>}
+                {chenMa.chen_mix_kg > 0 && <Tag color="purple">máy Mix {fmtKg(chenMa.chen_mix_kg)}</Tag>}
+                {chenMa.chen_loi_kg > 0 && <Tag>lỗi {fmtKg(chenMa.chen_loi_kg)}</Tag>}
+                {chenMa.chen_dkl_kg > 0 && <Tag>DKL {fmtKg(chenMa.chen_dkl_kg)}</Tag>}
+                {chenMa.chen_chuan_kg > 0 && <Tag>chuẩn {fmtKg(chenMa.chen_chuan_kg)}</Tag>}
+                {chenMa.chen_khac_kg > 0 && <Tag>mua ngoài / khác {fmtKg(chenMa.chen_khac_kg)}</Tag>}
+                {chenMa.ty_le_chen_pct !== null && <Text type="secondary">{chenMa.ty_le_chen_pct} % hàng vào máy</Text>}
+              </Space>
+            </div>
+          )}
+          <Table<MixIssue> rowKey="id" columns={[{ title: 'Lần', key: 'lan', width: 56, render: (_, r) => <Text strong>L{(r as MixIssue & { lan: number }).lan}</Text> }, ...columns]} dataSource={maRows} size="small" loading={loading}
+            pagination={{ pageSize: 30, showSizeChanger: false }} locale={{ emptyText: maId ? 'Mã này chưa có phiếu chèn nào' : 'Chọn mã nguyên liệu' }} />
         </Card>
+
+        {chuaMa.length > 0 && (
+          <Card size="small" bodyStyle={{ padding: 0 }} title={<Space>Phiếu chưa gắn mã hàng<Tag color="orange">{chuaMa.length}</Tag><Text type="secondary">máy gắn theo phiếu ca lúc thủ kho nhận, hoặc mở phiếu bấm Đổi mã</Text></Space>}>
+            <Table<MixIssue> rowKey="id" columns={columns} dataSource={chuaMa} size="small" pagination={false} />
+          </Card>
+        )}
 
         <Modal open={open} title="Lấy hàng chèn đầu ca" onCancel={() => setOpen(false)} onOk={submit} okText="Ghi lấy đầu ca" cancelText="Hủy" confirmLoading={saving} width={620}>
           <Row gutter={[12, 10]}>
@@ -169,6 +220,7 @@ export default function MixShiftPage() {
             <Col span={6}><Text>Hàng + pallet (kg)</Text><InputNumber style={{ width: '100%' }} min={0} step={10} value={f.grossKg} onChange={(v) => setF((x) => ({ ...x, grossKg: v === null || v === undefined ? null : Number(v), kg: null }))} /></Col>
             <Col span={6}><Text>Bì pallet (kg)</Text><InputNumber style={{ width: '100%' }} min={0} value={f.palletKg} onChange={(v) => setF((x) => ({ ...x, palletKg: v === null || v === undefined ? null : Number(v) }))} /></Col>
             <Col span={6}><Text>Kg hàng chèn *</Text><InputNumber style={{ width: '100%' }} min={1} step={10} max={lotChon?.ton_kg} value={kgNet} onChange={(v) => setF((x) => ({ ...x, kg: v === null || v === undefined ? null : Number(v) }))} /></Col>
+            <Col span={8}><Text>Ngày ca</Text><Input type="date" value={date} onChange={(e) => setDate(e.target.value || todayLocal())} /></Col>
             <Col span={8}><Text>Ca</Text><Select style={{ width: '100%' }} allowClear value={f.shiftId} onChange={(v) => setF((x) => ({ ...x, shiftId: v }))} options={shifts.map((s) => ({ value: s.id, label: s.name || s.code }))} placeholder="Ca sản xuất" /></Col>
             <Col span={8}><Text>Tổ trưởng (ca của ai)</Text><Select style={{ width: '100%' }} allowClear value={f.team || undefined} onChange={(v) => setF((x) => ({ ...x, team: v ?? '' }))} options={[{ value: 'Vang', label: 'Ca Vang' }, { value: 'Hiền', label: 'Ca Hiền' }]} placeholder="Ca Vang / Ca Hiền" /></Col>
             <Col span={8}><Text>Mục đích</Text><Select style={{ width: '100%' }} value={f.purpose} onChange={(v) => setF((x) => ({ ...x, purpose: v }))} options={(Object.keys(MIX_PURPOSE_LABELS) as MixPurpose[]).map((k) => ({ value: k, label: MIX_PURPOSE_LABELS[k] }))} /></Col>

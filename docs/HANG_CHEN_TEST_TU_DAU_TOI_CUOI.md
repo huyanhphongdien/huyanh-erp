@@ -261,6 +261,15 @@ Quy trình chốt 30/10: **Bước 1 QS khai báo** (nhập lô chèn, lấy đ�
 | 19.4 | Phiếu đã QS ký | không còn nút sửa; DB báo SAI_TRANG_THAI nếu gọi tay |
 | 19.5 | Sau khi sửa | phần Số liệu có dòng cam "Đã sửa cân lúc lấy: cũ → mới · ai · lúc nào"; máy tính Descriptions cũng hiện |
 
+## 20. Máy tính /wms/chen theo mã hàng đang chạy (không cần SQL, 30/10)
+
+| # | Việc | Kỳ vọng |
+|---|---|---|
+| 20.1 | Mở /wms/chen | hai bảng: **Phiếu đang mở** và **Phiếu theo mã hàng đang chạy**; không còn bảng theo ngày (ô ngày chuyển vào modal Lấy đầu ca) |
+| 20.2 | Ô chọn mã trên bảng 2 | mặc định mã đang chạy; đổi mã → bảng liệt kê mọi phiếu chèn vào mã đó qua nhiều ngày, cột **Lần** L1, L2… đếm trong từng ca; dòng tóm tắt: đã nhận kg · bành · bể Slap / máy Mix · lỗi / DKL / chuẩn · % hàng vào máy |
+| 20.3 | Ô thống kê "Tiêu hao mã … đã nhận" | khớp dòng tóm tắt |
+| 20.4 | Phiếu chưa gắn mã | bảng cam riêng bên dưới; mở phiếu → Đổi mã là biến mất |
+
 ## Lỗi hay gặp
 
 | Màn hình báo | Nguyên nhân | Làm gì |

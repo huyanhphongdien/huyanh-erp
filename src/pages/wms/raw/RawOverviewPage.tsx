@@ -15,6 +15,7 @@ import { rawStockService, type RawAlert, type RawBatchBalance, type RawDailyFlow
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_RUBBER_GROUP_LABELS, RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
+import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 
 const { Title, Text } = Typography
@@ -32,6 +33,7 @@ const ALERT_LABEL: Record<RawAlert['loai'], string> = {
 
 export default function RawOverviewPage() {
   const navigate = useNavigate()
+  usePhoneRedirect('/m/kho')
   const rawRole = useRawRole()
   const { data: facilities } = useActiveFacilities()
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined)

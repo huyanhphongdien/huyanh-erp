@@ -18,6 +18,7 @@ import { rawStockService, type RawIntakeQueueRow, type NhapKhoResult } from '../
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_LOT_SOURCE_LABELS, RAW_SETTINGS_DEFAULT, type RawLotSource, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
+import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import { ticketTypeLabel } from '../../../services/wms/wms.types'
 
@@ -32,6 +33,7 @@ type Filter = 'cho_nhap' | 'da_nhap' | 'tat_ca'
 
 export default function RawIntakeQueuePage() {
   const navigate = useNavigate()
+  usePhoneRedirect('/m/kho/nhap')
   const rawRole = useRawRole()
   const { data: facilities } = useActiveFacilities()
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined)

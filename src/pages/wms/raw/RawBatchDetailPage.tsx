@@ -13,6 +13,7 @@ import { ArrowLeftOutlined, PrinterOutlined, ReloadOutlined } from '@ant-design/
 import { rawStockService, RAW_TXN_LABELS, type RawBatchBalance, type RawLedgerRow } from '../../../services/wms/rawStockService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_LOT_SOURCE_LABELS, RAW_RUBBER_GROUP_LABELS, RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
+import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 
 const { Title, Text } = Typography
 
@@ -25,6 +26,7 @@ const fmtDate = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateS
 export default function RawBatchDetailPage() {
   const { batchId } = useParams<{ batchId: string }>()
   const navigate = useNavigate()
+  usePhoneRedirect(batchId ? `/m/kho/lo/${batchId}` : null)
   const [batch, setBatch] = useState<RawBatchBalance | null>(null)
   const [ledger, setLedger] = useState<RawLedgerRow[]>([])
   const [settings, setSettings] = useState<RawSettings>(RAW_SETTINGS_DEFAULT)

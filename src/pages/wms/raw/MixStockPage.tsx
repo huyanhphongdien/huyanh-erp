@@ -11,6 +11,7 @@ import { ArrowLeftOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/ico
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { mixService, MIX_LOT_STATUS_COLORS, MIX_LOT_STATUS_LABELS, MIX_SOURCE_LABELS, type MixBalance, type MixLot, type MixMovement, type MixSourceType } from '../../../services/wms/mixService'
 import { useRawRole } from '../../../hooks/useRawRole'
+import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 
 const { Title, Text } = Typography
@@ -28,6 +29,7 @@ const EMPTY: NewLot = { sourceType: 'loi', sourceDesc: '', grade: undefined, kgI
 
 export default function MixStockPage() {
   const navigate = useNavigate()
+  usePhoneRedirect('/m/kho/chen/kho')
   const { data: facilities } = useActiveFacilities()
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined)
   const [facilityInit, setFacilityInit] = useState(false)

@@ -13,6 +13,7 @@ import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoSe
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
+import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 
 const { Title, Text } = Typography
 const fmtKg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
@@ -22,6 +23,7 @@ const STEP_IDX: Record<MixIssue['status'], number> = { issued: 0, returned: 1, s
 export default function MixIssueDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  usePhoneRedirect(id ? `/m/kho/chen/phieu/${id}` : null)
   const [issue, setIssue] = useState<MixIssue | null>(null)
   const [photosOut, setPhotosOut] = useState<RawPhoto[]>([])
   const [photosRet, setPhotosRet] = useState<RawPhoto[]>([])

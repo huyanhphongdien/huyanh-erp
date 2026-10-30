@@ -91,7 +91,7 @@ export default function KhoMix() {
 
           <div className="kmx-grid2">
             <Link to="/m/kho/chen/lay" className="kmx-btn sec" onClick={(e) => { if (!canTake || !lotsCoHang.length) e.preventDefault() }} style={!canTake || !lotsCoHang.length ? { opacity: 0.45 } : undefined}>{I.plus}Lấy thêm lô</Link>
-            {hero ? <Link to={`/m/kho/chen/phieu/${hero.id}`} className="kmx-btn sec">{I.doc}Xem phiếu</Link> : <Link to="/m/kho/chen/ky" className="kmx-btn sec">{I.doc}Phiếu đang mở</Link>}
+            {hero ? <Link to={`/m/kho/chen/phieu/${hero.id}`} className="kmx-btn sec">{I.doc}Xem phiếu</Link> : <Link to="/m/kho/chen/phieu" className="kmx-btn sec">{I.doc}Lịch sử phiếu</Link>}
           </div>
 
           {others.length > 0 && (
@@ -127,7 +127,7 @@ export default function KhoMix() {
 
           <section aria-label="Kho chèn" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div className="kmx-row" style={{ padding: '0 2px', alignItems: 'baseline' }}>
-              <h2 className="kmx-h2">Kho chèn</h2>
+              <Link to="/m/kho/chen/kho" className="kmx-h2" style={{ display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', color: '#1B4D3E' }}>Kho chèn{I.chev}</Link>
               <span className="kmx-md">Tại kho <b className="kmx-mono" style={{ color: '#0D2E25' }}>{fmtKg(bal?.tai_kho_kg)} kg</b> · {bal?.so_lo ?? 0} lô{(bal?.o_day_chuyen_kg ?? 0) > 0 ? ` · dây chuyền ${fmtKg(bal?.o_day_chuyen_kg)} kg` : ''}</span>
             </div>
             {lots.length > 0 ? (
@@ -150,7 +150,7 @@ export default function KhoMix() {
 
           {done.length > 0 && (
             <section aria-label="Đã nhận gần đây" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <h2 className="kmx-h2">Đã nhận gần đây</h2>
+              <Link to="/m/kho/chen/phieu" className="kmx-h2" style={{ display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', color: '#1B4D3E' }}>Đã nhận gần đây · xem tất cả{I.chev}</Link>
               <div className="kmx-list">
                 {done.map((i) => (
                   <Link key={i.id} to={`/m/kho/chen/phieu/${i.id}`} className="kmx-li" style={{ textDecoration: 'none', color: 'inherit' }}>

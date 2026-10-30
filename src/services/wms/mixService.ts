@@ -237,6 +237,12 @@ export const mixService = {
     return { next_issue_id: (data as any)?.next_issue_id ?? null }
   },
 
+  /** Sửa lô chèn từ điện thoại (đã xử lý kim loại, QC cho phép, mô tả) hoặc hủy lô chưa dùng */
+  async suaLo(lotId: string, patch: { metalCleared?: boolean | null; qcAllowRerun?: boolean | null; qcAllowMixPct?: number | null; sourceDesc?: string | null; grade?: string | null; note?: string | null; huy?: boolean }): Promise<void> {
+    const { error } = await supabase.rpc('fn_mix_sua_lo', { p_lot_id: lotId, p_metal_cleared: patch.metalCleared ?? null, p_qc_allow_rerun: patch.qcAllowRerun ?? null, p_qc_allow_mix_pct: patch.qcAllowMixPct ?? null, p_source_desc: patch.sourceDesc ?? null, p_grade: patch.grade ?? null, p_note: patch.note ?? null, p_huy: patch.huy ?? false })
+    if (error) throw new Error(dichLoiNhapKho(error))
+  },
+
   async balance(facilityId: string): Promise<MixBalance | null> {
     const { data, error } = await supabase.from('v_mix_balance').select('*').eq('facility_id', facilityId).maybeSingle()
     if (error) throw error

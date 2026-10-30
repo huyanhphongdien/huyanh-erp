@@ -12,6 +12,7 @@ import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPurpose, type ShiftLite } from '../../../services/wms/mixService'
 import { rawIssueService, type ProductionOrderLite } from '../../../services/wms/rawIssueService'
 import { useRawRole } from '../../../hooks/useRawRole'
+import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 
 const { Title, Text } = Typography
@@ -21,6 +22,7 @@ const OPEN: MixIssue['status'][] = ['issued', 'returned', 'submitted', 'qc_confi
 
 export default function MixShiftPage() {
   const navigate = useNavigate()
+  usePhoneRedirect('/m/kho/chen')
   const [sp] = useSearchParams()
   const lotFilter = sp.get('lot')
   const { data: facilities } = useActiveFacilities()

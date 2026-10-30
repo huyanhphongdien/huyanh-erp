@@ -185,6 +185,14 @@ export default function KhoMixIssue() {
             <label htmlFor="kmx-rnote" className="kmx-sm" style={{ fontWeight: 600 }}>Ghi chú (không bắt buộc)</label>
             <input id="kmx-rnote" className="kmx-text" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
+          <div className="kmx-col" style={{ gap: 8, marginTop: 6 }}>
+            {!cancelAsk ? <button type="button" className="kmx-btn ghost" style={{ color: '#B91C1C' }} onClick={() => setCancelAsk(true)}>Lấy nhầm? Hủy phiếu</button> : (
+              <div className="kmx-card" style={{ borderColor: '#FECACA' }}>
+                <input className="kmx-text" placeholder="Lý do hủy" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} aria-label="Lý do hủy" />
+                <div className="kmx-grid2"><button type="button" className="kmx-btn red" disabled={busy === 'cancel'} onClick={() => run('cancel', () => mixService.ky(i.id, 'cancel', cancelReason.trim() || null), `Đã hủy, ${fmtKg(i.kg_out)} kg trả về tồn kho chèn`)}>Xác nhận hủy</button><button type="button" className="kmx-btn sec" onClick={() => setCancelAsk(false)}>Không</button></div>
+              </div>
+            )}
+          </div>
         </div></div>
         <div className="kmx-foot">
           <button type="button" className="kmx-btn" disabled={!ready || busy === 'tra'} onClick={traVaKy}>{I.pen}{busy === 'tra' ? 'Đang ghi…' : 'Ghi trả và ký bên giao'}</button>

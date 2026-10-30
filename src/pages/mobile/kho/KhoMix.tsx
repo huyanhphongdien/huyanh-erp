@@ -128,8 +128,8 @@ export default function KhoMix() {
     <div className="kmx">
       <header className="kmx-hd">
         <div className="kmx-hd-txt">
-          <span className="kmx-eyebrow">Hàng chèn · {facility?.name || facility?.code || ''}</span>
-          <span className="kmx-title">{cur ? `${cur.shift_name}${cur.team ? ` · Ca ${cur.team}` : ''}` : 'Hôm nay'}</span>
+          <span className="kmx-eyebrow">Hàng chèn · {facility?.code || ''}{cur?.team ? ` · Ca ${cur.team}` : ''}</span>
+          <span className="kmx-title">{cur ? cur.shift_name : 'Hôm nay'}</span>
         </div>
         <span className="kmx-hd-right">{now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} · {hm(now.toISOString())}<br />{firstName(user?.full_name) || ''}</span>
         <FacilitySelect value={facilityId} onChange={setFacilityId} facilities={facilities} />
@@ -177,7 +177,7 @@ export default function KhoMix() {
                     <div className="kmx-row" style={{ padding: '4px 2px 0', alignItems: 'flex-start', gap: 8 }}>
                       <span className="kmx-col" style={{ gap: 1 }}>
                         <span className="kmx-strong" style={{ fontSize: 13 }}>{g.ma ? <>Chèn vào mã <span className="kmx-mono" style={{ color: '#0D2E25' }}>{g.ma}</span></> : 'Chưa gắn mã gốc'}</span>
-                        <span className="kmx-sm">{g.ma ? (tm.length ? tm.map((x) => `${x.ma}: đã nhận ${fmtKg(x.chen_kg)} kg${x.ty_le_chen_pct !== null ? ` (${x.ty_le_chen_pct} % hàng vào máy)` : ''}`).join(' · ') : 'mã chưa có phiếu nào được thủ kho nhận') : 'máy gắn theo phiếu ca lúc thủ kho nhận, hoặc mở phiếu bấm Đổi mã'}</span>
+                        <span className="kmx-sm">{g.ma ? (tm.length ? tm.map((x) => `${x.ma}: đã nhận ${fmtKg(x.chen_kg)} kg${x.ty_le_chen_pct !== null ? ` (${x.ty_le_chen_pct} %)` : ''}`).join(' · ') : 'chưa có phiếu nào được nhận') : 'tự gắn khi thủ kho nhận · hoặc mở phiếu → Đổi mã'}</span>
                       </span>
                       <span className="kmx-chip blue" style={{ flex: '0 0 auto' }}>{g.idx.length} lần · {kg1(g.kg)} kg{g.banh ? ` · ${g.banh} b` : ''}</span>
                     </div>
@@ -186,16 +186,18 @@ export default function KhoMix() {
                         const i = cur.items[k]
                         const chip = CHIP[i.status]
                         return (
-                          <div key={i.id} className="kmx-li" style={{ alignItems: 'stretch', gap: 10 }}>
-                            <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-col" style={{ flex: 1, textDecoration: 'none', color: 'inherit', gap: 3 }}>
-                              <span className="kmx-row" style={{ justifyContent: 'flex-start', gap: 8 }}>
-                                <span className="kmx-mono" style={{ fontSize: 14, fontWeight: 800, color: '#0D2E25', background: '#E8F5F0', borderRadius: 8, padding: '2px 7px' }}>L{k + 1}</span>
-                                <span style={{ fontSize: 14, fontWeight: 700, color: '#0D2E25' }}>{i.so_banh !== null ? `${i.so_banh} b · ` : ''}{i.lot_so_lo || i.lot_code}</span>
-                                <span className={`kmx-chip ${chip.cls}`} style={{ marginLeft: 'auto' }}>{chip.text}</span>
+                          <div key={i.id} className="kmx-li" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+                            <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-col" style={{ textDecoration: 'none', color: 'inherit', gap: 3, minWidth: 0 }}>
+                              <span className="kmx-row" style={{ gap: 8, alignItems: 'center' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                  <span className="kmx-mono" style={{ fontSize: 14, fontWeight: 800, color: '#0D2E25', background: '#E8F5F0', borderRadius: 8, padding: '2px 7px', flex: '0 0 auto' }}>L{k + 1}</span>
+                                  <span style={{ fontSize: 14, fontWeight: 700, color: '#0D2E25', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.so_banh !== null ? `${i.so_banh} b · ` : ''}{i.lot_so_lo || i.lot_code}</span>
+                                </span>
+                                <span className={`kmx-chip ${chip.cls}`} style={{ flex: '0 0 auto' }}>{chip.text}</span>
                               </span>
                               <span className="kmx-sm">{i.vi_tri ? `${MIX_VI_TRI_LABELS[i.vi_tri]} · ` : ''}{i.gross_kg !== null ? `cả pallet ${kg1(i.gross_kg)} − bì ${kg1(i.pallet_kg ?? 0)} = ` : ''}<b className="kmx-mono" style={{ color: '#0D2E25' }}>{kg1(i.kg_out)} kg</b>{i.kg_return !== null ? ` · trả ${kg1(i.kg_return)} · tiêu hao ${kg1(i.kg_used)}` : ''} · {hm(i.out_at)}{i.out_by && i.out_by !== me && i.out_name ? ` · ${firstName(i.out_name)}` : ''}</span>
                             </Link>
-                            {i.status === 'issued' && <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-pill" style={{ flex: '0 0 auto', alignSelf: 'center', background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', padding: '0 14px' }}>Trả L{k + 1}</Link>}
+                            {i.status === 'issued' && <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-btn sec" style={{ minHeight: 42, fontSize: 14, textDecoration: 'none' }}>{I.lines}Trả L{k + 1} · cân cuối ca</Link>}
                           </div>
                         )
                       })}

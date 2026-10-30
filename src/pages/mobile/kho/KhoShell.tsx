@@ -32,7 +32,7 @@ export default function KhoShell() {
   const nav = useNavigate()
   const [scan, setScan] = useState(false)
   const [note, setNote] = useState<string | null>(null)
-  const showFab = loc.pathname === '/m/kho' || loc.pathname === '/m/kho/chen'
+  const showFab = loc.pathname === '/m/kho'   // tab Chèn: đã có 'Quét tem CH' trong màn Lấy, nút nổi che nội dung
   // Màn sâu của hàng chèn (lấy / phiếu / ký) chạy toàn màn hình, không có thanh tab dưới (theo mockup 30/10)
   const deep = /^\/m\/kho\/(chen\/.+|xuat|tp\/.+)/.test(loc.pathname)
 

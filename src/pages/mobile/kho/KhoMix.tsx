@@ -160,10 +160,10 @@ export default function KhoMix() {
     <div className="kmx">
       <header className="kmx-hd">
         <div className="kmx-hd-txt">
-          <span className="kmx-eyebrow">Hàng chèn · {facility?.code || ''}{cur?.team ? ` · Ca ${cur.team}` : ''}</span>
+          <span className="kmx-eyebrow">Hàng chèn · {facility?.code || ''}</span>
           <span className="kmx-title">{cur ? cur.shift_name : 'Hôm nay'}</span>
         </div>
-        <span className="kmx-hd-right">{now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} · {hm(now.toISOString())}<br />{firstName(user?.full_name) || ''}</span>
+        <span className="kmx-hd-right">{now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} · {hm(now.toISOString())}<br />{firstName(user?.full_name) || ''}{cur?.team ? ` · Ca ${cur.team}` : ''}</span>
         <FacilitySelect value={facilityId} onChange={setFacilityId} facilities={facilities} />
       </header>
       <div className="kmx-body">
@@ -204,9 +204,9 @@ export default function KhoMix() {
               <section key={g.id} className="kmx-card hero" aria-label={`Lệnh ${g.ma_gop}`} style={{ gap: 10 }}>
                 <div className="kmx-row" style={{ alignItems: 'flex-start' }}>
                   <span className="kmx-col" style={{ gap: 1, minWidth: 0 }}>
-                    <span className="kmx-lbl ok">Lệnh {gi + 1}{lenhsAsc.length > 1 ? ` / ${lenhsAsc.length}` : ''} · {g.code}</span>
+                    <span className="kmx-lbl ok">Lệnh {gi + 1}{lenhsAsc.length > 1 ? `/${lenhsAsc.length}` : ''}</span>
                     <span className="kmx-mono" style={{ fontSize: 20, fontWeight: 800, color: '#0D2E25' }}>{g.ma_gop}</span>
-                    <span className="kmx-sm">từ {fmtDt(g.started_at)}{g.started_name ? ` · ${firstName(g.started_name)}` : ''}{tm.length ? ` · đã nhận ${fmtKg(tm.reduce((s2, x) => s2 + x.chen_kg, 0))} kg` : ''}</span>
+                    <span className="kmx-sm">{g.code} · từ {fmtDt(g.started_at)}{g.started_name ? ` · ${firstName(g.started_name)}` : ''}{tm.length ? ` · đã nhận ${fmtKg(tm.reduce((s2, x) => s2 + x.chen_kg, 0))} kg` : ''}</span>
                   </span>
                   {canTake && <button type="button" className="kmx-pill sm" disabled={busyMa === g.id} onClick={() => setHoiKetThuc(g)}>{busyMa === g.id ? 'Đang gửi…' : 'Kết thúc'}</button>}
                 </div>
@@ -231,7 +231,7 @@ export default function KhoMix() {
                   </div>
                 )}
                 {items.length > 0 && <div className="kmx-list">{items.map((i, k) => dongLan(i, k + 1))}</div>}
-                <Link to={`/m/kho/chen/lay?lenh=${g.id}`} className="kmx-btn" aria-disabled={!canTake} onClick={(e) => { if (!canTake) e.preventDefault() }} style={!canTake ? { opacity: 0.45 } : undefined}>{I.plus}Lấy lần {items.length + 1}{lenhsAsc.length > 1 ? ` · ${g.ma_gop}` : ''}</Link>
+                <Link to={`/m/kho/chen/lay?lenh=${g.id}`} className="kmx-btn" aria-disabled={!canTake} onClick={(e) => { if (!canTake) e.preventDefault() }} style={!canTake ? { opacity: 0.45 } : undefined}>{I.plus}Lấy lần {items.length + 1}</Link>
               </section>
             )
           })}
@@ -251,7 +251,7 @@ export default function KhoMix() {
               {!canTake && !role.loading && <span className="kmx-sm kmx-center">Tài khoản này chưa được phân công khai báo hàng chèn (QS). BGĐ phân công ở máy tính: Hàng chèn → Phân công.</span>}
             </section>
           )}
-          <span className="kmx-sm kmx-center">Mỗi lần lấy = một pallet: chạm nguồn + số lô, cân cả pallet (băng tải: số bành), bì khai lúc trả. Cuối ca: 3 lần cân, chụp 2 ảnh. "Kết thúc" đóng lệnh và tự gửi mail báo cáo cho BGĐ.</span>
+          <span className="kmx-sm kmx-center" style={{ color: '#9CA3AF' }}>Mỗi lần lấy = một pallet · cuối ca trả 3 lần cân, 2 ảnh · Kết thúc = đóng lệnh + mail BGĐ</span>
 
           {otherIssued.length > 0 && (
             <section aria-label="Đang ở dây chuyền ca khác" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -291,9 +291,9 @@ export default function KhoMix() {
           </section>
 
           <section aria-label="Kho chèn" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className="kmx-row" style={{ padding: '0 2px', alignItems: 'baseline' }}>
+            <div className="kmx-col" style={{ padding: '0 2px', gap: 2 }}>
               <Link to="/m/kho/chen/kho" className="kmx-h2" style={{ display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', color: '#1B4D3E' }}>Kho chèn{I.chev}</Link>
-              <span className="kmx-md">Tại kho <b className="kmx-mono" style={{ color: '#0D2E25' }}>{fmtKg(bal?.tai_kho_kg)} kg</b> · {bal?.so_lo ?? 0} lô{(bal?.o_day_chuyen_kg ?? 0) > 0 ? ` · dây chuyền ${fmtKg(bal?.o_day_chuyen_kg)} kg` : ''}</span>
+              <span className="kmx-sm">Tại kho <b className="kmx-mono" style={{ color: '#0D2E25' }}>{fmtKg(bal?.tai_kho_kg)} kg</b> · {bal?.so_lo ?? 0} lô{(bal?.o_day_chuyen_kg ?? 0) > 0 ? ` · đang ở dây chuyền ${fmtKg(bal?.o_day_chuyen_kg)} kg` : ''}</span>
             </div>
             {lots.length > 0 ? (
               <div className="kmx-list">
@@ -301,11 +301,14 @@ export default function KhoMix() {
                   const khoa = l.source_type === 'dkl' && !l.metal_cleared
                   return (
                     <div key={l.id} className="kmx-li">
-                      <span className="kmx-col">
-                        <span className="kmx-mono" style={{ fontSize: 13, fontWeight: 700, color: khoa ? '#6B7280' : l.so_lo ? '#0D2E25' : '#B91C1C' }}>{l.so_lo || 'Chưa có số lô'} <span className="kmx-sm kmx-mono" style={{ fontWeight: 500 }}>{l.code}</span></span>
-                        <span className="kmx-sm" style={khoa ? { color: '#B91C1C', fontWeight: 500 } : undefined}>{khoa ? 'Dính kim loại · chưa xử lý, chưa lấy được' : `${MIX_SOURCE_LABELS[l.source_type]}${l.grade ? ` · ${l.grade}` : ''}${l.source_desc ? ` · ${l.source_desc}` : ''}`}</span>
+                      <span className="kmx-col" style={{ minWidth: 0, flex: 1 }}>
+                        <span className="kmx-mono" style={{ fontSize: 15, fontWeight: 800, color: khoa ? '#6B7280' : l.so_lo ? '#0D2E25' : '#B91C1C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.so_lo || 'Chưa có số lô'} <span className="kmx-sm kmx-mono" style={{ fontWeight: 500 }}>{l.code}</span></span>
+                        <span className="kmx-sm" style={{ ...(khoa ? { color: '#B91C1C', fontWeight: 500 } : {}), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{khoa ? 'Dính kim loại · chưa xử lý, chưa lấy được' : (l.source_desc || `${MIX_SOURCE_LABELS[l.source_type]}${l.grade ? ` · ${l.grade}` : ''}`)}</span>
                       </span>
-                      <span className={`kmx-num sm${khoa ? ' mut' : ''}`} style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{fmtKg(l.ton_kg)} <span className="kmx-sm">kg · {l.ton_banh} b</span>{l.kg_at_line > 0 && <span className="kmx-sm" style={{ display: 'block' }}>+{fmtKg(l.kg_at_line)} ở dây chuyền</span>}</span>
+                      <span className="kmx-col" style={{ alignItems: 'flex-end', flex: '0 0 auto', gap: 0 }}>
+                        <span className={`kmx-num sm${khoa ? ' mut' : ''}`} style={{ whiteSpace: 'nowrap' }}>{fmtKg(l.ton_kg)} <span className="kmx-sm">kg</span></span>
+                        <span className="kmx-sm" style={{ whiteSpace: 'nowrap' }}>{l.ton_banh} bành{l.kg_at_line > 0 ? ` · ${fmtKg(l.kg_at_line)} ở dây chuyền` : ''}</span>
+                      </span>
                     </div>
                   )
                 })}

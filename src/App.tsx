@@ -171,6 +171,9 @@ const RawIssueListPage = lazy(() => import('./pages/wms/raw/RawIssueListPage'));
 const RawIssueCreatePage = lazy(() => import('./pages/wms/raw/RawIssueCreatePage'));
 const RawIssueDetailPage = lazy(() => import('./pages/wms/raw/RawIssueDetailPage'));
 const RawRecheckPage = lazy(() => import('./pages/wms/raw/RawRecheckPage'));
+const RawStocktakeListPage = lazy(() => import('./pages/wms/raw/RawStocktakeListPage'));
+const RawStocktakeDetailPage = lazy(() => import('./pages/wms/raw/RawStocktakeDetailPage'));
+const RawBalanceReportPage = lazy(() => import('./pages/wms/raw/RawBalanceReportPage'));
 const WeighbridgeDetailPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeDetailPage'));
 
 // ===== Rubber Supply Chain (lazy) =====
@@ -573,6 +576,10 @@ function App() {
                 <Route path="nvl/xuat/new" element={<RawIssueCreatePage />} />
                 <Route path="nvl/xuat/:id" element={<RawIssueDetailPage />} />
                 <Route path="nvl/can-lai" element={<RawRecheckPage />} />
+                {/* GĐ3: kiểm kê + cân đối */}
+                <Route path="nvl/kiem-ke" element={<RawStocktakeListPage />} />
+                <Route path="nvl/kiem-ke/:id" element={<RawStocktakeDetailPage />} />
+                <Route path="nvl/can-doi" element={<RawBalanceReportPage />} />
                 {/* Trang cân chuyển sang can.huyanhrubber.vn — ERP chỉ giữ lịch sử + chi tiết */}
                 <Route path="weighbridge" element={<WeighbridgeListPage />} />
                 <Route path="weighbridge/list" element={<WeighbridgeListPage />} />

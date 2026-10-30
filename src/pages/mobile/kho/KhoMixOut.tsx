@@ -133,7 +133,6 @@ export default function KhoMixOut() {
   const maLabel = maChon.map((id) => maList.find((x) => x.raw_lot_id === id)?.ma || '?').join(' + ')
   const doiMode = (m: 'pallet' | 'kg') => { setMode(m); try { localStorage.setItem('kmx_can_mode', m) } catch { /* bỏ qua */ } }
   const doiViTri = (v: MixViTri) => { setViTri(v); try { localStorage.setItem('kmx_vi_tri', v) } catch { /* bỏ qua */ } }
-  const toggleMa = (id: string) => { setMaNguon('tay'); setMaChon((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id])) }
   const kgOk = kgN !== null && Number.isFinite(kgN) && kgN > 0
   // phương án B: chỉ chặn vượt tồn với hàng lấy từ lô TP (tồn thật); SBR / số lô gõ tay lấy quá tồn → máy ghi nhập thêm, chỉ báo
   const fgCua = lot?.source_ref_type === 'fg_lot' ? fgLots.find((g) => g.id === lot.source_ref_id) ?? null : null
@@ -407,7 +406,7 @@ export default function KhoMixOut() {
             )}
             <div className="kmx-tint" style={qua ? { background: '#FEE2E2', color: '#B91C1C' } : undefined}><span>{qua ? `Lấy nhiều hơn tồn lô TP (${fgCua ? fgCua.ton_banh : 0} bành)` : nhapThem > 0 ? `Lô tồn ${kgTxt(lot.ton_kg)} kg → máy ghi nhập thêm ${kgTxt(nhapThem)} kg${fgCua ? ' từ lô TP' : ''}` : 'Lô còn lại sau khi lấy'}</span><span className="kmx-num sm" style={qua ? { color: '#B91C1C' } : undefined}>{conLai === null ? `${fmtKg(lot.ton_kg)} kg trong kho` : `${fmtKg(Math.max(conLai, 0))} kg`}</span></div>
             <div className="kmx-row" style={{ alignItems: 'center' }}>
-              <span className="kmx-col"><span className="kmx-lbl">Số bành</span><span className="kmx-sm">ước {lot.kg_per_banh} kg/bành, máy tính lại lúc trả{soBanh !== '' ? ' · bạn đã chỉnh, giữ nguyên' : ''}</span></span>
+              <span className="kmx-col"><span className="kmx-lbl">Số bành</span><span className="kmx-sm">{bangTai ? `băng tải · ${kpb} kg/bành, không pallet` : `ước ${lot.kg_per_banh} kg/bành, máy tính lại lúc trả${soBanh !== '' ? ' · bạn đã chỉnh, giữ nguyên' : ''}`}</span></span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button type="button" className="kmx-pill sm" style={{ width: 44, padding: 0, fontSize: 20 }} aria-label="Bớt 1 bành" disabled={soBanhN === null || soBanhN <= 0} onClick={() => chinhBanh(-1)}>−</button>
                 <span className="kmx-num md" style={{ minWidth: 40, textAlign: 'center' }}>{soBanhN ?? '—'}</span>
@@ -416,28 +415,18 @@ export default function KhoMixOut() {
             </div>
           </section>
 
-          <section className="kmx-card" aria-label="Chèn vào mã nguyên liệu" style={{ gap: 8 }}>
-            <div className="kmx-row">
-              <span className="kmx-strong" style={{ fontSize: 13 }}>Chèn vào lệnh / mã nguyên liệu nào?</span>
-              {maNguon === 'phieu_ca' && <span className="kmx-chip ok">theo phiếu ca</span>}
-              {maNguon === 'dang_chay' && <span className="kmx-chip ok">mã đang chạy</span>}
-              {maNguon === 'lenh' && <span className="kmx-chip ok">theo lệnh</span>}
-              {maNguon === 'tay' && maChon.length > 0 && <span className="kmx-chip blue">bạn chọn</span>}
-            </div>
-            {lenhs.length > 0 && (
+          {lenhs.length > 1 ? (
+            <section className="kmx-card" aria-label="Chèn vào lệnh nào" style={{ gap: 8 }}>
+              <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Đang chạy {lenhs.length} lệnh song song — pallet này chèn vào lệnh nào?</span>{maNguon === 'lenh' && <span className="kmx-chip ok">theo lệnh</span>}</div>
               <div className="kmx-seg">
                 {lenhs.map((g) => { const on = g.raw_lot_ids.length === maChon.length && g.raw_lot_ids.every((x) => maChon.includes(x)); return <button key={g.id} type="button" className={on ? 'on' : ''} onClick={() => { setMaChon(g.raw_lot_ids); setMaNguon('lenh') }}>{g.ma_gop}</button> })}
               </div>
-            )}
-            {lenhs.length > 1 && maNguon !== 'lenh' && <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Đang chạy {lenhs.length} lệnh song song — chạm lệnh pallet này chèn vào.</span>}
-            {lenhs.length > 0 && maList.length > 0 && <span className="kmx-sm">Hoặc chọn mã lẻ (không theo lệnh):</span>}
-            {maList.length ? (
-              <div className="kmx-seg">
-                {maList.map((m) => <button key={m.raw_lot_id} type="button" className={maChon.includes(m.raw_lot_id) ? 'on' : ''} onClick={() => toggleMa(m.raw_lot_id)}>{m.ma}{m.trang_thai === 'dang_chay' ? ' · đang chạy' : ''}</button>)}
-              </div>
-            ) : <span className="kmx-sm">Kho NVL chưa có mã nào đang chạy hay sẵn sàng. Không bắt buộc: khi thủ kho nhận, máy lấy mã theo phiếu ca.</span>}
-            <span className="kmx-sm">{maChon.length > 1 ? `Chèn chung ${maChon.length} mã (${maLabel}): khi gom, kg chia đều cho mỗi mã.` : maChon.length === 1 ? `Ca này chèn vào ${maLabel}. Chạm thêm mã nữa nếu ca chạy chung hai mã (ví dụ KHMN-15 + 17).` : 'Chạm mã đang chạy. Chọn được nhiều mã nếu ca chạy chung.'}</span>
-          </section>
+            </section>
+          ) : lenhs.length === 1 ? (
+            <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>Chèn vào lệnh đang chạy</span><span className="kmx-mono" style={{ fontWeight: 800 }}>{lenhs[0].ma_gop}</span></div>
+          ) : (
+            <div className="kmx-tint" style={{ background: '#FEF3C7', color: '#92400E' }}><span>Chưa khai lệnh đang chạy — phiếu sẽ nằm ở "chưa gắn mã", gắn sau trên máy tính.</span></div>
+          )}
 
           <section className="kmx-card" aria-label="Chụp ảnh">
             <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Chụp 2 ảnh ngay tại cân</span><span className={`kmx-chip ${missing.length ? 'red' : 'ok'}`}>{required.length - missing.length}/{required.length} đã chụp</span></div>

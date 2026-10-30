@@ -49,7 +49,16 @@ export interface RawLotRun { id: string; facility_id: string; raw_lot_id: string
 
 /** Tổng kết một mã (fn_nvl_tong_ket_ma): NVL vào / chèn / TP / theo ca / đợt chạy / người nhận BGĐ — dùng cho nút Kết thúc mã + mail */
 export interface RawLotTongKetCa { shift_date: string; shift_name: string; team: string | null; so_lan: number; kg_lay: number; kg_tra: number; tieu_hao: number; da_nhan: number; chua_tra: number; cho_ky: number }
+/** Lệnh chạy (SQL p13): một đợt chạy máy gồm 1..n mã gộp; nhiều lệnh chạy song song được */
+export interface LenhChay {
+  id: string; facility_id: string; facility_code: string | null; code: string; raw_lot_ids: string[]; ma_gop: string; so_ma: number
+  started_at: string; ended_at: string | null; note: string | null; started_name: string | null; ended_name: string | null; dang_chay: boolean
+  chen_kg: number; so_phieu: number; phieu_mo: number; tieu_hao_cho_ky: number
+}
+export interface RawLotTongKetMa { ma: string; rubber_type_name: string; so_xe: number; wet_kg: number; dry_kg: number; drc_pct: number | null; nhap_kho_kg: number | null; xuat_sx_kho_kg: number | null; ngay_dau: string | null; ngay_cuoi: string | null }
 export interface RawLotTongKet {
+  /** có khi tổng kết theo lệnh: mã = ma_gop, ma_list = từng mã */
+  lenh_id?: string | null; lenh_code?: string | null; ma_list?: RawLotTongKetMa[]
   raw_lot_id: string; ma: string; nguon: string; facility_code: string; rubber_type_name: string; trang_thai: RawLotTrangThai; dang_chay: boolean
   so_xe: number; wet_kg: number; dry_kg: number; drc_pct: number | null; nhap_kho_kg: number | null; xuat_sx_kho_kg: number | null; ngay_dau: string | null; ngay_cuoi: string | null
   so_ca_ep: number | null; tp_dat_kg: number | null; loi_dkl_kg: number | null; hieu_suat_pct: number | null; ty_le_loi_pct: number | null
@@ -89,6 +98,29 @@ const normLot = (r: any): RawLotBalance => ({
   ...r, so: numOrNull(r.so), so_xe: num(r.so_xe), so_xe_con_hang: num(r.so_xe_con_hang), wet_kg: num(r.wet_kg), dry_kg: num(r.dry_kg), drc_pct: numOrNull(r.drc_pct),
   tuoi_ngay: numOrNull(r.tuoi_ngay), ngay_tu_lan_do_max: numOrNull(r.ngay_tu_lan_do_max), nhap_kho_kg: numOrNull(r.nhap_kho_kg), xuat_sx_kho_kg: numOrNull(r.xuat_sx_kho_kg), dieu_chinh_kho_kg: numOrNull(r.dieu_chinh_kho_kg),
 })
+
+const normLenh = (r: any): LenhChay => ({
+  ...r, raw_lot_ids: Array.isArray(r.raw_lot_ids) ? r.raw_lot_ids.map(String) : [], so_ma: num(r.so_ma), dang_chay: !!r.dang_chay,
+  chen_kg: num(r.chen_kg), so_phieu: num(r.so_phieu), phieu_mo: num(r.phieu_mo), tieu_hao_cho_ky: num(r.tieu_hao_cho_ky),
+})
+const normTongKet = (r: any): RawLotTongKet => {
+  const c = r.chen
+  const p = r.phieu ?? {}
+  return {
+    ...r, dang_chay: !!r.dang_chay, so_xe: num(r.so_xe), wet_kg: num(r.wet_kg), dry_kg: num(r.dry_kg), drc_pct: numOrNull(r.drc_pct), nhap_kho_kg: numOrNull(r.nhap_kho_kg), xuat_sx_kho_kg: numOrNull(r.xuat_sx_kho_kg),
+    so_ca_ep: numOrNull(r.so_ca_ep), tp_dat_kg: numOrNull(r.tp_dat_kg), loi_dkl_kg: numOrNull(r.loi_dkl_kg), hieu_suat_pct: numOrNull(r.hieu_suat_pct), ty_le_loi_pct: numOrNull(r.ty_le_loi_pct),
+    ma_list: Array.isArray(r.ma_list) ? r.ma_list.map((m: any) => ({ ...m, so_xe: num(m.so_xe), wet_kg: num(m.wet_kg), dry_kg: num(m.dry_kg), drc_pct: numOrNull(m.drc_pct), nhap_kho_kg: numOrNull(m.nhap_kho_kg), xuat_sx_kho_kg: numOrNull(m.xuat_sx_kho_kg) })) : undefined,
+    chen: c ? { chen_kg: num(c.chen_kg), so_phieu: num(c.so_phieu), so_banh: num(c.so_banh), be_kg: num(c.be_kg), mix_kg: num(c.mix_kg), loi_kg: num(c.loi_kg), dkl_kg: num(c.dkl_kg), chuan_kg: num(c.chuan_kg), khac_kg: num(c.khac_kg), ty_le_pct: numOrNull(c.ty_le_pct),
+      chi_tiet: (Array.isArray(c.chi_tiet) ? c.chi_tiet : []).map((d: any) => ({ ...d, kg: num(d.kg), so_banh: numOrNull(d.so_banh), so_phieu: num(d.so_phieu), co_chung: !!d.co_chung })) } : null,
+    phieu: { tong: num(p.tong), chua_tra: num(p.chua_tra), cho_ky: num(p.cho_ky), da_nhan: num(p.da_nhan), so_ca: num(p.so_ca), kg_lay: num(p.kg_lay), kg_tra: num(p.kg_tra), tieu_hao: num(p.tieu_hao), tieu_hao_da_nhan: num(p.tieu_hao_da_nhan),
+      so_banh: num(p.so_banh), be_slap: num(p.be_slap), may_mix: num(p.may_mix), lan_dau: p.lan_dau ?? null, lan_cuoi: p.lan_cuoi ?? null },
+    theo_ca: (Array.isArray(r.theo_ca) ? r.theo_ca : []).map((x: any) => ({ ...x, so_lan: num(x.so_lan), kg_lay: num(x.kg_lay), kg_tra: num(x.kg_tra), tieu_hao: num(x.tieu_hao), da_nhan: num(x.da_nhan), chua_tra: num(x.chua_tra), cho_ky: num(x.cho_ky) })),
+    dot_chay: Array.isArray(r.dot_chay) ? r.dot_chay : [],
+    bgd: Array.isArray(r.bgd) ? r.bgd : [],
+    nguoi_lap: r.nguoi_lap ?? null,
+    luc: r.luc ?? new Date().toISOString(),
+  }
+}
 
 export const rawLotService = {
   /** Mã của nhà máy; mặc định chỉ mã đang mở (mo) — kể cả đã chạy xong để tra cứu */
@@ -134,22 +166,35 @@ export const rawLotService = {
   async tongKetMa(rawLotId: string): Promise<RawLotTongKet> {
     const { data, error } = await supabase.rpc('fn_nvl_tong_ket_ma', { p_raw_lot_id: rawLotId })
     if (error) throw new Error(dichLoiNhapKho(error))
-    const r: any = data ?? {}
-    const c = r.chen
-    const p = r.phieu ?? {}
-    return {
-      ...r, dang_chay: !!r.dang_chay, so_xe: num(r.so_xe), wet_kg: num(r.wet_kg), dry_kg: num(r.dry_kg), drc_pct: numOrNull(r.drc_pct), nhap_kho_kg: numOrNull(r.nhap_kho_kg), xuat_sx_kho_kg: numOrNull(r.xuat_sx_kho_kg),
-      so_ca_ep: numOrNull(r.so_ca_ep), tp_dat_kg: numOrNull(r.tp_dat_kg), loi_dkl_kg: numOrNull(r.loi_dkl_kg), hieu_suat_pct: numOrNull(r.hieu_suat_pct), ty_le_loi_pct: numOrNull(r.ty_le_loi_pct),
-      chen: c ? { chen_kg: num(c.chen_kg), so_phieu: num(c.so_phieu), so_banh: num(c.so_banh), be_kg: num(c.be_kg), mix_kg: num(c.mix_kg), loi_kg: num(c.loi_kg), dkl_kg: num(c.dkl_kg), chuan_kg: num(c.chuan_kg), khac_kg: num(c.khac_kg), ty_le_pct: numOrNull(c.ty_le_pct),
-        chi_tiet: (Array.isArray(c.chi_tiet) ? c.chi_tiet : []).map((d: any) => ({ ...d, kg: num(d.kg), so_banh: numOrNull(d.so_banh), so_phieu: num(d.so_phieu), co_chung: !!d.co_chung })) } : null,
-      phieu: { tong: num(p.tong), chua_tra: num(p.chua_tra), cho_ky: num(p.cho_ky), da_nhan: num(p.da_nhan), so_ca: num(p.so_ca), kg_lay: num(p.kg_lay), kg_tra: num(p.kg_tra), tieu_hao: num(p.tieu_hao), tieu_hao_da_nhan: num(p.tieu_hao_da_nhan),
-        so_banh: num(p.so_banh), be_slap: num(p.be_slap), may_mix: num(p.may_mix), lan_dau: p.lan_dau ?? null, lan_cuoi: p.lan_cuoi ?? null },
-      theo_ca: (Array.isArray(r.theo_ca) ? r.theo_ca : []).map((x: any) => ({ ...x, so_lan: num(x.so_lan), kg_lay: num(x.kg_lay), kg_tra: num(x.kg_tra), tieu_hao: num(x.tieu_hao), da_nhan: num(x.da_nhan), chua_tra: num(x.chua_tra), cho_ky: num(x.cho_ky) })),
-      dot_chay: Array.isArray(r.dot_chay) ? r.dot_chay : [],
-      bgd: Array.isArray(r.bgd) ? r.bgd : [],
-      nguoi_lap: r.nguoi_lap ?? null,
-      luc: r.luc ?? new Date().toISOString(),
-    }
+    return normTongKet(data ?? {})
+  },
+  /** Tổng kết một LỆNH (gộp mã) — SQL p13 */
+  async tongKetLenh(lenhId: string): Promise<RawLotTongKet> {
+    const { data, error } = await supabase.rpc('fn_nvl_tong_ket_lenh', { p_lenh_id: lenhId })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    return normTongKet(data ?? {})
+  },
+  /** Lệnh chạy của nhà máy (mặc định chỉ lệnh đang chạy) */
+  async lenh(facilityId: string, opts: { all?: boolean; limit?: number } = {}): Promise<LenhChay[]> {
+    let q = supabase.from('v_nvl_lenh_chay').select('*').eq('facility_id', facilityId).order('started_at', { ascending: false }).limit(opts.limit ?? 50)
+    if (!opts.all) q = q.is('ended_at', null)
+    const { data, error } = await q
+    if (error) throw error
+    return ((data ?? []) as any[]).map(normLenh)
+  },
+  async lenhDangChay(facilityId: string): Promise<LenhChay[]> { return this.lenh(facilityId) },
+  /** Bắt đầu lệnh 1..n mã: thayThe (mặc định) kết thúc lệnh cũ · thayThe=false chạy song song · gopVao = gộp thêm mã vào lệnh đang chạy */
+  async batDauLenh(rawLotIds: string[], opts: { thayThe?: boolean; gopVao?: string | null; note?: string | null } = {}): Promise<{ lenh_id: string; code: string; ma_gop: string; da_chay: boolean; gop: boolean; da_thay: string[] }> {
+    const { data, error } = await supabase.rpc('fn_nvl_bat_dau_lenh', { p_raw_lot_ids: rawLotIds, p_thay_the: opts.thayThe ?? true, p_gop_vao: opts.gopVao ?? null, p_note: opts.note ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    const d: any = data ?? {}
+    return { lenh_id: String(d.lenh_id ?? ''), code: String(d.code ?? ''), ma_gop: String(d.ma_gop ?? ''), da_chay: !!d.da_chay, gop: !!d.gop, da_thay: Array.isArray(d.da_thay) ? d.da_thay.map(String) : [] }
+  },
+  async ketThucLenh(lenhId: string, note?: string | null): Promise<{ code: string; ma_gop: string }> {
+    const { data, error } = await supabase.rpc('fn_nvl_ket_thuc_lenh', { p_lenh_id: lenhId, p_note: note ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    const d: any = data ?? {}
+    return { code: String(d.code ?? ''), ma_gop: String(d.ma_gop ?? '') }
   },
 
   /** Chuẩn hoá chữ gõ → mã (gọi DB để dùng chung bảng bí danh) */

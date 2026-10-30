@@ -5,7 +5,7 @@
 // File: src/pages/mobile/kho/KhoMixMaTongKet.tsx · Route: /m/kho/chen/ma/:id/tong-ket
 // ============================================================================
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type RawLotTongKet } from '../../../services/wms/rawLotService'
 import { MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS } from '../../../services/wms/mixService'
 import { guiMailTongKet, mailtoTongKet, soanMailTongKet } from '../../../services/wms/maTongKetMail'
@@ -20,6 +20,7 @@ export default function KhoMixMaTongKet() {
   const nav = useNavigate()
   const [sp] = useSearchParams()
   const vua = sp.get('vua') === '1'
+  const laLenh = useLocation().pathname.includes('/lenh/')   // /m/kho/chen/lenh/:id/tong-ket = tổng kết theo lệnh (gộp mã)
   const [tk, setTk] = useState<RawLotTongKet | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [to, setTo] = useState<string[]>([])
@@ -30,9 +31,10 @@ export default function KhoMixMaTongKet() {
   useEffect(() => {
     if (!id) return
     let alive = true
-    rawLotService.tongKetMa(id).then((r) => { if (!alive) return; setTk(r); setTo(r.bgd.map((b) => b.email)) }).catch((e: any) => { if (alive) setErr(e?.message || 'Không tổng kết được (cần chạy SQL p12)') })
+    const req = laLenh ? rawLotService.tongKetLenh(id) : rawLotService.tongKetMa(id)
+    req.then((r) => { if (!alive) return; setTk(r); setTo(r.bgd.map((b) => b.email)) }).catch((e: any) => { if (alive) setErr(e?.message || 'Không tổng kết được (cần chạy SQL p12 + p13)') })
     return () => { alive = false }
-  }, [id])
+  }, [id, laLenh])
 
   const mail = useMemo(() => (tk ? soanMailTongKet(tk) : null), [tk])
   const toOk = to.filter(okEmail)
@@ -56,7 +58,7 @@ export default function KhoMixMaTongKet() {
   const hd = (
     <header className="kmx-hd">
       <button type="button" className="kmx-back" aria-label="Về trang Hàng chèn" onClick={() => nav('/m/kho/chen')}>{I.back}</button>
-      <div className="kmx-hd-txt"><span className="kmx-eyebrow">Tổng kết mã nguyên liệu</span><span className="kmx-title">{tk?.ma ?? '…'}</span></div>
+      <div className="kmx-hd-txt"><span className="kmx-eyebrow">{tk?.lenh_code ? `Tổng kết lệnh ${tk.lenh_code}` : laLenh ? 'Tổng kết lệnh chạy' : 'Tổng kết mã nguyên liệu'}</span><span className="kmx-title">{tk?.ma ?? '…'}</span></div>
     </header>
   )
   if (err) return <div className="kmx">{hd}<div className="kmx-body"><div className="kmx-inner"><div className="kmx-msg err">{err}</div></div></div></div>
@@ -71,7 +73,7 @@ export default function KhoMixMaTongKet() {
       {hd}
       <div className="kmx-body">
         <div className="kmx-inner">
-          {vua && <div className="kmx-msg" style={{ background: '#E8F5F0', color: '#0D2E25', fontWeight: 600 }}>Đã kết thúc chạy mã {tk.ma}. Kiểm tra số rồi gửi báo cáo Ban Giám đốc.</div>}
+          {vua && <div className="kmx-msg" style={{ background: '#E8F5F0', color: '#0D2E25', fontWeight: 600 }}>Đã kết thúc {tk.lenh_code ? `lệnh ${tk.lenh_code} (${tk.ma})` : `chạy mã ${tk.ma}`}. Kiểm tra số rồi gửi báo cáo Ban Giám đốc.</div>}
           {msg && <div className={`kmx-msg${msg.ok ? '' : ' err'}`}>{msg.text}</div>}
 
           <section className="kmx-card hero" style={{ gap: 6 }}>
@@ -94,7 +96,8 @@ export default function KhoMixMaTongKet() {
 
           <section className="kmx-card" style={{ gap: 4 }}>
             <span className="kmx-strong" style={{ fontSize: 13 }}>Nguyên liệu & thành phẩm</span>
-            <div className="kmx-kv"><span className="k">Nhập kho</span><span className="v">{tk.so_xe} xe · {fmtKg(tk.nhap_kho_kg ?? tk.dry_kg)} kg khô{tk.drc_pct !== null ? ` · DRC ${tk.drc_pct} %` : ''}</span></div>
+            {tk.ma_list && tk.ma_list.length > 1 && tk.ma_list.map((m) => <div key={m.ma} className="kmx-kv"><span className="k">· {m.ma}</span><span className="v">nhập {fmtKg(m.nhap_kho_kg ?? m.dry_kg)} · xuất {fmtKg(m.xuat_sx_kho_kg)} kg</span></div>)}
+            <div className="kmx-kv"><span className="k">{tk.ma_list && tk.ma_list.length > 1 ? 'Tổng nhập kho' : 'Nhập kho'}</span><span className="v">{tk.so_xe} xe · {fmtKg(tk.nhap_kho_kg ?? tk.dry_kg)} kg khô{tk.drc_pct !== null ? ` · DRC ${tk.drc_pct} %` : ''}</span></div>
             <div className="kmx-kv"><span className="k">Xuất vào máy</span><span className="v">{fmtKg(tk.xuat_sx_kho_kg)} kg khô · còn kho {fmtKg(tk.dry_kg)} kg</span></div>
             <div className="kmx-kv"><span className="k">Thành phẩm</span><span className="v">{tk.so_ca_ep ?? 0} ca ép · đạt {fmtKg(tk.tp_dat_kg)} kg · lỗi + DKL {fmtKg(tk.loi_dkl_kg)} kg</span></div>
             <div className="kmx-kv"><span className="k">Hiệu suất</span><span className="v">{tk.hieu_suat_pct !== null ? `${tk.hieu_suat_pct} %` : '—'}</span></div>

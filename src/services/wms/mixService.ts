@@ -94,6 +94,9 @@ export interface MixIssue {
   raw_lot_id: string | null
   raw_lot_ids: string[] | null
   vi_tri: MixViTri | null
+  lenh_id: string | null
+  lenh_code: string | null
+  lenh_ma_gop: string | null
   ma_goc: string | null
   ma_goc_all: string | null
   so_banh: number | null

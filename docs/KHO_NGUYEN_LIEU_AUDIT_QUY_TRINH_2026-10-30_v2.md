@@ -46,7 +46,7 @@ SELECT e.full_name, p.name AS chuc_vu, p.level FROM employees e JOIN positions p
 
 ## 4. Việc vận hành còn treo
 
-1. Chạy `docs/migrations/wms_mix_p11_bi_chi_luc_tra.sql` rồi `wms_nvl_p12_ket_thuc_ma.sql` (sau p8 → p9 → p10 đã chạy).
+1. Chạy `docs/migrations/wms_mix_p11_bi_chi_luc_tra.sql` → `wms_nvl_p12_ket_thuc_ma.sql` → `wms_nvl_p13_lenh_chay.sql` (sau p8 → p9 → p10 đã chạy). p13 = lệnh chạy gồm nhiều mã (KHMN-15 + 17), nhiều lệnh song song, phiếu chèn / phiếu ca gắn lệnh.
 2. Vercel mở hạn mức → Create Deployment nhánh main (hiện production còn ở 9df49751, thiếu 16 commit hôm nay). Trong lúc chờ dùng bản local `npx vite --host`.
 3. Thêm tên QS vào bước 1 ở màn Phân công; thủ kho thật vào bước 3 rồi thu anh ra.
 4. Gán các lô xe cũ vào TMHG-40 (tab Lô NVL) để % chèn và hiệu suất có số.

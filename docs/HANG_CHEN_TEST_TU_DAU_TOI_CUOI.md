@@ -309,7 +309,21 @@ Quy trình chốt 30/10: **Bước 1 QS khai báo** (nhập lô chèn, lấy đ�
 | 23.8 | Máy tính /wms/chen → **Tổng kết mã · mail BGĐ** với mã đã kết thúc | cửa sổ tổng kết, bảng theo ca có dòng Tổng, 3 nút mail |
 | 23.9 | Máy tính /wms/chen/phieu/:id phiếu đang ở dây chuyền | khung "2 · Trả cuối ca" hiện Cân 1 (khóa) · Cân 2 + ô tick "Dùng hết · bỏ cân 2" · Cân 3 pallet rỗng; dòng "Hàng trả = cân 2 − cân 3 · kg lấy = cân 1 − cân 3 · tiêu hao" |
 
-## Lỗi hay gặp
+## 24. Lệnh chạy nhiều mã · nhiều lệnh song song (sau SQL `wms_nvl_p13_lenh_chay.sql`, chạy SAU p12, 30/10 tối)
+
+| # | Thao tác | Mong đợi |
+|---|---|---|
+| 24.1 | Chạy p13, dòng kiểm chứng | `bang_lenh`, `v_lenh`, `f_bat_dau_lenh`, `f_tong_ket_lenh` có giá trị; `dot_chay_chua_co_lenh_phai_la_0` = 0; `v_mix_issues_co_lenh_code` = 1; `lay_theo_lenh` = true; `so_lenh_da_chuyen` = số đợt chạy cũ (mỗi đợt → lệnh một mã) |
+| 24.2 | Điện thoại Chèn → **Bắt đầu lệnh…** → chạm KHMN-15 rồi KHMN-17 → "Bắt đầu lệnh: KHMN-15 + KHMN-17" | đang chạy TMHG-40 → hộp hỏi: **Thay thế** / Chạy song song / Gộp vào TMHG-40 / Hủy; chọn Chạy song song → thẻ hiện 2 lệnh: "TMHG-40 · LC-…" và "KHMN-15 + KHMN-17 · LC-…" |
+| 24.3 | Lấy lần n (màn Cân) | thẻ "Chèn vào lệnh / mã nguyên liệu nào?" hiện 2 chip lệnh + dòng đỏ "Đang chạy 2 lệnh song song — chạm lệnh pallet này chèn vào"; chạm "KHMN-15 + KHMN-17" → chip "theo lệnh", xem lại ghi "Chèn vào mã: KHMN-15 + KHMN-17" |
+| 24.4 | Kết thúc lệnh TMHG-40 → còn một lệnh | lấy lần mới: máy tự chọn KHMN-15 + KHMN-17 (chip "theo lệnh"), không cần chạm |
+| 24.5 | Sổ ca → phiếu ca mới (ca này) | ô mã trống, gợi ý "Lệnh LC-… gộp KHMN-15 + KHMN-17 đang chạy — phiếu ca gắn lệnh, ô mã để trống"; lưu được; SQL `SELECT lenh_id FROM shift_production_reports ORDER BY created_at DESC LIMIT 1` có giá trị |
+| 24.6 | Máy tính /wms/chen khung "Lệnh đang chạy" | mỗi lệnh: tên gộp, mã LC, từ lúc nào, chèn đã nhận, nút **Tổng kết · mail BGĐ** và **Kết thúc lệnh**; "Bắt đầu lệnh…" mở hộp chọn nhiều mã + 3 cách (thay thế / song song / gộp) |
+| 24.7 | Lấy đầu ca trên máy tính | trên ô "Chèn vào mã nguyên liệu đang chạy" có nút nhanh "Lệnh LC-… · KHMN-15 + KHMN-17" điền sẵn cả hai mã |
+| 24.8 | Kết thúc lệnh KHMN-15 + 17 (điện thoại hoặc máy tính) | tổng kết lệnh: tiêu đề "Tổng kết lệnh LC-… · KHMN-15 + KHMN-17", NVL có dòng từng mã + tổng, chèn theo ca / lô, mail "Kết thúc lệnh LC-… · KHMN-15 + KHMN-17" với mục 1 liệt kê từng mã |
+| 24.9 | Trang Lô NVL mã KHMN-15 | hiệu suất theo mã trống (TP tính theo lệnh gộp), chèn theo mã = kg chia đều — đúng thiết kế |
+
+
 
 | Màn hình báo | Nguyên nhân | Làm gì |
 |---|---|---|

@@ -9,7 +9,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../../stores/authStore'
 import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot } from '../../../services/wms/mixService'
 import { useMixRole } from '../../../hooks/useMixRole'
-import { rawLotService, type RawLotBalance, type RawLotChen, type RawLotRun } from '../../../services/wms/rawLotService'
+import { rawLotService, type LenhChay, type RawLotBalance, type RawLotChen } from '../../../services/wms/rawLotService'
 import { firstName } from '../opsUtil'
 import { FacilitySelect, fmtD, fmtDt, fmtKg, todayLocal, useKhoFacility } from './khoCommon'
 import { I } from './khoMixUtil'
@@ -36,11 +36,12 @@ export default function KhoMix() {
   const [lots, setLots] = useState<MixLot[]>([])
   const [chenMa, setChenMa] = useState<Map<string, RawLotChen>>(new Map())   // tổng chèn đã nhận theo mã gốc
   // sổ mã đang chạy (một mã chạy nhiều ca; khai một lần, kết thúc khi xong)
-  const [runs, setRuns] = useState<RawLotRun[]>([])
+  const [lenhs, setLenhs] = useState<LenhChay[]>([])   // lệnh đang chạy (SQL p13): một lệnh = 1..n mã gộp
   const [maMo, setMaMo] = useState<RawLotBalance[]>([])
   const [chonMa, setChonMa] = useState(false)
-  const [hoiThay, setHoiThay] = useState<RawLotBalance | null>(null)   // bắt đầu mã khi đang có mã khác chạy: mặc định thay thế, hỏi một chạm
-  const [hoiKetThuc, setHoiKetThuc] = useState<RawLotRun | null>(null)
+  const [chonIds, setChonIds] = useState<string[]>([])   // mã chọn để bắt đầu lệnh (gộp được nhiều mã: KHMN-15 + 17)
+  const [hoiThay, setHoiThay] = useState<string[] | null>(null)   // bắt đầu lệnh khi đang có lệnh khác chạy: thay thế (mặc định) / song song / gộp
+  const [hoiKetThuc, setHoiKetThuc] = useState<LenhChay | null>(null)
   const [busyMa, setBusyMa] = useState<string | null>(null)
   const [msgMa, setMsgMa] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -58,10 +59,10 @@ export default function KhoMix() {
         mixService.listIssues({ facilityId, status: ['received'], limit: 3 }),
         mixService.listLots(facilityId),
         rawLotService.chen(facilityId).catch(() => [] as RawLotChen[]),
-        rawLotService.runs(facilityId).catch(() => [] as RawLotRun[]),
+        rawLotService.lenhDangChay(facilityId).catch(() => [] as LenhChay[]),
         rawLotService.list(facilityId).catch(() => [] as RawLotBalance[]),
       ])
-      setBal(b); setOpen(o); setToday(t.filter((x) => x.status !== 'cancelled')); setDone(d); setLots(l); setChenMa(new Map(c.map((x) => [x.ma, x]))); setRuns(r); setMaMo(m)
+      setBal(b); setOpen(o); setToday(t.filter((x) => x.status !== 'cancelled')); setDone(d); setLots(l); setChenMa(new Map(c.map((x) => [x.ma, x]))); setLenhs(r); setMaMo(m)
     } catch (e: any) { setErr(e?.message || 'Không tải được hàng chèn') }
     finally { setLoading(false) }
   }, [facilityId])
@@ -96,18 +97,24 @@ export default function KhoMix() {
     dayChuyen: curIssued.reduce((s, i) => s + i.kg_out, 0),
   } : null
   const lanKe = (cur?.items.length ?? 0) + 1
-  const maChuaChay = maMo.filter((x) => !runs.some((r) => r.raw_lot_id === x.raw_lot_id)).sort((a, b) => (b.ngay_cuoi ?? '').localeCompare(a.ngay_cuoi ?? '')).slice(0, 8)
-  async function batDau(m: RawLotBalance, thayThe?: boolean) {
-    if (runs.length && thayThe === undefined) { setHoiThay(m); return }   // 30/10: mặc định THAY THẾ mã cũ, có thể chọn chạy chung
-    setBusyMa(m.raw_lot_id); setMsgMa(null); setHoiThay(null)
-    try { const r = await rawLotService.batDauChay(m.raw_lot_id, thayThe ?? true); setMsgMa(r.da_chay ? `${r.ma} đã đang chạy rồi` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng ${r.ma}` : `Đã khai ${r.ma} bắt đầu chạy`); setChonMa(false); await load() }
-    catch (e: any) { setMsgMa(e?.message || 'Không khai được') }
+  const maChuaChay = maMo.filter((x) => !lenhs.some((g) => g.raw_lot_ids.includes(x.raw_lot_id))).sort((a, b) => (b.ngay_cuoi ?? '').localeCompare(a.ngay_cuoi ?? '')).slice(0, 8)
+  const maTen = (ids: string[]) => ids.map((id) => maMo.find((x) => x.raw_lot_id === id)?.ma ?? '?').join(' + ')
+  // bắt đầu lệnh 1..n mã; đang có lệnh chạy → hỏi: thay thế (mặc định 30/10) / chạy song song / gộp vào lệnh đang chạy
+  async function batDauLenh(ids: string[], opts?: { thayThe?: boolean; gopVao?: string }) {
+    if (!ids.length) return
+    if (lenhs.length && !opts) { setHoiThay(ids); return }
+    setBusyMa('lenh'); setMsgMa(null); setHoiThay(null)
+    try {
+      const r = await rawLotService.batDauLenh(ids, { thayThe: opts?.thayThe ?? true, gopVao: opts?.gopVao ?? null })
+      setMsgMa(r.da_chay ? `${r.ma_gop} đã đang chạy rồi (${r.code})` : r.gop ? `Đã gộp vào ${r.code}: ${r.ma_gop}` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng lệnh ${r.code} (${r.ma_gop})` : `Đã bắt đầu lệnh ${r.code}: ${r.ma_gop}`)
+      setChonMa(false); setChonIds([]); await load()
+    } catch (e: any) { setMsgMa(e?.message || 'Không khai được (cần chạy SQL p13)') }
     finally { setBusyMa(null) }
   }
-  // kết thúc mã → sang trang tổng kết (khối lượng chèn + mail BGĐ)
-  async function ketThuc(r: RawLotRun) {
-    setBusyMa(r.id); setMsgMa(null); setHoiKetThuc(null)
-    try { await rawLotService.ketThucChay(r.raw_lot_id); nav(`/m/kho/chen/ma/${r.raw_lot_id}/tong-ket?vua=1`) }
+  // kết thúc lệnh → sang trang tổng kết (khối lượng chèn + mail BGĐ)
+  async function ketThucLenh(g: LenhChay) {
+    setBusyMa(g.id); setMsgMa(null); setHoiKetThuc(null)
+    try { await rawLotService.ketThucLenh(g.id); nav(`/m/kho/chen/lenh/${g.id}/tong-ket?vua=1`) }
     catch (e: any) { setMsgMa(e?.message || 'Không kết thúc được'); setBusyMa(null) }
   }
   // gom các lần của ca theo MÃ GỐC đang chạy (số L vẫn đếm theo ca)
@@ -142,41 +149,49 @@ export default function KhoMix() {
           {err && <div className="kmx-msg err">{err}</div>}
           {loading && !open.length && !lots.length && <><div className="kmx-skel" /><div className="kmx-skel" /></>}
 
-          <section className="kmx-card" aria-label="Mã đang chạy" style={{ gap: 8, borderColor: runs.length ? '#E5E7EB' : '#FDE68A' }}>
+          <section className="kmx-card" aria-label="Lệnh đang chạy" style={{ gap: 8, borderColor: lenhs.length ? '#E5E7EB' : '#FDE68A' }}>
             <div className="kmx-row">
-              <span className="kmx-strong" style={{ fontSize: 13 }}>Mã nguyên liệu đang chạy</span>
-              {canTake && <button type="button" className="kmx-pill sm" onClick={() => setChonMa((v) => !v)}>{chonMa ? 'Đóng' : 'Bắt đầu mã…'}</button>}
+              <span className="kmx-strong" style={{ fontSize: 13 }}>Lệnh đang chạy · mã nguyên liệu</span>
+              {canTake && <button type="button" className="kmx-pill sm" onClick={() => { setChonMa((v) => !v); setChonIds([]); setHoiThay(null) }}>{chonMa ? 'Đóng' : 'Bắt đầu lệnh…'}</button>}
             </div>
             {msgMa && <span className="kmx-sm" style={{ color: '#1B4D3E', fontWeight: 600 }}>{msgMa}</span>}
             {hoiKetThuc && (
               <div className="kmx-tint col" style={{ alignItems: 'stretch', gap: 6 }}>
-                <span className="kmx-sm" style={{ color: '#0D2E25' }}>Kết thúc mã <b>{hoiKetThuc.ma}</b>? Phiếu ca, phiếu chèn, lô TP sẽ không tự gắn mã này nữa. Máy tổng kết chèn và soạn mail BGĐ ngay sau.</span>
+                <span className="kmx-sm" style={{ color: '#0D2E25' }}>Kết thúc lệnh <b>{hoiKetThuc.ma_gop}</b> ({hoiKetThuc.code})? Phiếu ca, phiếu chèn, lô TP sẽ không tự gắn lệnh này nữa. Máy tổng kết chèn và soạn mail BGĐ ngay sau.</span>
                 <div className="kmx-row" style={{ gap: 6 }}>
-                  <button type="button" className="kmx-pill sm" style={{ background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', flex: 1 }} disabled={busyMa === hoiKetThuc.id} onClick={() => ketThuc(hoiKetThuc)}>{busyMa === hoiKetThuc.id ? '…' : 'Kết thúc và tổng kết'}</button>
+                  <button type="button" className="kmx-pill sm" style={{ background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', flex: 1 }} disabled={busyMa === hoiKetThuc.id} onClick={() => ketThucLenh(hoiKetThuc)}>{busyMa === hoiKetThuc.id ? '…' : 'Kết thúc và tổng kết'}</button>
                   <button type="button" className="kmx-pill sm" onClick={() => setHoiKetThuc(null)}>Hủy</button>
                 </div>
               </div>
             )}
-            {hoiThay && (
-              <div className="kmx-tint col" style={{ alignItems: 'stretch', gap: 6 }}>
-                <span className="kmx-sm" style={{ color: '#0D2E25' }}>Bắt đầu <b>{hoiThay.ma}</b>: đang chạy {runs.map((r) => r.ma).join(', ')}. Mặc định kết thúc mã cũ, thay bằng mã mới.</span>
-                <div className="kmx-row" style={{ gap: 6 }}>
-                  <button type="button" className="kmx-pill sm" style={{ background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', flex: 1 }} disabled={busyMa === hoiThay.raw_lot_id} onClick={() => batDau(hoiThay, true)}>Thay thế</button>
-                  <button type="button" className="kmx-pill sm" disabled={busyMa === hoiThay.raw_lot_id} onClick={() => batDau(hoiThay, false)}>Chạy chung</button>
-                  <button type="button" className="kmx-pill sm" onClick={() => setHoiThay(null)}>Hủy</button>
-                </div>
+            {lenhs.length ? lenhs.map((g) => (
+              <div key={g.id} className="kmx-row" style={{ alignItems: 'center' }}>
+                <span className="kmx-col" style={{ gap: 1 }}>
+                  <span className="kmx-mono" style={{ fontSize: 16, fontWeight: 800, color: '#0D2E25' }}>{g.ma_gop}</span>
+                  <span className="kmx-sm">{g.code} · từ {fmtDt(g.started_at)}{g.started_name ? ` · ${firstName(g.started_name)}` : ''}{g.chen_kg > 0 ? ` · chèn ${fmtKg(g.chen_kg)} kg` : ''}{g.phieu_mo ? ` · ${g.phieu_mo} phiếu mở` : ''}</span>
+                </span>
+                <span className="kmx-row" style={{ gap: 6 }}>
+                  <button type="button" className="kmx-pill sm" onClick={() => nav(`/m/kho/chen/lenh/${g.id}/tong-ket`)}>Tổng kết</button>
+                  {canTake && <button type="button" className="kmx-pill sm" disabled={busyMa === g.id} onClick={() => setHoiKetThuc(g)}>{busyMa === g.id ? '…' : 'Kết thúc'}</button>}
+                </span>
               </div>
-            )}
-            {runs.length ? runs.map((r) => (
-              <div key={r.id} className="kmx-row" style={{ alignItems: 'center' }}>
-                <span className="kmx-col" style={{ gap: 1 }}><span className="kmx-mono" style={{ fontSize: 16, fontWeight: 800, color: '#0D2E25' }}>{r.ma}</span><span className="kmx-sm">chạy từ {fmtDt(r.started_at)}{r.started_name ? ` · ${firstName(r.started_name)}` : ''}</span></span>
-                <span className="kmx-row" style={{ gap: 6 }}><button type="button" className="kmx-pill sm" onClick={() => nav(`/m/kho/chen/ma/${r.raw_lot_id}/tong-ket`)}>Tổng kết</button>{canTake && <button type="button" className="kmx-pill sm" disabled={busyMa === r.id} onClick={() => setHoiKetThuc(r)}>{busyMa === r.id ? '…' : 'Kết thúc'}</button>}</span>
-              </div>
-            )) : <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Chưa khai mã đang chạy. Khai một lần, mọi ca sau tự theo mã này (phiếu ca, phiếu chèn, lô thành phẩm).</span>}
+            )) : <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Chưa khai lệnh đang chạy. Khai một lần (một hay nhiều mã gộp, ví dụ KHMN-15 + 17), mọi ca sau tự theo lệnh này (phiếu ca, phiếu chèn, lô thành phẩm).</span>}
             {chonMa && (
               <div className="kmx-col" style={{ gap: 6 }}>
-                {maChuaChay.length ? <div className="kmx-seg">{maChuaChay.map((m) => <button key={m.raw_lot_id} type="button" disabled={busyMa === m.raw_lot_id} onClick={() => batDau(m)}>{m.ma}</button>)}</div> : <span className="kmx-sm">Không còn mã nào chưa chạy. Mã mới sinh ra khi nhận phiếu cân vào kho.</span>}
-                {runs.length > 0 && <span className="kmx-sm">Chạm mã = thay thế mã đang chạy (máy hỏi lại một chạm, có thể chọn chạy chung).</span>}
+                <span className="kmx-sm">Chạm một hay nhiều mã chạy chung một lệnh, rồi bấm Bắt đầu.</span>
+                {maChuaChay.length ? <div className="kmx-seg">{maChuaChay.map((m) => <button key={m.raw_lot_id} type="button" className={chonIds.includes(m.raw_lot_id) ? 'on' : ''} onClick={() => setChonIds((cur) => (cur.includes(m.raw_lot_id) ? cur.filter((x) => x !== m.raw_lot_id) : [...cur, m.raw_lot_id]))}>{m.ma}</button>)}</div> : <span className="kmx-sm">Không còn mã nào chưa chạy. Mã mới sinh ra khi nhận phiếu cân vào kho.</span>}
+                {chonIds.length > 0 && !hoiThay && <button type="button" className="kmx-btn sec" disabled={busyMa === 'lenh'} onClick={() => batDauLenh(chonIds)}>{busyMa === 'lenh' ? 'Đang khai…' : `Bắt đầu lệnh: ${maTen(chonIds)}`}</button>}
+                {hoiThay && (
+                  <div className="kmx-tint col" style={{ alignItems: 'stretch', gap: 6 }}>
+                    <span className="kmx-sm" style={{ color: '#0D2E25' }}>Bắt đầu <b>{maTen(hoiThay)}</b>: đang chạy {lenhs.map((g) => g.ma_gop).join(' · ')}. Mặc định kết thúc lệnh cũ, thay bằng lệnh mới.</span>
+                    <div className="kmx-row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                      <button type="button" className="kmx-pill sm" style={{ background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', flex: 1 }} disabled={busyMa === 'lenh'} onClick={() => batDauLenh(hoiThay, { thayThe: true })}>Thay thế</button>
+                      <button type="button" className="kmx-pill sm" disabled={busyMa === 'lenh'} onClick={() => batDauLenh(hoiThay, { thayThe: false })}>Chạy song song</button>
+                      {lenhs.map((g) => <button key={g.id} type="button" className="kmx-pill sm" disabled={busyMa === 'lenh'} onClick={() => batDauLenh(hoiThay, { thayThe: false, gopVao: g.id })}>Gộp vào {g.ma_gop}</button>)}
+                      <button type="button" className="kmx-pill sm" onClick={() => setHoiThay(null)}>Hủy</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </section>

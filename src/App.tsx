@@ -483,6 +483,7 @@ function App() {
               <Route path="chen/kho/nhap" element={<Suspense fallback={<LoadingSpinner />}><KhoMixLotNew /></Suspense>} />
               <Route path="chen/phieu" element={<Suspense fallback={<LoadingSpinner />}><KhoMixList /></Suspense>} />
               <Route path="chen/ma/:id/tong-ket" element={<Suspense fallback={<LoadingSpinner />}><KhoMixMaTongKet /></Suspense>} />
+              <Route path="chen/lenh/:id/tong-ket" element={<Suspense fallback={<LoadingSpinner />}><KhoMixMaTongKet /></Suspense>} />
             </Route>
 
             {/* ============================================================ */}

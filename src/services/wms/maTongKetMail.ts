@@ -26,14 +26,17 @@ export function soanMailTongKet(tk: RawLotTongKet): MailTongKet {
   const dotDau = tk.dot_chay.length ? tk.dot_chay[0] : null
   const tyLe = c?.ty_le_pct ?? null
   const conKho = tk.dry_kg
+  const laLenh = !!tk.lenh_code
+  const nhieuMa = (tk.ma_list?.length ?? 0) > 1
+  const tenDoi = laLenh ? `lệnh chạy ${tk.lenh_code} (mã ${tk.ma})` : `mã nguyên liệu ${tk.ma}`
   const luuY: string[] = []
   if (p.chua_tra > 0) luuY.push(`${p.chua_tra} phiếu chèn chưa trả (còn ở dây chuyền) → tiêu hao chưa tính phần này`)
   if (p.cho_ky > 0) luuY.push(`${p.cho_ky} phiếu chèn chờ ký (${kg(p.tieu_hao - p.tieu_hao_da_nhan, 1)} kg tiêu hao chưa vào sổ ca)`)
-  if (tk.dang_chay) luuY.push('Mã vẫn đang khai là đang chạy (chưa bấm Kết thúc mã)')
+  if (tk.dang_chay) luuY.push(laLenh ? 'Lệnh vẫn đang chạy (chưa bấm Kết thúc lệnh)' : 'Mã vẫn đang khai là đang chạy (chưa bấm Kết thúc mã)')
   if ((tk.xuat_sx_kho_kg ?? 0) <= 0) luuY.push('Mã chưa có phiếu xuất NVL vào sản xuất → chưa tính được % chèn và hiệu suất')
   if (conKho > 0.5) luuY.push(`Còn ${kg(conKho)} kg khô của mã trong kho NVL`)
 
-  const subject = `[Huy Anh ERP] Kết thúc mã ${tk.ma}${tieuHao > 0 ? ` · chèn ${kg(tieuHao)} kg${tyLe !== null ? ` (${pct(tyLe)})` : ''}` : ''} · ${tk.facility_code}`
+  const subject = `[Huy Anh ERP] ${tk.dang_chay ? 'Báo cáo' : 'Kết thúc'} ${laLenh ? `lệnh ${tk.lenh_code} · ${tk.ma}` : `mã ${tk.ma}`}${tieuHao > 0 ? ` · chèn ${kg(tieuHao)} kg${tyLe !== null ? ` (${pct(tyLe)})` : ''}` : ''} · ${tk.facility_code}`
 
   const dongCa = tk.theo_ca.map((x) => `   ${d(x.shift_date)} ${x.shift_name}${x.team ? ` · Ca ${x.team}` : ''}: ${x.so_lan} lần · lấy ${kg(x.kg_lay)} · trả ${kg(x.kg_tra)} · tiêu hao ${kg(x.tieu_hao)} kg${x.chua_tra ? ` · ${x.chua_tra} chưa trả` : ''}${x.cho_ky ? ` · ${x.cho_ky} chờ ký` : ''}`)
   const dongLo = (c?.chi_tiet ?? []).map((x) => `   ${x.lot_code}${x.so_lo ? ` (số lô ${x.so_lo})` : ''} · ${MIX_SOURCE_LABELS[x.source_type as keyof typeof MIX_SOURCE_LABELS] ?? x.source_type}${x.vi_tri ? ` · ${MIX_VI_TRI_LABELS[x.vi_tri]}` : ''}: ${kg(x.kg)} kg${x.so_banh ? ` · ${x.so_banh} bành` : ''}${x.co_chung ? ' (chèn chung mã khác, chia đều)' : ''}`)
@@ -41,11 +44,12 @@ export function soanMailTongKet(tk: RawLotTongKet): MailTongKet {
   const text = [
     'Kính gửi Ban Giám đốc,',
     '',
-    `Nhà máy ${tk.facility_code} ${tk.dang_chay ? 'báo cáo mã nguyên liệu đang chạy' : 'đã kết thúc chạy mã nguyên liệu'} ${tk.ma}${tk.rubber_type_name ? ` (${tk.rubber_type_name})` : ''}.`,
+    `Nhà máy ${tk.facility_code} ${tk.dang_chay ? 'báo cáo' : 'đã kết thúc chạy'} ${tenDoi}${tk.rubber_type_name ? ` (${tk.rubber_type_name})` : ''}.`,
     `Thời gian chạy: ${dotDau ? dt(dotDau.started_at) : '—'} → ${dotCuoi?.ended_at ? dt(dotCuoi.ended_at) : 'đang chạy'}${dotDau?.started_name ? ` · khai: ${dotDau.started_name}` : ''}${dotCuoi?.ended_name ? ` · kết thúc: ${dotCuoi.ended_name}` : ''}${tk.dot_chay.length > 1 ? ` (${tk.dot_chay.length} đợt)` : ''}.`,
     '',
     '1. NGUYÊN LIỆU',
-    `   - Nhập kho: ${tk.so_xe} xe · ${kg(tk.wet_kg)} kg tươi · ${kg(tk.nhap_kho_kg ?? tk.dry_kg)} kg khô${tk.drc_pct !== null ? ` (DRC ${pct(tk.drc_pct)})` : ''} · về ${d(tk.ngay_dau)}${tk.ngay_cuoi && tk.ngay_cuoi !== tk.ngay_dau ? ` → ${d(tk.ngay_cuoi)}` : ''}`,
+    ...(nhieuMa ? (tk.ma_list ?? []).map((m) => `   - ${m.ma}: ${m.so_xe} xe · nhập ${kg(m.nhap_kho_kg ?? m.dry_kg)} kg khô · xuất vào máy ${kg(m.xuat_sx_kho_kg)} kg · còn kho ${kg(m.dry_kg)} kg`) : []),
+    `   - ${nhieuMa ? 'Tổng nhập kho' : 'Nhập kho'}: ${tk.so_xe} xe · ${kg(tk.wet_kg)} kg tươi · ${kg(tk.nhap_kho_kg ?? tk.dry_kg)} kg khô${tk.drc_pct !== null ? ` (DRC ${pct(tk.drc_pct)})` : ''} · về ${d(tk.ngay_dau)}${tk.ngay_cuoi && tk.ngay_cuoi !== tk.ngay_dau ? ` → ${d(tk.ngay_cuoi)}` : ''}`,
     `   - Xuất vào sản xuất: ${kg(tk.xuat_sx_kho_kg)} kg khô`,
     `   - Còn trong kho: ${kg(conKho)} kg khô`,
     '',
@@ -66,7 +70,7 @@ export function soanMailTongKet(tk: RawLotTongKet): MailTongKet {
     luuY.length ? '4. LƯU Ý' : '4. Tất cả phiếu chèn của mã đã đủ 3 chữ ký, số liệu chốt.',
     ...luuY.map((x) => `   - ${x}`),
     '',
-    `Chi tiết: ${APP_URL}/wms/chen (chọn mã ${tk.ma}) · lô NVL: ${APP_URL}/wms/nvl/lo`,
+    `Chi tiết: ${APP_URL}/wms/chen (chọn ${laLenh ? `lệnh ${tk.lenh_code}` : `mã ${tk.ma}`}) · lô NVL: ${APP_URL}/wms/nvl/lo`,
     '',
     `Người lập: ${tk.nguoi_lap?.name ?? ''} · ${dt(tk.luc)}`,
     'Huy Anh ERP · soạn tự động từ màn hình Hàng chèn',
@@ -77,7 +81,7 @@ export function soanMailTongKet(tk: RawLotTongKet): MailTongKet {
   const bangCa = tk.theo_ca.length ? `<table style="border-collapse:collapse;font-size:13px;margin:6px 0">${tr(['Ca', 'Lần', 'Lấy (kg)', 'Trả (kg)', 'Tiêu hao (kg)', 'Ghi chú'], true)}${tk.theo_ca.map((x) => tr([esc(`${d(x.shift_date)} ${x.shift_name}${x.team ? ` · Ca ${x.team}` : ''}`), String(x.so_lan), kg(x.kg_lay), kg(x.kg_tra), kg(x.tieu_hao), esc([x.chua_tra ? `${x.chua_tra} chưa trả` : '', x.cho_ky ? `${x.cho_ky} chờ ký` : ''].filter(Boolean).join(' · '))])).join('')}${tr(['<b>Tổng</b>', `<b>${p.tong}</b>`, `<b>${kg(p.kg_lay)}</b>`, `<b>${kg(p.kg_tra)}</b>`, `<b>${kg(p.tieu_hao)}</b>`, ''])}</table>` : ''
   const bangLo = c?.chi_tiet?.length ? `<table style="border-collapse:collapse;font-size:13px;margin:6px 0">${tr(['Lô chèn', 'Nguồn', 'Vị trí', 'Kg', 'Bành'], true)}${c.chi_tiet.map((x) => tr([esc(`${x.lot_code}${x.so_lo ? ` (${x.so_lo})` : ''}${x.co_chung ? ' · chung mã' : ''}`), esc(MIX_SOURCE_LABELS[x.source_type as keyof typeof MIX_SOURCE_LABELS] ?? x.source_type), esc(x.vi_tri ? MIX_VI_TRI_LABELS[x.vi_tri] : '—'), kg(x.kg), x.so_banh ? String(x.so_banh) : '—'])).join('')}</table>` : ''
   const html = `<div style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto;color:#111;font-size:14px;line-height:1.5">
-<h2 style="color:#1B4D3E;margin:0 0 4px">${tk.dang_chay ? 'Báo cáo mã nguyên liệu đang chạy' : 'Kết thúc mã nguyên liệu'} ${esc(tk.ma)}</h2>
+<h2 style="color:#1B4D3E;margin:0 0 4px">${tk.dang_chay ? 'Báo cáo' : 'Kết thúc'} ${laLenh ? `lệnh chạy ${esc(tk.lenh_code ?? '')} · mã ${esc(tk.ma)}` : `mã nguyên liệu ${esc(tk.ma)}`}</h2>
 <p style="margin:0 0 12px;color:#555">${esc(tk.rubber_type_name || '')} · nhà máy ${esc(tk.facility_code)} · ${dotDau ? dt(dotDau.started_at) : '—'} → ${dotCuoi?.ended_at ? dt(dotCuoi.ended_at) : 'đang chạy'}</p>
 <p>Kính gửi Ban Giám đốc,</p>
 <table style="border-collapse:collapse;font-size:14px;margin:8px 0">
@@ -86,6 +90,7 @@ ${tr(['Số lần chèn', `${p.tong} lần / ${p.so_ca} ca · ${p.so_banh} bành
 ${tr(['Vị trí', `bể Slap ${kg(c?.be_kg ?? p.be_slap)} kg · máy Mix ${kg(c?.mix_kg ?? p.may_mix)} kg`])}
 ${c ? tr(['Theo nguồn', `lỗi ${kg(c.loi_kg)} · DKL ${kg(c.dkl_kg)} · chuẩn ${kg(c.chuan_kg)} · khác ${kg(c.khac_kg)} kg`]) : ''}
 ${tr(['NVL nhập kho', `${tk.so_xe} xe · ${kg(tk.wet_kg)} kg tươi · ${kg(tk.nhap_kho_kg ?? tk.dry_kg)} kg khô${tk.drc_pct !== null ? ` (DRC ${pct(tk.drc_pct)})` : ''}`])}
+${nhieuMa ? tr(['Theo mã', (tk.ma_list ?? []).map((m) => `${esc(m.ma)}: nhập ${kg(m.nhap_kho_kg ?? m.dry_kg)} · xuất ${kg(m.xuat_sx_kho_kg)} · còn ${kg(m.dry_kg)} kg`).join('<br/>')]) : ''}
 ${tr(['NVL xuất vào sản xuất', `${kg(tk.xuat_sx_kho_kg)} kg khô · còn kho ${kg(conKho)} kg`])}
 ${tr(['Thành phẩm', `${tk.so_ca_ep ?? 0} ca ép · TP đạt ${kg(tk.tp_dat_kg)} kg · lỗi + DKL ${kg(tk.loi_dkl_kg)} kg${tk.ty_le_loi_pct !== null ? ` (${pct(tk.ty_le_loi_pct)})` : ''}`])}
 ${tr(['Hiệu suất', `<b>${pct(tk.hieu_suat_pct)}</b> = TP đạt / (NVL vào máy + chèn)`])}
@@ -93,7 +98,7 @@ ${tr(['Hiệu suất', `<b>${pct(tk.hieu_suat_pct)}</b> = TP đạt / (NVL vào 
 ${bangCa ? `<h3 style="font-size:14px;margin:12px 0 2px">Chèn theo ca</h3>${bangCa}` : ''}
 ${bangLo ? `<h3 style="font-size:14px;margin:12px 0 2px">Theo lô chèn</h3>${bangLo}` : ''}
 ${luuY.length ? `<h3 style="font-size:14px;margin:12px 0 2px;color:#B45309">Lưu ý</h3><ul style="margin:0 0 8px 18px">${luuY.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p style="color:#15803D">Tất cả phiếu chèn của mã đã đủ 3 chữ ký, số liệu chốt.</p>'}
-<p style="margin:12px 0 0">Chi tiết: <a href="${APP_URL}/wms/chen">${APP_URL}/wms/chen</a> (chọn mã ${esc(tk.ma)}) · <a href="${APP_URL}/wms/nvl/lo">lô NVL</a></p>
+<p style="margin:12px 0 0">Chi tiết: <a href="${APP_URL}/wms/chen">${APP_URL}/wms/chen</a> (chọn ${laLenh ? `lệnh ${esc(tk.lenh_code ?? '')}` : `mã ${esc(tk.ma)}`}) · <a href="${APP_URL}/wms/nvl/lo">lô NVL</a></p>
 <p style="color:#555;font-size:12px;margin:12px 0 0">Người lập: ${esc(tk.nguoi_lap?.name ?? '')} · ${dt(tk.luc)}<br/>Huy Anh ERP · soạn tự động từ màn hình Hàng chèn</p>
 </div>`
   return { subject, text, html }

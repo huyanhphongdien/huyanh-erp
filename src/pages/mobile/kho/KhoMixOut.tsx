@@ -11,7 +11,7 @@ import { useAuthStore } from '../../../stores/authStore'
 import { mixService, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue, type MixLot, type MixPurpose, type MixViTri } from '../../../services/wms/mixService'
 import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
-import { rawLotService, type RawLotBalance } from '../../../services/wms/rawLotService'
+import { rawLotService, type LenhChay, type RawLotBalance } from '../../../services/wms/rawLotService'
 import { shiftBookService } from '../../../services/wms/shiftBookService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import type { OpsShiftOption } from '../../../services/opsService'
@@ -43,7 +43,8 @@ export default function KhoMixOut() {
   // mã nguyên liệu gốc đang chạy mà ca này chèn vào (một hay nhiều)
   const [maList, setMaList] = useState<RawLotBalance[]>([])
   const [maChon, setMaChon] = useState<string[]>([])
-  const [maNguon, setMaNguon] = useState<'phieu_ca' | 'dang_chay' | 'tay' | null>(null)
+  const [maNguon, setMaNguon] = useState<'phieu_ca' | 'lenh' | 'dang_chay' | 'tay' | null>(null)
+  const [lenhs, setLenhs] = useState<LenhChay[]>([])   // lệnh đang chạy (SQL p13): một lệnh = 1..n mã gộp; nhiều lệnh → tổ chạm chọn lệnh
   const [shift, setShift] = useState<ShiftPick | null>(null)
   const [shifts, setShifts] = useState<OpsShiftOption[]>([])
   const [pickShift, setPickShift] = useState(false)
@@ -77,12 +78,14 @@ export default function KhoMixOut() {
     return () => { alive = false }
   }, [facilityId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // mã gốc tự nhận: phiếu ca của ca này → mã đang chạy duy nhất → tổ chạm chọn
+  useEffect(() => { if (!facilityId) return; rawLotService.lenhDangChay(facilityId).then(setLenhs).catch(() => setLenhs([])) }, [facilityId])
+  // mã gốc tự nhận: phiếu ca của ca này → một lệnh đang chạy → mã đang chạy duy nhất → tổ chạm chọn
   useEffect(() => {
     if (!facilityId || maNguon === 'tay') return
     let alive = true
     const fallback = () => {
       if (!alive) return
+      if (lenhs.length === 1) { setMaChon(lenhs[0].raw_lot_ids); setMaNguon('lenh'); return }   // đúng một lệnh → mã của lệnh (gộp)
       const dc = maList.filter((x) => x.trang_thai === 'dang_chay')
       if (dc.length === 1) { setMaChon([dc[0].raw_lot_id]); setMaNguon('dang_chay') } else if (maNguon !== null) { setMaChon([]); setMaNguon(null) }
     }
@@ -97,7 +100,7 @@ export default function KhoMixOut() {
       })
       .catch(fallback)
     return () => { alive = false }
-  }, [facilityId, shift?.id, maList]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [facilityId, shift?.id, maList, lenhs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadPhotos = useCallback(async () => { try { setPhotos(await rawPhotoService.list('mix_issue_out', issueId)) } catch { /* bỏ qua */ } }, [issueId])
 
@@ -331,11 +334,19 @@ export default function KhoMixOut() {
 
           <section className="kmx-card" aria-label="Chèn vào mã nguyên liệu" style={{ gap: 8 }}>
             <div className="kmx-row">
-              <span className="kmx-strong" style={{ fontSize: 13 }}>Chèn vào mã nguyên liệu nào?</span>
+              <span className="kmx-strong" style={{ fontSize: 13 }}>Chèn vào lệnh / mã nguyên liệu nào?</span>
               {maNguon === 'phieu_ca' && <span className="kmx-chip ok">theo phiếu ca</span>}
               {maNguon === 'dang_chay' && <span className="kmx-chip ok">mã đang chạy</span>}
+              {maNguon === 'lenh' && <span className="kmx-chip ok">theo lệnh</span>}
               {maNguon === 'tay' && maChon.length > 0 && <span className="kmx-chip blue">bạn chọn</span>}
             </div>
+            {lenhs.length > 0 && (
+              <div className="kmx-seg">
+                {lenhs.map((g) => { const on = g.raw_lot_ids.length === maChon.length && g.raw_lot_ids.every((x) => maChon.includes(x)); return <button key={g.id} type="button" className={on ? 'on' : ''} onClick={() => { setMaChon(g.raw_lot_ids); setMaNguon('lenh') }}>{g.ma_gop}</button> })}
+              </div>
+            )}
+            {lenhs.length > 1 && maNguon !== 'lenh' && <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Đang chạy {lenhs.length} lệnh song song — chạm lệnh pallet này chèn vào.</span>}
+            {lenhs.length > 0 && maList.length > 0 && <span className="kmx-sm">Hoặc chọn mã lẻ (không theo lệnh):</span>}
             {maList.length ? (
               <div className="kmx-seg">
                 {maList.map((m) => <button key={m.raw_lot_id} type="button" className={maChon.includes(m.raw_lot_id) ? 'on' : ''} onClick={() => toggleMa(m.raw_lot_id)}>{m.ma}{m.trang_thai === 'dang_chay' ? ' · đang chạy' : ''}</button>)}

@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Alert, Button, Card, Col, Input, InputNumber, Modal, Row, Select, Space, Statistic, Table, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Col, Input, InputNumber, Modal, Radio, Row, Select, Space, Statistic, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { DatabaseOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
@@ -13,7 +13,7 @@ import MaTongKetModal from '../../../components/wms/MaTongKetModal'
 import { xacNhanBatDauMa } from '../../../components/wms/xacNhanBatDauMa'
 import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPurpose, type MixViTri, type ShiftLite } from '../../../services/wms/mixService'
 import { rawIssueService, type ProductionOrderLite } from '../../../services/wms/rawIssueService'
-import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type RawLotBalance, type RawLotChen } from '../../../services/wms/rawLotService'
+import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type LenhChay, type RawLotBalance, type RawLotChen } from '../../../services/wms/rawLotService'
 import { useMixRole } from '../../../hooks/useMixRole'
 import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
@@ -51,7 +51,10 @@ export default function MixShiftPage() {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [chayBusy, setChayBusy] = useState(false)
-  const [tk, setTk] = useState<{ open: boolean; vua: boolean }>({ open: false, vua: false })   // tổng kết mã + mail BGĐ
+  const [tk, setTk] = useState<{ open: boolean; vua: boolean; lenhId?: string | null; rawLotId?: string | null }>({ open: false, vua: false })   // tổng kết mã / lệnh + mail BGĐ
+  const [lenhs, setLenhs] = useState<LenhChay[]>([])   // lệnh đang chạy (SQL p13): một lệnh = 1..n mã gộp
+  const [lenhOpen, setLenhOpen] = useState(false)
+  const [lf, setLf] = useState<{ ids: string[]; cach: 'thay_the' | 'song_song' | 'gop'; gopVao?: string }>({ ids: [], cach: 'thay_the' })
   const [f, setF] = useState({ lotId: undefined as string | undefined, kg: null as number | null, shiftId: undefined as string | undefined, team: '', purpose: 'chay_lai' as MixPurpose, targetIndex: '', targetValue: null as number | null, poId: undefined as string | undefined, note: '', rawLotIds: [] as string[], soBanh: null as number | null, grossKg: null as number | null, palletKg: 15 as number | null, viTri: undefined as MixViTri | undefined })
 
   useEffect(() => {
@@ -84,6 +87,8 @@ export default function MixShiftPage() {
   }, [facilityId, lotFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load() }, [load])
+  const taiLenh = useCallback(() => { if (!facilityId) return; rawLotService.lenhDangChay(facilityId).then(setLenhs).catch(() => setLenhs([])) }, [facilityId])
+  useEffect(() => { taiLenh() }, [taiLenh, openIssues])
   useEffect(() => {
     if (!facilityId || !maId) { setMaIssues([]); return }
     let alive = true
@@ -122,32 +127,52 @@ export default function MixShiftPage() {
   const lotChon = lotsCoHang.find((l) => l.id === f.lotId)
   // kg hàng chèn: gõ thẳng, hoặc = hàng + pallet − bì (như sổ tay tổ ép)
   const kgNet = f.kg ?? f.grossKg   // cân tổng; bì khai lúc trả
-  // khai / kết thúc mã đang chạy ngay trên máy tính (sổ mã đang chạy, SQL p10)
-  //   · bắt đầu: mặc định THAY THẾ mã đang chạy (hỏi một lần, có thể chọn chạy chung) — 30/10
-  //   · kết thúc: xác nhận → kết thúc → mở tổng kết khối lượng chèn + mail BGĐ (SQL p12)
+  // lệnh chạy (SQL p13): bắt đầu 1..n mã — thay thế (mặc định 30/10) / song song / gộp; kết thúc lệnh → tổng kết chèn + mail BGĐ
   const doiChay = async (batDau: boolean) => {
     if (!maChon) return
     if (batDau) {
-      const khac = maAll.filter((x) => x.dang_chay_tu && x.raw_lot_id !== maChon.raw_lot_id).map((x) => x.ma)
-      const thayThe = await xacNhanBatDauMa({ ma: maChon.ma, dangChay: khac })
-      if (thayThe === null) return
+      const xn = await xacNhanBatDauMa({ ma: maChon.ma, dangChay: lenhs.filter((g) => !g.raw_lot_ids.includes(maChon.raw_lot_id)).map((g) => ({ id: g.id, label: g.ma_gop })) })
+      if (!xn) return
       setChayBusy(true)
-      try { const r = await rawLotService.batDauChay(maChon.raw_lot_id, thayThe); message.success(`${r.da_chay ? `${r.ma} đã đang chạy` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng ${r.ma}` : `Đã khai ${r.ma} đang chạy`} — phiếu ca, phiếu chèn, lô TP từ giờ tự theo mã này`); await load() }
-      catch (e: any) { message.error(e?.message || 'Không khai được (cần chạy SQL p10)') }
+      try { const r = await rawLotService.batDauLenh([maChon.raw_lot_id], { thayThe: xn.thayThe, gopVao: xn.gopVao }); message.success(`${r.da_chay ? `${r.ma_gop} đã đang chạy` : r.gop ? `Đã gộp vào lệnh ${r.code}: ${r.ma_gop}` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng lệnh ${r.code}` : `Đã bắt đầu lệnh ${r.code}: ${r.ma_gop}`} — phiếu ca, phiếu chèn, lô TP từ giờ tự theo lệnh này`); await load(); taiLenh() }
+      catch (e: any) { message.error(e?.message || 'Không khai được (cần chạy SQL p13)') }
       finally { setChayBusy(false) }
       return
     }
+    // mã cũ không nằm trong lệnh nào (sổ trước p13) → kết thúc theo mã
     Modal.confirm({
       title: `Kết thúc mã ${maChon.ma}?`,
       content: 'Mã sẽ không còn tự gắn vào phiếu ca, phiếu chèn, lô thành phẩm. Ngay sau đó máy tổng kết khối lượng chèn của mã và soạn sẵn mail báo cáo Ban Giám đốc.',
       okText: 'Kết thúc mã và tổng kết', cancelText: 'Hủy',
       onOk: async () => {
         setChayBusy(true)
-        try { await rawLotService.ketThucChay(maChon.raw_lot_id); message.success(`${maChon.ma} đã kết thúc chạy`); await load(); setTk({ open: true, vua: true }) }
+        try { await rawLotService.ketThucChay(maChon.raw_lot_id); message.success(`${maChon.ma} đã kết thúc chạy`); await load(); taiLenh(); setTk({ open: true, vua: true, rawLotId: maChon.raw_lot_id }) }
         catch (e: any) { message.error(e?.message || 'Không kết thúc được') }
         finally { setChayBusy(false) }
       },
     })
+  }
+  const ketThucLenh = (g: LenhChay) => Modal.confirm({
+    title: `Kết thúc lệnh ${g.code} · ${g.ma_gop}?`,
+    content: 'Phiếu ca, phiếu chèn, lô thành phẩm sẽ không tự gắn lệnh này nữa. Ngay sau đó máy tổng kết khối lượng chèn của lệnh và soạn sẵn mail báo cáo Ban Giám đốc.',
+    okText: 'Kết thúc lệnh và tổng kết', cancelText: 'Hủy',
+    onOk: async () => {
+      setChayBusy(true)
+      try { await rawLotService.ketThucLenh(g.id); message.success(`Đã kết thúc lệnh ${g.code}`); await load(); taiLenh(); setTk({ open: true, vua: true, lenhId: g.id }) }
+      catch (e: any) { message.error(e?.message || 'Không kết thúc được') }
+      finally { setChayBusy(false) }
+    },
+  })
+  const batDauLenhSubmit = async () => {
+    if (!lf.ids.length) { message.warning('Chọn ít nhất một mã'); return }
+    if (lf.cach === 'gop' && !lf.gopVao) { message.warning('Chọn lệnh để gộp vào'); return }
+    setChayBusy(true)
+    try {
+      const r = await rawLotService.batDauLenh(lf.ids, { thayThe: lf.cach === 'thay_the', gopVao: lf.cach === 'gop' ? lf.gopVao : null })
+      message.success(r.da_chay ? `${r.ma_gop} đã đang chạy (${r.code})` : r.gop ? `Đã gộp vào ${r.code}: ${r.ma_gop}` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng ${r.code} (${r.ma_gop})` : `Đã bắt đầu lệnh ${r.code}: ${r.ma_gop}`)
+      setLenhOpen(false); setLf({ ids: [], cach: 'thay_the' }); await load(); taiLenh()
+    } catch (e: any) { message.error(e?.message || 'Không khai được (cần chạy SQL p13)') }
+    finally { setChayBusy(false) }
   }
 
   const submit = async () => {
@@ -224,6 +249,22 @@ export default function MixShiftPage() {
           </Card>
         )}
 
+        <Card size="small" title={<Space wrap>Lệnh đang chạy<Tag color={lenhs.length ? 'green' : 'default'}>{lenhs.length}</Tag><Button size="small" type="primary" ghost disabled={!canWrite} onClick={() => { setLf({ ids: [], cach: lenhs.length ? 'thay_the' : 'song_song' }); setLenhOpen(true) }}>Bắt đầu lệnh…</Button><Text type="secondary" style={{ fontSize: 12 }}>một lệnh = một hay nhiều mã chạy chung (KHMN-15 + 17); nhiều lệnh chạy song song được (TMHG-39 bể Slap trong lúc 15 + 17 vào máy Mix)</Text></Space>}>
+          {lenhs.length ? (
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              {lenhs.map((g) => (
+                <Space key={g.id} wrap>
+                  <Text strong style={{ fontSize: 15 }}>{g.ma_gop}</Text>
+                  <Tag>{g.code}</Tag>
+                  <Text type="secondary">từ {new Date(g.started_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}{g.started_name ? ` · ${g.started_name}` : ''} · chèn đã nhận {fmtKg(g.chen_kg)} kg{g.tieu_hao_cho_ky > 0 ? ` · chờ ký ${fmtKg(g.tieu_hao_cho_ky)} kg` : ''}{g.phieu_mo ? ` · ${g.phieu_mo} phiếu mở` : ''}</Text>
+                  <Button size="small" onClick={() => setTk({ open: true, vua: false, lenhId: g.id })}>Tổng kết · mail BGĐ</Button>
+                  <Button size="small" danger ghost disabled={!canWrite} loading={chayBusy} onClick={() => ketThucLenh(g)}>Kết thúc lệnh</Button>
+                </Space>
+              ))}
+            </Space>
+          ) : <Text type="secondary">Chưa khai lệnh nào đang chạy — phiếu ca, phiếu chèn, lô TP sẽ không tự gắn mã. Bấm "Bắt đầu lệnh…" (cần SQL p13).</Text>}
+        </Card>
+
         <Card size="small" bodyStyle={{ padding: 0 }} title={<Space>Phiếu đang mở (chưa đủ 3 chữ ký)<Tag color={openIssues.length ? 'gold' : 'default'}>{openIssues.length}</Tag></Space>}>
           <Table<MixIssue> rowKey="id" columns={columns} dataSource={openIssues} size="small" loading={loading} pagination={false} locale={{ emptyText: 'Không có phiếu đang mở' }} />
         </Card>
@@ -234,9 +275,11 @@ export default function MixShiftPage() {
               options={maAll.map((m) => ({ value: m.raw_lot_id, label: `${m.ma} · ${RAW_LOT_TRANG_THAI_LABELS[m.trang_thai]}${m.rubber_type_name ? ' · ' + m.rubber_type_name : ''}` }))} />
             {maChon && <Tag color={maChon.trang_thai === 'dang_chay' ? 'green' : maChon.trang_thai === 'san_sang' ? 'blue' : 'default'}>{RAW_LOT_TRANG_THAI_LABELS[maChon.trang_thai]}</Tag>}
             {maChon && (maChon.dang_chay_tu
-              ? <Button size="small" danger ghost loading={chayBusy} disabled={!canWrite} onClick={() => doiChay(false)}>Kết thúc mã</Button>
+              ? (() => { const g = lenhs.find((x) => x.raw_lot_ids.includes(maChon.raw_lot_id)); return g
+                  ? <Space size={4}><Tag color="green">lệnh {g.code}{g.so_ma > 1 ? ` · ${g.ma_gop}` : ''}</Tag><Button size="small" danger ghost loading={chayBusy} disabled={!canWrite} onClick={() => ketThucLenh(g)}>Kết thúc lệnh</Button></Space>
+                  : <Button size="small" danger ghost loading={chayBusy} disabled={!canWrite} onClick={() => doiChay(false)}>Kết thúc mã</Button> })()
               : <Button size="small" type="primary" ghost loading={chayBusy} disabled={!canWrite} onClick={() => doiChay(true)}>Khai mã này đang chạy</Button>)}
-            {maChon && <Button size="small" onClick={() => setTk({ open: true, vua: false })}>Tổng kết mã · mail BGĐ</Button>}
+            {maChon && <Button size="small" onClick={() => setTk({ open: true, vua: false, rawLotId: maChon.raw_lot_id })}>Tổng kết mã · mail BGĐ</Button>}
             {maChon && <Text type="secondary">{maChon.ngay_dau ? `về ${new Date(maChon.ngay_dau).toLocaleDateString('vi-VN')}` : ''}{maChon.ngay_cuoi && maChon.ngay_cuoi !== maChon.ngay_dau ? ` → ${new Date(maChon.ngay_cuoi).toLocaleDateString('vi-VN')}` : ''} · {maChon.so_xe} xe · xuất SX {fmtKg(maChon.xuat_sx_kho_kg)} kg khô</Text>}
           </Space>}>
           {maId && (
@@ -292,6 +335,7 @@ export default function MixShiftPage() {
             </Col>
             <Col span={24}><Text>Chèn vào đâu *</Text><Select style={{ width: '100%' }} value={f.viTri} onChange={(v) => setF((x) => ({ ...x, viTri: v }))} placeholder="Chèn bể Slap / chèn máy Mix" options={(Object.keys(MIX_VI_TRI_LABELS) as MixViTri[]).map((k) => ({ value: k, label: `Chèn ${MIX_VI_TRI_LABELS[k]}` }))} /></Col>
             <Col span={24}><Text>Chèn vào mã nguyên liệu đang chạy</Text>
+              {lenhs.length > 0 && <Space wrap size={4} style={{ marginBottom: 4 }}>{lenhs.map((g) => <Button key={g.id} size="small" type={g.raw_lot_ids.length === f.rawLotIds.length && g.raw_lot_ids.every((x) => f.rawLotIds.includes(x)) ? 'primary' : 'default'} onClick={() => setF((x) => ({ ...x, rawLotIds: g.raw_lot_ids }))}>Lệnh {g.code} · {g.ma_gop}</Button>)}</Space>}
               <Select mode="multiple" style={{ width: '100%' }} allowClear showSearch optionFilterProp="label" value={f.rawLotIds} onChange={(v) => setF((x) => ({ ...x, rawLotIds: v }))} placeholder="Để trống = lấy theo phiếu ca của ca này" options={maList.map((m) => ({ value: m.raw_lot_id, label: `${m.ma}${m.trang_thai === 'dang_chay' ? ' · đang chạy' : ''}` }))} />
               <Text type="secondary">Chọn nhiều mã nếu ca chạy chung (ví dụ KHMN-15 + 17): khi gom, kg chia đều.</Text>
             </Col>
@@ -310,7 +354,24 @@ export default function MixShiftPage() {
             <Col span={24}><Text>Ghi chú</Text><Input value={f.note} onChange={(e) => setF((x) => ({ ...x, note: e.target.value }))} /></Col>
           </Row>
         </Modal>
-        <MaTongKetModal open={tk.open} vuaKetThuc={tk.vua} rawLotId={maId ?? null} onClose={() => setTk({ open: false, vua: false })} />
+        <Modal open={lenhOpen} onCancel={() => setLenhOpen(false)} onOk={batDauLenhSubmit} okText="Bắt đầu lệnh" cancelText="Hủy" confirmLoading={chayBusy} title="Bắt đầu lệnh chạy">
+          <Space direction="vertical" size={10} style={{ width: '100%' }}>
+            <div><Text>Mã nguyên liệu chạy chung trong lệnh này *</Text>
+              <Select mode="multiple" style={{ width: '100%' }} showSearch optionFilterProp="label" value={lf.ids} onChange={(v) => setLf((x) => ({ ...x, ids: v }))} placeholder="Chọn một hay nhiều mã (KHMN-15 + KHMN-17)"
+                options={maAll.filter((m) => m.trang_thai !== 'huy' && m.trang_thai !== 'dong').map((m) => ({ value: m.raw_lot_id, label: `${m.ma} · ${RAW_LOT_TRANG_THAI_LABELS[m.trang_thai]}${m.rubber_type_name ? ' · ' + m.rubber_type_name : ''}` }))} /></div>
+            {lenhs.length > 0 && (
+              <Radio.Group value={lf.cach} onChange={(e) => setLf((x) => ({ ...x, cach: e.target.value }))}>
+                <Space direction="vertical">
+                  <Radio value="thay_the">Thay thế · kết thúc {lenhs.map((g) => g.ma_gop).join(', ')} (mặc định)</Radio>
+                  <Radio value="song_song">Chạy song song · lệnh riêng, lệnh cũ vẫn chạy (mỗi phiếu chèn phải chọn lệnh)</Radio>
+                  <Radio value="gop">Gộp thêm mã vào lệnh đang chạy</Radio>
+                </Space>
+              </Radio.Group>
+            )}
+            {lf.cach === 'gop' && <Select style={{ width: '100%' }} value={lf.gopVao} onChange={(v) => setLf((x) => ({ ...x, gopVao: v }))} placeholder="Gộp vào lệnh" options={lenhs.map((g) => ({ value: g.id, label: `${g.code} · ${g.ma_gop}` }))} />}
+          </Space>
+        </Modal>
+        <MaTongKetModal open={tk.open} vuaKetThuc={tk.vua} rawLotId={tk.lenhId ? null : (tk.rawLotId ?? maId ?? null)} lenhId={tk.lenhId ?? null} onClose={() => setTk({ open: false, vua: false })} />
       </Space>
     </div>
   )

@@ -22,7 +22,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { rawIssueService, type ProductionOrderLite } from '../../../services/wms/rawIssueService'
-import { rawLotService, type RawLotBalance } from '../../../services/wms/rawLotService'
+import { rawLotService, type LenhChay, type RawLotBalance } from '../../../services/wms/rawLotService'
 import {
   Card, Table, Button, Space, Typography, Row, Col, Select, DatePicker,
   Input, InputNumber, Tag, Spin, Alert, Switch, Tooltip, Modal, message,
@@ -113,18 +113,18 @@ export default function ShiftBookEntryPage() {
   // GĐ6b: phiếu mới tự theo sổ mã đang chạy (đúng một mã) — người dùng vẫn đổi được
   const [runIds, setRunIds] = useState<string[] | null>(null)   // null = chưa tải / chưa chạy SQL p10
   const [khaiBusy, setKhaiBusy] = useState(false)
-  const taiSoChay = (fid: string) => rawLotService.dangChay(fid).then((ids) => { setRunIds(ids); return ids }).catch(() => { setRunIds(null); return [] as string[] })
+  const [lenhs, setLenhs] = useState<LenhChay[]>([])   // lệnh đang chạy (SQL p13): lệnh nhiều mã → phiếu ca gắn lệnh, ô mã để trống
+  const taiSoChay = (fid: string) => { rawLotService.lenhDangChay(fid).then(setLenhs).catch(() => setLenhs([])); return rawLotService.dangChay(fid).then((ids) => { setRunIds(ids); return ids }).catch(() => { setRunIds(null); return [] as string[] }) }
   useEffect(() => {
     if (!facilityId) return
     taiSoChay(facilityId).then((ids) => { if (ids.length === 1 && !(id && id !== 'new')) setRawLotId((cur) => cur ?? ids[0]) })
   }, [facilityId, id])
   const khaiDangChay = async () => {
     if (!facilityId || !rawLotId) return
-    const khac = (runIds ?? []).filter((x) => x !== rawLotId).map((x) => rawLots.find((l) => l.raw_lot_id === x)?.ma ?? '?')
-    const thayThe = await xacNhanBatDauMa({ ma: rawLots.find((l) => l.raw_lot_id === rawLotId)?.ma ?? '', dangChay: khac })   // mặc định thay thế mã cũ (30/10)
-    if (thayThe === null) return
+    const xn = await xacNhanBatDauMa({ ma: rawLots.find((l) => l.raw_lot_id === rawLotId)?.ma ?? '', dangChay: lenhs.filter((g) => !g.raw_lot_ids.includes(rawLotId)).map((g) => ({ id: g.id, label: g.ma_gop })) })   // mặc định thay thế lệnh cũ (30/10)
+    if (!xn) return
     setKhaiBusy(true)
-    try { const r = await rawLotService.batDauChay(rawLotId, thayThe); message.success(r.da_chay ? `${r.ma} đã đang chạy` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng ${r.ma} — các ca sau tự theo mã này` : `Đã khai ${r.ma} đang chạy — các ca sau tự theo mã này`); await taiSoChay(facilityId); rawLotService.list(facilityId, { includeClosed: true }).then(setRawLots).catch(() => { /* bỏ qua */ }) }
+    try { const r = await rawLotService.batDauLenh([rawLotId], { thayThe: xn.thayThe, gopVao: xn.gopVao }); message.success(r.da_chay ? `${r.ma_gop} đã đang chạy` : r.gop ? `Đã gộp vào lệnh ${r.code}: ${r.ma_gop}` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng ${r.ma_gop} — các ca sau tự theo lệnh này` : `Đã khai ${r.ma_gop} đang chạy — các ca sau tự theo lệnh này`); await taiSoChay(facilityId); rawLotService.list(facilityId, { includeClosed: true }).then(setRawLots).catch(() => { /* bỏ qua */ }) }
     catch (e: any) { message.error(e?.message || 'Không khai được (cần chạy SQL p10)') }
     finally { setKhaiBusy(false) }
   }
@@ -582,7 +582,8 @@ export default function ShiftBookEntryPage() {
             />
             <Text type="secondary" style={{ fontSize: 11 }}>
               {runIds === null ? 'Sổ mã đang chạy chưa có (chạy SQL p10) — chọn tay.'
-                : rawLotId && runIds.includes(rawLotId) ? 'Đúng theo sổ mã đang chạy.'
+                : !rawLotId && lenhs.some((g) => g.so_ma > 1) ? `Lệnh ${lenhs.filter((g) => g.so_ma > 1).map((g) => `${g.code} gộp ${g.ma_gop}`).join('; ')} đang chạy — phiếu ca gắn lệnh, ô mã để trống. `
+                : rawLotId && runIds.includes(rawLotId) ? `Đúng theo sổ mã đang chạy${(() => { const g = lenhs.find((x) => x.raw_lot_ids.includes(rawLotId)); return g && g.so_ma > 1 ? ` (lệnh ${g.code} gộp ${g.ma_gop})` : '' })()}.`
                 : runIds.length === 0 ? 'Chưa khai mã nào đang chạy. ' : 'Khác mã trong sổ đang chạy. '}
               {runIds !== null && rawLotId && !runIds.includes(rawLotId) && !daKhoa && <a onClick={khaiBusy ? undefined : khaiDangChay}>{khaiBusy ? 'đang khai…' : 'Khai mã này đang chạy từ giờ'}</a>}
             </Text>

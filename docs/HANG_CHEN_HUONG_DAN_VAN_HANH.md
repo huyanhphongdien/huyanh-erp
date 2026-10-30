@@ -34,7 +34,14 @@ Quy tắc: không có số lô thì không nhập được. Lô **DKL** phải b
 - Hai mã cùng chạy: phiếu ca mới không tự điền (chọn tay), phiếu chèn gắn cả hai (kg chia đều khi gom).
 - Chip "Đang chạy" ở tab Lô NVL theo sổ này.
 
-**Khi đang có mã khác chạy** (từ 30/10 tối): bấm mã mới → máy hỏi một lần, mặc định **Thay thế** (kết thúc mã cũ, ghi "thay bằng …" vào sổ mã). Chỉ chọn **Chạy chung** khi hai mã thật sự vào máy cùng lúc (khi đó phiếu ca không tự điền mã, phải chọn tay).
+### 2b. Lệnh chạy gồm nhiều mã (SQL p13, từ sổ tay tổ ép 30/10)
+
+Sổ tay ghi "ca Hiền chèn MM vào KHMN-15 + 17" trong lúc "TMHG-39 chèn bể Slap": một **lệnh chạy** có thể gộp nhiều mã (15 + 17), và nhiều lệnh chạy **song song**. Máy làm theo đúng vậy:
+- **Bắt đầu lệnh** (điện thoại tab Chèn, thẻ đầu → "Bắt đầu lệnh…" chạm một hay nhiều mã → Bắt đầu; máy tính /wms/chen khung "Lệnh đang chạy" → "Bắt đầu lệnh…"). Lệnh có mã LC-PD-261030-01 và tên gộp "KHMN-15 + KHMN-17".
+- Đang có lệnh khác chạy → máy hỏi một lần: **Thay thế** (mặc định, kết thúc lệnh cũ) · **Chạy song song** (lệnh riêng, ví dụ TMHG-39 bên bể Slap) · **Gộp vào lệnh đang chạy** (15 đang chạy, thêm 17).
+- **Phiếu chèn**: đúng một lệnh đang chạy → tự gắn mã của lệnh; nhiều lệnh song song → màn Cân hiện chip từng lệnh, tổ chạm lệnh pallet này chèn vào (chip "theo lệnh"). Tiêu hao tính cho cả lệnh; khi xem theo từng mã thì chia đều.
+- **Phiếu ca**: tự gắn lệnh; ô mã chỉ tự điền khi lệnh có một mã. Lệnh 15 + 17 → ô mã để trống, thành phẩm tính theo lệnh (tổng kết lệnh), không tách được theo từng mã.
+- **Kết thúc lệnh** → tổng kết theo lệnh (NVL từng mã + tổng, chèn, TP, hiệu suất) và mail BGĐ như mục 6b. Mã cũ khai trước p13 vẫn là lệnh một mã, dùng như trước.
 
 ## 3. Lấy hàng chèn — mỗi pallet một lần (QS)
 

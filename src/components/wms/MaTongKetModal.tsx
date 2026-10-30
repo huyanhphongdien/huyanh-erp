@@ -17,7 +17,7 @@ const fmtD = (v: string | null | undefined) => (v ? new Date(v).toLocaleDateStri
 const fmtDt = (v: string | null | undefined) => (v ? new Date(v).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '—')
 const okEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
 
-export default function MaTongKetModal({ rawLotId, open, vuaKetThuc, onClose }: { rawLotId: string | null; open: boolean; vuaKetThuc?: boolean; onClose: () => void }) {
+export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onClose }: { rawLotId?: string | null; lenhId?: string | null; open: boolean; vuaKetThuc?: boolean; onClose: () => void }) {
   const [tk, setTk] = useState<RawLotTongKet | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -25,15 +25,16 @@ export default function MaTongKetModal({ rawLotId, open, vuaKetThuc, onClose }: 
   const [sending, setSending] = useState(false)
 
   useEffect(() => {
-    if (!open || !rawLotId) return
+    if (!open || (!rawLotId && !lenhId)) return
     let alive = true
     setLoading(true); setErr(null); setTk(null)
-    rawLotService.tongKetMa(rawLotId)
+    const req = lenhId ? rawLotService.tongKetLenh(lenhId) : rawLotService.tongKetMa(rawLotId ?? '')
+    req
       .then((r) => { if (!alive) return; setTk(r); setTo(r.bgd.map((b) => b.email)) })
-      .catch((e: any) => { if (alive) setErr(e?.message || 'Không tổng kết được (cần chạy SQL p12)') })
+      .catch((e: any) => { if (alive) setErr(e?.message || 'Không tổng kết được (cần chạy SQL p12 + p13)') })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [open, rawLotId])
+  }, [open, rawLotId, lenhId])
 
   const mail = useMemo(() => (tk ? soanMailTongKet(tk) : null), [tk])
   const toOk = to.filter(okEmail)
@@ -64,12 +65,12 @@ export default function MaTongKetModal({ rawLotId, open, vuaKetThuc, onClose }: 
 
   return (
     <Modal open={open} onCancel={onClose} footer={null} width={900} destroyOnHidden
-      title={<Space wrap>{tk ? <>Tổng kết mã <Text strong style={{ fontSize: 18 }}>{tk.ma}</Text><Tag color={tk.dang_chay ? 'green' : 'default'}>{tk.dang_chay ? 'Đang chạy' : RAW_LOT_TRANG_THAI_LABELS[tk.trang_thai]}</Tag>{tk.rubber_type_name && <Text type="secondary">{tk.rubber_type_name}</Text>}</> : 'Tổng kết mã'}</Space>}>
+      title={<Space wrap>{tk ? <>{tk.lenh_code ? <>Tổng kết lệnh <Text strong style={{ fontSize: 18 }}>{tk.lenh_code}</Text><Text strong>{tk.ma}</Text></> : <>Tổng kết mã <Text strong style={{ fontSize: 18 }}>{tk.ma}</Text></>}<Tag color={tk.dang_chay ? 'green' : 'default'}>{tk.dang_chay ? 'Đang chạy' : RAW_LOT_TRANG_THAI_LABELS[tk.trang_thai]}</Tag>{tk.rubber_type_name && <Text type="secondary">{tk.rubber_type_name}</Text>}</> : 'Tổng kết mã'}</Space>}>
       {err && <Alert type="error" showIcon message={err} />}
       {loading && <Text type="secondary">Đang tổng kết…</Text>}
       {tk && mail && (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          {vuaKetThuc && <Alert type="success" showIcon message={`Đã kết thúc chạy mã ${tk.ma}. Kiểm tra số bên dưới rồi gửi báo cáo cho Ban Giám đốc.`} />}
+          {vuaKetThuc && <Alert type="success" showIcon message={`Đã kết thúc ${tk.lenh_code ? `lệnh ${tk.lenh_code} (${tk.ma})` : `chạy mã ${tk.ma}`}. Kiểm tra số bên dưới rồi gửi báo cáo cho Ban Giám đốc.`} />}
           <Row gutter={[16, 8]}>
             <Col xs={12} md={6}><Statistic title="Tiêu hao hàng chèn (kg)" value={tk.chen?.chen_kg ?? tk.phieu.tieu_hao_da_nhan} precision={0} valueStyle={{ color: '#1B4D3E', fontWeight: 700 }} suffix={tk.chen?.ty_le_pct !== null && tk.chen?.ty_le_pct !== undefined ? <Text type="secondary" style={{ fontSize: 12 }}>= {tk.chen.ty_le_pct} % hàng vào máy</Text> : undefined} /></Col>
             <Col xs={12} md={6}><Statistic title="Số lần chèn" value={tk.phieu.tong} suffix={<Text type="secondary" style={{ fontSize: 12 }}>/ {tk.phieu.so_ca} ca · {tk.phieu.so_banh} bành</Text>} /></Col>
@@ -87,6 +88,7 @@ export default function MaTongKetModal({ rawLotId, open, vuaKetThuc, onClose }: 
             </>}
             <Text type="secondary">đã lấy {fmtKg(tk.phieu.kg_lay)} · trả {fmtKg(tk.phieu.kg_tra)} kg · thủ kho đã nhận {fmtKg(tk.phieu.tieu_hao_da_nhan)} kg</Text>
           </Space>
+          {tk.ma_list && tk.ma_list.length > 1 && <Text type="secondary">Theo mã: {tk.ma_list.map((m) => `${m.ma} nhập ${fmtKg(m.nhap_kho_kg ?? m.dry_kg)} · xuất ${fmtKg(m.xuat_sx_kho_kg)} kg`).join(' · ')}</Text>}
           {(tk.phieu.chua_tra > 0 || tk.phieu.cho_ky > 0 || tk.dang_chay) && (
             <Alert type="warning" showIcon message={[tk.phieu.chua_tra > 0 ? `${tk.phieu.chua_tra} phiếu chưa trả (còn ở dây chuyền)` : '', tk.phieu.cho_ky > 0 ? `${tk.phieu.cho_ky} phiếu chờ ký` : '', tk.dang_chay ? 'mã vẫn đang khai là đang chạy' : ''].filter(Boolean).join(' · ') + ' — số tiêu hao có thể còn thay đổi.'} />
           )}

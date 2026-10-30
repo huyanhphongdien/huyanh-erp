@@ -49,7 +49,7 @@ export default function KhoLots() {
   const list = useMemo(() => {
     const s = q.trim().toUpperCase()
     return lots
-      .filter((l) => filter === 'done' ? l.trang_thai === 'da_chay_xong' || l.status !== 'mo' : l.dry_kg > 0.005)
+      .filter((l) => filter === 'done' ? l.trang_thai === 'da_chay_xong' || l.status !== 'mo' : l.dry_kg > 0.005 || (l.status === 'mo' && (l.trang_thai === 'trong' || l.trang_thai === 'dang_chay')))   // mã tạo trước / đang chạy chưa có hàng vẫn hiện
       .filter((l) => filter !== 'due' || (byLot.get(l.raw_lot_id) ?? []).some(due))
       .filter((l) => !s || l.ma.includes(s) || l.rubber_type_name.toUpperCase().includes(s) || (byLot.get(l.raw_lot_id) ?? []).some((r) => r.batch_no.toUpperCase().includes(s)))
   }, [lots, q, filter, byLot]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -74,7 +74,7 @@ export default function KhoLots() {
       const ma = p?.ma || raw.toUpperCase().replace(/\s+/g, '-')
       const id = await rawLotService.layHoacTao(facilityId, ma)
       if (ganCho) await rawStockService.ganMa(ganCho.batch_id, id)
-      setMsg({ ok: true, text: ganCho ? `✅ ${ganCho.batch_no} đã gán mã ${ma}` : `✅ Đã tạo mã ${ma} — chọn được ở tab Chèn (Bắt đầu lệnh) và sổ ca; chưa có hàng nên chưa hiện ở "Còn hàng"` })
+      setMsg({ ok: true, text: ganCho ? `✅ ${ganCho.batch_no} đã gán mã ${ma}` : `✅ Đã tạo mã ${ma} (Chưa có hàng) — chọn được ở tab Chèn (Bắt đầu lệnh) và sổ ca` })
       setMaMoi(''); setGan(null); await load()
     } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không tạo được mã' }) }
     finally { setBusy(null) }

@@ -14,12 +14,14 @@ import './khoMix.css'
 
 const I = {
   lots: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22"><path d="M3 9l9-5 9 5v10l-9 5-9-5z" /><path d="M3 9l9 5 9-5M12 14v10" /></svg>,
+  count: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM8.5 12l2 2 4-4M8.5 17h7" /></svg>,
   intake: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22"><path d="M4 7h16v13H4z" /><path d="M12 3v9M8 8l4 4 4-4" /></svg>,
   mix: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22"><path d="M4 17l6-6 4 4 6-6" /><path d="M14 9h6v6" /></svg>,
 }
 const TABS = [
   { to: '/m/kho', ico: I.lots, label: 'Lô NVL', exact: true, also: ['/m/kho/lo'] },
   { to: '/m/kho/nhap', ico: I.intake, label: 'Nhập', exact: false, also: [] },
+  { to: '/m/kho/kiem-ke', ico: I.count, label: 'Kiểm kê', exact: false, also: [] },
   { to: '/m/kho/chen', ico: I.mix, label: 'Hàng chèn', exact: false, also: [] },
 ]
 

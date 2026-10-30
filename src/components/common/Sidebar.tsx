@@ -427,22 +427,11 @@ const getMenuGroups = (
     executiveOnly: true,
     rawKeeperAllowed: true,   // GĐ0 kho NVL: thủ kho / QC theo raw_store_keepers
     items: [
-      { path: '/wms', label: 'Tồn kho', icon: <Warehouse size={18} /> }, // tabs: overview | nvl | alerts | stock-check
-      // Kho nguyên liệu mủ (GĐ1) — sổ kho khô; thủ kho NVL thấy nhờ rawKeeperAllowed của group
-      { path: '/wms/nvl', label: 'Kho NVL mủ', icon: <Warehouse size={18} />, extraActivePaths: ['/wms/nvl/lo'] },
-      { path: '/wms/nvl/nhap', label: 'Nhập NVL (phiếu cân)', icon: <PackagePlus size={18} /> },
-      { path: '/wms/nvl/xuat', label: 'Xuất NVL (sản xuất)', icon: <PackageMinus size={18} />, extraActivePaths: ['/wms/nvl/xuat/'] },
-      { path: '/wms/nvl/can-lai', label: 'Cân lại / DRC', icon: <FlaskConical size={18} /> },
-      { path: '/wms/nvl/kiem-ke', label: 'Kiểm kê NVL', icon: <ClipboardList size={18} />, extraActivePaths: ['/wms/nvl/kiem-ke/'] },
-      { path: '/wms/nvl/can-doi', label: 'Cân đối & hao hụt', icon: <BarChart3 size={18} /> },
-      { path: '/wms/nvl/doi-chieu', label: 'Đối chiếu giấy–máy', icon: <ClipboardCheck size={18} /> },
-      // GĐ4 hàng chèn (mix): phiếu theo ca + kho chèn
-      { path: '/wms/chen', label: 'Hàng chèn (ca)', icon: <ArrowRightLeft size={18} />, extraActivePaths: ['/wms/chen/phieu'] },
-      { path: '/wms/chen/ton', label: 'Kho chèn', icon: <Boxes size={18} /> },
-      { path: '/wms/stock-in', label: 'Nhập kho', icon: <PackagePlus size={18} /> },
-      { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
-      { path: '/wms/transfer', label: 'Chuyển kho NM', icon: <PackageMinus size={18} /> },
-      { path: '/wms/weighbridge/list', label: 'Phiếu cân (đa NM)', icon: <Scale size={18} /> },
+      // 2026-10-30 gom menu KHO 17 → 7 mục (quyết định chủ DN): mỗi hub 1 mục, trang con đi bằng thanh tab (HubLayout).
+      { path: '/wms/nvl', label: 'Kho NVL mủ', icon: <Warehouse size={18} />, extraActivePaths: ['/wms/nvl'] },
+      { path: '/wms/chen', label: 'Hàng chèn', icon: <ArrowRightLeft size={18} />, extraActivePaths: ['/wms/chen'] },
+      { path: '/wms/weighbridge/list', label: 'Phiếu cân (đa NM)', icon: <Scale size={18} />, extraActivePaths: ['/wms/weighbridge'] },
+      { path: '/wms', label: 'Kho vật tư & thành phẩm', icon: <Boxes size={18} />, extraActivePaths: ['/wms/stock-in', '/wms/stock-out', '/wms/transfer', '/wms/inventory'] }, // tab: Tồn kho | Nhập kho | Xuất kho | Chuyển kho NM
       { path: '/wms/qc', label: 'QC / DRC', icon: <FlaskConical size={18} /> }, // tabs: dashboard | recheck | quick-scan | standards
       { path: '/wms/reports', label: 'Báo cáo WMS', icon: <BarChart3 size={18} /> }, // tabs: dashboard | stock-movement | supplier-quality | inventory-value | supplier-scoring
       { path: '/wms/config', label: 'Cấu hình', icon: <Settings size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] }, // tabs: materials | warehouses | settings

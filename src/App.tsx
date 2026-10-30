@@ -11,6 +11,7 @@
 
 import { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import HubLayout from './components/wms/HubLayout';
 import { Capacitor } from '@capacitor/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './stores/authStore';
@@ -102,6 +103,7 @@ const KhoMixSign = lazy(() => import('./pages/mobile/kho/KhoMixSign'));
 const KhoMixStock = lazy(() => import('./pages/mobile/kho/KhoMixStock'));
 const KhoMixLotNew = lazy(() => import('./pages/mobile/kho/KhoMixLotNew'));
 const KhoMixList = lazy(() => import('./pages/mobile/kho/KhoMixList'));
+const KhoStocktake = lazy(() => import('./pages/mobile/kho/KhoStocktake'));
 
 // ===== CHẤM CÔNG V2: Ca, Phân ca, Tăng ca =====
 const ShiftListPage = lazy(() => import('./features/shifts').then(m => ({ default: m.ShiftListPage })));
@@ -464,6 +466,7 @@ function App() {
               <Route index element={<Suspense fallback={<LoadingSpinner />}><KhoLots /></Suspense>} />
               <Route path="lo/:batchId" element={<Suspense fallback={<LoadingSpinner />}><KhoLotDetail /></Suspense>} />
               <Route path="nhap" element={<Suspense fallback={<LoadingSpinner />}><KhoIntake /></Suspense>} />
+              <Route path="kiem-ke" element={<Suspense fallback={<LoadingSpinner />}><KhoStocktake /></Suspense>} />
               <Route path="chen" element={<Suspense fallback={<LoadingSpinner />}><KhoMix /></Suspense>} />
               <Route path="chen/lay" element={<Suspense fallback={<LoadingSpinner />}><KhoMixOut /></Suspense>} />
               <Route path="chen/phieu/:id" element={<Suspense fallback={<LoadingSpinner />}><KhoMixIssue /></Suspense>} />
@@ -568,24 +571,25 @@ function App() {
 
               {/* ===== WMS MODULE ===== */}
               <Route path="wms">
-                {/* Phase A: Inventory tabbed wrapper — overview | nvl | alerts | stock-check */}
-                <Route index element={<WMSInventoryTabbedPage />} />
+                {/* Hub Kho vật tư & thành phẩm — tab: Tồn kho | Nhập kho | Xuất kho | Chuyển kho NM (menu trái chỉ 1 mục) */}
+                <Route element={<HubLayout hub="kho" />}>
+                  <Route index element={<WMSInventoryTabbedPage />} />
+                  <Route path="stock-in" element={<StockInListPage />} />
+                  <Route path="stock-in/new" element={<StockInCreatePage />} />
+                  <Route path="stock-in/:id" element={<StockInDetailPage />} />
+                  <Route path="stock-out" element={<StockOutListPage />} />
+                  <Route path="stock-out/new" element={<StockOutCreatePage />} />
+                  <Route path="stock-out/:id" element={<StockOutDetailPage />} />
+                  <Route path="stock-out/:id/pick" element={<PickingListPage />} />
+                  <Route path="transfer" element={<TransferListPage />} />
+                  <Route path="transfer/new" element={<TransferCreatePage />} />
+                  <Route path="transfer/:id" element={<TransferDetailPage />} />
+                  <Route path="inventory/:materialId" element={<InventoryDetailPage />} />
+                </Route>
                 <Route path="nvl-dashboard" element={<Navigate to="/wms?tab=nvl" replace />} />
                 <Route path="materials" element={<WMSMaterialListPage />} />
                 <Route path="warehouses" element={<WMSWarehouseListPage />} />
                 <Route path="warehouses/:id/locations" element={<WMSWarehouseLocationPage />} />
-                <Route path="stock-in" element={<StockInListPage />} />
-                <Route path="stock-in/new" element={<StockInCreatePage />} />
-                <Route path="stock-in/:id" element={<StockInDetailPage />} />
-                <Route path="stock-out" element={<StockOutListPage />} />
-                <Route path="stock-out/new" element={<StockOutCreatePage />} />
-                <Route path="stock-out/:id" element={<StockOutDetailPage />} />
-                <Route path="stock-out/:id/pick" element={<PickingListPage />} />
-                {/* F3: Inter-facility Transfer */}
-                <Route path="transfer" element={<TransferListPage />} />
-                <Route path="transfer/new" element={<TransferCreatePage />} />
-                <Route path="transfer/:id" element={<TransferDetailPage />} />
-                <Route path="inventory/:materialId" element={<InventoryDetailPage />} />
                 {/* Phase A: redirect to consolidated /wms inventory tabbed */}
                 <Route path="alerts" element={<Navigate to="/wms?tab=alerts" replace />} />
                 <Route path="stock-check" element={<Navigate to="/wms?tab=stock-check" replace />} />
@@ -597,26 +601,27 @@ function App() {
                 <Route path="qc/batch/:batchId" element={<BatchQCHistoryPage />} />
                 {/* Batch Label — In nhãn QR */}
                 <Route path="batch/:batchId/label" element={<BatchLabelPage />} />
-                {/* Kho nguyên liệu mủ — GĐ1 (sổ kho khô) */}
-                <Route path="nvl" element={<RawOverviewPage />} />
-                <Route path="nvl/nhap" element={<RawIntakeQueuePage />} />
-                <Route path="nvl/lo/:batchId" element={<RawBatchDetailPage />} />
-                <Route path="nvl/ton-dau" element={<RawOpeningStockPage />} />
-                {/* GĐ2: lệnh xuất cho sản xuất + cân lại */}
-                <Route path="nvl/xuat" element={<RawIssueListPage />} />
-                <Route path="nvl/xuat/new" element={<RawIssueCreatePage />} />
-                <Route path="nvl/xuat/:id" element={<RawIssueDetailPage />} />
-                <Route path="nvl/can-lai" element={<RawRecheckPage />} />
-                {/* GĐ3: kiểm kê + cân đối */}
-                <Route path="nvl/kiem-ke" element={<RawStocktakeListPage />} />
-                <Route path="nvl/kiem-ke/:id" element={<RawStocktakeDetailPage />} />
-                <Route path="nvl/can-doi" element={<RawBalanceReportPage />} />
-                {/* GĐ5: đối chiếu giấy – máy (chạy song song) */}
-                <Route path="nvl/doi-chieu" element={<RawReconcilePage />} />
-                {/* GĐ4: hàng chèn theo ca + kho chèn */}
-                <Route path="chen" element={<MixShiftPage />} />
-                <Route path="chen/ton" element={<MixStockPage />} />
-                <Route path="chen/phieu/:id" element={<MixIssueDetailPage />} />
+                {/* Hub Kho nguyên liệu mủ GĐ1–5 — tab: Tổng quan | Nhập | Xuất SX | Cân lại | Kiểm kê | Cân đối | Đối chiếu | Tồn đầu */}
+                <Route element={<HubLayout hub="nvl" />}>
+                  <Route path="nvl" element={<RawOverviewPage />} />
+                  <Route path="nvl/nhap" element={<RawIntakeQueuePage />} />
+                  <Route path="nvl/lo/:batchId" element={<RawBatchDetailPage />} />
+                  <Route path="nvl/ton-dau" element={<RawOpeningStockPage />} />
+                  <Route path="nvl/xuat" element={<RawIssueListPage />} />
+                  <Route path="nvl/xuat/new" element={<RawIssueCreatePage />} />
+                  <Route path="nvl/xuat/:id" element={<RawIssueDetailPage />} />
+                  <Route path="nvl/can-lai" element={<RawRecheckPage />} />
+                  <Route path="nvl/kiem-ke" element={<RawStocktakeListPage />} />
+                  <Route path="nvl/kiem-ke/:id" element={<RawStocktakeDetailPage />} />
+                  <Route path="nvl/can-doi" element={<RawBalanceReportPage />} />
+                  <Route path="nvl/doi-chieu" element={<RawReconcilePage />} />
+                </Route>
+                {/* Hub Hàng chèn GĐ4 — tab: Phiếu theo ca | Kho chèn */}
+                <Route element={<HubLayout hub="chen" />}>
+                  <Route path="chen" element={<MixShiftPage />} />
+                  <Route path="chen/ton" element={<MixStockPage />} />
+                  <Route path="chen/phieu/:id" element={<MixIssueDetailPage />} />
+                </Route>
                 {/* Trang cân chuyển sang can.huyanhrubber.vn — ERP chỉ giữ lịch sử + chi tiết */}
                 <Route path="weighbridge" element={<WeighbridgeListPage />} />
                 <Route path="weighbridge/list" element={<WeighbridgeListPage />} />

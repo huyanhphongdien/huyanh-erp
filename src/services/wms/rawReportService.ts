@@ -42,7 +42,16 @@ export interface WetLossByAge {
   kho_lech_pct: number | null
 }
 
+export interface CanDoiNvlTp { facility_id: string; ngay: string; nvl_kho_xuat_sx_kg: number; chen_tieu_hao_kg: number; tp_dat_kg: number; loi_dkl_kg: number; hao_hut_kg: number; hieu_suat_pct: number | null }
+
 export const rawReportService = {
+  /** T4: NVL khô xuất SX + chèn tiêu hao = TP đạt + LOI/DKL + hao hụt, theo ngày */
+  async canDoiNvlTp(facilityId: string, from: string, to: string): Promise<CanDoiNvlTp[]> {
+    const { data, error } = await supabase.from('v_can_doi_nvl_tp').select('*').eq('facility_id', facilityId).gte('ngay', from).lte('ngay', to).order('ngay', { ascending: false })
+    if (error) throw error
+    return ((data ?? []) as any[]).map((r): CanDoiNvlTp => ({ ...r, nvl_kho_xuat_sx_kg: num(r.nvl_kho_xuat_sx_kg), chen_tieu_hao_kg: num(r.chen_tieu_hao_kg), tp_dat_kg: num(r.tp_dat_kg), loi_dkl_kg: num(r.loi_dkl_kg), hao_hut_kg: num(r.hao_hut_kg), hieu_suat_pct: numOrNull(r.hieu_suat_pct) }))
+  },
+
   /** Cân đối kg khô theo loại trong tháng (p_month = ngày bất kỳ trong tháng, YYYY-MM-DD) */
   async balanceMonth(facilityId: string, month: string): Promise<RawBalanceRow[]> {
     const { data, error } = await supabase.rpc('fn_raw_balance_month', { p_facility_id: facilityId, p_month: month })

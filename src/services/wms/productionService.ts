@@ -304,7 +304,15 @@ export const productionService = {
       .eq('production_order_id', poId)
     if (itemsErr) throw itemsErr
 
-    const validItems = (items || []).filter(it => it.source_batch_id && it.allocated_quantity > 0)
+    const validItemsAll = (items || []).filter(it => it.source_batch_id && it.allocated_quantity > 0)
+    // ★ 2026-10-30 (audit C1): lô NVL mủ (raw_rubber_type) đã trừ ở SỔ KHO KHÔ qua lệnh xuất NVL —
+    //   KHÔNG trừ lại ở đây (cột quantity_remaining của lô NVL = 1, không mang nghĩa kg).
+    const rawIds = new Set<string>()
+    if (validItemsAll.length) {
+      const { data: rawLots } = await supabase.from('stock_batches').select('id').in('id', validItemsAll.map(it => it.source_batch_id!)).not('raw_rubber_type', 'is', null)
+      for (const b of (rawLots || []) as { id: string }[]) rawIds.add(b.id)
+    }
+    const validItems = validItemsAll.filter(it => !rawIds.has(it.source_batch_id!))
 
     // Validate từng batch có đủ quantity_remaining trước khi trừ
     for (const item of validItems) {
@@ -541,12 +549,14 @@ export const productionService = {
     // Calculate yield_percent from total input
     const { data: items, error: itemsErr } = await supabase
       .from('production_order_items')
-      .select('required_quantity, source_batch:stock_batches(material_id, warehouse_id)')
+      .select('required_quantity, actual_input_quantity, actual_drc_before, source_batch:stock_batches(material_id, warehouse_id)')
       .eq('production_order_id', poId)
 
     if (itemsErr) throw itemsErr
 
-    const totalInput = (items || []).reduce((sum, item) => sum + (item.required_quantity || 0), 0)
+    // ★ 2026-10-30 (audit C2): hiệu suất theo KG KHÔ — kg ướt × DRC lúc xuất (lệnh xuất NVL ghi actual_drc_before);
+    //   dòng cũ không có DRC thì coi 100 %.
+    const totalInput = (items || []).reduce((sum, item: any) => sum + (Number(item.actual_input_quantity ?? item.required_quantity ?? 0) * (Number(item.actual_drc_before ?? 100) / 100)), 0)
     const yield_percent = totalInput > 0
       ? Math.round((data.actual_quantity / totalInput) * 10000) / 100
       : null

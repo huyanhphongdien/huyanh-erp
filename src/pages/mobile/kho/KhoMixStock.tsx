@@ -26,6 +26,7 @@ export default function KhoMixStock() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(() => (loc.state as any)?.msg ? { ok: true, text: (loc.state as any).msg } : null)
   const [busy, setBusy] = useState<string | null>(null)
   const [huyAsk, setHuyAsk] = useState<string | null>(null)
+  const [kk, setKk] = useState<Record<string, { kg: string; lyDo: string }>>({})
 
   const load = useCallback(async () => {
     if (!facilityId) return
@@ -39,6 +40,19 @@ export default function KhoMixStock() {
   useEffect(() => { load() }, [load])
 
   const canWrite = role.isKeeper || role.isQC || role.isBGD
+
+  async function kiemKe(l: MixLot) {
+    const e = kk[l.id]; const n = e && e.kg !== '' ? Number(e.kg) : null
+    if (n === null || !Number.isFinite(n) || n < 0) { setMsg({ ok: false, text: 'Nhập kg cân thực' }); return }
+    if (Math.abs(n - l.ton_kg) > 0.005 && !e.lyDo) { setMsg({ ok: false, text: `${l.code}: lệch ${(n - l.ton_kg).toFixed(0)} kg, chọn lý do` }); return }
+    setBusy(l.id); setMsg(null)
+    try {
+      const r = await mixService.kiemKe(l.id, n, e.lyDo || null, null)
+      setMsg({ ok: true, text: `${r.code}: sổ ${fmtKg(r.kg_so)} → thực ${fmtKg(r.kg_thuc)} kg (${r.chenh_kg > 0 ? '+' : ''}${fmtKg(r.chenh_kg)})` })
+      setKk((x) => { const y = { ...x }; delete y[l.id]; return y }); await load()
+    } catch (e2: any) { setMsg({ ok: false, text: e2?.message || 'Không ghi được' }) }
+    finally { setBusy(null) }
+  }
 
   async function sua(l: MixLot, patch: Parameters<typeof mixService.suaLo>[1], ok: string) {
     setBusy(l.id); setMsg(null)
@@ -97,6 +111,18 @@ export default function KhoMixStock() {
                 </div>
               )}
               {l.note && <span className="kmx-sm">Ghi chú: {l.note}</span>}
+              {kk[l.id] !== undefined ? (
+                <div className="kmx-col" style={{ gap: 8, background: '#F9FAFB', borderRadius: 12, padding: 10 }}>
+                  <span className="kmx-lbl">Kiểm kê · cân thực tại kho (sổ {fmtKg(l.ton_kg)} kg)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" style={{ height: 56, fontSize: 28 }} type="number" inputMode="decimal" placeholder={String(l.ton_kg)} value={kk[l.id].kg} onChange={(e) => setKk((x) => ({ ...x, [l.id]: { ...x[l.id], kg: e.target.value } }))} aria-label="Kg cân thực" /><span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span></div>
+                  {kk[l.id].kg !== '' && Math.abs(Number(kk[l.id].kg) - l.ton_kg) > 0.005 && (
+                    <select className="kmx-text" value={kk[l.id].lyDo} onChange={(e) => setKk((x) => ({ ...x, [l.id]: { ...x[l.id], lyDo: e.target.value } }))} aria-label="Lý do lệch"><option value="">— lý do lệch {(Number(kk[l.id].kg) - l.ton_kg) > 0 ? '+' : ''}{(Number(kk[l.id].kg) - l.ton_kg).toFixed(0)} kg —</option>{['Rơi vãi / hao', 'Cân lệch lúc lấy/trả', 'Nhập nhầm kg lô', 'Lẫn lô khác', 'Khác'].map((v) => <option key={v} value={v}>{v}</option>)}</select>
+                  )}
+                  <div className="kmx-grid2"><button type="button" className="kmx-btn md" disabled={busy === l.id || kk[l.id].kg === ''} onClick={() => kiemKe(l)}>{I.check}Ghi kiểm kê</button><button type="button" className="kmx-btn sec" onClick={() => setKk((x) => { const y = { ...x }; delete y[l.id]; return y })}>Thôi</button></div>
+                </div>
+              ) : canWrite && l.status !== 'cancelled' && (
+                <button type="button" className="kmx-btn sec" onClick={() => setKk((x) => ({ ...x, [l.id]: { kg: '', lyDo: '' } }))}>Kiểm kê lô này</button>
+              )}
               <div className="kmx-grid2">
                 <Link to={`/m/kho/chen/phieu?lot=${l.id}`} className="kmx-btn ghost" style={{ color: '#1B4D3E', fontSize: 13 }}>Phiếu của lô</Link>
                 {l.status !== 'cancelled' && l.kg_used <= 0.005 && l.kg_at_line <= 0.005 && canWrite && (
@@ -116,7 +142,7 @@ export default function KhoMixStock() {
             {moves.map((m, k) => (
               <div key={`${m.loai}-${m.lot_id}-${m.issue_id ?? ''}-${m.thoi_diem}-${k}`} className="kmx-li">
                 <span className="kmx-col">
-                  <span style={{ fontSize: 13, fontWeight: 600 }}><span className={`kmx-chip ${m.loai === 'nhap_lo' ? 'ok' : m.loai === 'lay' ? 'blue' : 'amb'}`} style={{ marginRight: 6 }}>{m.loai === 'nhap_lo' ? 'Nhập lô' : m.loai === 'lay' ? 'Lấy' : 'Trả'}</span>{m.issue_code ? <Link to={`/m/kho/chen/phieu/${m.issue_id}`} className="kmx-mono" style={{ color: '#1B4D3E' }}>{m.issue_code}</Link> : <span className="kmx-mono">{m.lot_code}</span>}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}><span className={`kmx-chip ${m.loai === 'nhap_lo' ? 'ok' : m.loai === 'lay' ? 'blue' : m.loai === 'dieu_chinh' ? 'red' : 'amb'}`} style={{ marginRight: 6 }}>{m.loai === 'nhap_lo' ? 'Nhập lô' : m.loai === 'lay' ? 'Lấy' : m.loai === 'dieu_chinh' ? 'Kiểm kê' : 'Trả'}</span>{m.issue_code ? <Link to={`/m/kho/chen/phieu/${m.issue_id}`} className="kmx-mono" style={{ color: '#1B4D3E' }}>{m.issue_code}</Link> : <span className="kmx-mono">{m.lot_code}</span>}</span>
                   <span className="kmx-sm">{fmtDt(m.thoi_diem)} · {m.mo_ta || ''}{m.nguoi ? ` · ${m.nguoi}` : ''}</span>
                 </span>
                 <span className="kmx-num sm" style={{ color: m.kg < 0 ? '#B91C1C' : '#15803D', whiteSpace: 'nowrap' }}>{m.kg > 0 ? '+' : ''}{fmtKg(m.kg)}</span>

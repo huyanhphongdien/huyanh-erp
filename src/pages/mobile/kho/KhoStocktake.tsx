@@ -31,6 +31,7 @@ export default function KhoStocktake() {
   const [scan, setScan] = useState(false)
   const [hi, setHi] = useState<string | null>(null)
   const refs = useRef<Record<string, HTMLElement | null>>({})
+  const [forceAsk, setForceAsk] = useState<string | null>(null)
 
   const load = useCallback(async (keepId?: string | null) => {
     if (!facilityId) return
@@ -79,16 +80,20 @@ export default function KhoStocktake() {
     finally { setBusy(null) }
   }
 
-  async function act(buoc: 'count_done' | 'approve' | 'cancel' | 'create') {
+  async function act(buoc: 'count_done' | 'approve' | 'cancel' | 'create', force = false) {
     if (!facilityId) return
     setBusy(buoc); setMsg(null)
     try {
-      if (buoc === 'create') { const id = await rawStocktakeService.create(facilityId, todayLocal(), 'Tạo từ điện thoại'); setMsg({ ok: true, text: 'Đã tạo phiếu kiểm kê hôm nay' }); await load(id); return }
+      if (buoc === 'create') { const id = await rawStocktakeService.create(facilityId, todayLocal(), 'Tạo từ điện thoại', force); setForceAsk(null); setMsg({ ok: true, text: 'Đã tạo phiếu kiểm kê hôm nay' }); await load(id); return }
       if (!st) return
       const r = await rawStocktakeService.ky(st.id, buoc)
       setMsg({ ok: true, text: buoc === 'count_done' ? 'Đã hoàn tất đếm, chờ BGĐ duyệt' : buoc === 'approve' ? `Đã duyệt: điều chỉnh ${r.so_lo_dieu_chinh} lô, ${fmtSigned(r.chenh_kho_kg)} kg khô, khóa sổ đến ${new Date(st.ngay_kiem_ke).toLocaleDateString('vi-VN')}` : 'Đã hủy phiếu kiểm kê' })
       await load(st.id)
-    } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Thao tác thất bại' }) }
+    } catch (e: any) {
+      const t = e?.message || 'Thao tác thất bại'
+      if (buoc === 'create' && /phiếu cân sẵn sàng chưa nhập/.test(t)) setForceAsk(t)
+      setMsg({ ok: false, text: t })
+    }
     finally { setBusy(null) }
   }
 
@@ -119,6 +124,7 @@ export default function KhoStocktake() {
             <span className="kmx-strong" style={{ fontSize: 17 }}>Chưa có phiếu kiểm kê nào</span>
             <span className="kmx-md">Tạo phiếu cho hôm nay: máy chụp số sổ của từng lô còn hàng, bạn đi đếm và cân lại từng lô. Duyệt xong là khóa sổ đến hết ngày kiểm kê, nên làm kiểm kê vào cuối ngày.</span>
             <button type="button" className="kmx-btn" disabled={!canCount || busy === 'create'} onClick={() => act('create')}>{I.plus}Tạo kiểm kê hôm nay</button>
+            {forceAsk && <button type="button" className="kmx-btn danger" disabled={busy === 'create'} onClick={() => act('create', true)}>Vẫn tạo, bỏ qua phiếu cân chưa nhập</button>}
           </section>
         )}
         {st && (

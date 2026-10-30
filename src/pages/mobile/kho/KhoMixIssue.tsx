@@ -12,7 +12,9 @@ import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
 import { fmtD, fmtDt, fmtKg } from './khoCommon'
-import { I, KmxPhotoTiles, Lightbox } from './khoMixUtil'
+import { detectShift, hhmm, I, KmxPhotoTiles, Lightbox, type ShiftPick } from './khoMixUtil'
+import { useAuthStore } from '../../../stores/authStore'
+import type { OpsShiftOption } from '../../../services/opsService'
 import './khoMix.css'
 
 const hm = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '')
@@ -38,6 +40,13 @@ export default function KhoMixIssue() {
   const [editRet, setEditRet] = useState(false)
   const [cancelAsk, setCancelAsk] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  // C4: phiếu bàn giao chưa có ca → bắt chọn ca + tổ trước khi trả
+  const user = useAuthStore((s) => s.user)
+  const [shift, setShift] = useState<ShiftPick | null>(null)
+  const [shifts, setShifts] = useState<OpsShiftOption[]>([])
+  const [pickShift, setPickShift] = useState(false)
+  const [team, setTeam] = useState('')
+  const [teams, setTeams] = useState<string[]>(['Đen', 'Vàng'])
   const [big, setBig] = useState<{ src: string; cap: string } | null>(null)
   const role = useRawRole(i?.facility_id ?? null)
 
@@ -52,6 +61,13 @@ export default function KhoMixIssue() {
     } catch (e: any) { setErr(e?.message || 'Không tải được phiếu') }
   }, [id])
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    if (!i || i.shift_id || i.status !== 'issued') return
+    let alive = true
+    detectShift(user?.employee_id || null).then((d) => { if (alive) { setShifts(d.shifts); setShift((cur) => cur ?? d.pick) } }).catch(() => { /* bỏ qua */ })
+    mixService.listTeams(i.facility_id).then((t) => { if (alive) setTeams([...new Set([...t, 'Đen', 'Vàng'])]) }).catch(() => { /* bỏ qua */ })
+    return () => { alive = false }
+  }, [i?.id, i?.shift_id, i?.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const required = settings.anh_bat_buoc?.length ? settings.anh_bat_buoc : ['toan_canh', 'man_hinh_can']
   const missOut = rawPhotoService.missing(pOut, required)
@@ -72,7 +88,7 @@ export default function KhoMixIssue() {
     if (!i || !kgRetOk) return
     setBusy('tra'); setMsg(null)
     try {
-      const r = await mixService.tra(i.id, kgRetN!, handover, note.trim() || null)
+      const r = await mixService.tra(i.id, kgRetN!, handover, note.trim() || null, null, i.shift_id ? null : shift?.id ?? null, i.shift_id ? null : (team.trim() || null))
       let signed = false
       try { await mixService.ky(i.id, 'submit'); signed = true }
       catch (e: any) { setMsg({ ok: false, text: `Đã ghi trả nhưng chưa ký được: ${e?.message || ''}` }) }
@@ -132,7 +148,7 @@ export default function KhoMixIssue() {
   if (st === 'issued') {
     const tieuHao = kgRetN !== null && Number.isFinite(kgRetN) ? Math.max(i.kg_out - kgRetN, 0) : null
     const p = tieuHao !== null && i.kg_out > 0 ? Math.round((100 * tieuHao) / i.kg_out) : 0
-    const ready = kgRetOk && missRet.length === 0 && missOut.length === 0
+    const ready = kgRetOk && missRet.length === 0 && missOut.length === 0 && (!!i.shift_id || !!shift)
     return (
       <div className="kmx">
         <header className="kmx-hd">
@@ -149,6 +165,16 @@ export default function KhoMixIssue() {
             <section className="kmx-card" style={{ borderColor: '#FECACA' }}>
               <div className="kmx-note red" style={{ padding: 0, background: 'transparent' }}>{I.info}<span>Lúc lấy còn thiếu {missOut.length} ảnh bắt buộc. Chụp bổ sung ở đây rồi mới ký được.</span></div>
               <KmxPhotoTiles refType="mix_issue_out" refId={i.id} photos={pOut} required={required} facilityCode={i.facility_code || undefined} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />
+            </section>
+          )}
+          {!i.shift_id && (
+            <section className="kmx-card" aria-label="Ca và tổ" style={{ gap: 10, borderColor: shift ? '#E5E7EB' : '#FECACA' }}>
+              <div className="kmx-row">
+                <span className="kmx-col"><span className="kmx-lbl">Ca nhận bàn giao · bắt buộc</span><span className="kmx-strong" style={{ fontSize: 15 }}>{shift ? `${shift.name}${shift.start_time ? ` · ${hhmm(shift.start_time)}–${hhmm(shift.end_time)}` : ''}` : 'Chưa chọn ca'}</span><span className="kmx-sm" style={{ color: shift ? '#15803D' : '#B45309' }}>{shift?.nguon === 'cham_cong' ? 'tự nhận theo chấm công của bạn' : shift?.nguon === 'gio' ? 'tự nhận theo giờ hiện tại' : shift ? 'bạn chọn' : 'phiếu bàn giao từ ca trước, cần ghi rõ ca này'}</span></span>
+                <button type="button" className="kmx-pill sm" onClick={() => setPickShift((v) => !v)}>{pickShift ? 'Đóng' : 'Đổi ca'}</button>
+              </div>
+              {pickShift && <div className="kmx-seg">{shifts.map((s) => <button key={s.id} type="button" className={shift?.id === s.id ? 'on' : ''} onClick={() => { setShift({ id: s.id, name: s.name, code: s.code, start_time: s.start_time, end_time: s.end_time, nguon: 'tay' }); setPickShift(false) }}>{s.name}</button>)}</div>}
+              <div className="kmx-col" style={{ gap: 6 }}><span className="kmx-lbl">Tổ</span><div className="kmx-seg">{teams.map((t) => <button key={t} type="button" className={team === t ? 'on' : ''} onClick={() => setTeam(t)}>Tổ {t}</button>)}</div></div>
             </section>
           )}
           <section className="kmx-card" aria-label="Cân phần còn lại" style={{ gap: 10 }}>

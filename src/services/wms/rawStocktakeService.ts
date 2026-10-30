@@ -95,8 +95,8 @@ export const rawStocktakeService = {
     return { stocktake: normStocktake(s), lines: (ls ?? []).map(normLine) }
   },
 
-  async create(facilityId: string, ngay: string, note?: string | null): Promise<string> {
-    const { data, error } = await supabase.rpc('fn_nvl_tao_kiem_ke', { p_facility_id: facilityId, p_ngay: ngay, p_note: note ?? null })
+  async create(facilityId: string, ngay: string, note?: string | null, boQuaHangDoi = false): Promise<string> {
+    const { data, error } = await supabase.rpc('fn_nvl_tao_kiem_ke', { p_facility_id: facilityId, p_ngay: ngay, p_note: note ?? null, p_bo_qua_hang_doi: boQuaHangDoi })
     if (error) throw new Error(dichLoiNhapKho(error))
     return String(data)
   },

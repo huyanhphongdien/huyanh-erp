@@ -11,7 +11,6 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
-import { recordInventoryMove } from './inventorySync'
 import type { RawRubberType, RawRubberGroup, RawLotSource } from './raw.types'
 
 const num = (v: unknown): number => {
@@ -199,7 +198,7 @@ export interface NhapKhoResult {
 /** Mã lỗi hàm DB → câu tiếng Việt cho người dùng */
 export function dichLoiNhapKho(err: unknown): string {
   const msg = String((err as any)?.message ?? err ?? '')
-  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|KHONG_CO_QUYEN|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO|LENH_TRONG|KHONG_TIM_THAY_LO|LO_KHAC_NHA_MAY|LO_DA_HET|VUOT_TON|KHONG_TIM_THAY_DONG|LENH_DA_GUI_KY|KHONG_TIM_THAY_LENH|SAI_TRANG_THAI|THIEU_KG_CAN|DA_TRU_SO|BUOC_KHONG_HOP_LE|CAN_LY_DO|DANG_CO_KIEM_KE_MO|KHO_TRONG|KHONG_TIM_THAY_KIEM_KE|CON_LO_CHUA_DEM|DA_DUYET|KY_DA_KHOA|DKL_CHUA_XU_LY|TRA_QUA_LAY|THIEU_ANH)(?::([^\n"]*))?/)
+  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|KHONG_CO_QUYEN|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO|LENH_TRONG|KHONG_TIM_THAY_LO|LO_KHAC_NHA_MAY|LO_DA_HET|VUOT_TON|KHONG_TIM_THAY_DONG|LENH_DA_GUI_KY|KHONG_TIM_THAY_LENH|SAI_TRANG_THAI|THIEU_KG_CAN|DA_TRU_SO|BUOC_KHONG_HOP_LE|CAN_LY_DO|DANG_CO_KIEM_KE_MO|KHO_TRONG|KHONG_TIM_THAY_KIEM_KE|CON_LO_CHUA_DEM|DA_DUYET|KY_DA_KHOA|DKL_CHUA_XU_LY|TRA_QUA_LAY|THIEU_ANH|THIEU_CA|CON_PHIEU_CAN_CHO_NHAP|PHIEU_CA_CHUA_MO|PHIEU_CA_DA_KY|THIEU_CO_BANH|DA_CHUYEN_HET|LO_NVL_CHI_SUA_QUA_SO_KHO)(?::([^\n"]*))?/)
   if (!m) return msg || 'Lỗi không xác định'
   const chi_tiet = m[2] ? ` (${m[2]})` : ''
   switch (m[1]) {
@@ -239,6 +238,13 @@ export function dichLoiNhapKho(err: unknown): string {
     case 'KY_DA_KHOA': return `Kỳ đã khóa sổ, không ghi lùi ngày được${chi_tiet}`
     case 'DKL_CHUA_XU_LY': return `Lô dính kim loại chưa đánh dấu đã xử lý, không lấy chèn được${chi_tiet}`
     case 'TRA_QUA_LAY': return `Kg trả nhiều hơn kg lấy${chi_tiet}`
+    case 'THIEU_CA': return `Phiếu chưa có ca, chọn ca trước${chi_tiet}`
+    case 'CON_PHIEU_CAN_CHO_NHAP': return `Còn ${m[2] || ''} phiếu cân sẵn sàng chưa nhập kho. Nhập hết trước khi kiểm kê, hoặc xác nhận bỏ qua`
+    case 'PHIEU_CA_CHUA_MO': return `Tổ chưa mở phiếu ca của ca này; mở phiếu ca (nháp) rồi lấy hàng chuẩn${chi_tiet}`
+    case 'PHIEU_CA_DA_KY': return `Phiếu ca của ca này đã ký, ghi vào phiếu ca sau${chi_tiet}`
+    case 'THIEU_CO_BANH': return `Chủng loại chưa khai cỡ bành (kg/bành), BGĐ cập nhật danh mục vật liệu${chi_tiet}`
+    case 'DA_CHUYEN_HET': return `Dòng này đã chuyển hết sang kho chèn${chi_tiet}`
+    case 'LO_NVL_CHI_SUA_QUA_SO_KHO': return `Lô NVL chỉ sửa được qua sổ kho (cân lại / kiểm kê / lệnh xuất)${chi_tiet}`
     case 'THIEU_ANH': return `Thiếu ảnh bắt buộc, chụp đủ rồi mới ký${chi_tiet.replace('mix_issue_out', 'lúc lấy').replace('mix_issue_return', 'lúc trả').replace('toan_canh', 'toàn cảnh').replace('man_hinh_can', 'màn hình cân')}`
     default: return msg
   }
@@ -359,7 +365,7 @@ export const rawStockService = {
       batch_id: b.batch_id, batch_no: b.batch_no, rubber_type: b.rubber_type,
       wet_kg: num(b.wet_kg), drc_pct: num(b.drc_pct), dry_kg: num(b.dry_kg),
     }))
-    try { await legacySyncAfterIntake(ticketId, batches) } catch (e) { console.warn('[rawStock] legacy sync failed:', e) }
+    // 2026-10-30 (audit T1): không đồng bộ sang sổ vật tư cũ nữa — kho vật tư đã rút khỏi module, sổ kho khô là nguồn duy nhất
     return batches
   },
 
@@ -491,43 +497,4 @@ function normalizeBatch(r: any): RawBatchBalance {
  * Giữ các báo cáo WMS cũ: một stock_in_orders cho phiếu + inventory_transactions
  * cho từng lô. Không chặn nếu lỗi — sổ kho khô mới là nguồn sự thật của kho NVL.
  */
-async function legacySyncAfterIntake(ticketId: string, batches: NhapKhoResult[]): Promise<void> {
-  if (!batches.length) return
-  const { data: ticket } = await supabase
-    .from('weighbridge_tickets').select('id, code, net_weight, deal_id, vehicle_plate, driver_name, supplier_name').eq('id', ticketId).maybeSingle()
-  if (!ticket) return
-  const { data: b0 } = await supabase.from('stock_batches').select('id, warehouse_id, material_id').eq('id', batches[0].batch_id).maybeSingle()
-  if (!b0?.warehouse_id) return
-
-  // Đã có phiếu nhập cho ticket này (luồng cũ) thì thôi
-  const { data: existing } = await supabase.from('stock_in_orders').select('id').like('notes', `%phiếu cân ${ticket.code}%`).limit(1)
-  let stockInId: string | null = existing?.[0]?.id ?? null
-  if (!stockInId) {
-    const now = new Date()
-    const prefix = `NK-NVL-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
-    const { data: last } = await supabase.from('stock_in_orders').select('code').like('code', `${prefix}-%`).order('code', { ascending: false }).limit(1)
-    const seq = last?.[0]?.code ? Number(String(last[0].code).split('-').pop()) + 1 : 1
-    const code = `${prefix}-${String(Number.isFinite(seq) ? seq : 1).padStart(3, '0')}`
-    const totalWet = batches.reduce((s, b) => s + b.wet_kg, 0)
-    const { data: si } = await supabase.from('stock_in_orders').insert({
-      code, type: 'raw', warehouse_id: b0.warehouse_id, source_type: 'purchase', deal_id: ticket.deal_id ?? null,
-      status: 'confirmed', total_quantity: batches.length, total_weight: totalWet, confirmed_at: now.toISOString(),
-      notes: `Nhập từ phiếu cân ${ticket.code} · sổ kho khô · ${batches.map((b) => b.batch_no).join(', ')}`,
-    }).select('id').maybeSingle()
-    stockInId = si?.id ?? null
-  }
-  for (const b of batches) {
-    if (stockInId) {
-      await supabase.from('stock_in_details').insert({
-        stock_in_id: stockInId, material_id: b0.material_id, batch_id: b.batch_id, quantity: 1, weight: b.wet_kg, unit: 'kg',
-      })
-    }
-    await recordInventoryMove({
-      material_id: b0.material_id, warehouse_id: b0.warehouse_id, batch_id: b.batch_id,
-      delta_kg: b.wet_kg, type: 'weighbridge_in', reference_type: 'stock_in', reference_id: stockInId ?? ticketId,
-      notes: `Nhập NVL từ phiếu cân ${ticket.code} (${b.batch_no})`,
-    })
-  }
-}
-
 export default rawStockService

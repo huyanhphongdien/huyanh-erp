@@ -21,6 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { rawIssueService, type ProductionOrderLite } from '../../../services/wms/rawIssueService'
 import {
   Card, Table, Button, Space, Typography, Row, Col, Select, DatePicker,
   Input, InputNumber, Tag, Spin, Alert, Switch, Tooltip, Modal, message,
@@ -99,6 +100,10 @@ export default function ShiftBookEntryPage() {
   // KHÔNG đặt sẵn một ca mặc định: chưa ai xác nhận xưởng ép bành chạy ca dài hay ca
   // ngắn, và gõ cứng một mặc định là dựng lại đúng cái sai vừa gỡ.
   const [shiftId, setShiftId] = useState<string | undefined>(sp.get('shift') || undefined)
+  // Audit C2 (30/10/2026): phiếu ca gắn lệnh sản xuất (tùy chọn) để nối ca ↔ lệnh ↔ lô NVL
+  const [poId, setPoId] = useState<string | undefined>(undefined)
+  const [pos, setPos] = useState<ProductionOrderLite[]>([])
+  useEffect(() => { rawIssueService.listProductionOrders().then(setPos).catch(() => setPos([])) }, [])
   const [soNguoi, setSoNguoi] = useState<number | null>(null)
   const [suCo, setSuCo] = useState<string>('')
 
@@ -150,6 +155,7 @@ export default function ShiftBookEntryPage() {
         setFacilityId(r.facilityId ?? undefined)
         setNgay(dayjs(r.reportDate))
         setShiftId(r.shiftId)
+        setPoId(r.productionOrderId ?? undefined)
         setSoNguoi(r.headcount)
         setSuCo(r.incidents ?? '')
         const map: Record<string, OWork> = {}
@@ -306,13 +312,14 @@ export default function ShiftBookEntryPage() {
           shiftId,
           headcount: soNguoi,
           incidents: suCo || null,
+          productionOrderId: poId ?? null,
         })
         setReport(moi)
         rid = moi.id
         navigate(`/wms/production/shift-book/${moi.id}`, { replace: true })
       } else {
         await shiftBookService.updateReport(rid, {
-          headcount: soNguoi, incidents: suCo || null,
+          headcount: soNguoi, incidents: suCo || null, productionOrderId: poId ?? null,
         })
       }
 
@@ -538,6 +545,14 @@ export default function ShiftBookEntryPage() {
             <InputNumber
               min={0} value={soNguoi} onChange={(v) => { setSoNguoi(v === null ? null : Number(v)); setDirty(true) }}
               disabled={daKhoa} style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} md={5}>
+            <Text type="secondary" style={{ fontSize: 12 }}>Lệnh sản xuất (nếu có)</Text>
+            <Select
+              value={poId} onChange={(v) => { setPoId(v); setDirty(true) }} disabled={daKhoa} allowClear showSearch optionFilterProp="label"
+              placeholder="Không gắn" style={{ width: '100%' }}
+              options={pos.map((o) => ({ value: o.id, label: `${o.code}${o.target_grade ? ' · ' + o.target_grade : ''}` }))}
             />
           </Col>
         </Row>

@@ -10,7 +10,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { ArrowLeftOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
-import { rawReportService, type RawBalanceRow, type WetLossByAge } from '../../../services/wms/rawReportService'
+import { rawReportService, type CanDoiNvlTp, type RawBalanceRow, type WetLossByAge } from '../../../services/wms/rawReportService'
 import { rawRecheckService, type DryVariance } from '../../../services/wms/rawRecheckService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_RUBBER_GROUP_LABELS, RAW_RUBBER_TYPE_LABELS, RAW_SETTINGS_DEFAULT, type RawRubberType, type RawSettings } from '../../../services/wms/raw.types'
@@ -29,6 +29,7 @@ export default function RawBalanceReportPage() {
   const [rows, setRows] = useState<RawBalanceRow[]>([])
   const [loss, setLoss] = useState<WetLossByAge[]>([])
   const [variance, setVariance] = useState<DryVariance[]>([])
+  const [canDoi, setCanDoi] = useState<CanDoiNvlTp[]>([])
   const [settings, setSettings] = useState<RawSettings>(RAW_SETTINGS_DEFAULT)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -44,13 +45,14 @@ export default function RawBalanceReportPage() {
     if (!facilityId) return
     setLoading(true); setError(null)
     try {
-      const [b, l, v, s] = await Promise.all([
+      const [b, l, v, s, cd] = await Promise.all([
         rawReportService.balanceMonth(facilityId, month.format('YYYY-MM-01')),
         rawReportService.wetLossByAge(facilityId),
         rawRecheckService.listVariance(facilityId),
         rawSettingsService.getForFacility(facilityId),
+        rawReportService.canDoiNvlTp(facilityId, month.format('YYYY-MM-01'), month.endOf('month').format('YYYY-MM-DD')).catch(() => [] as CanDoiNvlTp[]),
       ])
-      setRows(b); setLoss(l); setVariance(v); setSettings(s)
+      setRows(b); setLoss(l); setVariance(v); setSettings(s); setCanDoi(cd)
     } catch (e: any) { setError(e?.message || 'Không tải được báo cáo') }
     finally { setLoading(false) }
   }, [facilityId, month])
@@ -156,6 +158,20 @@ export default function RawBalanceReportPage() {
                 <Table.Summary.Cell index={11} align="right"><Text strong>{sum('so_lo_cuoi')}</Text></Table.Summary.Cell>
               </Table.Summary.Row>
             )} />
+        </Card>
+
+        <Card size="small" title={`Cân đối NVL khô → thành phẩm theo ngày · ${month.format('MM/YYYY')}`} extra={<Text type="secondary">NVL khô xuất SX + chèn tiêu hao = TP đạt + LOI/DKL + hao hụt</Text>} bodyStyle={{ padding: 0 }}>
+          <Table<CanDoiNvlTp> rowKey="ngay" size="small" loading={loading} pagination={{ pageSize: 10, showSizeChanger: false }} scroll={{ x: 760 }} dataSource={canDoi}
+            locale={{ emptyText: 'Chưa có ngày nào có cả xuất NVL và sổ ca đã nhận' }}
+            columns={[
+              { title: 'Ngày', dataIndex: 'ngay', key: 'ngay', render: (v) => dayjs(v).format('DD/MM') },
+              { title: 'NVL khô xuất SX', dataIndex: 'nvl_kho_xuat_sx_kg', key: 'a', align: 'right', render: (v) => fmtKg(v) },
+              { title: 'Chèn tiêu hao', dataIndex: 'chen_tieu_hao_kg', key: 'b', align: 'right', render: (v) => fmtKg(v) },
+              { title: 'TP đạt (kg)', dataIndex: 'tp_dat_kg', key: 'c', align: 'right', render: (v) => <Text strong>{fmtKg(v)}</Text> },
+              { title: 'LOI / DKL', dataIndex: 'loi_dkl_kg', key: 'd', align: 'right', render: (v) => fmtKg(v) },
+              { title: 'Hao hụt', dataIndex: 'hao_hut_kg', key: 'e', align: 'right', render: (v: number) => <Text type={Math.abs(v) > 0 ? (v < 0 ? 'danger' : undefined) : 'secondary'}>{fmtSigned(v)}</Text> },
+              { title: 'Hiệu suất', dataIndex: 'hieu_suat_pct', key: 'f', align: 'right', render: (v: number | null) => (v === null ? '—' : <Tag color={v >= 95 ? 'green' : v >= 85 ? 'gold' : 'red'}>{v} %</Tag>) },
+            ]} />
         </Card>
 
         <Row gutter={[12, 12]}>

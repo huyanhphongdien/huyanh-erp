@@ -48,14 +48,19 @@ export default function RawStocktakeListPage() {
 
   useEffect(() => { load() }, [load])
 
-  const create = async () => {
+  const create = async (boQuaHangDoi = false) => {
     if (!facilityId) { message.warning('Chọn nhà máy'); return }
     setCreating(true)
     try {
-      const id = await rawStocktakeService.create(facilityId, ngay.format('YYYY-MM-DD'), note.trim() || null)
+      const id = await rawStocktakeService.create(facilityId, ngay.format('YYYY-MM-DD'), note.trim() || null, boQuaHangDoi)
       message.success('Đã tạo phiếu kiểm kê, chụp sổ mọi lô còn hàng')
       setOpen(false); navigate(`/wms/nvl/kiem-ke/${id}`)
-    } catch (e: any) { message.error(e?.message || 'Không tạo được') }
+    } catch (e: any) {
+      const msg = e?.message || 'Không tạo được'
+      if (/phiếu cân sẵn sàng chưa nhập/.test(msg)) {
+        Modal.confirm({ title: 'Còn phiếu cân chưa nhập kho', content: `${msg}. Vẫn tạo kiểm kê? (những phiếu đó sẽ nằm ngoài tồn kiểm kê và bị khoá kỳ nếu duyệt)`, okText: 'Vẫn tạo', cancelText: 'Để nhập trước', onOk: () => create(true) })
+      } else message.error(msg)
+    }
     finally { setCreating(false) }
   }
 
@@ -96,7 +101,7 @@ export default function RawStocktakeListPage() {
           <Table<RawStocktake> rowKey="id" columns={columns} dataSource={rows} size="small" loading={loading} pagination={{ pageSize: 20, showSizeChanger: false }} />
         </Card>
       </Space>
-      <Modal open={open} title="Tạo phiếu kiểm kê" onCancel={() => setOpen(false)} onOk={create} okText="Tạo" cancelText="Hủy" confirmLoading={creating}>
+      <Modal open={open} title="Tạo phiếu kiểm kê" onCancel={() => setOpen(false)} onOk={() => create()} okText="Tạo" cancelText="Hủy" confirmLoading={creating}>
         <Space direction="vertical" size={10} style={{ width: '100%' }}>
           <Text type="secondary">Phiếu sẽ chụp số sổ của mọi lô còn hàng tại {facilities?.find((f) => f.id === facilityId)?.code ?? 'nhà máy'}. Một nhà máy chỉ mở một phiếu tại một thời điểm.</Text>
           <div><Text>Ngày kiểm kê</Text><DatePicker value={ngay} onChange={(d) => d && setNgay(d)} format="DD/MM/YYYY" style={{ width: '100%' }} /></div>

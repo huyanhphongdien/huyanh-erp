@@ -5,10 +5,10 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Alert, Button, Card, Checkbox, Col, Descriptions, Input, InputNumber, Modal, Row, Space, Steps, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Checkbox, Col, Descriptions, Input, InputNumber, Modal, Row, Select, Space, Steps, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined, CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons'
 import RawPhotoTiles from '../../../components/wms/RawPhotoTiles'
-import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, type MixIssue } from '../../../services/wms/mixService'
+import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, type MixIssue, type ShiftLite } from '../../../services/wms/mixService'
 import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
@@ -33,6 +33,9 @@ export default function MixIssueDetailPage() {
   const [kgReturn, setKgReturn] = useState<number | null>(null)
   const [handover, setHandover] = useState(false)
   const [retNote, setRetNote] = useState('')
+  const [shifts, setShifts] = useState<ShiftLite[]>([])
+  const [retShiftId, setRetShiftId] = useState<string | undefined>(undefined)
+  const [retTeam, setRetTeam] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
@@ -52,6 +55,7 @@ export default function MixIssueDetailPage() {
   }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { mixService.listShifts().then(setShifts).catch(() => setShifts([])) }, [])
 
   const required = settings.anh_bat_buoc?.length ? settings.anh_bat_buoc : ['toan_canh', 'man_hinh_can']
   const canEditPhotos = !!issue && ['issued', 'returned'].includes(issue.status)
@@ -67,7 +71,8 @@ export default function MixIssueDetailPage() {
 
   const ghiTra = async () => {
     if (!issue || kgReturn === null) { message.warning('Nhập kg trả cuối ca (0 nếu dùng hết)'); return }
-    await run('tra', () => mixService.tra(issue.id, kgReturn, handover, retNote.trim() || null), `Đã ghi trả ${fmtKg(kgReturn)} kg · tiêu hao ${fmtKg(issue.kg_out - kgReturn)} kg`)
+    if (!issue.shift_id && !retShiftId) { message.warning('Phiếu bàn giao chưa có ca, chọn ca trước'); return }
+    await run('tra', () => mixService.tra(issue.id, kgReturn, handover, retNote.trim() || null, null, issue.shift_id ? null : retShiftId ?? null, issue.shift_id ? null : (retTeam.trim() || null)), `Đã ghi trả ${fmtKg(kgReturn)} kg · tiêu hao ${fmtKg(issue.kg_out - kgReturn)} kg`)
   }
 
   const ky = async (buoc: 'submit' | 'qc_confirm' | 'receive') => {
@@ -150,6 +155,12 @@ export default function MixIssueDetailPage() {
               {st === 'issued' ? (
                 <Space direction="vertical" size={10} style={{ width: '100%' }}>
                   <Alert type="info" showIcon message="Cuối ca: cân phần còn lại, nhập kg trả (0 nếu dùng hết), chụp 2 ảnh rồi mới ký." />
+                  {!issue.shift_id && (
+                    <Row gutter={12}>
+                      <Col span={12}><Text>Ca (phiếu bàn giao chưa có ca) *</Text><Select style={{ width: '100%' }} value={retShiftId} onChange={setRetShiftId} options={shifts.map((s) => ({ value: s.id, label: s.name || s.code }))} placeholder="Chọn ca" /></Col>
+                      <Col span={12}><Text>Tổ</Text><Input value={retTeam} onChange={(e) => setRetTeam(e.target.value)} placeholder="Đen / Vàng…" /></Col>
+                    </Row>
+                  )}
                   <Row gutter={12}>
                     <Col span={10}><Text>Kg trả về kho *</Text><InputNumber style={{ width: '100%' }} min={0} max={issue.kg_out} step={10} value={kgReturn} onChange={(v) => setKgReturn(v === null || v === undefined ? null : Number(v))} onPressEnter={ghiTra} /></Col>
                     <Col span={14}><Text>Ghi chú</Text><Input value={retNote} onChange={(e) => setRetNote(e.target.value)} /></Col>

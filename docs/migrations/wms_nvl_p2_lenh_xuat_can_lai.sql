@@ -498,6 +498,9 @@ BEGIN
   RETURN jsonb_build_object('so_lo', v_n, 'kho_kg', v_kho);
 END $$;
 
+-- ─── 5) Làm mới schema cache của PostgREST (web thấy bảng/view mới ngay) ───
+NOTIFY pgrst, 'reload schema';
+
 -- ─── KIỂM CHỨNG (gửi lại kết quả) ──────────────────────────────────────────
 SELECT to_regclass('public.raw_issue_orders') AS t1, to_regclass('public.raw_issue_lines') AS t2,
        to_regclass('public.v_raw_issue_orders') AS v1, to_regclass('public.v_raw_recheck_due') AS v2, to_regclass('public.v_raw_dry_variance') AS v3,

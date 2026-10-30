@@ -199,6 +199,21 @@ Sổ tay thực tế có **2 bảng**: *"Ca Vàng chèn vào KHMN-15 + 17 · L1:
 | 14.9 | Ký đủ 3 bước → tab **Lô NVL** → thẻ mã KHMN-15 | dòng vàng "Chèn vào mã: 176,5 kg · 5 bành · 1 phiếu · x % hàng vào máy" + dòng tách *bể Slap / máy Mix* rồi theo loại (lỗi/DKL/chuẩn); mở thẻ thấy từng lô chèn, phiếu chèn chung 2 mã ghi "chèn chung mã khác" (kg đã chia đôi) |
 | 14.10 | SQL `SELECT ma, chen_kg, chen_be_kg, chen_mix_kg, so_banh_chen, chi_tiet FROM v_raw_lot_chen WHERE chen_kg > 0` | khớp số trên điện thoại; `v_raw_lot_yield.chen_tieu_hao_kg` cùng số |
 
+## 15. Số lô của lô chèn (sau SQL `wms_mix_p5_so_lo.sql`, chạy SAU p4, 30/10)
+
+| # | Việc | Kỳ vọng |
+|---|---|---|
+| 15.1 | Chạy SQL → kiểm chứng | `f_lay_v4`, `f_tao_lo`, `f_sua_lo` khác null; `lo_chua_co_so_lo` = số lô cũ không có nguồn số lô (lô từ lô TP / sổ QC đã tự điền) |
+| 15.2 | Điện thoại Kho chèn → Nhập lô chèn → **Gõ tay** (mua ngoài SBR 1502) | thẻ đỏ "Số lô · bắt buộc" đứng đầu; nút dưới ghi "Gõ số lô trước" cho đến khi có số lô; gõ trùng số lô đang có → nhắc "Đã có lô CH-… cùng số lô" nhưng vẫn nhập được |
+| 15.3 | **Từ sổ ca** (LOI/DKL) | cũng bắt gõ số lô (số trên bao hàng lỗi) |
+| 15.4 | **Từ sổ QC** | ô số lô tự điền từ sổ QC, sửa được; sổ QC không ghi thì bắt gõ |
+| 15.5 | **Hàng chuẩn** kho TP | ô số lô có nút gợi ý = các lô TP đạt còn tồn của chủng loại đó |
+| 15.6 | **Lô TP lỗi** | không hỏi: số lô giữ nguyên số lô TP (ghi rõ trên thẻ) |
+| 15.7 | Kho chèn (điện thoại + máy tính) | số lô in to trên thẻ / cột đầu bảng, mã CH-… nhỏ bên dưới; lô cũ không số lô: chữ đỏ "Chưa có số lô" + ô **Gán** (thủ kho/QC/BGĐ) |
+| 15.8 | Lấy đầu ca → chọn lô cũ chưa có số lô | màn Cân mở đầu bằng thẻ "Lô CH-… chưa có số lô · gõ số lô trên bao"; nút Tiếp tục ghi "Gõ số lô của lô chèn" cho đến khi gõ; ghi xong → lô có số lô, lần sau không hỏi |
+| 15.9 | Quét tem | quét tem CH-… như cũ; quét/gõ đúng số lô trên bao cũng chọn được lô |
+| 15.10 | Phiếu chèn, bảng /wms/chen, chi tiết phiếu, dòng chèn theo mã | hiện số lô thay cho mã CH (mã CH nhỏ kèm) |
+
 ## Lỗi hay gặp
 
 | Màn hình báo | Nguyên nhân | Làm gì |

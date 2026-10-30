@@ -98,7 +98,7 @@ export default function MixShiftPage() {
   const columns: ColumnsType<MixIssue> = [
     { title: 'Phiếu', dataIndex: 'code', key: 'code', render: (v, r) => <a onClick={() => navigate(`/wms/chen/phieu/${r.id}`)}><Text code>{v}</Text></a> },
     { title: 'Ngày · ca', key: 'ca', render: (_, r) => <span>{new Date(r.shift_date).toLocaleDateString('vi-VN')}{r.shift_name ? ` · ${r.shift_name}` : ''}{r.team ? <Text type="secondary"> · {r.team}</Text> : null}</span> },
-    { title: 'Lô chèn', key: 'lot', render: (_, r) => <span><Text code>{r.lot_code}</Text> <Text type="secondary">{MIX_SOURCE_LABELS[r.source_type]}{r.lot_grade ? ` · ${r.lot_grade}` : ''}</Text></span> },
+    { title: 'Lô chèn', key: 'lot', render: (_, r) => <span>{r.lot_so_lo ? <Text strong>{r.lot_so_lo} </Text> : null}<Text code>{r.lot_code}</Text> <Text type="secondary">{MIX_SOURCE_LABELS[r.source_type]}{r.lot_grade ? ` · ${r.lot_grade}` : ''}</Text></span> },
     { title: 'Chèn vào', key: 'vi_tri', render: (_, r) => <span>{r.vi_tri ? <Tag color={r.vi_tri === 'be_slap' ? 'cyan' : 'purple'}>{MIX_VI_TRI_LABELS[r.vi_tri]}</Tag> : null}{r.ma_goc_all ? <Tag color="geekblue">{r.ma_goc_all}</Tag> : <Text type="secondary">mã: theo phiếu ca</Text>}{r.so_banh !== null ? <Text type="secondary"> · {r.so_banh} bành</Text> : null}</span> },
     { title: 'Mục đích', dataIndex: 'purpose', key: 'purpose', render: (v: MixPurpose, r) => <span>{MIX_PURPOSE_LABELS[v]}{r.target_index ? <Text type="secondary"> · {r.target_index} {r.target_value ?? ''}</Text> : null}</span> },
     { title: 'Lấy', dataIndex: 'kg_out', key: 'kg_out', align: 'right', render: (v) => fmtKg(v) },
@@ -157,7 +157,7 @@ export default function MixShiftPage() {
           <Row gutter={[12, 10]}>
             <Col span={24}><Text>Lô chèn *</Text>
               <Select style={{ width: '100%' }} showSearch optionFilterProp="label" value={f.lotId} onChange={(v) => setF((x) => ({ ...x, lotId: v }))}
-                options={lotsCoHang.map((l) => ({ value: l.id, disabled: l.source_type === 'dkl' && !l.metal_cleared, label: `${l.code} · ${MIX_SOURCE_LABELS[l.source_type]}${l.grade ? ' · ' + l.grade : ''} · tồn ${fmtKg(l.ton_kg)} kg${l.source_type === 'dkl' && !l.metal_cleared ? ' · CHƯA XỬ LÝ KIM LOẠI' : ''}` }))} />
+                options={lotsCoHang.map((l) => ({ value: l.id, disabled: l.source_type === 'dkl' && !l.metal_cleared, label: `${l.so_lo ? l.so_lo + ' · ' : 'CHƯA CÓ SỐ LÔ · '}${l.code} · ${MIX_SOURCE_LABELS[l.source_type]}${l.grade ? ' · ' + l.grade : ''} · tồn ${fmtKg(l.ton_kg)} kg${l.source_type === 'dkl' && !l.metal_cleared ? ' · CHƯA XỬ LÝ KIM LOẠI' : ''}` }))} />
               {lotChon && <Text type="secondary">{lotChon.source_desc || ''} · Po {lotChon.po ?? '—'} · Mooney {lotChon.mooney ?? '—'} · PRI {lotChon.pri ?? '—'}{lotChon.qc_allow_mix_pct !== null ? ` · trộn ≤ ${lotChon.qc_allow_mix_pct} %` : ''}{!lotChon.qc_allow_rerun ? ' · KHÔNG chạy lại' : ''}</Text>}
             </Col>
             <Col span={24}><Text>Chèn vào đâu *</Text><Select style={{ width: '100%' }} value={f.viTri} onChange={(v) => setF((x) => ({ ...x, viTri: v }))} placeholder="Chèn bể Slap / chèn máy Mix" options={(Object.keys(MIX_VI_TRI_LABELS) as MixViTri[]).map((k) => ({ value: k, label: `Chèn ${MIX_VI_TRI_LABELS[k]}` }))} /></Col>

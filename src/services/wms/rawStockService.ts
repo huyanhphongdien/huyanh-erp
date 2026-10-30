@@ -249,7 +249,7 @@ export function dichLoiNhapKho(err: unknown): string {
     case 'DA_CHUYEN_HET': return `Dòng này đã chuyển hết sang kho chèn${chi_tiet}`
     case 'THIEU_MA_NVL': return `Phiếu chưa có mã nguyên liệu, chọn hoặc tạo mã rồi nhận${chi_tiet}`
     case 'MA_KHONG_HOP_LE': return `Mã không hợp lệ${chi_tiet}`
-    case 'THIEU_SO_LO': return 'Thiếu số lô thành phẩm'
+    case 'THIEU_SO_LO': return `Thiếu số lô${chi_tiet}`
     case 'TRUNG_SO_LO': return `Số lô đã có rồi${chi_tiet}`
     case 'LO_TP_CHUA_QC': return `Lô chưa bị QC đánh CXL / Loại, không chuyển chèn được${chi_tiet}`
     case 'LO_TP_KHONG_DU': return `Lô không đủ bành${chi_tiet}`

@@ -3,12 +3,13 @@
 //   · Hàng lỗi / Dính kim loại: chạm dòng LOI/DKL của sổ ca đã nhận (kg còn chưa chuyển) hoặc dòng sổ QC hàng không đạt
 //   · Hàng chuẩn: chạm chủng loại còn trong kho TP → tạo lô chèn + tự ghi XUẤT BÀNH vào phiếu ca nháp của ca này
 //   · Mua ngoài / khác: gõ tay như cũ
+//   · SỐ LÔ bắt buộc (30/10): lô TP / sổ QC máy tự lấy; sổ ca, hàng chuẩn, gõ tay thì người dùng nhập
 // File: src/pages/mobile/kho/KhoMixLotNew.tsx · Route: /m/kho/chen/kho/nhap
 // ============================================================================
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../../stores/authStore'
-import { mixService, MIX_SOURCE_LABELS, type MixNguonLoi, type MixNguonQc, type MixNguonTp, type MixSourceType } from '../../../services/wms/mixService'
+import { mixService, MIX_SOURCE_LABELS, type MixLot, type MixNguonLoi, type MixNguonQc, type MixNguonTp, type MixSourceType } from '../../../services/wms/mixService'
 import type { OpsShiftOption } from '../../../services/opsService'
 import { fgLotService, FG_QC_LABELS, type FgLot } from '../../../services/wms/fgLotService'
 import { fmtD, fmtKg, todayLocal, useKhoFacility } from './khoCommon'
@@ -27,6 +28,10 @@ export default function KhoMixLotNew() {
   const [tpLoi, setTpLoi] = useState<FgLot[]>([])
   const [pickFg, setPickFg] = useState<FgLot | null>(null)
   const [banh, setBanh] = useState('')
+  // số lô của hàng chèn (bắt buộc; lô TP và sổ QC tự có)
+  const [soLo, setSoLo] = useState('')
+  const [fgDat, setFgDat] = useState<FgLot[]>([])       // lô TP đạt còn tồn → gợi ý số lô cho hàng chuẩn
+  const [existing, setExisting] = useState<MixLot[]>([]) // lô chèn đang có → nhắc trùng số lô
   // nguồn
   const [loi, setLoi] = useState<MixNguonLoi[]>([])
   const [qc, setQc] = useState<MixNguonQc[]>([])
@@ -55,19 +60,23 @@ export default function KhoMixLotNew() {
   useEffect(() => {
     if (!facilityId) return
     let alive = true
-    Promise.all([mixService.listNguonLoi(facilityId), mixService.listNguonQc(facilityId), mixService.listNguonTp(facilityId), detectShift(user?.employee_id || null), fgLotService.list(facilityId, { qc: ['cxl', 'loai'], onlyTon: true }).catch(() => [] as FgLot[])])
-      .then(([a, b, c, d, f]) => { if (!alive) return; setLoi(a); setQc(b); setTp(c); setShifts(d.shifts); setShift(d.pick); setTpLoi(f) })
+    Promise.all([mixService.listNguonLoi(facilityId), mixService.listNguonQc(facilityId), mixService.listNguonTp(facilityId), detectShift(user?.employee_id || null), fgLotService.list(facilityId, { qc: ['cxl', 'loai'], onlyTon: true }).catch(() => [] as FgLot[]),
+      fgLotService.list(facilityId, { qc: ['dat'], onlyTon: true }).catch(() => [] as FgLot[]), mixService.listLots(facilityId, true).catch(() => [] as MixLot[])])
+      .then(([a, b, c, d, f, g, h]) => { if (!alive) return; setLoi(a); setQc(b); setTp(c); setShifts(d.shifts); setShift(d.pick); setTpLoi(f); setFgDat(g); setExisting(h) })
       .catch((e) => alive && setMsg(e?.message || 'Không tải được nguồn hàng'))
     return () => { alive = false }
   }, [facilityId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const kgN = kg === '' ? null : Number(kg)
   const kgOk = kgN !== null && Number.isFinite(kgN) && kgN > 0
+  const soLoClean = soLo.trim().toUpperCase()
+  const soLoOk = soLoClean.length > 0
+  const trung = soLoOk ? existing.find((x) => x.status !== 'cancelled' && (x.so_lo || '').toUpperCase() === soLoClean) : undefined
   const num = (s: string) => (s.trim() === '' ? null : Number.isFinite(Number(s)) ? Number(s) : null)
   const code = (s: string) => s.replace(/ \(.*\)/, '')
   const done = (text: string) => nav('/m/kho/chen/kho', { replace: true, state: { msg: text } })
 
-  const chonNguon = (t: MixSourceType) => { setSourceType(t); setPickLine(null); setPickQc(null); setPickTp(null); setPickFg(null); setKg(''); setMsg(null); setMode(t === 'loi' || t === 'dkl' ? 'lo_tp' : 'tay') }
+  const chonNguon = (t: MixSourceType) => { setSourceType(t); setPickLine(null); setPickQc(null); setPickTp(null); setPickFg(null); setKg(''); setSoLo(''); setMsg(null); setMode(t === 'loi' || t === 'dkl' ? 'lo_tp' : 'tay') }
   async function ghiTuFg() {
     if (!pickFg) return
     const n = Number(banh)
@@ -82,37 +91,37 @@ export default function KhoMixLotNew() {
     if (!facilityId || !kgOk) return
     setBusy(true); setMsg(null)
     try {
-      await mixService.createLot({ facilityId, sourceType, sourceDesc: desc.trim() || null, grade: grade.trim() || null, kgIn: kgN!, po: num(po), mooney: num(mooney), pri: num(pri), qcAllowMixPct: num(mixPct), qcAllowRerun: rerun, metalCleared: sourceType === 'dkl' ? metal : true, receivedDate: date || null, note: note.trim() || null })
-      done(`Đã nhập lô chèn ${fmtKg(kgN)} kg (${code(MIX_SOURCE_LABELS[sourceType])})`)
+      await mixService.createLot({ facilityId, sourceType, sourceDesc: desc.trim() || null, grade: grade.trim() || null, kgIn: kgN!, po: num(po), mooney: num(mooney), pri: num(pri), qcAllowMixPct: num(mixPct), qcAllowRerun: rerun, metalCleared: sourceType === 'dkl' ? metal : true, receivedDate: date || null, note: note.trim() || null, soLo: soLoClean })
+      done(`Đã nhập lô chèn ${soLoClean} · ${fmtKg(kgN)} kg (${code(MIX_SOURCE_LABELS[sourceType])})`)
     } catch (e: any) { setMsg(e?.message || 'Không nhập được') }
     finally { setBusy(false) }
   }
   async function ghiTuSoCa() {
-    if (!pickLine || !kgOk) return
+    if (!pickLine || !kgOk || !soLoOk) return
     setBusy(true); setMsg(null)
-    try { await mixService.taoLoTuSoCa(pickLine.line_id, kgN, note.trim() || null, pickLine.material_code === 'DKL' ? metal : true); done(`Đã chuyển ${fmtKg(kgN)} kg ${pickLine.material_name} (${pickLine.shift_name || ''} ${fmtD(pickLine.report_date)}) vào kho chèn`) }
+    try { await mixService.taoLoTuSoCa(pickLine.line_id, kgN, note.trim() || null, pickLine.material_code === 'DKL' ? metal : true, soLoClean); done(`Đã chuyển ${fmtKg(kgN)} kg ${pickLine.material_name} · lô ${soLoClean} (${pickLine.shift_name || ''} ${fmtD(pickLine.report_date)}) vào kho chèn`) }
     catch (e: any) { setMsg(e?.message || 'Không chuyển được') }
     finally { setBusy(false) }
   }
   async function ghiTuQc() {
-    if (!pickQc || !kgOk) return
+    if (!pickQc || !kgOk || !soLoOk) return
     setBusy(true); setMsg(null)
-    try { await mixService.taoLoTuQc(pickQc.reject_id, kgN!, note.trim() || null, true); done(`Đã chuyển ${fmtKg(kgN)} kg hàng không đạt (lô SX ${pickQc.so_lo || '?'}) vào kho chèn`) }
+    try { await mixService.taoLoTuQc(pickQc.reject_id, kgN!, note.trim() || null, true, soLoClean); done(`Đã chuyển ${fmtKg(kgN)} kg hàng không đạt (lô ${soLoClean}) vào kho chèn`) }
     catch (e: any) { setMsg(e?.message || 'Không chuyển được') }
     finally { setBusy(false) }
   }
   async function ghiHangChuan() {
-    if (!facilityId || !pickTp || !kgOk) return
+    if (!facilityId || !pickTp || !kgOk || !soLoOk) return
     if (!shift) { setMsg('Chọn ca để ghi xuất bành vào phiếu ca'); return }
     setBusy(true); setMsg(null)
-    try { const r = await mixService.layHangChuan({ facilityId, materialId: pickTp.material_id, kg: kgN!, shiftDate: todayLocal(), shiftId: shift.id, note: note.trim() || null }); done(`Đã chuyển ${r.banh} bành ${r.material} (${fmtKg(r.kg)} kg) sang kho chèn, phiếu ca đã ghi xuất bành`) }
+    try { const r = await mixService.layHangChuan({ facilityId, materialId: pickTp.material_id, kg: kgN!, shiftDate: todayLocal(), shiftId: shift.id, note: note.trim() || null, soLo: soLoClean }); done(`Đã chuyển ${r.banh} bành ${r.material} · lô ${soLoClean} (${fmtKg(r.kg)} kg) sang kho chèn, phiếu ca đã ghi xuất bành`) }
     catch (e: any) { setMsg(e?.message || 'Không chuyển được') }
     finally { setBusy(false) }
   }
 
   const banhTp = pickTp && kgOk && pickTp.weight_per_unit ? Math.max(Math.round(kgN! / pickTp.weight_per_unit), 1) : null
 
-  const KgBox = ({ id, hint }: { id: string; hint?: string }) => (
+  const kgBox = (id: string, hint?: string) => (
     <section className="kmx-card" style={{ gap: 8 }}>
       <label htmlFor={id} className="kmx-strong" style={{ fontSize: 13 }}>Khối lượng (kg)</label>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -121,6 +130,14 @@ export default function KhoMixLotNew() {
       </div>
       {hint && <span className="kmx-sm">{hint}</span>}
       <input className="kmx-text" placeholder="Ghi chú (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Ghi chú" />
+    </section>
+  )
+  const soLoBox = (id: string, hint?: string, suggest?: string[]) => (
+    <section className="kmx-card" aria-label="Số lô" style={{ gap: 8, borderColor: soLoOk ? '#E5E7EB' : '#FECACA' }}>
+      <label htmlFor={id} className="kmx-strong" style={{ fontSize: 13 }}>Số lô <span style={{ fontWeight: 500, color: soLoOk ? '#6B7280' : '#B45309' }}>· bắt buộc</span></label>
+      <input id={id} className="kmx-text kmx-mono" style={{ textTransform: 'uppercase', fontWeight: 700, fontSize: 17 }} placeholder="Số lô trên bao / sổ (vd S2308AB)" value={soLo} onChange={(e) => setSoLo(e.target.value)} autoCapitalize="characters" />
+      {suggest && suggest.length > 0 && <div className="kmx-seg">{suggest.slice(0, 8).map((s) => <button key={s} type="button" className={soLoClean === s ? 'on' : ''} style={{ minWidth: 0, height: 40, fontSize: 13 }} onClick={() => setSoLo(s)}>{s}</button>)}</div>}
+      {trung ? <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Đã có lô {trung.code} cùng số lô này (tồn {fmtKg(trung.ton_kg)} kg). Vẫn nhập thêm được nếu là đợt khác.</span> : hint ? <span className="kmx-sm">{hint}</span> : null}
     </section>
   )
 
@@ -166,7 +183,7 @@ export default function KhoMixLotNew() {
         {pickFg && (
           <>
             <div className="kmx-card" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span className="kmx-col"><span className="kmx-lbl">Đã chọn · lô TP</span><span className="kmx-strong kmx-mono">{pickFg.so_lo}</span><span className="kmx-sm">{pickFg.material_name} · còn {pickFg.ton_banh} bành · {pickFg.kg_per_banh} kg/bành</span></span>
+              <span className="kmx-col"><span className="kmx-lbl">Đã chọn · lô TP</span><span className="kmx-strong kmx-mono">{pickFg.so_lo}</span><span className="kmx-sm">{pickFg.material_name} · còn {pickFg.ton_banh} bành · {pickFg.kg_per_banh} kg/bành · số lô giữ nguyên {pickFg.so_lo}</span></span>
               <button type="button" className="kmx-pill sm" onClick={() => { setPickFg(null); setBanh('') }}>Đổi</button>
             </div>
             <section className="kmx-card" style={{ gap: 8 }}>
@@ -201,7 +218,8 @@ export default function KhoMixLotNew() {
               <span className="kmx-col"><span className="kmx-lbl">Đã chọn</span><span className="kmx-strong">{pickLine.material_name} · {pickLine.shift_name || ''} {fmtD(pickLine.report_date)}{pickLine.team ? ` · Tổ ${pickLine.team}` : ''}</span><span className="kmx-sm">chưa chuyển {fmtKg(pickLine.con_lai_kg)} kg</span></span>
               <button type="button" className="kmx-pill sm" onClick={() => { setPickLine(null); setKg('') }}>Đổi</button>
             </div>
-            <KgBox id="kg-soca" hint={kgOk && kgN! > pickLine.con_lai_kg + 0.01 ? `Nhiều hơn phần chưa chuyển (${fmtKg(pickLine.con_lai_kg)} kg)` : 'Mặc định = phần chưa chuyển; sửa nếu chỉ chuyển một phần'} />
+            {soLoBox('solo-soca', `Số lô ghi trên bao hàng ${pickLine.material_code} của ca này`)}
+            {kgBox('kg-soca', kgOk && kgN! > pickLine.con_lai_kg + 0.01 ? `Nhiều hơn phần chưa chuyển (${fmtKg(pickLine.con_lai_kg)} kg)` : 'Mặc định = phần chưa chuyển; sửa nếu chỉ chuyển một phần')}
             {pickLine.material_code === 'DKL' && <label className="kmx-check-row kmx-card" htmlFor="lot-metal2"><input id="lot-metal2" type="checkbox" checked={metal} onChange={(e) => setMetal(e.target.checked)} /><span><b>Đã xử lý kim loại</b><br /><span className="kmx-sm">Chưa tick thì vào kho nhưng chưa lấy chèn được.</span></span></label>}
           </>
         )}
@@ -212,7 +230,7 @@ export default function KhoMixLotNew() {
             <h2 className="kmx-h2" style={{ padding: '0 2px' }}>Sổ QC hàng không đạt · chạm để chuyển</h2>
             {!qc.length && <div className="kmx-card muted kmx-center" style={{ fontSize: 13 }}>Sổ QC chưa có dòng nào trong 90 ngày.</div>}
             {qc.map((q) => (
-              <button key={q.reject_id} type="button" className={`kmx-card${q.da_chuyen ? ' muted' : ' press'}`} disabled={q.da_chuyen} style={{ font: 'inherit', textAlign: 'left', width: '100%' }} onClick={() => { setPickQc(q); setKg('') }}>
+              <button key={q.reject_id} type="button" className={`kmx-card${q.da_chuyen ? ' muted' : ' press'}`} disabled={q.da_chuyen} style={{ font: 'inherit', textAlign: 'left', width: '100%' }} onClick={() => { setPickQc(q); setKg(''); setSoLo(q.so_lo || '') }}>
                 <span className="kmx-row"><span className="kmx-strong">{fmtD(q.ngay_sx)} · lô SX {q.so_lo || '?'}{q.to_sx ? ` · tổ ${q.to_sx}` : ''}</span><span className={`kmx-chip ${q.da_chuyen ? 'mut' : q.tinh_trang === 'LOAI' ? 'red' : 'amb'}`}>{q.da_chuyen ? `đã chuyển ${q.lot_code || ''}` : q.tinh_trang === 'LOAI' ? 'Loại' : 'Chờ xử lý'}</span></span>
                 <span className="kmx-sm">{q.ly_do || 'không ghi lý do'}{q.po_min !== null || q.po_max !== null ? ` · Po ${q.po_min ?? ''}–${q.po_max ?? ''}` : ''}{q.ma_nguyen_lieu ? ` · NVL ${q.ma_nguyen_lieu}` : ''}</span>
               </button>
@@ -225,7 +243,8 @@ export default function KhoMixLotNew() {
               <span className="kmx-col"><span className="kmx-lbl">Đã chọn · sổ QC</span><span className="kmx-strong">{fmtD(pickQc.ngay_sx)} · lô SX {pickQc.so_lo || '?'}</span><span className="kmx-sm">{pickQc.ly_do || ''}</span></span>
               <button type="button" className="kmx-pill sm" onClick={() => { setPickQc(null); setKg('') }}>Đổi</button>
             </div>
-            <KgBox id="kg-qc" hint="Sổ QC không ghi kg: cân rồi gõ số thật" />
+            {soLoBox('solo-qc', pickQc.so_lo ? 'Lấy từ sổ QC, sửa nếu trên bao ghi khác' : 'Sổ QC không ghi số lô: gõ số lô trên bao')}
+            {kgBox('kg-qc', 'Sổ QC không ghi kg: cân rồi gõ số thật')}
           </>
         )}
 
@@ -235,7 +254,7 @@ export default function KhoMixLotNew() {
             <h2 className="kmx-h2" style={{ padding: '0 2px' }}>Chủng loại còn trong kho thành phẩm · chạm để chuyển</h2>
             {!tp.length && <div className="kmx-card muted kmx-center" style={{ fontSize: 13 }}>Kho TP (theo sổ ca đã nhận) đang trống.</div>}
             {tp.map((t) => (
-              <button key={t.material_id} type="button" className="kmx-card press" style={{ font: 'inherit', textAlign: 'left', width: '100%' }} onClick={() => { setPickTp(t); setKg('') }}>
+              <button key={t.material_id} type="button" className="kmx-card press" style={{ font: 'inherit', textAlign: 'left', width: '100%' }} onClick={() => { setPickTp(t); setKg(''); setSoLo('') }}>
                 <span className="kmx-row" style={{ alignItems: 'flex-end' }}>
                   <span className="kmx-col"><span className="kmx-strong">{t.material_name}</span><span className="kmx-sm">{t.code}{t.weight_per_unit ? ` · ${t.weight_per_unit} kg/bành` : ' · chưa khai cỡ bành'}</span></span>
                   <span className="kmx-col" style={{ alignItems: 'flex-end' }}><span className="kmx-num lg">{t.ton_banh}</span><span className="kmx-sm" style={{ fontWeight: 600 }}>bành · {fmtKg(t.ton_kg)} kg</span></span>
@@ -250,7 +269,8 @@ export default function KhoMixLotNew() {
               <span className="kmx-col"><span className="kmx-lbl">Đã chọn · kho TP</span><span className="kmx-strong">{pickTp.material_name}</span><span className="kmx-sm">còn {pickTp.ton_banh} bành · {fmtKg(pickTp.ton_kg)} kg</span></span>
               <button type="button" className="kmx-pill sm" onClick={() => { setPickTp(null); setKg('') }}>Đổi</button>
             </div>
-            <KgBox id="kg-tp" hint={banhTp ? `= ${banhTp} bành × ${pickTp.weight_per_unit} kg = ${fmtKg(banhTp * (pickTp.weight_per_unit || 0))} kg (làm tròn theo bành)` : 'Máy quy ra số bành theo cỡ bành'} />
+            {soLoBox('solo-tp', 'Số lô TP đem chèn (chạm gợi ý từ lô đạt còn tồn)', fgDat.filter((f) => f.material_code === pickTp.code).map((f) => f.so_lo))}
+            {kgBox('kg-tp', banhTp ? `= ${banhTp} bành × ${pickTp.weight_per_unit} kg = ${fmtKg(banhTp * (pickTp.weight_per_unit || 0))} kg (làm tròn theo bành)` : 'Máy quy ra số bành theo cỡ bành')}
             <section className="kmx-card" aria-label="Ca ghi xuất bành" style={{ gap: 10, borderColor: shift ? '#E5E7EB' : '#FECACA' }}>
               <div className="kmx-row">
                 <span className="kmx-col"><span className="kmx-lbl">Ghi xuất bành vào phiếu ca</span><span className="kmx-strong" style={{ fontSize: 15 }}>{shift ? `${shift.name}${shift.start_time ? ` · ${hhmm(shift.start_time)}–${hhmm(shift.end_time)}` : ''}` : 'Chưa chọn ca'}</span><span className="kmx-sm">Phiếu ca của ca này phải đang là NHÁP (chưa ký)</span></span>
@@ -264,6 +284,7 @@ export default function KhoMixLotNew() {
         {/* ── Gõ tay ── */}
         {(mode === 'tay' || sourceType === 'mua_ngoai' || sourceType === 'khac') && !pickLine && !pickQc && !pickFg && (
           <>
+            {soLoBox('solo-tay', sourceType === 'mua_ngoai' ? 'Số lô nhà cung cấp in trên bao / chứng từ (vd SBR 1502 lô 2408)' : 'Số lô ghi trên bao hoặc sổ')}
             <section className="kmx-card" aria-label="Mô tả" style={{ gap: 10 }}>
               <div className="kmx-col" style={{ gap: 4 }}>
                 <label htmlFor="lot-desc" className="kmx-lbl">Mô tả</label>
@@ -314,10 +335,10 @@ export default function KhoMixLotNew() {
       </div></div>
       <div className="kmx-foot">
         {pickFg ? <button type="button" className="kmx-btn" disabled={busy || !(Number(banh) > 0)} onClick={ghiTuFg}>{I.check}{busy ? 'Đang chuyển…' : `Chuyển ${banh || 0} bành vào kho chèn`}</button>
-          : pickLine ? <button type="button" className="kmx-btn" disabled={!kgOk || busy || (kgN! > pickLine.con_lai_kg + 0.01)} onClick={ghiTuSoCa}>{I.check}{busy ? 'Đang chuyển…' : `Chuyển vào kho chèn · ${fmtKg(kgN)} kg`}</button>
-          : pickQc ? <button type="button" className="kmx-btn" disabled={!kgOk || busy} onClick={ghiTuQc}>{I.check}{busy ? 'Đang chuyển…' : `Chuyển vào kho chèn · ${fmtKg(kgN)} kg`}</button>
-          : pickTp ? <button type="button" className="kmx-btn" disabled={!kgOk || busy || !shift} onClick={ghiHangChuan}>{I.check}{busy ? 'Đang chuyển…' : banhTp ? `Chuyển ${banhTp} bành sang kho chèn` : 'Chuyển sang kho chèn'}</button>
-          : (mode === 'tay' || sourceType === 'mua_ngoai' || sourceType === 'khac') ? <button type="button" className="kmx-btn" disabled={!kgOk || busy} onClick={ghiTay}>{I.check}{busy ? 'Đang nhập…' : kgOk ? `Nhập kho chèn · ${fmtKg(kgN)} kg` : 'Nhập kho chèn'}</button>
+          : pickLine ? <button type="button" className="kmx-btn" disabled={!kgOk || !soLoOk || busy || (kgN! > pickLine.con_lai_kg + 0.01)} onClick={ghiTuSoCa}>{I.check}{busy ? 'Đang chuyển…' : !soLoOk ? 'Gõ số lô trước' : `Chuyển vào kho chèn · ${fmtKg(kgN)} kg`}</button>
+          : pickQc ? <button type="button" className="kmx-btn" disabled={!kgOk || !soLoOk || busy} onClick={ghiTuQc}>{I.check}{busy ? 'Đang chuyển…' : !soLoOk ? 'Gõ số lô trước' : `Chuyển vào kho chèn · ${fmtKg(kgN)} kg`}</button>
+          : pickTp ? <button type="button" className="kmx-btn" disabled={!kgOk || !soLoOk || busy || !shift} onClick={ghiHangChuan}>{I.check}{busy ? 'Đang chuyển…' : !soLoOk ? 'Gõ số lô trước' : banhTp ? `Chuyển ${banhTp} bành sang kho chèn` : 'Chuyển sang kho chèn'}</button>
+          : (mode === 'tay' || sourceType === 'mua_ngoai' || sourceType === 'khac') ? <button type="button" className="kmx-btn" disabled={!kgOk || !soLoOk || busy} onClick={ghiTay}>{I.check}{busy ? 'Đang nhập…' : !soLoOk ? 'Gõ số lô trước' : kgOk ? `Nhập kho chèn · ${fmtKg(kgN)} kg` : 'Nhập kho chèn'}</button>
           : <span className="kmx-sm kmx-center">Chạm một dòng ở trên để chuyển vào kho chèn</span>}
       </div>
     </div>

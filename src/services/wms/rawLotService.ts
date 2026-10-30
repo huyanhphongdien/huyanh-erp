@@ -52,7 +52,7 @@ export interface RawLotYield {
 }
 
 /** Hàng chèn đã vào từng mã gốc (v_raw_lot_chen): chỉ phiếu thủ kho đã nhận; phiếu chèn chung nhiều mã thì kg chia đều */
-export interface RawLotChenChiTiet { lot_code: string; vi_tri: 'be_slap' | 'may_mix' | null; source_type: string; grade: string | null; desc: string | null; kg: number; so_banh: number | null; so_phieu: number; co_chung: boolean }
+export interface RawLotChenChiTiet { lot_code: string; so_lo: string | null; vi_tri: 'be_slap' | 'may_mix' | null; source_type: string; grade: string | null; desc: string | null; kg: number; so_banh: number | null; so_phieu: number; co_chung: boolean }
 export interface RawLotChen {
   raw_lot_id: string; facility_id: string; ma: string; rubber_type_name: string; trang_thai: RawLotTrangThai; xuat_sx_kho_kg: number | null
   chen_kg: number; so_phieu_chen: number; so_banh_chen: number; chen_be_kg: number; chen_mix_kg: number; chen_loi_kg: number; chen_dkl_kg: number; chen_chuan_kg: number; chen_khac_kg: number; ty_le_chen_pct: number | null

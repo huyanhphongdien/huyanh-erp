@@ -27,6 +27,7 @@ export default function KhoMixStock() {
   const [busy, setBusy] = useState<string | null>(null)
   const [huyAsk, setHuyAsk] = useState<string | null>(null)
   const [kk, setKk] = useState<Record<string, { kg: string; lyDo: string }>>({})
+  const [ganSoLo, setGanSoLo] = useState<Record<string, string>>({})   // lô cũ chưa có số lô → gán
 
   const load = useCallback(async () => {
     if (!facilityId) return
@@ -89,7 +90,7 @@ export default function KhoMixStock() {
           return (
             <section key={l.id} className="kmx-card" aria-label={`Lô ${l.code}`} style={{ gap: 8 }}>
               <div className="kmx-row">
-                <span className="kmx-mono" style={{ fontSize: 15, fontWeight: 700, color: '#0D2E25' }}>{l.code}</span>
+                <span className="kmx-col" style={{ gap: 0 }}><span className="kmx-mono" style={{ fontSize: 16, fontWeight: 800, color: l.so_lo ? '#0D2E25' : '#B91C1C' }}>{l.so_lo || 'Chưa có số lô'}</span><span className="kmx-sm kmx-mono">{l.code}</span></span>
                 <span style={{ display: 'flex', gap: 4 }}><span className={`kmx-chip ${CHIP[l.source_type]}`}>{MIX_SOURCE_LABELS[l.source_type].replace(/ \(.*\)/, '')}</span>{l.status !== 'available' && <span className={`kmx-chip ${l.status === 'in_use' ? 'ok' : 'mut'}`}>{MIX_LOT_STATUS_LABELS[l.status]}</span>}</span>
               </div>
               <div className="kmx-row" style={{ alignItems: 'flex-end' }}>
@@ -108,6 +109,15 @@ export default function KhoMixStock() {
                 <div className="kmx-col" style={{ gap: 6 }}>
                   <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Dính kim loại, chưa xử lý: chưa lấy chèn được.</span>
                   <button type="button" className="kmx-btn sec" disabled={!canWrite || busy === l.id} onClick={() => sua(l, { metalCleared: true }, `${l.code}: đã đánh dấu xử lý kim loại, lấy chèn được rồi`)}>{I.check}Đã xử lý kim loại, mở lấy</button>
+                </div>
+              )}
+              {!l.so_lo && l.status !== 'cancelled' && (
+                <div className="kmx-col" style={{ gap: 6, background: '#FEF2F2', borderRadius: 12, padding: 10 }}>
+                  <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Lô chưa có số lô. Gán số lô để quản lý; chưa gán thì lúc lấy đầu ca tổ phải gõ.</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input className="kmx-text kmx-mono" style={{ textTransform: 'uppercase', fontWeight: 700 }} placeholder="Số lô trên bao" value={ganSoLo[l.id] ?? ''} onChange={(e) => setGanSoLo((x) => ({ ...x, [l.id]: e.target.value }))} aria-label="Số lô" autoCapitalize="characters" />
+                    <button type="button" className="kmx-pill" style={{ flex: '0 0 auto', background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E' }} disabled={!canWrite || busy === l.id || !(ganSoLo[l.id] ?? '').trim()} onClick={() => sua(l, { soLo: (ganSoLo[l.id] ?? '').trim().toUpperCase() }, `${l.code}: đã gán số lô ${(ganSoLo[l.id] ?? '').trim().toUpperCase()}`)}>Gán</button>
+                  </div>
                 </div>
               )}
               {l.note && <span className="kmx-sm">Ghi chú: {l.note}</span>}

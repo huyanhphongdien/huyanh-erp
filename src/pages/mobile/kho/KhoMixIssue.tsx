@@ -181,7 +181,7 @@ export default function KhoMixIssue() {
         <div className="kmx-body"><div className="kmx-inner">
           {msg && <div className={`kmx-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>}
           <div className="kmx-card" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}>
-            <span className="kmx-col"><span className="kmx-lbl">Đã lấy đầu ca</span><span className="kmx-md">{hm(i.out_at)} · lô {i.lot_code}{i.vi_tri ? ` · ${MIX_VI_TRI_LABELS[i.vi_tri].toLowerCase()}` : ''}{i.so_banh !== null ? ` · ${i.so_banh} bành` : ''}{i.ma_goc_all ? ` · vào mã ${i.ma_goc_all}` : ''} · {pOut.length} ảnh</span></span>
+            <span className="kmx-col"><span className="kmx-lbl">Đã lấy đầu ca</span><span className="kmx-md">{hm(i.out_at)} · lô {i.lot_so_lo || i.lot_code}{i.vi_tri ? ` · ${MIX_VI_TRI_LABELS[i.vi_tri].toLowerCase()}` : ''}{i.so_banh !== null ? ` · ${i.so_banh} bành` : ''}{i.ma_goc_all ? ` · vào mã ${i.ma_goc_all}` : ''} · {pOut.length} ảnh</span></span>
             <span className="kmx-num md" style={{ whiteSpace: 'nowrap' }}>{fmtKg(i.kg_out)} <span className="kmx-sm">kg</span></span>
           </div>
           {missOut.length > 0 && (
@@ -293,7 +293,7 @@ export default function KhoMixIssue() {
             <div className="kmx-col kmx-center kmx-stat ok"><span className="kmx-lbl ok">Tiêu hao</span><span className="kmx-num md ok">{i.kg_used === null ? '—' : fmtKg(i.kg_used)}</span></div>
           </div>
           {i.kg_used !== null && <div className="kmx-bar" style={{ height: 10 }}><span style={{ width: `${Math.min(pct, 100)}%` }} /></div>}
-          <span className="kmx-md">Lô <span className="kmx-mono" style={{ fontWeight: 600, color: '#0D2E25' }}>{i.lot_code}</span> · {MIX_SOURCE_LABELS[i.source_type].toLowerCase()}{i.lot_grade ? ` · ${i.lot_grade}` : ''}{i.po !== null ? ` · Po ${i.po}` : ''} · {MIX_PURPOSE_LABELS[i.purpose].toLowerCase()}{i.target_index ? ` ${i.target_index}${i.target_value !== null ? ' → ' + i.target_value : ''}` : ''}</span>
+          <span className="kmx-md">Lô <span className="kmx-mono" style={{ fontWeight: 700, color: '#0D2E25' }}>{i.lot_so_lo || i.lot_code}</span>{i.lot_so_lo ? <span className="kmx-sm kmx-mono"> {i.lot_code}</span> : null} · {MIX_SOURCE_LABELS[i.source_type].toLowerCase()}{i.lot_grade ? ` · ${i.lot_grade}` : ''}{i.po !== null ? ` · Po ${i.po}` : ''} · {MIX_PURPOSE_LABELS[i.purpose].toLowerCase()}{i.target_index ? ` ${i.target_index}${i.target_value !== null ? ' → ' + i.target_value : ''}` : ''}</span>
           <div className="kmx-row" style={{ alignItems: 'center' }}>
             <span className="kmx-md">{i.vi_tri ? <>Chèn <b>{MIX_VI_TRI_LABELS[i.vi_tri]}</b> · </> : null}Chèn vào mã: {i.ma_goc_all ? <b className="kmx-mono" style={{ color: '#0D2E25' }}>{i.ma_goc_all}</b> : <span style={{ color: '#B45309' }}>chưa gắn · lấy theo phiếu ca khi thủ kho nhận</span>}{i.so_banh !== null ? ` · ${i.so_banh} bành` : ''}{i.gross_kg !== null ? ` · cả pallet ${kgTxt(i.gross_kg)} − bì ${kgTxt(i.pallet_kg ?? 0)}` : ''}{i.so_banh_tra !== null ? ` · còn ${i.so_banh_tra} bành` : ''}</span>
             {!['received', 'cancelled'].includes(st) && (role.perms.submit || role.isKeeper || role.isQC || role.isBGD) && <button type="button" className="kmx-pill sm" onClick={moDoiMa}>{doiMa ? 'Đóng' : 'Đổi mã'}</button>}

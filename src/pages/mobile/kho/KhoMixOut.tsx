@@ -32,6 +32,7 @@ export default function KhoMixOut() {
   const [lots, setLots] = useState<MixLot[]>([])
   const [lot, setLot] = useState<MixLot | null>(null)
   const [kg, setKg] = useState('')
+  const [soLo, setSoLo] = useState('')   // lô cũ chưa có số lô: tổ gõ, máy ghi vào lô
   // cân theo sổ tay tổ ép: số bành · hàng + pallet · bì pallet → hàng chèn = cân − bì
   const [mode, setMode] = useState<'pallet' | 'kg'>(() => { try { return localStorage.getItem('kmx_can_mode') === 'kg' ? 'kg' : 'pallet' } catch { return 'pallet' } })
   const [soBanh, setSoBanh] = useState('')
@@ -119,15 +120,18 @@ export default function KhoMixOut() {
   const conLai = lot && kgN !== null ? lot.ton_kg - kgN : null
   const teamFinal = team.trim()
 
-  const chonLo = (l: MixLot) => { setLot(l); setMsg(null); setStep(2) }
+  const chonLo = (l: MixLot) => { setLot(l); setSoLo(''); setMsg(null); setStep(2) }
+  const soLoOk = !lot || !!lot.so_lo || soLo.trim().length > 0
 
   async function onScan(raw: string) {
     setScan(false)
     const p = parseKhoScan(raw)
     if (!p) return
     try {
-      const l = p.kind === 'mix_lot' ? await mixService.findLotByCode(p.value) : null
-      if (!l) { setMsg(`Không tìm thấy lô chèn "${p.value}"`); return }
+      // tem CH-… hoặc số lô in trên bao (so_lo)
+      const bySoLo = p.kind !== 'mix_lot' ? lots.find((x) => (x.so_lo || '').toUpperCase() === p.value.toUpperCase()) : undefined
+      const l = p.kind === 'mix_lot' ? await mixService.findLotByCode(p.value) : bySoLo ?? null
+      if (!l) { setMsg(`Không tìm thấy lô chèn có tem hoặc số lô "${p.value}"`); return }
       const inList = lots.find((x) => x.id === l.id)
       if (!inList) { setMsg(`${l.code} không còn hàng hoặc thuộc nhà máy khác`); return }
       if (inList.source_type === 'dkl' && !inList.metal_cleared) { setMsg(`${l.code} dính kim loại, chưa xử lý, chưa lấy được`); return }
@@ -136,10 +140,10 @@ export default function KhoMixOut() {
   }
 
   async function ghi() {
-    if (!lot || !kgOk || qua) return
+    if (!lot || !kgOk || qua || !soLoOk) return
     setBusy(true); setMsg(null)
     try {
-      await mixService.lay({ id: issueId, lotId: lot.id, kg: kgN!, shiftDate: todayLocal(), shiftId: shift?.id ?? null, team: teamFinal || null, purpose, targetIndex: purpose === 'nang_chi_so' ? targetIndex : null, targetValue: purpose === 'nang_chi_so' && targetValue !== '' ? Number(targetValue) : null, note: note.trim() || null, viTri, rawLotIds: maChon, soBanh: soBanhN, grossKg: mode === 'pallet' ? grossN : null, palletKg: mode === 'pallet' ? palletN : null })
+      await mixService.lay({ id: issueId, lotId: lot.id, kg: kgN!, shiftDate: todayLocal(), shiftId: shift?.id ?? null, team: teamFinal || null, purpose, targetIndex: purpose === 'nang_chi_so' ? targetIndex : null, targetValue: purpose === 'nang_chi_so' && targetValue !== '' ? Number(targetValue) : null, note: note.trim() || null, soLo: lot.so_lo ? null : soLo.trim().toUpperCase(), viTri, rawLotIds: maChon, soBanh: soBanhN, grossKg: mode === 'pallet' ? grossN : null, palletKg: mode === 'pallet' ? palletN : null })
       const i = await mixService.getIssue(issueId)
       setCodeDone(i?.code || ''); setDoneAt(i?.out_at || new Date().toISOString()); setStep(4)
     } catch (e: any) { setMsg(e?.message || 'Không ghi được') }
@@ -177,7 +181,7 @@ export default function KhoMixOut() {
           </div>
           <div className="kmx-done-card">
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}><span className="kmx-num xl">{kgTxt(kgN)}</span><span style={{ fontSize: 15, fontWeight: 600 }}>kg · {doneAt ? new Date(doneAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}</span></div>
-            <span>Lô <span className="kmx-mono" style={{ fontWeight: 600, color: '#fff' }}>{lot?.code}</span> · {lot ? MIX_SOURCE_LABELS[lot.source_type].toLowerCase() : ''}{lot?.source_desc ? ` · ${lot.source_desc}` : ''}</span>
+            <span>Lô <span className="kmx-mono" style={{ fontWeight: 600, color: '#fff' }}>{lot?.so_lo || soLo.trim().toUpperCase() || lot?.code}</span> · {lot ? MIX_SOURCE_LABELS[lot.source_type].toLowerCase() : ''}{lot?.source_desc ? ` · ${lot.source_desc}` : ''}</span>
             <span>{viTri ? `Chèn ${MIX_VI_TRI_LABELS[viTri]}` : ''}{soBanhN !== null ? ` · ${soBanhN} bành` : ''}</span>
             {maChon.length > 0 && <span>{maChon.length ? <>Chèn vào mã <b className="kmx-mono" style={{ color: '#fff' }}>{maLabel}</b></> : 'Mã gốc theo phiếu ca'}</span>}
             <span>{caTo} · {purpose === 'chay_lai' ? 'chạy lại' : `nâng ${targetIndex}${targetValue ? ' → ' + targetValue : ''}`} · {photos.length} ảnh · {firstName(user?.full_name) || ''}</span>
@@ -208,7 +212,7 @@ export default function KhoMixOut() {
             const chip = l.source_type === 'loi' ? 'amb' : l.source_type === 'dkl' ? 'red' : l.source_type === 'std' ? 'blue' : 'mut'
             const body = (
               <>
-                <span className="kmx-row"><span className="kmx-mono" style={{ fontSize: 15, fontWeight: 700, color: khoa ? '#6B7280' : '#0D2E25' }}>{l.code}</span><span className={`kmx-chip ${chip}`}>{MIX_SOURCE_LABELS[l.source_type].replace(/ \(.*\)/, '')}</span></span>
+                <span className="kmx-row"><span className="kmx-col" style={{ gap: 0 }}><span className="kmx-mono" style={{ fontSize: 16, fontWeight: 800, color: khoa ? '#6B7280' : l.so_lo ? '#0D2E25' : '#B91C1C' }}>{l.so_lo || 'Chưa có số lô'}</span><span className="kmx-sm kmx-mono">{l.code}</span></span><span className={`kmx-chip ${chip}`}>{MIX_SOURCE_LABELS[l.source_type].replace(/ \(.*\)/, '')}</span></span>
                 <span className="kmx-row" style={{ alignItems: 'flex-end' }}>
                   <span className="kmx-col">
                     <span style={{ fontSize: 14, fontWeight: 600, color: khoa ? '#6B7280' : '#1F2937' }}>{l.source_desc || MIX_SOURCE_LABELS[l.source_type]}{l.grade ? ` · ${l.grade}` : ''}</span>
@@ -237,6 +241,13 @@ export default function KhoMixOut() {
         <Steps cur={2} />
         <div className="kmx-body"><div className="kmx-inner">
           {msg && <div className="kmx-msg err">{msg}</div>}
+          {!lot.so_lo && (
+            <section className="kmx-card" aria-label="Số lô" style={{ gap: 8, borderColor: soLo.trim() ? '#E5E7EB' : '#FECACA' }}>
+              <label htmlFor="kmx-solo" className="kmx-strong" style={{ fontSize: 13 }}>Lô {lot.code} chưa có số lô <span style={{ fontWeight: 500, color: '#B45309' }}>· gõ số lô trên bao</span></label>
+              <input id="kmx-solo" className="kmx-text kmx-mono" style={{ textTransform: 'uppercase', fontWeight: 700, fontSize: 17 }} placeholder="vd S2308AB" value={soLo} onChange={(e) => setSoLo(e.target.value)} autoCapitalize="characters" />
+              <span className="kmx-sm">Máy ghi số lô này vào lô chèn, lần sau không phải gõ nữa.</span>
+            </section>
+          )}
           <section className="kmx-card" aria-label="Chèn vào đâu" style={{ gap: 8 }}>
             <span className="kmx-strong" style={{ fontSize: 13 }}>Chèn vào đâu? <span style={{ fontWeight: 500, color: viTri ? '#6B7280' : '#B45309' }}>{viTri ? '' : '· bắt buộc'}</span></span>
             <div className="kmx-seg">
@@ -327,7 +338,7 @@ export default function KhoMixOut() {
           </section>
         </div></div>
         <div className="kmx-foot">
-          <button type="button" className="kmx-btn" disabled={!kgOk || qua || missing.length > 0 || !viTri} onClick={() => { setMsg(null); setStep(3) }}>{viTri ? 'Tiếp tục' : 'Chọn chèn bể Slap hay máy Mix'}{I.next}</button>
+          <button type="button" className="kmx-btn" disabled={!kgOk || qua || missing.length > 0 || !viTri || !soLoOk} onClick={() => { setMsg(null); setStep(3) }}>{!soLoOk ? 'Gõ số lô của lô chèn' : viTri ? 'Tiếp tục' : 'Chọn chèn bể Slap hay máy Mix'}{I.next}</button>
         </div>
       </div>
     )
@@ -345,7 +356,7 @@ export default function KhoMixOut() {
           <section className="kmx-card" aria-label="Tóm tắt phiếu" style={{ gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 8, padding: '6px 0 2px' }}><span className="kmx-num xxl">{kgTxt(kgN)}</span><span style={{ fontSize: 20, fontWeight: 700, color: '#6B7280' }}>kg</span></div>
             <div style={{ borderTop: '1px solid #F3F4F6' }}>
-              <div className="kmx-kv"><span className="k">Lô chèn</span><span className="v"><span className="kmx-mono" style={{ color: '#0D2E25' }}>{lot.code}</span><br /><span className="kmx-sm" style={{ fontWeight: 500 }}>{MIX_SOURCE_LABELS[lot.source_type]}{lot.grade ? ` · ${lot.grade}` : ''}</span></span></div>
+              <div className="kmx-kv"><span className="k">Lô chèn</span><span className="v"><span className="kmx-mono" style={{ color: '#0D2E25', fontWeight: 700 }}>{lot.so_lo || soLo.trim().toUpperCase()}</span> <span className="kmx-sm kmx-mono">{lot.code}</span><br /><span className="kmx-sm" style={{ fontWeight: 500 }}>{MIX_SOURCE_LABELS[lot.source_type]}{lot.grade ? ` · ${lot.grade}` : ''}</span></span></div>
               <div className="kmx-kv"><span className="k">Chèn vào</span><span className="v">{viTri ? MIX_VI_TRI_LABELS[viTri] : '—'}</span></div>
               <div className="kmx-kv"><span className="k">Cân</span><span className="v">{mode === 'pallet' ? `${soBanhN !== null ? `${soBanhN} bành · ` : ''}cả pallet ${kgTxt(grossN)} − bì ${kgTxt(palletN)} kg` : 'gõ thẳng kg hàng'}</span></div>
               <div className="kmx-kv"><span className="k">Chèn vào mã</span><span className="v">{maChon.length ? <span className="kmx-mono" style={{ color: '#0D2E25' }}>{maLabel}</span> : <span style={{ color: '#B45309' }}>chưa chọn · lấy theo phiếu ca</span>}</span></div>

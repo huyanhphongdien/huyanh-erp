@@ -119,7 +119,7 @@ export default function KhoLots() {
                     <div className="ops-sm" style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '6px 8px', background: 'var(--tint, #FFF7E6)', borderRadius: 8 }}>
                       <span><b>Chèn vào mã:</b> <span className="ops-mono">{fmtKg(c.chen_kg)} kg</span>{c.so_banh_chen ? ` · ${c.so_banh_chen} bành` : ''} · {c.so_phieu_chen} phiếu{c.ty_le_chen_pct !== null ? ` · ${c.ty_le_chen_pct} % hàng vào máy` : ''}</span>
                       {loai && <span>{loai} kg</span>}
-                      {isOpen && c.chi_tiet.map((d, k) => <span key={`${d.lot_code}-${d.vi_tri}-${k}`} className="ops-mono">· {d.lot_code}{d.vi_tri ? ` ${d.vi_tri === 'be_slap' ? 'bể Slap' : 'máy Mix'}` : ''}{d.desc ? ` (${d.desc})` : ''} {fmtKg(d.kg)} kg{d.so_banh ? ` · ${d.so_banh} bành` : ''}{d.co_chung ? ' · chèn chung mã khác' : ''}</span>)}
+                      {isOpen && c.chi_tiet.map((d, k) => <span key={`${d.lot_code}-${d.vi_tri}-${k}`} className="ops-mono">· {d.so_lo || d.lot_code}{d.vi_tri ? ` ${d.vi_tri === 'be_slap' ? 'bể Slap' : 'máy Mix'}` : ''}{d.desc ? ` (${d.desc})` : ''} {fmtKg(d.kg)} kg{d.so_banh ? ` · ${d.so_banh} bành` : ''}{d.co_chung ? ' · chèn chung mã khác' : ''}</span>)}
                     </div>
                   )
                 })()}

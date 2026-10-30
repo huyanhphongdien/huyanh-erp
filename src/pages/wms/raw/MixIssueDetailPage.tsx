@@ -141,6 +141,7 @@ export default function MixIssueDetailPage() {
                 <Descriptions.Item label="Mã NVL gốc">{issue.ma_goc_all ? <Tag color="geekblue">{issue.ma_goc_all}</Tag> : <Text type="secondary">chưa gắn · lấy theo phiếu ca khi thủ kho nhận</Text>}</Descriptions.Item>
                 {(issue.so_banh !== null || issue.gross_kg !== null) && <Descriptions.Item label="Cân lúc lấy">{issue.so_banh !== null ? `${issue.so_banh} bành` : ''}{issue.gross_kg !== null ? `${issue.so_banh !== null ? ' · ' : ''}cả pallet ${fmtKg(issue.gross_kg, 1)} − bì ${fmtKg(issue.pallet_kg ?? 0, 1)} kg` : ''}</Descriptions.Item>}
                 {(issue.so_banh_tra !== null || issue.return_gross_kg !== null) && <Descriptions.Item label="Cân lúc trả">{issue.so_banh_tra !== null ? `còn ${issue.so_banh_tra} bành` : ''}{issue.return_gross_kg !== null ? `${issue.so_banh_tra !== null ? ' · ' : ''}cả pallet ${fmtKg(issue.return_gross_kg, 1)} − bì ${fmtKg(issue.return_pallet_kg ?? 0, 1)} kg` : ''}</Descriptions.Item>}
+                <Descriptions.Item label="Lô chèn">{issue.lot_so_lo ? <Text strong>{issue.lot_so_lo}</Text> : <Text type="secondary">chưa có số lô</Text>} <Text code>{issue.lot_code}</Text></Descriptions.Item>
                 <Descriptions.Item label="Chỉ số lô">Po {issue.po ?? '—'} · Mooney {issue.mooney ?? '—'} · PRI {issue.pri ?? '—'}</Descriptions.Item>
                 <Descriptions.Item label="Tiêu hao">
                   <Text strong style={{ fontSize: 18 }}>{fmtKg(issue.kg_used)} kg</Text>

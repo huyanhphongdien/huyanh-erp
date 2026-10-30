@@ -23,9 +23,9 @@ const GRADES = ['SVR 3L', 'SVR 5', 'SVR 10', 'SVR 20', 'SVR CV50', 'SVR CV60', '
 interface NewLot {
   sourceType: MixSourceType; sourceDesc: string; grade: string | undefined; kgIn: number | null
   po: number | null; mooney: number | null; pri: number | null; qcAllowMixPct: number | null; qcAllowRerun: boolean; metalCleared: boolean
-  receivedDate: string; note: string
+  receivedDate: string; note: string; soLo: string
 }
-const EMPTY: NewLot = { sourceType: 'loi', sourceDesc: '', grade: undefined, kgIn: null, po: null, mooney: null, pri: null, qcAllowMixPct: null, qcAllowRerun: true, metalCleared: false, receivedDate: todayLocal(), note: '' }
+const EMPTY: NewLot = { sourceType: 'loi', sourceDesc: '', grade: undefined, kgIn: null, po: null, mooney: null, pri: null, qcAllowMixPct: null, qcAllowRerun: true, metalCleared: false, receivedDate: todayLocal(), note: '', soLo: '' }
 
 export default function MixStockPage() {
   const navigate = useNavigate()
@@ -67,13 +67,14 @@ export default function MixStockPage() {
 
   const submit = async () => {
     if (!facilityId || !form.kgIn || form.kgIn <= 0) { message.warning('Nhập khối lượng (kg)'); return }
+    if (!form.soLo.trim()) { message.warning('Nhập số lô của hàng chèn'); return }
     if (form.sourceType === 'dkl' && !form.metalCleared) { message.warning('Lô dính kim loại phải đánh dấu "đã xử lý kim loại" trước khi được lấy chèn — vẫn nhập được, nhưng chưa lấy được'); }
     setSaving(true)
     try {
       await mixService.createLot({
         facilityId, sourceType: form.sourceType, sourceDesc: form.sourceDesc.trim() || null, grade: form.grade ?? null, kgIn: form.kgIn,
         po: form.po, mooney: form.mooney, pri: form.pri, qcAllowMixPct: form.qcAllowMixPct, qcAllowRerun: form.qcAllowRerun, metalCleared: form.metalCleared,
-        receivedDate: form.receivedDate || null, note: form.note.trim() || null,
+        receivedDate: form.receivedDate || null, note: form.note.trim() || null, soLo: form.soLo.trim().toUpperCase(),
       })
       message.success('Đã nhập lô chèn'); setOpen(false); setForm({ ...EMPTY, receivedDate: todayLocal() }); await load()
     } catch (e: any) { message.error(e?.message || 'Không nhập được') }
@@ -81,6 +82,7 @@ export default function MixStockPage() {
   }
 
   const columns: ColumnsType<MixLot> = [
+    { title: 'Số lô', dataIndex: 'so_lo', key: 'so_lo', render: (v) => (v ? <Text strong>{v}</Text> : <Tag color="red">chưa có số lô</Tag>) },
     { title: 'Mã lô', dataIndex: 'code', key: 'code', render: (v, r) => <a onClick={() => navigate(`/wms/chen?lot=${r.id}`)}><Text code>{v}</Text></a> },
     { title: 'Nguồn', dataIndex: 'source_type', key: 'source_type', render: (v: MixSourceType, r) => <span><Tag>{MIX_SOURCE_LABELS[v]}</Tag>{r.source_type === 'dkl' && (r.metal_cleared ? <Tag color="green">đã xử lý KL</Tag> : <Tag color="red">chưa xử lý KL</Tag>)}</span> },
     { title: 'Mô tả', dataIndex: 'source_desc', key: 'source_desc', render: (v, r) => <span>{v || '—'}{r.grade && <Text type="secondary"> · {r.grade}</Text>}</span> },
@@ -151,6 +153,7 @@ export default function MixStockPage() {
           <Row gutter={[12, 10]}>
             <Col span={12}><Text>Nguồn hàng</Text><Select style={{ width: '100%' }} value={form.sourceType} onChange={(v) => up({ sourceType: v })} options={(Object.keys(MIX_SOURCE_LABELS) as MixSourceType[]).map((k) => ({ value: k, label: MIX_SOURCE_LABELS[k] }))} /></Col>
             <Col span={12}><Text>Grade</Text><Select style={{ width: '100%' }} allowClear showSearch value={form.grade} onChange={(v) => up({ grade: v })} options={GRADES.map((g) => ({ value: g, label: g }))} placeholder="SVR 3L…" /></Col>
+            <Col span={24}><Text>Số lô *</Text><Input value={form.soLo} onChange={(e) => up({ soLo: e.target.value })} placeholder="Số lô trên bao / chứng từ (vd S2308AB, SBR 1502 lô 2408)" style={{ textTransform: 'uppercase', fontWeight: 600 }} /></Col>
             <Col span={24}><Text>Mô tả nguồn</Text><Input value={form.sourceDesc} onChange={(e) => up({ sourceDesc: e.target.value })} placeholder="Hàng lỗi Po thấp tổ Đen 27/10 · SVR 3L kho TP · Cty Đại Lộc…" /></Col>
             <Col span={8}><Text>Khối lượng (kg) *</Text><InputNumber style={{ width: '100%' }} min={1} step={10} value={form.kgIn} onChange={(v) => up({ kgIn: v === null || v === undefined ? null : Number(v) })} /></Col>
             <Col span={8}><Text>Ngày nhập</Text><Input type="date" value={form.receivedDate} onChange={(e) => up({ receivedDate: e.target.value })} /></Col>

@@ -202,7 +202,7 @@ export default function MixIssueDetailPage() {
               ) : (
                 <Space direction="vertical" size={10} style={{ width: '100%' }}>
                   <Text>Trả <Text strong>{fmtKg(issue.kg_return)} kg</Text> lúc {fmtDt(issue.return_at)} · {issue.return_name || ''}{issue.handover_to_next ? ' · bàn giao ca sau' : ''}</Text>
-                  {st === 'returned' && <Button size="small" onClick={() => run('sua', () => mixService.tra(issue.id, kgReturn ?? issue.kg_return ?? 0, handover || issue.handover_to_next, retNote.trim() || null), 'Đã cập nhật kg trả')} loading={busy === 'sua'} disabled={kgReturn === null}>Sửa kg trả (nhập ô dưới rồi bấm)</Button>}
+                  {st === 'returned' && <Button size="small" onClick={() => run('sua', () => mixService.tra(issue.id, kgReturn ?? issue.kg_return ?? 0, handover || issue.handover_to_next, retNote.trim() || null, null, null, null, { palletKg: issue.return_pallet_kg ?? issue.pallet_kg ?? null }), 'Đã cập nhật kg trả')} loading={busy === 'sua'} disabled={kgReturn === null}>Sửa kg trả (nhập ô dưới rồi bấm)</Button>}
                   {st === 'returned' && <InputNumber style={{ width: 200 }} min={0} max={issue.kg_out} step={10} value={kgReturn} placeholder={String(issue.kg_return ?? '')} onChange={(v) => setKgReturn(v === null || v === undefined ? null : Number(v))} />}
                   <RawPhotoTiles refType="mix_issue_return" refId={issue.id} photos={photosRet} required={required} facilityCode={issue.facility_code || undefined} disabled={!canEditPhotos} onChange={load} size={120} />
                 </Space>
@@ -235,12 +235,11 @@ export default function MixIssueDetailPage() {
           <Input.TextArea rows={2} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} style={{ marginTop: 8 }} />
         </Modal>
         <Modal open={suaOpen} title={`Sửa cân lúc lấy · ${issue.code}`} onCancel={() => setSuaOpen(false)} okText="Lưu cân mới" cancelText="Thôi" confirmLoading={busy === 'sualay'}
-          onOk={async () => { const kgNet = sg !== null ? Math.round((sg - (spk ?? 0)) * 100) / 100 : sk; if (!kgNet || kgNet <= 0) { message.warning('Nhập hàng + pallet hoặc kg'); return } await run('sualay', () => mixService.suaLay(issue.id, { kg: sg !== null ? null : sk, grossKg: sg, palletKg: sg !== null ? spk : null, soBanh: sb }), 'Đã sửa cân lúc lấy'); setSuaOpen(false) }}>
+          onOk={async () => { const kgNet = sg ?? sk; if (!kgNet || kgNet <= 0) { message.warning('Nhập cân cả pallet hoặc kg'); return } await run('sualay', () => mixService.suaLay(issue.id, { kg: sg !== null ? null : sk, grossKg: sg, palletKg: null, soBanh: sb }), 'Đã sửa cân lúc lấy'); setSuaOpen(false) }}>
           <Row gutter={[12, 10]}>
-            <Col span={8}><Text>Hàng + pallet (kg)</Text><InputNumber style={{ width: '100%' }} min={0} value={sg} onChange={(v) => { setSg(v === null || v === undefined ? null : Number(v)); setSb(null) }} /></Col>
-            <Col span={8}><Text>Bì pallet (kg)</Text><InputNumber style={{ width: '100%' }} min={0} value={spk} onChange={(v) => { setSpk(v === null || v === undefined ? null : Number(v)); setSb(null) }} /></Col>
-            <Col span={8}><Text>Kg lấy {sg !== null ? '(tự tính)' : '*'}</Text><InputNumber style={{ width: '100%' }} min={0} value={sg !== null ? Math.round((sg - (spk ?? 0)) * 100) / 100 : sk} disabled={sg !== null} onChange={(v) => setSk(v === null || v === undefined ? null : Number(v))} /></Col>
-            <Col span={8}><Text>Số bành <Text type="secondary">(tự tính)</Text></Text><InputNumber style={{ width: '100%' }} min={0} value={sb ?? (() => { const k = sg !== null ? sg - (spk ?? 0) : sk; return k && k > 0 ? Math.max(Math.round(k / (issue.lot_kg_per_banh || 35)), 1) : null })()} onChange={(v) => setSb(v === null || v === undefined ? null : Number(v))} /></Col>
+            <Col span={8}><Text>Cân cả pallet (kg) · bì khai lúc trả</Text><InputNumber style={{ width: '100%' }} min={0} value={sg} onChange={(v) => { setSg(v === null || v === undefined ? null : Number(v)); setSb(null) }} /></Col>
+            <Col span={8}><Text>Kg lấy {sg !== null ? '(tự tính)' : '*'}</Text><InputNumber style={{ width: '100%' }} min={0} value={sg !== null ? sg : sk} disabled={sg !== null} onChange={(v) => setSk(v === null || v === undefined ? null : Number(v))} /></Col>
+            <Col span={8}><Text>Số bành <Text type="secondary">(tự tính)</Text></Text><InputNumber style={{ width: '100%' }} min={0} value={sb ?? (() => { const k = sg !== null ? sg - 15 : sk; return k && k > 0 ? Math.max(Math.round(k / (issue.lot_kg_per_banh || 35)), 1) : null })()} onChange={(v) => setSb(v === null || v === undefined ? null : Number(v))} /></Col>
             <Col span={16}><Text type="secondary">Đang ghi {fmtKg(issue.kg_out, 1)} kg{issue.kg_return !== null ? ` · đã trả ${fmtKg(issue.kg_return, 1)} kg (kg lấy mới không được nhỏ hơn)` : ''}. Chỉ sửa được trước bước QS ký.</Text></Col>
           </Row>
         </Modal>

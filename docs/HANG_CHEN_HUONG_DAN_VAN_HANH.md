@@ -9,7 +9,7 @@ Dành cho QS tại xưởng, QC, thủ kho và chủ doanh nghiệp. Điện tho
 | Chạy SQL theo thứ tự p4 → p5 → p6 → p7 → p8 → p9 → p10 | Supabase SQL Editor | p4–p7 đã chạy 30/10; **p8** (`wms_mix_p8_sua_can_lay.sql`), **p9** (`wms_mix_p9_tra_bi_pallet.sql`), **p10** (`wms_nvl_p10_ma_dang_chay.sql`) chạy tiếp theo thứ tự |
 | Phân công | Máy tính: Hàng chèn → tab **Phân công** | Bước 1 QS khai báo · Bước 2 QC duyệt (Lê Thành Nhân, Lê Thị Lệ Trinh, chủ DN) · Bước 3 Thủ kho nhận (tạm: chủ DN). Gõ tên → Thêm; Thu để bỏ. BGĐ level ≤ 3 làm được mọi bước |
 | Cỡ bành | Danh mục chủng loại (`weight_per_unit`) | mặc định 35 kg/bành; lô TP / hàng chuẩn lấy cỡ bành của chủng loại |
-| Bì pallet | Không cần cấu hình | lúc lấy chỉ là số tạm (15); **khai chính xác ở lần trả**: dùng hết thì cân pallet rỗng, số trên cân chính là bì |
+| Bì pallet | Không cần cấu hình | **không hỏi lúc lấy**; chỉ khai ở lần trả: dùng hết thì cân pallet rỗng (số trên cân = bì), còn dư thì gõ bì |
 
 Ai không có tên ở bước 1 sẽ thấy "chưa được phân công khai báo (QS)" và không lấy / nhập lô được.
 
@@ -41,7 +41,7 @@ Trang chính tab Chèn → nút **Lấy lần n** (máy đếm theo ca).
 1. **Chọn lô:** quét tem CH-… hoặc gõ / quét đúng số lô trên bao, hoặc chạm thẻ lô. Thẻ xám phía trên liệt kê các lần đã lấy của ca (L1, L2…) để đối chiếu sổ.
 2. **Ca:** tự nhận theo chấm công hoặc giờ, bấm Đổi ca nếu khác. Tổ trưởng: **Ca Vang** hoặc **Ca Hiền**. Dùng để: Chạy lại / Nâng chỉ số.
 3. **Chèn vào đâu:** Chèn bể Slap hoặc Chèn máy Mix (bắt buộc, máy nhớ lần trước).
-4. **Cân:** chỉ cần số trên cân "Hàng + pallet" (cân tổng). Bì 15 là tạm, sẽ khai chính xác ở lần trả. Máy tạm trừ bì ra kg hàng chèn và tính **số bành** (− + nếu đếm khác). Bấm "Gõ thẳng kg" nếu không cân cả pallet.
+4. **Cân:** chỉ gõ số trên cân "Cân cả pallet". Không hỏi bì ở bước này; kg lấy tạm bằng số cân tổng, máy ước **số bành** (− + nếu đếm khác). Bì khai ở lần trả, khi đó kg lấy tính lại. Bấm "Gõ thẳng kg" nếu không cân cả pallet.
 5. **Chèn vào mã:** chip mã tự sáng theo phiếu ca; chạm thêm mã nếu chèn chung.
 6. **Chụp 2 ảnh** tại cân (toàn cảnh, màn hình cân) → Tiếp tục → xem lại → **Ghi lần n**.
 7. Pallet tiếp theo: **Lấy lần n+1**. Lần 1 chưa trả vẫn lấy lần 2, 3 bình thường.
@@ -90,7 +90,7 @@ Nhiều phiếu một ca: thẻ đầu trang **"Ký tất cả N phiếu · ngà
 
 - Mỗi phiếu = một pallet = một lần chèn; số lần đếm theo ca, gom theo mã gốc.
 - Bành 35 kg (hoặc cỡ bành của chủng loại), máy tự quy; chỉ chỉnh khi đếm khác.
-- Bì pallet: lúc lấy tạm, lúc trả chính xác; máy tự tính lại kg lấy theo bì lúc trả.
+- Bì pallet: lúc lấy không hỏi, lúc trả khai; máy tự tính lại kg lấy = cân tổng − bì.
 - 2 ảnh lúc lấy và 2 ảnh lúc trả luôn bắt buộc, kể cả dùng hết (ảnh pallet rỗng trên cân là bằng chứng bì).
 - Kho chèn, sổ ca, gom theo mã chỉ thay đổi ở bước thủ kho nhận.
 - Chi tiết kiểm thử từng màn: `docs/HANG_CHEN_TEST_TU_DAU_TOI_CUOI.md` (mục 14–22).

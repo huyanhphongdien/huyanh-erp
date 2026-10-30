@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hàng chèn · mockup điện thoại</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+  html, body { margin: 0; background: #DDE3DD; color: #1F2937; font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; }
+  a { color: #1B4D3E; } a:hover { color: #2D8B6E; }
+  .topbar { position: sticky; top: 0; z-index: 20; background: #0D2E25; color: #FFFFFF; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 8px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  .topbar strong { font-size: 12px; margin-right: 8px; color: #E8A838; letter-spacing: .04em; text-transform: uppercase; }
+  .topbar a { color: #D1E3DC; text-decoration: none; padding: 6px 9px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
+  .topbar a.active { background: #1B4D3E; color: #FFFFFF; font-weight: 600; }
+  .screen { display: none; justify-content: center; padding: 20px 0 32px; }
+  .screen.active { display: flex; }
+  .phone { width: 390px; max-width: 100%; height: 844px; max-height: calc(100vh - 110px); min-height: 720px; border: 10px solid #0D2E25; border-radius: 40px; overflow: hidden; box-shadow: 0 20px 50px rgba(13,46,37,.3); background: #F4F6F4; }
+  @media (max-width: 420px) { .screen { padding: 0; } .phone { border: 0; border-radius: 0; max-height: none; height: calc(100vh - 52px); box-shadow: none; } }
+  .note { font-size: 12px; color: #4B5563; padding: 8px 16px 20px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="topbar"><strong>Hàng chèn · điện thoại</strong><a href="#Main">01 · Trang chính</a><a href="#Lay1">02 · Lấy 1/3 chọn lô</a><a href="#Lay2">03 · Lấy 2/3 cân & chụp</a><a href="#Lay3">04 · Lấy 3/3 xác nhận</a><a href="#LayXong">05 · Đã ghi</a><a href="#Tra">06 · Trả cuối ca</a><a href="#TraXong">07 · Đã trả</a><a href="#Ky">08 · Chờ ký</a><a href="#Phieu">09 · Phiếu</a></div>
+<section id="Main" class="screen"><div class="phone"><div id="top" style="width: 100%; max-width: 390px; height: 100%; min-height: 720px; box-sizing: border-box; background: #F4F6F4; color: #1F2937; font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.45; display: flex; flex-direction: column; overflow: hidden">
+<header style="background: #0D2E25; color: #FFFFFF; padding: 52px 20px 16px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #E8A838">Hàng chèn · Phong Điền</span>
+<span style="font-size: 22px; font-weight: 800; letter-spacing: -0.01em">Ca 1 · Tổ Đen</span>
+</div>
+<span style="font-size: 12px; color: #D1E3DC; text-align: right; line-height: 1.35">30/10 · 10:44<br>Lê Duy Minh</span>
+</header>
+<div style="flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px">
+<section aria-label="Việc tiếp theo" style="background: #FFFFFF; border: 2px solid #2D8B6E; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #15803D">Đang ở dây chuyền</span>
+<span style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #15803D; background: #DCFCE7; padding: 3px 9px; border-radius: 999px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>2 ảnh lúc lấy</span>
+</div>
+<div style="display: flex; align-items: baseline; gap: 6px">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 44px; font-weight: 700; line-height: 1; color: #0D2E25">600</span>
+<span style="font-size: 16px; font-weight: 600; color: #6B7280">kg</span>
+</div>
+<span style="font-size: 13px; color: #4B5563">Lấy lúc <b>06:08</b> từ lô <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; color: #0D2E25">CH-PD-261030-01</span> · hàng lỗi Po thấp · chạy lại</span>
+<a href="#Tra" style="display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 58px; border-radius: 14px; background: #1B4D3E; color: #FFFFFF; font-size: 18px; font-weight: 700; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h18M3 6h18M3 18h18"/></svg>Trả cuối ca</a>
+<span style="font-size: 12px; color: #6B7280; text-align: center">Cuối ca: cân phần còn lại, chụp 2 ảnh, một chạm là xong</span>
+</section>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<a href="#Lay1" style="display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; border: 1px solid #E5E7EB; border-radius: 12px; background: #FFFFFF; color: #1B4D3E; font-size: 14px; font-weight: 600; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Lấy thêm lô</a>
+<a href="#Phieu" style="display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; border: 1px solid #E5E7EB; border-radius: 12px; background: #FFFFFF; color: #1B4D3E; font-size: 14px; font-weight: 600; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Xem phiếu</a>
+</div>
+<section aria-label="Chờ ký" style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 0 2px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #6B7280">Chờ ký</h2>
+<span style="font-size: 11px; font-weight: 700; color: #B45309; background: #FEF3C7; padding: 2px 8px; border-radius: 999px">1 phiếu</span>
+</div>
+<a href="#Ky" style="display: flex; align-items: center; gap: 12px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 14px; padding: 12px 14px; text-decoration: none; color: #1F2937">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: #FEF3C7; color: #B45309; display: flex; align-items: center; justify-content: center; flex: 0 0 40px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>
+<span style="display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 14px; font-weight: 700; color: #0D2E25">PC-PD-261029-07</span>
+<span style="font-size: 12px; color: #6B7280">Ca 3 hôm qua · tiêu hao 380 kg · QS chưa xác nhận</span>
+</span>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+</a>
+</section>
+<section aria-label="Kho chèn" style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #6B7280">Kho chèn</h2>
+<span style="font-size: 13px; color: #4B5563">Tại kho <b style="font-family: 'JetBrains Mono', ui-monospace, monospace; color: #0D2E25">700 kg</b> · 2 lô</span>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 14px; padding: 4px 14px; display: flex; flex-direction: column">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid #F3F4F6">
+<span style="display: flex; flex-direction: column; gap: 1px; min-width: 0">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; font-weight: 700; color: #0D2E25">CH-PD-261030-01</span>
+<span style="font-size: 12px; color: #6B7280">Hàng lỗi · Po thấp · SVR 3L</span>
+</span>
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 16px; font-weight: 700; color: #0D2E25; white-space: nowrap">400 <span style="font-size: 11px; font-weight: 500; color: #6B7280">kg</span></span>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0">
+<span style="display: flex; flex-direction: column; gap: 1px; min-width: 0">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; font-weight: 700; color: #0D2E25">CH-PD-261030-02</span>
+<span style="font-size: 12px; color: #B91C1C; font-weight: 500">Dính kim loại · chưa xử lý, chưa lấy được</span>
+</span>
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 16px; font-weight: 700; color: #9CA3AF; white-space: nowrap">300 <span style="font-size: 11px; font-weight: 500; color: #9CA3AF">kg</span></span>
+</div>
+</div>
+</section>
+</div>
+<nav aria-label="Điều hướng" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #FFFFFF; border-top: 1px solid #E5E7EB; padding: 8px 8px 22px">
+<a href="#top" style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; font-size: 11px; font-weight: 600; color: #6B7280; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-5 9 5v10l-9 5-9-5z"/><path d="M3 9l9 5 9-5M12 14v10"/></svg>Lô NVL</a>
+<a href="#top" style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; font-size: 11px; font-weight: 600; color: #6B7280; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16v13H4z"/><path d="M12 3v9M8 8l4 4 4-4"/></svg>Nhập</a>
+<a href="#Main" aria-current="page" style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; font-size: 11px; font-weight: 700; color: #1B4D3E; text-decoration: none"><span style="display: flex; align-items: center; justify-content: center; width: 52px; height: 28px; border-radius: 14px; background: #E8F5F0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6 4 4 6-6"/><path d="M14 9h6v6"/></svg></span>Hàng chèn</a>
+</nav>
+</div></div></section>
+<section id="Lay1" class="screen"><div class="phone"><div style="width: 100%; max-width: 390px; height: 100%; min-height: 720px; box-sizing: border-box; background: #F4F6F4; color: #1F2937; font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.45; display: flex; flex-direction: column; overflow: hidden">
+<header style="background: #0D2E25; color: #FFFFFF; padding: 48px 16px 14px; display: flex; align-items: center; gap: 12px">
+<a href="#Main" aria-label="Về trang chính" style="width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.14); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex: 0 0 40px; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></a>
+<div style="display: flex; flex-direction: column; gap: 1px; min-width: 0">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #E8A838">Lấy đầu ca · Ca 1 · Tổ Đen</span>
+<span style="font-size: 20px; font-weight: 800">Chọn lô chèn</span>
+</div>
+</header>
+<nav aria-label="Các bước" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 16px 0">
+<div style="display: flex; flex-direction: column; gap: 5px"><span style="height: 5px; border-radius: 3px; background: #E8A838"></span><span style="font-size: 11px; font-weight: 700; color: #0D2E25">1 · Chọn lô</span></div>
+<div style="display: flex; flex-direction: column; gap: 5px"><span style="height: 5px; border-radius: 3px; background: #D1D5DB"></span><span style="font-size: 11px; font-weight: 600; color: #6B7280">2 · Cân &amp; chụp</span></div>
+<div style="display: flex; flex-direction: column; gap: 5px"><span style="height: 5px; border-radius: 3px; background: #D1D5DB"></span><span style="font-size: 11px; font-weight: 600; color: #6B7280">3 · Xác nhận</span></div>
+</nav>
+<div style="flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 12px">
+<a href="#Lay2" style="display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 64px; border: 2px dashed #2D8B6E; border-radius: 16px; background: #E8F5F0; color: #0D2E25; font-size: 16px; font-weight: 700; text-decoration: none"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 7h4v4H7zM13 7h4v4h-4zM7 13h4v4H7zM13 13h2M17 13v4h-4"/></svg>Quét tem trên lô</a>
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 2px">
+<span style="flex: 1; height: 1px; background: #E5E7EB"></span>
+<span style="font-size: 12px; font-weight: 600; color: #6B7280">hoặc chạm chọn trong kho chèn</span>
+<span style="flex: 1; height: 1px; background: #E5E7EB"></span>
+</div>
+<a href="#Lay2" style="display: flex; flex-direction: column; gap: 8px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 14px 16px; text-decoration: none; color: #1F2937">
+<span style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 15px; font-weight: 700; color: #0D2E25">CH-PD-261030-01</span>
+<span style="font-size: 11px; font-weight: 700; color: #B45309; background: #FEF3C7; padding: 3px 9px; border-radius: 999px">Hàng lỗi</span>
+</span>
+<span style="display: flex; align-items: flex-end; justify-content: space-between; gap: 8px">
+<span style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 14px; font-weight: 600">Po thấp · SVR 3L · tổ Đen 27/10</span>
+<span style="font-size: 12px; color: #6B7280">Po 28 · Mooney 62 · QC: trộn ≤ 10 %, chạy lại được</span>
+</span>
+<span style="display: flex; flex-direction: column; align-items: flex-end">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 28px; font-weight: 700; line-height: 1; color: #0D2E25">1.000</span>
+<span style="font-size: 11px; font-weight: 600; color: #6B7280">kg trong kho</span>
+</span>
+</span>
+<span style="display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 13px; font-weight: 700; color: #1B4D3E">Chọn lô này<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+</a>
+<a href="#Lay2" style="display: flex; flex-direction: column; gap: 8px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 14px 16px; text-decoration: none; color: #1F2937">
+<span style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 15px; font-weight: 700; color: #0D2E25">CH-PD-261029-04</span>
+<span style="font-size: 11px; font-weight: 700; color: #1D4ED8; background: #DBEAFE; padding: 3px 9px; border-radius: 999px">Hàng chuẩn</span>
+</span>
+<span style="display: flex; align-items: flex-end; justify-content: space-between; gap: 8px">
+<span style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 14px; font-weight: 600">SVR 10 từ kho thành phẩm</span>
+<span style="font-size: 12px; color: #6B7280">Po 35 · PRI 68 · dùng để nâng chỉ số</span>
+</span>
+<span style="display: flex; flex-direction: column; align-items: flex-end">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 28px; font-weight: 700; line-height: 1; color: #0D2E25">2.000</span>
+<span style="font-size: 11px; font-weight: 600; color: #6B7280">kg trong kho</span>
+</span>
+</span>
+<span style="display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 13px; font-weight: 700; color: #1B4D3E">Chọn lô này<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>
+</a>
+<div aria-label="Lô chưa lấy được" style="display: flex; flex-direction: column; gap: 8px; background: #F9FAFB; border: 1px dashed #D1D5DB; border-radius: 16px; padding: 14px 16px; color: #6B7280">
+<span style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 15px; font-weight: 700; color: #6B7280">CH-PD-261030-02</span>
+<span style="font-size: 11px; font-weight: 700; color: #B91C1C; background: #FEE2E2; padding: 3px 9px; border-radius: 999px">Dính kim loại</span>
+</span>
+<span style="display: flex; align-items: flex-end; justify-content: space-between; gap: 8px">
+<span style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 14px; font-weight: 600; color: #6B7280">DKL ca 2 · 300 kg</span>
+<span style="font-size: 12px; color: #B91C1C; font-weight: 600">Chưa xử lý kim loại, chưa lấy được. Báo thủ kho.</span>
+</span>
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 28px; font-weight: 700; line-height: 1; color: #9CA3AF">300</span>
+</span>
+</div>
+<span style="font-size: 12px; color: #6B7280; text-align: center; padding: 0 8px">Kho chèn trống? Nhờ thủ kho nhập lô trên máy tính, mục Kho chèn.</span>
+</div>
+</div></div></section>
+<section id="Lay2" class="screen"><div class="phone"><div style="width: 100%; max-width: 390px; height: 100%; min-height: 720px; box-sizing: border-box; background: #F4F6F4; color: #1F2937; font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.45; display: flex; flex-direction: column; overflow: hidden">
+<header style="background: #0D2E25; color: #FFFFFF; padding: 48px 16px 14px; display: flex; align-items: center; gap: 12px">
+<a href="#Lay1" aria-label="Quay lại chọn lô" style="width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.14); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex: 0 0 40px; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></a>
+<div style="display: flex; flex-direction: column; gap: 1px; min-width: 0">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #E8A838">Lấy đầu ca · lô CH-PD-261030-01</span>
+<span style="font-size: 20px; font-weight: 800">Cân và chụp</span>
+</div>
+</header>
+<nav aria-label="Các bước" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 16px 0">
+<div style="display: flex; flex-direction: column; gap: 5px"><span style="height: 5px; border-radius: 3px; background: #2D8B6E"></span><span style="font-size: 11px; font-weight: 600; color: #15803D">1 · Chọn lô</span></div>
+<div style="display: flex; flex-direction: column; gap: 5px"><span style="height: 5px; border-radius: 3px; background: #E8A838"></span><span style="font-size: 11px; font-weight: 700; color: #0D2E25">2 · Cân &amp; chụp</span></div>
+<div style="display: flex; flex-direction: column; gap: 5px"><span style="height: 5px; border-radius: 3px; background: #D1D5DB"></span><span style="font-size: 11px; font-weight: 600; color: #6B7280">3 · Xác nhận</span></div>
+</nav>
+<div style="flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 12px 16px 12px; display: flex; flex-direction: column; gap: 10px">
+<section aria-label="Số đọc trên cân" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+<label for="kg" style="font-size: 13px; font-weight: 700; color: #0D2E25">Đọc đúng số trên màn hình cân</label>
+<div style="display: flex; align-items: center; gap: 10px">
+<input id="kg" type="number" inputmode="decimal" value="600" style="flex: 1; min-width: 0; height: 68px; padding: 0 16px; border: 2px solid #1B4D3E; border-radius: 14px; font: inherit; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 38px; font-weight: 700; color: #0D2E25; text-align: right; box-sizing: border-box; background: #FFFFFF">
+<span style="font-size: 18px; font-weight: 700; color: #6B7280">kg</span>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: baseline; padding: 8px 12px; background: #E8F5F0; border-radius: 10px; font-size: 13px; color: #1B4D3E"><span>Lô còn lại sau khi lấy</span><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 16px; font-weight: 700; color: #0D2E25">400 kg</span></div>
+</section>
+<section aria-label="Ca và tổ" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="display: flex; flex-direction: column; gap: 1px"><span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280">Ca</span><span style="font-size: 15px; font-weight: 700; color: #0D2E25">Ca 1 · 06:00–14:00</span><span style="font-size: 11px; color: #15803D">tự nhận theo giờ chấm công</span></span>
+<button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #E5E7EB; border-radius: 999px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600; color: #1B4D3E">Đổi ca</button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280">Tổ</span>
+<div style="display: flex; gap: 8px">
+<button type="button" aria-pressed="true" style="flex: 1; height: 44px; border: 0; border-radius: 12px; background: #1B4D3E; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700">Tổ Đen</button>
+<button type="button" aria-pressed="false" style="flex: 1; height: 44px; border: 1px solid #E5E7EB; border-radius: 12px; background: #FFFFFF; color: #1F2937; font: inherit; font-size: 14px; font-weight: 600">Tổ Trắng</button>
+<button type="button" aria-pressed="false" style="flex: 1; height: 44px; border: 1px solid #E5E7EB; border-radius: 12px; background: #FFFFFF; color: #1F2937; font: inherit; font-size: 14px; font-weight: 600">Tổ Vàng</button>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280">Dùng để</span>
+<div style="display: flex; gap: 8px">
+<button type="button" aria-pressed="true" style="flex: 1; height: 44px; border: 0; border-radius: 12px; background: #1B4D3E; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700">Chạy lại</button>
+<button type="button" aria-pressed="false" style="flex: 1; height: 44px; border: 1px solid #E5E7EB; border-radius: 12px; background: #FFFFFF; color: #1F2937; font: inherit; font-size: 14px; font-weight: 600">Nâng chỉ số</button>
+</div>
+</div>
+</section>
+<section aria-label="Chụp ảnh" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-size: 13px; font-weight: 700; color: #0D2E25">Chụp 2 ảnh ngay tại cân</span>
+<span style="font-size: 11px; font-weight: 700; color: #15803D; background: #DCFCE7; padding: 3px 9px; border-radius: 999px">2/2 đã chụp</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<button type="button" aria-label="Ảnh 1 toàn cảnh đống hàng, đã chụp, bấm để chụp lại" style="padding: 0; border: 2px solid #2D8B6E; border-radius: 12px; background: #E8F5F0; display: flex; flex-direction: column; align-items: stretch; overflow: hidden; font: inherit; color: #1F2937; text-align: left">
+<span style="height: 96px; display: flex; align-items: center; justify-content: center; background: #D1E3DC; font-size: 11px; color: #0D2E25; text-align: center; padding: 6px">[ảnh: pallet hàng chèn trên cân sàn]</span>
+<span style="padding: 7px 10px; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 12px; font-weight: 700">1 · Toàn cảnh đống hàng</span><span style="font-size: 11px; color: #15803D; font-weight: 600">06:07 · đã chụp</span></span>
+</button>
+<button type="button" aria-label="Ảnh 2 màn hình cân, đã chụp, bấm để chụp lại" style="padding: 0; border: 2px solid #2D8B6E; border-radius: 12px; background: #E8F5F0; display: flex; flex-direction: column; align-items: stretch; overflow: hidden; font: inherit; color: #1F2937; text-align: left">
+<span style="height: 96px; display: flex; align-items: center; justify-content: center; background: #0D2E25; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 22px; font-weight: 700; color: #E8A838">600 kg</span>
+<span style="padding: 7px 10px; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 12px; font-weight: 700">2 · Màn hình cân</span><span style="font-size: 11px; color: #15803D; font-weight: 600">06:08 · đã chụp</span></span>
+</button>
+</div>
+<button type="button" style="height: 40px; border: 1px dashed #9CA3AF; border-radius: 10px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600; color: #4B5563; display: flex; align-items: center; justify-content: center; gap: 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Thêm ảnh bổ sung (tùy chọn)</button>
+<span style="font-size: 11px; color: #6B7280">Ảnh tự gắn giờ, vị trí và người chụp. Thiếu ảnh 1 hoặc 2 thì chưa qua bước sau được.</span>
+</section>
+</div>
+<div style="padding: 10px 16px 22px; background: #F4F6F4; border-top: 1px solid #E5E7EB">
+<a href="#Lay3" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 58px; border-radius: 14px; background: #1B4D3E; color: #FFFFFF; font-size: 18px; font-weight: 700; text-decoration: none">Tiếp tục<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+</div>
+</div></div></section>
+<section id="Lay3" class="screen"><div class="phone"><div style="width: 100%; max-width: 390px; height: 100%; min-height: 720px; box-sizing: border-box; background: #F4F6F4; color: #1F2937; font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.45; display: flex; flex-direction: column; overflow: hidden">
+<header style="background: #0D2E25; color: #FFFFFF; padding: 48px 16px 14px; display: flex; align-items: center; gap: 12px">
+<a href="#Lay2" aria-label="Quay lại cân và chụp" style="width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.14); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex: 0 0 40px; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></a>
+<div style="display: flex; flex-direction: column; gap: 1px; min-width: 0">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #E8A838">Lấy đầu ca · Ca 1 · Tổ Đen</span>
+<span style="font-size: 20px; font-weight: 800">Xem lại rồi ghi</span>
+</div>
+</header>
+<nav aria-label="Các bước" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 16px 0">
+<div style="display: flex; flex-direction: column; gap: 5px"><span style="height: 5px; border-radius: 3px; background: #2D8B6E"></span><span style="font-size: 11px; font-weight: 600; color: #15803D">1 · Chọn lô</span></div>
+<div style="display: flex; flex-direction: column; gap: 5px"><span style="height: 5px; border-radius: 3px; background: #2D8B6E"></span><span style="font-size: 11px; font-weight: 600; color: #15803D">2 · Cân &amp; chụp</span></div>
+<div style="display: flex; flex-direction: column; gap: 5px"><span style="height: 5px; border-radius: 3px; background: #E8A838"></span><span style="font-size: 11px; font-weight: 700; color: #0D2E25">3 · Xác nhận</span></div>
+</nav>
+<div style="flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 12px 16px 12px; display: flex; flex-direction: column; gap: 10px">
+<section aria-label="Tóm tắt phiếu" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; justify-content: center; gap: 8px; padding: 6px 0 2px">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 56px; font-weight: 700; line-height: 1; color: #0D2E25">600</span>
+<span style="font-size: 20px; font-weight: 700; color: #6B7280">kg</span>
+</div>
+<div style="display: flex; flex-direction: column; border-top: 1px solid #F3F4F6">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #F3F4F6"><span style="font-size: 13px; color: #6B7280">Lô chèn</span><span style="font-size: 14px; font-weight: 600; text-align: right"><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; color: #0D2E25">CH-PD-261030-01</span><br><span style="font-size: 12px; font-weight: 500; color: #6B7280">Hàng lỗi Po thấp · SVR 3L</span></span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #F3F4F6"><span style="font-size: 13px; color: #6B7280">Ca · tổ</span><span style="font-size: 14px; font-weight: 600">Ca 1 · Tổ Đen</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #F3F4F6"><span style="font-size: 13px; color: #6B7280">Dùng để</span><span style="font-size: 14px; font-weight: 600">Chạy lại</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0">
+<span style="font-size: 13px; color: #6B7280">Ảnh lúc lấy</span>
+<span style="display: flex; align-items: center; gap: 6px">
+<span style="width: 46px; height: 46px; border-radius: 8px; background: #D1E3DC; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #0D2E25; text-align: center; padding: 2px">[toàn cảnh]</span>
+<span style="width: 46px; height: 46px; border-radius: 8px; background: #0D2E25; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; color: #E8A838">600</span>
+<span style="font-size: 12px; font-weight: 700; color: #15803D">2/2</span>
+</span>
+</div>
+</div>
+</section>
+<section aria-label="Ghi chú" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 6px">
+<label for="note" style="font-size: 13px; font-weight: 700; color: #0D2E25">Ghi chú <span style="font-weight: 500; color: #6B7280">(không bắt buộc)</span></label>
+<input id="note" type="text" placeholder="Ví dụ: chèn vào mẻ SVR 10 máy 2" style="height: 48px; padding: 0 14px; border: 1px solid #E5E7EB; border-radius: 12px; font: inherit; font-size: 15px; color: #1F2937; box-sizing: border-box; width: 100%; background: #FFFFFF">
+</section>
+<div style="display: flex; gap: 10px; align-items: flex-start; background: #FEF3C7; border-radius: 14px; padding: 12px 14px; color: #92400E; font-size: 13px; line-height: 1.4">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 20px; margin-top: 1px"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5l3 2"/></svg>
+<span><b>Cuối ca</b> vào <b>Trả cuối ca</b> ở trang chính, cân phần còn lại. Tiêu hao = 600 − số trả. Kho chèn chỉ trừ khi thủ kho nhận.</span>
+</div>
+</div>
+<div style="padding: 10px 16px 22px; background: #F4F6F4; border-top: 1px solid #E5E7EB; display: flex; flex-direction: column; gap: 8px">
+<a href="#LayXong" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 58px; border-radius: 14px; background: #1B4D3E; color: #FFFFFF; font-size: 18px; font-weight: 700; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Ghi lấy đầu ca · 600 kg</a>
+<a href="#Lay2" style="display: flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 12px; color: #4B5563; font-size: 14px; font-weight: 600; text-decoration: none">Sửa lại</a>
+</div>
+</div></div></section>
+<section id="LayXong" class="screen"><div class="phone"><div style="width: 100%; max-width: 390px; height: 100%; min-height: 720px; box-sizing: border-box; background: #0D2E25; color: #FFFFFF; font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.45; display: flex; flex-direction: column; overflow: hidden">
+<div style="flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 96px 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center">
+<span style="width: 96px; height: 96px; border-radius: 50%; background: #2D8B6E; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 12px rgba(45,139,110,0.25)"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.01em">Đã ghi lấy đầu ca</h1>
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 20px; font-weight: 700; color: #E8A838">PC-PD-261030-01</span>
+</div>
+<div style="width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px; text-align: left">
+<div style="display: flex; align-items: baseline; gap: 6px"><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 40px; font-weight: 700; line-height: 1">600</span><span style="font-size: 15px; font-weight: 600; color: #D1E3DC">kg · 06:08</span></div>
+<span style="font-size: 14px; color: #D1E3DC">Lô <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; color: #FFFFFF">CH-PD-261030-01</span> · hàng lỗi Po thấp</span>
+<span style="font-size: 14px; color: #D1E3DC">Ca 1 · Tổ Đen · chạy lại · 2 ảnh · Lê Duy Minh</span>
+</div>
+<div style="width: 100%; background: #E8A838; color: #0D2E25; border-radius: 14px; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; text-align: left; font-size: 13.5px; line-height: 1.4">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 20px; margin-top: 1px"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5l3 2"/></svg>
+<span><b>Việc tiếp theo, cuối ca:</b> mở trang chính, bấm <b>Trả cuối ca</b>, cân phần còn lại và chụp 2 ảnh.</span>
+</div>
+</div>
+<div style="padding: 10px 16px 24px; display: flex; flex-direction: column; gap: 8px">
+<a href="#Main" style="display: flex; align-items: center; justify-content: center; min-height: 58px; border-radius: 14px; background: #FFFFFF; color: #0D2E25; font-size: 18px; font-weight: 700; text-decoration: none">Về trang chính</a>
+<a href="#Lay1" style="display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; color: #FFFFFF; font-size: 15px; font-weight: 600; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Lấy thêm lô khác</a>
+</div>
+</div></div></section>
+<section id="Tra" class="screen"><div class="phone"><div style="width: 100%; max-width: 390px; height: 100%; min-height: 720px; box-sizing: border-box; background: #F4F6F4; color: #1F2937; font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.45; display: flex; flex-direction: column; overflow: hidden">
+<header style="background: #0D2E25; color: #FFFFFF; padding: 48px 16px 14px; display: flex; align-items: center; gap: 12px">
+<a href="#Main" aria-label="Về trang chính" style="width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.14); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex: 0 0 40px; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></a>
+<div style="display: flex; flex-direction: column; gap: 1px; min-width: 0">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #E8A838">PC-PD-261030-01 · Ca 1 · Tổ Đen</span>
+<span style="font-size: 20px; font-weight: 800">Trả cuối ca</span>
+</div>
+</header>
+<div style="flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 12px 16px 12px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 14px; padding: 10px 14px">
+<span style="display: flex; flex-direction: column; gap: 1px"><span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280">Đã lấy đầu ca</span><span style="font-size: 13px; color: #4B5563">06:08 · lô CH-PD-261030-01 · 2 ảnh</span></span>
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 24px; font-weight: 700; color: #0D2E25; white-space: nowrap">600 <span style="font-size: 12px; font-weight: 500; color: #6B7280">kg</span></span>
+</div>
+<section aria-label="Cân phần còn lại" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+<label for="kgtra" style="font-size: 13px; font-weight: 700; color: #0D2E25">Cân phần còn lại, đọc số trên cân</label>
+<div style="display: flex; align-items: center; gap: 10px">
+<input id="kgtra" type="number" inputmode="decimal" value="150" style="flex: 1; min-width: 0; height: 68px; padding: 0 16px; border: 2px solid #1B4D3E; border-radius: 14px; font: inherit; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 38px; font-weight: 700; color: #0D2E25; text-align: right; box-sizing: border-box; background: #FFFFFF">
+<span style="font-size: 18px; font-weight: 700; color: #6B7280">kg</span>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" style="flex: 1; height: 40px; border: 1px solid #E5E7EB; border-radius: 999px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600; color: #1B4D3E">Dùng hết · 0 kg</button>
+<button type="button" style="flex: 1; height: 40px; border: 1px solid #E5E7EB; border-radius: 999px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600; color: #1B4D3E">Chưa dùng · 600 kg</button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: #E8F5F0; border-radius: 12px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px"><span style="font-size: 13px; font-weight: 600; color: #1B4D3E">Tiêu hao ca này</span><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 22px; font-weight: 700; color: #0D2E25">450 kg</span></div>
+<div style="display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #D1E3DC"><span style="width: 75%; background: #1B4D3E"></span></div>
+<div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: #4B5563"><span>Đã dùng 450 kg (75 %)</span><span>Trả 150 kg</span></div>
+</div>
+<label for="bangiao" style="display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #1F2937; padding: 2px 0">
+<input id="bangiao" type="checkbox" style="width: 22px; height: 22px; margin: 0; accent-color: #1B4D3E; flex: 0 0 22px">
+<span>Để <b>150 kg</b> lại dây chuyền cho ca sau<br><span style="font-size: 12px; color: #6B7280">Không cân về kho; máy tự mở phiếu cho ca kế khi thủ kho nhận.</span></span>
+</label>
+</section>
+<section aria-label="Chụp ảnh lúc trả" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-size: 13px; font-weight: 700; color: #0D2E25">Chụp 2 ảnh phần trả</span>
+<span style="font-size: 11px; font-weight: 700; color: #B91C1C; background: #FEE2E2; padding: 3px 9px; border-radius: 999px">1/2 · thiếu ảnh cân</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<button type="button" aria-label="Ảnh 1 toàn cảnh phần trả, đã chụp, bấm để chụp lại" style="padding: 0; border: 2px solid #2D8B6E; border-radius: 12px; background: #E8F5F0; display: flex; flex-direction: column; align-items: stretch; overflow: hidden; font: inherit; color: #1F2937; text-align: left">
+<span style="height: 90px; display: flex; align-items: center; justify-content: center; background: #D1E3DC; font-size: 11px; color: #0D2E25; text-align: center; padding: 6px">[ảnh: phần hàng còn lại trên cân]</span>
+<span style="padding: 7px 10px; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 12px; font-weight: 700">1 · Toàn cảnh</span><span style="font-size: 11px; color: #15803D; font-weight: 600">14:01 · đã chụp</span></span>
+</button>
+<button type="button" aria-label="Ảnh 2 màn hình cân, chưa chụp, bấm để chụp" style="padding: 0; border: 2px dashed #B91C1C; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; align-items: stretch; overflow: hidden; font: inherit; color: #1F2937; text-align: left">
+<span style="height: 90px; display: flex; align-items: center; justify-content: center; background: #FFF5F5"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#B91C1C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+<span style="padding: 7px 10px; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 12px; font-weight: 700">2 · Màn hình cân</span><span style="font-size: 11px; color: #B91C1C; font-weight: 700">Chạm để chụp</span></span>
+</button>
+</div>
+<span style="font-size: 11px; color: #6B7280">Đủ 2 ảnh thì nút dưới mới sáng. Ảnh 3 bổ sung không bắt buộc.</span>
+</section>
+</div>
+<div style="padding: 10px 16px 22px; background: #F4F6F4; border-top: 1px solid #E5E7EB; display: flex; flex-direction: column; gap: 6px">
+<a href="#TraXong" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 58px; border-radius: 14px; background: #1B4D3E; color: #FFFFFF; font-size: 18px; font-weight: 700; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Ghi trả và ký bên giao</a>
+<span style="font-size: 12px; color: #6B7280; text-align: center">Một chạm = ghi 150 kg trả + chữ ký 1/3 của bạn</span>
+</div>
+</div></div></section>
+<section id="TraXong" class="screen"><div class="phone"><div style="width: 100%; max-width: 390px; height: 100%; min-height: 720px; box-sizing: border-box; background: #F4F6F4; color: #1F2937; font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.45; display: flex; flex-direction: column; overflow: hidden">
+<header style="background: #0D2E25; color: #FFFFFF; padding: 60px 24px 22px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center">
+<span style="width: 72px; height: 72px; border-radius: 50%; background: #2D8B6E; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 10px rgba(45,139,110,0.25)"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 24px; font-weight: 800">Đã trả, bạn đã ký</h1>
+<span style="font-size: 13px; color: #D1E3DC">PC-PD-261030-01 · Ca 1 · Tổ Đen · 14:02</span>
+</div>
+</header>
+<div style="flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 12px">
+<section aria-label="Kết quả ca" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 14px 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; text-align: center">
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280">Lấy</span><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 20px; font-weight: 700; color: #0D2E25">600</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280">Trả</span><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 20px; font-weight: 700; color: #0D2E25">150</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px; background: #E8F5F0; border-radius: 10px; padding: 4px 0"><span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #15803D">Tiêu hao</span><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 20px; font-weight: 700; color: #15803D">450</span></div>
+</section>
+<section aria-label="Tiến độ ký" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 0">
+<h2 style="margin: 0 0 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #6B7280">Còn 2 chữ ký nữa</h2>
+<div style="display: flex; gap: 12px; align-items: flex-start; padding: 6px 0">
+<span style="width: 28px; height: 28px; border-radius: 50%; background: #2D8B6E; color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex: 0 0 28px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
+<span style="display: flex; flex-direction: column; gap: 1px; padding-top: 3px"><span style="font-size: 14px; font-weight: 700; color: #0D2E25">Bên giao đã ký</span><span style="font-size: 12px; color: #6B7280">Lê Duy Minh · Tổ Đen · 14:02</span></span>
+</div>
+<div style="display: flex; gap: 12px; align-items: flex-start; padding: 6px 0">
+<span style="width: 28px; height: 28px; border-radius: 50%; background: #FEF3C7; color: #B45309; display: flex; align-items: center; justify-content: center; flex: 0 0 28px; font-size: 12px; font-weight: 800">2</span>
+<span style="display: flex; flex-direction: column; gap: 1px; padding-top: 3px"><span style="font-size: 14px; font-weight: 700; color: #B45309">QS xác nhận · đang chờ</span><span style="font-size: 12px; color: #6B7280">Phòng QC thấy phiếu trong mục Chờ ký</span></span>
+</div>
+<div style="display: flex; gap: 12px; align-items: flex-start; padding: 6px 0">
+<span style="width: 28px; height: 28px; border-radius: 50%; background: #F3F4F6; color: #6B7280; display: flex; align-items: center; justify-content: center; flex: 0 0 28px; font-size: 12px; font-weight: 800">3</span>
+<span style="display: flex; flex-direction: column; gap: 1px; padding-top: 3px"><span style="font-size: 14px; font-weight: 700; color: #6B7280">Thủ kho nhận</span><span style="font-size: 12px; color: #6B7280">Lúc này kho chèn mới trừ 450 kg, sổ ca tự điền dòng CHÈN</span></span>
+</div>
+</section>
+<div style="display: flex; gap: 10px; align-items: flex-start; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 14px; padding: 12px 14px; font-size: 13px; color: #4B5563; line-height: 1.4">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1B4D3E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 20px; margin-top: 1px"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+<span>Bạn không cần làm gì thêm. Có gì sai thì mở phiếu để sửa kg trả trước khi QS ký.</span>
+</div>
+</div>
+<div style="padding: 10px 16px 22px; background: #F4F6F4; border-top: 1px solid #E5E7EB; display: flex; flex-direction: column; gap: 8px">
+<a href="#Main" style="display: flex; align-items: center; justify-content: center; min-height: 58px; border-radius: 14px; background: #1B4D3E; color: #FFFFFF; font-size: 18px; font-weight: 700; text-decoration: none">Về trang chính</a>
+<a href="#Phieu" style="display: flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 12px; color: #1B4D3E; font-size: 14px; font-weight: 600; text-decoration: none">Xem phiếu</a>
+</div>
+</div></div></section>
+<section id="Ky" class="screen"><div class="phone"><div style="width: 100%; max-width: 390px; height: 100%; min-height: 720px; box-sizing: border-box; background: #F4F6F4; color: #1F2937; font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.45; display: flex; flex-direction: column; overflow: hidden">
+<header style="background: #0D2E25; color: #FFFFFF; padding: 48px 16px 14px; display: flex; align-items: center; gap: 12px">
+<a href="#Main" aria-label="Về trang chính" style="width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.14); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex: 0 0 40px; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></a>
+<div style="display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #E8A838">QS · thủ kho · Phong Điền</span>
+<span style="font-size: 20px; font-weight: 800">Chờ bạn ký</span>
+</div>
+<span style="font-size: 13px; font-weight: 800; color: #0D2E25; background: #E8A838; min-width: 28px; height: 28px; border-radius: 14px; display: flex; align-items: center; justify-content: center; padding: 0 8px">2</span>
+</header>
+<div style="flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 12px">
+<section aria-label="Phiếu chờ QS" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 15px; font-weight: 700; color: #0D2E25">PC-PD-261030-01</span>
+<span style="font-size: 11px; font-weight: 700; color: #B45309; background: #FEF3C7; padding: 3px 9px; border-radius: 999px">Bước 2/3 · QS</span>
+</div>
+<span style="font-size: 13px; color: #4B5563">Hôm nay · Ca 1 · Tổ Đen · lô CH-PD-261030-01 hàng lỗi Po thấp · chạy lại</span>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; text-align: center">
+<div style="background: #F9FAFB; border-radius: 10px; padding: 8px 4px; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280">Lấy 06:08</span><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 18px; font-weight: 700; color: #0D2E25">600</span></div>
+<div style="background: #F9FAFB; border-radius: 10px; padding: 8px 4px; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280">Trả 14:02</span><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 18px; font-weight: 700; color: #0D2E25">150</span></div>
+<div style="background: #E8F5F0; border-radius: 10px; padding: 8px 4px; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #15803D">Tiêu hao</span><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 18px; font-weight: 700; color: #15803D">450</span></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280">4 ảnh · chạm để xem to</span>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+<button type="button" aria-label="Ảnh lúc lấy, toàn cảnh" style="padding: 0; border: 0; border-radius: 8px; height: 68px; background: #D1E3DC; font: inherit; font-size: 9px; color: #0D2E25; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px"><span>[lấy]</span><span>toàn cảnh</span></button>
+<button type="button" aria-label="Ảnh lúc lấy, màn hình cân 600 kg" style="padding: 0; border: 0; border-radius: 8px; height: 68px; background: #0D2E25; font: inherit; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; font-weight: 700; color: #E8A838; display: flex; align-items: center; justify-content: center">600</button>
+<button type="button" aria-label="Ảnh lúc trả, toàn cảnh" style="padding: 0; border: 0; border-radius: 8px; height: 68px; background: #D1E3DC; font: inherit; font-size: 9px; color: #0D2E25; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px"><span>[trả]</span><span>toàn cảnh</span></button>
+<button type="button" aria-label="Ảnh lúc trả, màn hình cân 150 kg" style="padding: 0; border: 0; border-radius: 8px; height: 68px; background: #0D2E25; font: inherit; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; font-weight: 700; color: #E8A838; display: flex; align-items: center; justify-content: center">150</button>
+</div>
+</div>
+<span style="font-size: 12px; color: #6B7280">Bên giao: Lê Duy Minh ký 14:02 · ảnh có giờ và vị trí</span>
+<a href="#Phieu" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 54px; border-radius: 14px; background: #1B4D3E; color: #FFFFFF; font-size: 17px; font-weight: 700; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Xác nhận QS</a>
+<a href="#Phieu" style="display: flex; align-items: center; justify-content: center; min-height: 40px; border-radius: 12px; color: #B91C1C; font-size: 13px; font-weight: 600; text-decoration: none">Số không đúng, hỏi lại tổ</a>
+</section>
+<section aria-label="Phiếu chờ thủ kho" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 15px; font-weight: 700; color: #0D2E25">PC-PD-261029-07</span>
+<span style="font-size: 11px; font-weight: 700; color: #1D4ED8; background: #DBEAFE; padding: 3px 9px; border-radius: 999px">Bước 3/3 · Thủ kho</span>
+</div>
+<span style="font-size: 13px; color: #4B5563">Hôm qua · Ca 3 · Tổ Trắng · lô CH-PD-261029-04 hàng chuẩn SVR 10 · nâng chỉ số</span>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #F9FAFB; border-radius: 10px; padding: 8px 12px">
+<span style="font-size: 13px; color: #4B5563">Lấy 500 · trả 120 · QS Trần Thị Hoa ký 07:10</span>
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 18px; font-weight: 700; color: #0D2E25; white-space: nowrap">380 kg</span>
+</div>
+<a href="#Phieu" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 54px; border-radius: 14px; background: #1B4D3E; color: #FFFFFF; font-size: 17px; font-weight: 700; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16v13H4z"/><path d="M12 3v9M8 8l4 4 4-4"/></svg>Nhận · trừ kho chèn 380 kg</a>
+<span style="font-size: 12px; color: #6B7280; text-align: center">Sau bước này sổ ca ép bành tự điền dòng CHÈN 380 kg</span>
+</section>
+</div>
+</div></div></section>
+<section id="Phieu" class="screen"><div class="phone"><div style="width: 100%; max-width: 390px; height: 100%; min-height: 720px; box-sizing: border-box; background: #F4F6F4; color: #1F2937; font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.45; display: flex; flex-direction: column; overflow: hidden">
+<header style="background: #0D2E25; color: #FFFFFF; padding: 48px 16px 14px; display: flex; align-items: center; gap: 12px">
+<a href="#Main" aria-label="Về trang chính" style="width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.14); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex: 0 0 40px; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></a>
+<div style="display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #E8A838">Phiếu chèn · Ca 1 · Tổ Đen</span>
+<span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 19px; font-weight: 700">PC-PD-261030-01</span>
+</div>
+<span style="font-size: 11px; font-weight: 700; color: #0D2E25; background: #E8A838; padding: 4px 10px; border-radius: 999px; white-space: nowrap">Chờ QS</span>
+</header>
+<div style="flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 12px">
+<section aria-label="Số liệu" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; text-align: center">
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280">Lấy</span><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 22px; font-weight: 700; color: #0D2E25">600</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280">Trả</span><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 22px; font-weight: 700; color: #0D2E25">150</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px; background: #E8F5F0; border-radius: 10px; padding: 4px 0"><span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #15803D">Tiêu hao</span><span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 22px; font-weight: 700; color: #15803D">450</span></div>
+</div>
+<div style="display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: #D1E3DC"><span style="width: 75%; background: #1B4D3E"></span></div>
+<span style="font-size: 13px; color: #4B5563">Lô <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; color: #0D2E25">CH-PD-261030-01</span> · hàng lỗi Po thấp · SVR 3L · Po 28 · chạy lại</span>
+</section>
+<section aria-label="Dòng thời gian" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column">
+<div style="display: flex; gap: 12px; padding: 4px 0 12px; border-left: 2px solid #2D8B6E; margin-left: 13px; padding-left: 20px; position: relative">
+<span style="position: absolute; left: -15px; top: 4px; width: 28px; height: 28px; border-radius: 50%; background: #2D8B6E; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 6px; flex: 1">
+<span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 14px; font-weight: 700; color: #0D2E25">Lấy đầu ca · 600 kg</span><span style="font-size: 12px; color: #6B7280">06:08</span></span>
+<span style="font-size: 12px; color: #6B7280">Lê Duy Minh · Tổ Đen</span>
+<span style="display: flex; gap: 6px"><span style="width: 56px; height: 44px; border-radius: 8px; background: #D1E3DC; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #0D2E25">[toàn cảnh]</span><span style="width: 56px; height: 44px; border-radius: 8px; background: #0D2E25; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; color: #E8A838">600</span></span>
+</div>
+</div>
+<div style="display: flex; gap: 12px; padding: 4px 0 12px; border-left: 2px solid #2D8B6E; margin-left: 13px; padding-left: 20px; position: relative">
+<span style="position: absolute; left: -15px; top: 4px; width: 28px; height: 28px; border-radius: 50%; background: #2D8B6E; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 6px; flex: 1">
+<span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 14px; font-weight: 700; color: #0D2E25">Trả cuối ca · 150 kg</span><span style="font-size: 12px; color: #6B7280">14:02</span></span>
+<span style="font-size: 12px; color: #6B7280">Lê Duy Minh · về kho, không bàn giao</span>
+<span style="display: flex; gap: 6px"><span style="width: 56px; height: 44px; border-radius: 8px; background: #D1E3DC; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #0D2E25">[toàn cảnh]</span><span style="width: 56px; height: 44px; border-radius: 8px; background: #0D2E25; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; color: #E8A838">150</span></span>
+</div>
+</div>
+<div style="display: flex; gap: 12px; padding: 4px 0 12px; border-left: 2px solid #2D8B6E; margin-left: 13px; padding-left: 20px; position: relative">
+<span style="position: absolute; left: -15px; top: 4px; width: 28px; height: 28px; border-radius: 50%; background: #2D8B6E; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 2px; flex: 1">
+<span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 14px; font-weight: 700; color: #0D2E25">Bên giao ký</span><span style="font-size: 12px; color: #6B7280">14:02</span></span>
+<span style="font-size: 12px; color: #6B7280">Lê Duy Minh</span>
+</div>
+</div>
+<div style="display: flex; gap: 12px; padding: 4px 0 12px; border-left: 2px dashed #D1D5DB; margin-left: 13px; padding-left: 20px; position: relative">
+<span style="position: absolute; left: -15px; top: 4px; width: 28px; height: 28px; border-radius: 50%; background: #FEF3C7; color: #B45309; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800">2</span>
+<div style="display: flex; flex-direction: column; gap: 2px; flex: 1">
+<span style="font-size: 14px; font-weight: 700; color: #B45309">QS xác nhận · đang chờ</span>
+<span style="font-size: 12px; color: #6B7280">Phòng QC</span>
+</div>
+</div>
+<div style="display: flex; gap: 12px; padding: 4px 0 4px; margin-left: 13px; padding-left: 22px; position: relative">
+<span style="position: absolute; left: -15px; top: 4px; width: 28px; height: 28px; border-radius: 50%; background: #F3F4F6; color: #6B7280; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800">3</span>
+<div style="display: flex; flex-direction: column; gap: 2px; flex: 1">
+<span style="font-size: 14px; font-weight: 700; color: #6B7280">Thủ kho nhận · trừ kho chèn</span>
+<span style="font-size: 12px; color: #6B7280">Chưa đến lượt</span>
+</div>
+</div>
+</section>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<a href="#Tra" style="display: flex; align-items: center; justify-content: center; min-height: 48px; border: 1px solid #E5E7EB; border-radius: 12px; background: #FFFFFF; color: #1B4D3E; font-size: 14px; font-weight: 600; text-decoration: none">Sửa kg trả</a>
+<a href="#Main" style="display: flex; align-items: center; justify-content: center; min-height: 48px; border: 1px solid #FECACA; border-radius: 12px; background: #FFFFFF; color: #B91C1C; font-size: 14px; font-weight: 600; text-decoration: none">Hủy phiếu</a>
+</div>
+<span style="font-size: 12px; color: #6B7280; text-align: center; padding: 0 8px">Sửa hoặc hủy chỉ được trước khi QS ký. Hủy thì 600 kg trả về tồn kho chèn.</span>
+</div>
+</div></div></section>
+<div class="note">Mockup · số liệu minh họa Phong Điền 30/10/2026 · bấm các nút xanh để đi qua luồng: Trang chính → Trả cuối ca, hoặc Lấy thêm lô → 3 bước.</div>
+<script>
+(function () {
+  function show() {
+    var id = (location.hash || '#Main').slice(1);
+    if (!document.getElementById(id)) id = 'Main';
+    document.querySelectorAll('.screen').forEach(function (s) { s.classList.toggle('active', s.id === id); });
+    document.querySelectorAll('.topbar a').forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === '#' + id); });
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', show);
+  show();
+})();
+</script>
+</body>
+</html>

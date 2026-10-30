@@ -3,6 +3,8 @@
 --   "lấy đầu ca nếu không khai báo thì bỏ đi, chỉ lấy khối lượng pallet lúc trả")
 --   · fn_mix_lay / fn_mix_sua_lay: không có bì → kg lấy tạm = cân tổng; số bành ước theo (cân − 15)
 --   · fn_mix_tra: lúc lấy có cân tổng mà trả không khai bì → chặn (THIEU_KHOI_LUONG); kg lấy = cân tổng − bì
+--   · Audit tối 30/10: sửa cân lấy sau khi đã trả giữ bì đã khai (không mất bì); kiểm kê kho chèn cho cả thủ kho nhận;
+--     % chèn so với hàng vào máy chỉ tính khi mã đã xuất NVL (trước đó hiện 100 % gây hiểu nhầm)
 -- Ngày: 2026-10-30 · Phụ thuộc: wms_nvl_p10_ma_dang_chay.sql (CHẠY p8 → p9 → p10 → p11)
 -- ⚠ Chạy qua RPC agent_sql: KHÔNG được có BEGIN;/COMMIT; (lỗi 0A000).
 -- ============================================================
@@ -65,17 +67,18 @@ BEGIN
   IF i.status NOT IN ('issued', 'returned') THEN RAISE EXCEPTION 'SAI_TRANG_THAI:%:%:đã ký, không sửa cân lấy được', i.code, i.status; END IF;
   IF NOT public.fn_mix_duoc_ky('khai_bao', i.facility_id) THEN RAISE EXCEPTION 'KHONG_CO_QUYEN:khai_bao'; END IF;
   SELECT * INTO l FROM public.mix_lots WHERE id = i.mix_lot_id FOR UPDATE;
-  v_kg := COALESCE(p_kg, CASE WHEN p_gross_kg IS NOT NULL THEN round(p_gross_kg - COALESCE(p_pallet_kg, 0), 2) END);
+  -- sửa cân lấy: bì lấy theo thứ tự gõ tay → bì đã khai lúc trả → chưa có (chỉ cân tổng)
+  v_kg := COALESCE(p_kg, CASE WHEN p_gross_kg IS NOT NULL THEN round(p_gross_kg - COALESCE(p_pallet_kg, i.return_pallet_kg, 0), 2) END);
   IF v_kg IS NULL OR v_kg <= 0 THEN RAISE EXCEPTION 'THIEU_KHOI_LUONG'; END IF;
   v_ton := l.kg_in - l.kg_used - (l.kg_at_line - i.kg_out);                     -- tồn nếu bỏ phiếu này ra
   IF v_kg > v_ton + 0.01 THEN RAISE EXCEPTION 'VUOT_TON:%:lấy % > tồn %', l.code, v_kg, round(v_ton, 2); END IF;
   IF i.kg_return IS NOT NULL AND i.kg_return > v_kg + 0.01 THEN RAISE EXCEPTION 'TRA_QUA_LAY:%:đã trả % > kg lấy mới %', i.code, i.kg_return, v_kg; END IF;
-  v_banh := COALESCE(p_so_banh, GREATEST(round(GREATEST(v_kg - CASE WHEN p_gross_kg IS NOT NULL AND p_pallet_kg IS NULL THEN 15 ELSE 0 END, 0) / COALESCE(NULLIF(l.kg_per_banh, 0), 35))::int, 1));
+  v_banh := COALESCE(p_so_banh, GREATEST(round(GREATEST(v_kg - CASE WHEN p_gross_kg IS NOT NULL AND COALESCE(p_pallet_kg, i.return_pallet_kg) IS NULL THEN 15 ELSE 0 END, 0) / COALESCE(NULLIF(l.kg_per_banh, 0), 35))::int, 1));
 
   UPDATE public.mix_lots SET kg_at_line = GREATEST(kg_at_line - i.kg_out + v_kg, 0), updated_at = now() WHERE id = l.id;
   UPDATE public.mix_issues
      SET kg_out = v_kg,
-         gross_kg = p_gross_kg, pallet_kg = CASE WHEN p_gross_kg IS NULL THEN NULL ELSE COALESCE(p_pallet_kg, 0) END,
+         gross_kg = p_gross_kg, pallet_kg = CASE WHEN p_gross_kg IS NULL THEN NULL ELSE COALESCE(p_pallet_kg, i.return_pallet_kg) END,
          so_banh = v_banh,
          kg_used = CASE WHEN kg_return IS NOT NULL THEN round(v_kg - kg_return, 2) ELSE kg_used END,
          out_edit_at = now(), out_edit_by = v_emp, out_kg_truoc = COALESCE(out_kg_truoc, i.kg_out),
@@ -135,9 +138,65 @@ BEGIN
   RETURN jsonb_build_object('code', i.code, 'kg_out', v_out, 'kg_return', v_kg, 'kg_used', round(v_out - v_kg, 2), 'bi', v_bi);
 END $$;
 
+CREATE OR REPLACE FUNCTION public.fn_mix_kiem_ke(p_lot_id uuid, p_kg_thuc numeric, p_ly_do text DEFAULT NULL, p_note text DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE l record; v_ton numeric; v_chenh numeric; v_emp uuid := public.fn_nvl_emp_hien_tai();
+BEGIN
+  SELECT * INTO l FROM public.mix_lots WHERE id = p_lot_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'KHONG_TIM_THAY_LO'; END IF;
+  IF NOT (public.fn_mix_duoc_ky('khai_bao', l.facility_id) OR public.fn_mix_duoc_ky('nhan_kho', l.facility_id)) THEN RAISE EXCEPTION 'KHONG_CO_QUYEN:kiem_ke_kho_chen'; END IF;   -- QS hoặc thủ kho nhận
+  IF l.status = 'cancelled' THEN RAISE EXCEPTION 'SAI_TRANG_THAI:%:đã hủy', l.code; END IF;
+  IF p_kg_thuc IS NULL OR p_kg_thuc < 0 THEN RAISE EXCEPTION 'THIEU_KHOI_LUONG'; END IF;
+  v_ton := l.kg_in - l.kg_used - l.kg_at_line;
+  v_chenh := round(p_kg_thuc - v_ton, 2);
+  IF v_chenh <> 0 AND COALESCE(btrim(p_ly_do), '') = '' THEN RAISE EXCEPTION 'CAN_LY_DO:%:lệch % kg', l.code, v_chenh; END IF;
+  INSERT INTO public.mix_adjustments (mix_lot_id, kg_so, kg_thuc, chenh_kg, ly_do, note, created_by)
+  VALUES (l.id, round(v_ton, 2), p_kg_thuc, v_chenh, p_ly_do, p_note, v_emp);
+  -- Điều chỉnh vào kg_in để tồn (= kg_in − used − at_line) khớp cân thực; sổ chuyển động giữ vết
+  UPDATE public.mix_lots
+     SET kg_in = kg_in + v_chenh,
+         status = CASE WHEN (kg_in + v_chenh - kg_used - kg_at_line) <= 0.005 AND kg_at_line <= 0.005 THEN 'depleted' WHEN kg_at_line > 0.005 THEN 'in_use' ELSE 'available' END,
+         updated_at = now()
+   WHERE id = l.id;
+  RETURN jsonb_build_object('code', l.code, 'kg_so', round(v_ton, 2), 'kg_thuc', p_kg_thuc, 'chenh_kg', v_chenh);
+END $$;
+
+-- ─── v_raw_lot_chen: % chèn chỉ khi mã đã xuất NVL ──────────────────────────
+CREATE OR REPLACE VIEW public.v_raw_lot_chen AS
+WITH ct AS (
+  SELECT x.raw_lot_id, l.id AS mix_lot_id, l.code AS lot_code, l.so_lo, l.source_type, l.grade, l.source_desc, i.vi_tri,
+         round(sum(i.kg_used / GREATEST(cardinality(i.raw_lot_ids), 1)), 2) AS kg,
+         sum(i.so_banh)::int AS so_banh, count(*)::int AS so_phieu,
+         bool_or(cardinality(i.raw_lot_ids) > 1) AS co_chung
+    FROM public.mix_issues i
+    JOIN LATERAL (SELECT unnest(COALESCE(i.raw_lot_ids, CASE WHEN i.raw_lot_id IS NULL THEN NULL ELSE ARRAY[i.raw_lot_id] END)) AS raw_lot_id) x ON true
+    JOIN public.mix_lots l ON l.id = i.mix_lot_id
+   WHERE i.status = 'received'
+   GROUP BY x.raw_lot_id, l.id, l.code, l.so_lo, l.source_type, l.grade, l.source_desc, i.vi_tri
+)
+SELECT b.raw_lot_id, b.facility_id, b.ma, b.rubber_type_name, b.trang_thai, b.xuat_sx_kho_kg,
+       round(COALESCE(sum(ct.kg), 0), 2) AS chen_kg,
+       COALESCE(sum(ct.so_phieu), 0)::int AS so_phieu_chen,
+       COALESCE(sum(ct.so_banh), 0)::int AS so_banh_chen,
+       round(COALESCE(sum(ct.kg) FILTER (WHERE ct.vi_tri = 'be_slap'), 0), 2) AS chen_be_kg,
+       round(COALESCE(sum(ct.kg) FILTER (WHERE ct.vi_tri = 'may_mix'), 0), 2) AS chen_mix_kg,
+       round(COALESCE(sum(ct.kg) FILTER (WHERE ct.source_type = 'loi'), 0), 2) AS chen_loi_kg,
+       round(COALESCE(sum(ct.kg) FILTER (WHERE ct.source_type = 'dkl'), 0), 2) AS chen_dkl_kg,
+       round(COALESCE(sum(ct.kg) FILTER (WHERE ct.source_type = 'std'), 0), 2) AS chen_chuan_kg,
+       round(COALESCE(sum(ct.kg) FILTER (WHERE ct.source_type IN ('mua_ngoai', 'khac')), 0), 2) AS chen_khac_kg,
+       CASE WHEN COALESCE(b.xuat_sx_kho_kg, 0) > 0   -- chưa xuất NVL của mã thì không tính %, tránh hiện 100 %
+            THEN round(100 * COALESCE(sum(ct.kg), 0) / (COALESCE(b.xuat_sx_kho_kg, 0) + COALESCE(sum(ct.kg), 0)), 1) END AS ty_le_chen_pct,
+       COALESCE(jsonb_agg(jsonb_build_object('lot_code', ct.lot_code, 'so_lo', ct.so_lo, 'vi_tri', ct.vi_tri, 'source_type', ct.source_type, 'grade', ct.grade, 'desc', ct.source_desc, 'kg', ct.kg, 'so_banh', ct.so_banh, 'so_phieu', ct.so_phieu, 'co_chung', ct.co_chung) ORDER BY ct.kg DESC) FILTER (WHERE ct.mix_lot_id IS NOT NULL), '[]'::jsonb) AS chi_tiet
+FROM public.v_raw_lot_balance b
+LEFT JOIN ct ON ct.raw_lot_id = b.raw_lot_id
+GROUP BY b.raw_lot_id, b.facility_id, b.ma, b.rubber_type_name, b.trang_thai, b.xuat_sx_kho_kg;
+ALTER VIEW public.v_raw_lot_chen SET (security_invoker = on);
+GRANT SELECT ON public.v_raw_lot_chen TO authenticated;
+
 NOTIFY pgrst, 'reload schema';
 
 -- ─── KIỂM CHỨNG ────────────────────────────────────────────────────────────
 SELECT (SELECT count(*) FROM pg_proc WHERE proname = 'fn_mix_lay' AND pronamespace = 'public'::regnamespace) AS so_ban_fn_mix_lay_phai_la_1,
        (SELECT count(*) FROM pg_proc WHERE proname = 'fn_mix_tra' AND pronamespace = 'public'::regnamespace) AS so_ban_fn_mix_tra_phai_la_1,
-       (SELECT prosrc LIKE '%khai bì pallet lúc trả%' FROM pg_proc WHERE proname = 'fn_mix_tra' AND pronamespace = 'public'::regnamespace) AS tra_bat_bi;
+       (SELECT prosrc LIKE '%khai bì pallet lúc trả%' FROM pg_proc WHERE proname = 'fn_mix_tra' AND pronamespace = 'public'::regnamespace) AS tra_bat_bi,
+       (SELECT prosrc LIKE '%kiem_ke_kho_chen%' FROM pg_proc WHERE proname = 'fn_mix_kiem_ke' AND pronamespace = 'public'::regnamespace) AS kiem_ke_thu_kho;

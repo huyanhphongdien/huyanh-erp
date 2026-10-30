@@ -189,12 +189,12 @@ Sổ tay thực tế có **2 bảng**: *"Ca Vàng chèn vào KHMN-15 + 17 · L1:
 | # | Việc | Kỳ vọng |
 |---|---|---|
 | 14.1 | Chạy SQL → 2 dòng kiểm chứng | `f_lay_v3`, `f_tra_v3`, `v_chen` khác null; `phieu_co_ma_goc` = số phiếu cũ đã gán mã từ phiếu ca; bảng 2 (mã có chèn) có thể trống nếu chưa có phiếu nào nhận |
-| 14.2 | Điện thoại Chèn → **Lấy đầu ca** → chọn lô 1502 → màn Cân | thẻ đầu **"Chèn vào đâu?"** 2 nút *Chèn bể Slap* / *Chèn máy Mix* (bắt buộc, máy nhớ lần trước); mặc định **"Cân cả pallet, như sổ tay"**: ô Số bành · Bì pallet (nhớ lần trước, mặc định 15) · ô to "Hàng + pallet"; gõ 5 / 15 / 191,5 → dòng xanh "Hàng chèn = 191,5 − bì 15 → **176,5 kg**" |
+| 14.2 | Điện thoại Chèn → **Lấy đầu ca** → chọn lô 1502 → màn Cân | thẻ đầu Ca (ca tự nhận, Ca Vang / Ca Hiền), rồi **"Chèn vào đâu?"** 2 nút *Chèn bể Slap* / *Chèn máy Mix*; mặc định **"Cân cả pallet"**: một ô to số trên cân (không có ô bì), gõ 191,5 → dòng "Cả pallet · bì sẽ trừ lúc trả → 191,5 kg", số bành ước 5 với − + |
 | 14.3 | Bấm "Gõ thẳng kg" | về ô kg như cũ; máy nhớ cách cân cho lần sau |
 | 14.4 | Thẻ **"Chèn vào mã nguyên liệu nào?"** | nếu ca này đã có phiếu ca ghi mã → mã tự sáng + chip "theo phiếu ca"; nếu không, kho chỉ có 1 mã đang chạy → tự chọn, chip "mã đang chạy"; còn lại tổ chạm mã (chọn **nhiều** mã được, ví dụ KHMN-15 + KHMN-17 → chữ "kg chia đều cho mỗi mã") |
-| 14.5 | Tiếp tục → Xem lại | dòng "Cân: 5 bành · cả pallet 191,5 − bì 15 kg", "Chèn vào mã: KHMN-15 + KHMN-17", số to 176,5 kg; Ghi → màn đã ghi nêu mã + số bành |
+| 14.5 | Tiếp tục → Xem lại | dòng "Cân: 5 bành · cả pallet 191,5 kg · bì trừ lúc trả", "Chèn vào mã: KHMN-15 + KHMN-17"; Ghi → màn đã ghi nêu mã + số bành |
 | 14.6 | Máy tính /wms/chen | cột **Chèn vào** (Bể Slap xanh ngọc / Máy Mix tím + mã gốc geekblue + số bành); modal Lấy đầu ca bắt chọn "Chèn vào đâu", chọn nhiều mã + Số bành / Hàng + pallet / Bì pallet / Kg hàng chèn (tự tính) |
-| 14.7 | Trả cuối ca (điện thoại) | cũng "Cân phần còn lại cả pallet": Số bành còn · Bì · Hàng + pallet → Trả = cân − bì; nút "Dùng hết · 0 kg" vẫn một chạm |
+| 14.7 | Trả cuối ca (điện thoại) | ba lần cân: cân 1 hiện sẵn 191,5; **Dùng hết · bỏ cân 2** hoặc gõ cân 2 hàng trả + pallet; cân 3 pallet rỗng (mặc định 15); kg lấy tính lại = cân 1 − cân 3; 2 ảnh bắt buộc |
 | 14.8 | Phiếu (dòng thời gian) → dòng "Chèn Bể Slap · Chèn vào mã: …" → **Đổi mã** | đổi bể Slap/máy Mix, chọn lại 1 hay nhiều mã → Lưu; bỏ hết = máy lấy theo phiếu ca lúc thủ kho nhận; sau khi thủ kho đã nhận thì không còn nút Đổi |
 | 14.9 | Ký đủ 3 bước → tab **Lô NVL** → thẻ mã KHMN-15 | dòng vàng "Chèn vào mã: 176,5 kg · 5 bành · 1 phiếu · x % hàng vào máy" + dòng tách *bể Slap / máy Mix* rồi theo loại (lỗi/DKL/chuẩn); mở thẻ thấy từng lô chèn, phiếu chèn chung 2 mã ghi "chèn chung mã khác" (kg đã chia đôi) |
 | 14.10 | SQL `SELECT ma, chen_kg, chen_be_kg, chen_mix_kg, so_banh_chen, chi_tiet FROM v_raw_lot_chen WHERE chen_kg > 0` | khớp số trên điện thoại; `v_raw_lot_yield.chen_tieu_hao_kg` cùng số |

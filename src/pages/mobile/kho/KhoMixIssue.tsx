@@ -319,11 +319,11 @@ export default function KhoMixIssue() {
                 <div className="kmx-row" style={{ fontSize: 11, fontWeight: 600, color: '#4B5563' }}><span>Đã dùng {kgTxt(tieuHao)} kg ({p} %)</span><span>Trả {kgTxt(kgRetN)} kg</span></div>
               </div>
             )}
-            {kgRetN !== null && !kgRetOk && <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Số trả phải từ 0 đến {fmtKg(kgOutNew)} kg</span>}
+            {kgRetN !== null && !kgRetOk && <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Số trả phải từ 0 đến {kgTxt(kgOutNew)} kg</span>}
             {settings.chen_ban_giao_ca && (
               <label className="kmx-check-row" htmlFor="kmx-handover">
                 <input id="kmx-handover" type="checkbox" checked={handover} onChange={(e) => setHandover(e.target.checked)} />
-                <span>Để <b>{kgRetN !== null && kgRetN > 0 ? `${fmtKg(kgRetN)} kg` : 'phần còn lại'}</b> lại dây chuyền cho ca sau<br /><span className="kmx-sm">Không cân về kho; máy tự mở phiếu cho ca kế khi thủ kho nhận.</span></span>
+                <span>Để <b>{kgRetN !== null && kgRetN > 0 ? `${kgTxt(kgRetN)} kg` : 'phần còn lại'}</b> lại dây chuyền cho ca sau<br /><span className="kmx-sm">Không cân về kho; máy tự mở phiếu cho ca kế khi thủ kho nhận.</span></span>
               </label>
             )}
           </section>
@@ -347,7 +347,7 @@ export default function KhoMixIssue() {
         </div></div>
         <div className="kmx-foot">
           <button type="button" className="kmx-btn" disabled={!ready || busy === 'tra'} onClick={traVaKy}>{I.pen}{busy === 'tra' ? 'Đang ghi…' : 'Ghi trả và ký bên giao'}</button>
-          <span className="kmx-sm kmx-center">Một chạm = ghi {kgRetN !== null && kgRetOk ? `${fmtKg(kgRetN)} kg trả` : 'kg trả'} + chữ ký 1/3 của bạn</span>
+          <span className="kmx-sm kmx-center">Một chạm = ghi {kgRetN !== null && kgRetOk ? `${kgTxt(kgRetN)} kg trả` : 'kg trả'} + chữ ký 1/3 của bạn</span>
         </div>
       </div>
     )

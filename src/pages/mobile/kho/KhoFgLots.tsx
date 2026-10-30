@@ -58,7 +58,7 @@ export default function KhoFgLots() {
     setAdding(true); setMsg(null)
     try {
       const [m, r, d] = await Promise.all([shiftBookService.listMaterials(), rawLotService.list(facilityId, { onlyWithStock: false }), detectShift(user?.employee_id || null)])
-      setMaterials(m.filter((x) => x.weightPerUnit && !['CHEN'].includes(x.code))); setRawLots(r.filter((x) => x.trang_thai === 'dang_chay' || x.trang_thai === 'san_sang' || x.trang_thai === 'da_chay_xong').slice(0, 20)); setShifts(d.shifts); setShift(d.pick)
+      setMaterials(m.filter((x) => x.weightPerUnit && !['CHEN'].includes(x.code))); setRawLots(r.filter((x) => x.trang_thai === 'dang_chay' || x.trang_thai === 'san_sang' || x.trang_thai === 'trong' || x.trang_thai === 'da_chay_xong').slice(0, 20)); setShifts(d.shifts); setShift(d.pick)
       const dc = r.find((x) => x.trang_thai === 'dang_chay'); if (dc) setRawLotId(dc.raw_lot_id)
     } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không tải được danh mục' }) }
   }

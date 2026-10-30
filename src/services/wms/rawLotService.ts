@@ -187,7 +187,7 @@ export const rawLotService = {
   /** Mã có thể chèn vào: đang mở, ưu tiên đang chạy rồi sẵn sàng */
   async maDangChay(facilityId: string): Promise<RawLotBalance[]> {
     const l = await this.list(facilityId)
-    const rank: Record<string, number> = { dang_chay: 0, san_sang: 1, da_chay_xong: 2 }
+    const rank: Record<string, number> = { dang_chay: 0, san_sang: 1, trong: 2, da_chay_xong: 3 }   // 'trong' = mã mới tạo, chưa gán lô xe: vẫn chọn được
     return l.filter((x) => x.trang_thai in rank).sort((a, b) => rank[a.trang_thai] - rank[b.trang_thai] || (b.ngay_cuoi ?? '').localeCompare(a.ngay_cuoi ?? ''))
   },
 

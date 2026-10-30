@@ -103,6 +103,7 @@ const KhoMixSign = lazy(() => import('./pages/mobile/kho/KhoMixSign'));
 const KhoMixStock = lazy(() => import('./pages/mobile/kho/KhoMixStock'));
 const KhoMixLotNew = lazy(() => import('./pages/mobile/kho/KhoMixLotNew'));
 const KhoMixList = lazy(() => import('./pages/mobile/kho/KhoMixList'));
+const KhoMixMaTongKet = lazy(() => import('./pages/mobile/kho/KhoMixMaTongKet'));
 const KhoStocktake = lazy(() => import('./pages/mobile/kho/KhoStocktake'));
 const KhoRawIssue = lazy(() => import('./pages/mobile/kho/KhoRawIssue'));
 const KhoFgLots = lazy(() => import('./pages/mobile/kho/KhoFgLots'));
@@ -481,6 +482,7 @@ function App() {
               <Route path="chen/kho" element={<Suspense fallback={<LoadingSpinner />}><KhoMixStock /></Suspense>} />
               <Route path="chen/kho/nhap" element={<Suspense fallback={<LoadingSpinner />}><KhoMixLotNew /></Suspense>} />
               <Route path="chen/phieu" element={<Suspense fallback={<LoadingSpinner />}><KhoMixList /></Suspense>} />
+              <Route path="chen/ma/:id/tong-ket" element={<Suspense fallback={<LoadingSpinner />}><KhoMixMaTongKet /></Suspense>} />
             </Route>
 
             {/* ============================================================ */}

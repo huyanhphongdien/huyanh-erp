@@ -295,6 +295,20 @@ Quy trình chốt 30/10: **Bước 1 QS khai báo** (nhập lô chèn, lấy đ�
 | 22.7 | Bắt đầu mã thứ hai | hai mã cùng "đang chạy"; phiếu ca mới không tự điền (vì không rõ), phiếu chèn tự gắn cả hai (chèn chung); chạm Kết thúc một mã để còn một |
 | 22.8 | Kết thúc mã | chip về Sẵn sàng / Đã chạy xong tùy tồn; phiếu đã gắn mã không đổi |
 
+## 23. Kết thúc mã · tổng kết · mail BGĐ · thay thế mã · số bành (sau SQL `wms_nvl_p12_ket_thuc_ma.sql`, chạy SAU p11, 30/10 tối)
+
+| # | Thao tác | Mong đợi |
+|---|---|---|
+| 23.1 | Chạy p12, dòng kiểm chứng | `cot_so_banh_tay` = 1, `f_tong_ket` có giá trị, `bat_dau_thay_the` = true, `tra_tinh_lai_banh` = true, `so_nguoi_bgd_co_email` ≥ 1 (nếu 0: thêm email cho chức vụ level ≤ 3 trong Nhân sự, mail vẫn gõ tay được) |
+| 23.2 | Điện thoại Chèn, đang chạy TMHG-40, bấm **Bắt đầu mã…** → chạm mã khác | hộp "Bắt đầu X: đang chạy TMHG-40. Mặc định kết thúc mã cũ" với **Thay thế** / Chạy chung / Hủy; Thay thế → "Đã thay TMHG-40 bằng X", thẻ chỉ còn X |
+| 23.3 | Máy tính /wms/chen chọn mã chưa chạy → **Khai mã này đang chạy** | hộp xác nhận tương tự, ô tick "Chạy chung"; OK = thay thế |
+| 23.4 | Sổ ca: ô mã → link **Khai mã này đang chạy từ giờ** | cùng hộp xác nhận |
+| 23.5 | Lấy L1 cân 191,5 (không chỉnh bành) → trả: dùng hết, bì 16,5 | kg lấy 175; số bành tự thành round(175/35) = 5 (trước đây giữ ước 5 từ (191,5 − 15)/35) ; lấy L2 cân 230 rồi bấm **+** thành 7 → trả bì 16 → số bành vẫn 7 (tổ chỉnh) |
+| 23.6 | Điện thoại thẻ mã → **Kết thúc** → "Kết thúc và tổng kết" | sang trang Tổng kết mã: tiêu hao chèn to, % hàng vào máy, chip bể/máy/nguồn, NVL & TP, chèn theo ca, theo lô, mail soạn sẵn, chip người nhận BGĐ |
+| 23.7 | **Gửi mail cho BGĐ** | "Đã gửi cho …" (hoặc lỗi → dùng **Mở ứng dụng mail**: Outlook mở sẵn người nhận + tiêu đề + nội dung) ; **Sao chép nội dung** dán được vào Zalo |
+| 23.8 | Máy tính /wms/chen → **Tổng kết mã · mail BGĐ** với mã đã kết thúc | cửa sổ tổng kết, bảng theo ca có dòng Tổng, 3 nút mail |
+| 23.9 | Máy tính /wms/chen/phieu/:id phiếu đang ở dây chuyền | khung "2 · Trả cuối ca" hiện Cân 1 (khóa) · Cân 2 + ô tick "Dùng hết · bỏ cân 2" · Cân 3 pallet rỗng; dòng "Hàng trả = cân 2 − cân 3 · kg lấy = cân 1 − cân 3 · tiêu hao" |
+
 ## Lỗi hay gặp
 
 | Màn hình báo | Nguyên nhân | Làm gì |

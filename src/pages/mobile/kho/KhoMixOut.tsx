@@ -143,7 +143,7 @@ export default function KhoMixOut() {
     if (!lot || !kgOk || qua || !soLoOk) return
     setBusy(true); setMsg(null)
     try {
-      await mixService.lay({ id: issueId, lotId: lot.id, kg: kgN!, shiftDate: todayLocal(), shiftId: shift?.id ?? null, team: teamFinal || null, purpose, targetIndex: purpose === 'nang_chi_so' ? targetIndex : null, targetValue: purpose === 'nang_chi_so' && targetValue !== '' ? Number(targetValue) : null, note: note.trim() || null, soLo: lot.so_lo ? null : soLo.trim().toUpperCase(), viTri, rawLotIds: maChon, soBanh: soBanhN, grossKg: mode === 'pallet' ? grossN : null, palletKg: null })
+      await mixService.lay({ id: issueId, lotId: lot.id, kg: kgN!, shiftDate: todayLocal(), shiftId: shift?.id ?? null, team: teamFinal || null, purpose, targetIndex: purpose === 'nang_chi_so' ? targetIndex : null, targetValue: purpose === 'nang_chi_so' && targetValue !== '' ? Number(targetValue) : null, note: note.trim() || null, soLo: lot.so_lo ? null : soLo.trim().toUpperCase(), viTri, rawLotIds: maChon, soBanh: soBanh === '' ? null : soBanhN, grossKg: mode === 'pallet' ? grossN : null, palletKg: null })
       const i = await mixService.getIssue(issueId)
       setCodeDone(i?.code || ''); setDoneAt(i?.out_at || new Date().toISOString()); setStep(4)
     } catch (e: any) { setMsg(e?.message || 'Không ghi được') }
@@ -320,7 +320,7 @@ export default function KhoMixOut() {
             )}
             <div className="kmx-tint" style={qua ? { background: '#FEE2E2', color: '#B91C1C' } : undefined}><span>{qua ? 'Lấy nhiều hơn tồn của lô' : 'Lô còn lại sau khi lấy'}</span><span className="kmx-num sm" style={qua ? { color: '#B91C1C' } : undefined}>{conLai === null ? `${fmtKg(lot.ton_kg)} kg trong kho` : `${fmtKg(Math.max(conLai, 0))} kg`}</span></div>
             <div className="kmx-row" style={{ alignItems: 'center' }}>
-              <span className="kmx-col"><span className="kmx-lbl">Số bành</span><span className="kmx-sm">tự tính {lot.kg_per_banh} kg/bành{soBanh !== '' ? ' · bạn đã chỉnh' : ''}</span></span>
+              <span className="kmx-col"><span className="kmx-lbl">Số bành</span><span className="kmx-sm">ước {lot.kg_per_banh} kg/bành, máy tính lại lúc trả{soBanh !== '' ? ' · bạn đã chỉnh, giữ nguyên' : ''}</span></span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button type="button" className="kmx-pill sm" style={{ width: 44, padding: 0, fontSize: 20 }} aria-label="Bớt 1 bành" disabled={soBanhN === null || soBanhN <= 0} onClick={() => chinhBanh(-1)}>−</button>
                 <span className="kmx-num md" style={{ minWidth: 40, textAlign: 'center' }}>{soBanhN ?? '—'}</span>
@@ -371,7 +371,7 @@ export default function KhoMixOut() {
             <div style={{ borderTop: '1px solid #F3F4F6' }}>
               <div className="kmx-kv"><span className="k">Lô chèn</span><span className="v"><span className="kmx-mono" style={{ color: '#0D2E25', fontWeight: 700 }}>{lot.so_lo || soLo.trim().toUpperCase()}</span> <span className="kmx-sm kmx-mono">{lot.code}</span><br /><span className="kmx-sm" style={{ fontWeight: 500 }}>{MIX_SOURCE_LABELS[lot.source_type]}{lot.grade ? ` · ${lot.grade}` : ''}</span></span></div>
               <div className="kmx-kv"><span className="k">Chèn vào</span><span className="v">{viTri ? MIX_VI_TRI_LABELS[viTri] : '—'}</span></div>
-              <div className="kmx-kv"><span className="k">Cân</span><span className="v">{mode === 'pallet' ? `${soBanhN !== null ? `${soBanhN} bành · ` : ''}cả pallet ${kgTxt(grossN)} kg · bì trừ lúc trả` : 'gõ thẳng kg hàng'}</span></div>
+              <div className="kmx-kv"><span className="k">Cân</span><span className="v">{mode === 'pallet' ? `${soBanhN !== null ? `${soBanhN} bành${soBanh === '' ? ' (ước)' : ''} · ` : ''}cả pallet ${kgTxt(grossN)} kg · bì trừ lúc trả` : 'gõ thẳng kg hàng'}</span></div>
               <div className="kmx-kv"><span className="k">Chèn vào mã</span><span className="v">{maChon.length ? <span className="kmx-mono" style={{ color: '#0D2E25' }}>{maLabel}</span> : <span style={{ color: '#B45309' }}>chưa chọn · lấy theo phiếu ca</span>}</span></div>
               <div className="kmx-kv"><span className="k">Ca · tổ</span><span className="v">{caTo}</span></div>
               <div className="kmx-kv"><span className="k">Dùng để</span><span className="v">{purpose === 'chay_lai' ? 'Chạy lại' : `Nâng ${targetIndex}${targetValue ? ' → ' + targetValue : ''}`}</span></div>

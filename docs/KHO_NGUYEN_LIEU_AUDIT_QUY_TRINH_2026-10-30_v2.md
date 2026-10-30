@@ -31,11 +31,11 @@ Phạm vi: toàn bộ thay đổi trong ngày (GĐ6 mã nguyên liệu, GĐ7 lô
 | # | Vấn đề | Đề xuất |
 |---|---|---|
 | B1 | **Phiếu bàn giao ca sau** (phần dư để lại dây chuyền) không có ảnh lúc lấy vì máy tự mở; QS ca sau phải chụp bổ sung mới ký được | giữ (ca sau chụp pallet lúc bắt đầu ca), hoặc miễn ảnh lấy cho phiếu bàn giao |
-| B2 | **Mã đang chạy không ai Kết thúc** → mọi ca sau vẫn gắn mã cũ | khi Bắt đầu mã mới, mặc định **thay thế** mã đang chạy (hỏi "chạy chung?" nếu cố ý); thẻ nhắc đỏ khi mã chạy quá 7 ngày |
+| B2 | **Mã đang chạy không ai Kết thúc** → mọi ca sau vẫn gắn mã cũ | ✅ ĐÃ LÀM (p12, 30/10 tối): Bắt đầu mã mới mặc định **thay thế**, hộp xác nhận có "chạy chung"; thêm nút **Kết thúc mã** → tổng kết chèn + mail BGĐ |
 | B3 | **"Đã lấy" trên trang chính** gộp cân tổng của phiếu chưa trả với kg lấy thật của phiếu đã trả | ghi rõ "cả pallet tới khi trả" (đã làm ở dòng L), chấp nhận lệch tạm vài kg/pallet |
-| B4 | **Số bành lúc lấy** là ước tính; lúc trả máy không tính lại vì không biết tổ đã chỉnh tay hay chưa | tính lại theo kg lấy thật nếu tổ không chỉnh (cần cờ "đã chỉnh tay") |
+| B4 | **Số bành lúc lấy** là ước tính; lúc trả máy không tính lại vì không biết tổ đã chỉnh tay hay chưa | ✅ ĐÃ LÀM (p12): cờ `so_banh_tay`, lúc trả tính lại theo kg lấy thật nếu tổ không chỉnh |
 | B5 | **Phân công (mix_signers)** chỉ chức vụ level ≤ 3 thêm/thu được. Nếu tài khoản anh là "Phó phòng" level 4 thì màn Phân công chỉ xem, không thêm được QS | kiểm tra bằng SQL bên dưới; nếu level > 3 thì cho thêm người ở bước `nhan_kho` quyền phân công |
-| B6 | **Máy tính, màn trả** vẫn kiểu 2 ô (dùng hết / cân pallet rỗng, hàng + pallet, bì), chưa đổi theo 3 lần cân như điện thoại | đổi cho giống điện thoại, hoặc để vì máy tính ít dùng để trả |
+| B6 | **Máy tính, màn trả** vẫn kiểu 2 ô (dùng hết / cân pallet rỗng, hàng + pallet, bì), chưa đổi theo 3 lần cân như điện thoại | ✅ ĐÃ LÀM (30/10 tối): cân 1 (khóa) · cân 2 + "Dùng hết · bỏ cân 2" · cân 3 pallet rỗng |
 | B7 | **Vercel** 100 build/ngày, 4 project cùng repo | đặt Ignored Build Step cho 4 project (bảng lệnh ở hướng dẫn 30/10); gom nhiều sửa vào một lần đẩy |
 
 Kiểm tra level của anh:
@@ -46,7 +46,7 @@ SELECT e.full_name, p.name AS chuc_vu, p.level FROM employees e JOIN positions p
 
 ## 4. Việc vận hành còn treo
 
-1. Chạy `docs/migrations/wms_mix_p11_bi_chi_luc_tra.sql` (sau p8 → p9 → p10 đã chạy).
+1. Chạy `docs/migrations/wms_mix_p11_bi_chi_luc_tra.sql` rồi `wms_nvl_p12_ket_thuc_ma.sql` (sau p8 → p9 → p10 đã chạy).
 2. Vercel mở hạn mức → Create Deployment nhánh main (hiện production còn ở 9df49751, thiếu 16 commit hôm nay). Trong lúc chờ dùng bản local `npx vite --host`.
 3. Thêm tên QS vào bước 1 ở màn Phân công; thủ kho thật vào bước 3 rồi thu anh ra.
 4. Gán các lô xe cũ vào TMHG-40 (tab Lô NVL) để % chèn và hiệu suất có số.

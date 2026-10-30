@@ -27,6 +27,7 @@ import {
   Card, Table, Button, Space, Typography, Row, Col, Select, DatePicker,
   Input, InputNumber, Tag, Spin, Alert, Switch, Tooltip, Modal, message,
 } from 'antd'
+import { xacNhanBatDauMa } from '../../../components/wms/xacNhanBatDauMa'
 import {
   ArrowLeftOutlined, SaveOutlined, SendOutlined, CheckCircleOutlined,
   InboxOutlined, WarningOutlined, StopOutlined, PrinterOutlined,
@@ -119,8 +120,11 @@ export default function ShiftBookEntryPage() {
   }, [facilityId, id])
   const khaiDangChay = async () => {
     if (!facilityId || !rawLotId) return
+    const khac = (runIds ?? []).filter((x) => x !== rawLotId).map((x) => rawLots.find((l) => l.raw_lot_id === x)?.ma ?? '?')
+    const thayThe = await xacNhanBatDauMa({ ma: rawLots.find((l) => l.raw_lot_id === rawLotId)?.ma ?? '', dangChay: khac })   // mặc định thay thế mã cũ (30/10)
+    if (thayThe === null) return
     setKhaiBusy(true)
-    try { const r = await rawLotService.batDauChay(rawLotId); message.success(r.da_chay ? `${r.ma} đã đang chạy` : `Đã khai ${r.ma} đang chạy — các ca sau tự theo mã này`); await taiSoChay(facilityId); rawLotService.list(facilityId, { includeClosed: true }).then(setRawLots).catch(() => { /* bỏ qua */ }) }
+    try { const r = await rawLotService.batDauChay(rawLotId, thayThe); message.success(r.da_chay ? `${r.ma} đã đang chạy` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng ${r.ma} — các ca sau tự theo mã này` : `Đã khai ${r.ma} đang chạy — các ca sau tự theo mã này`); await taiSoChay(facilityId); rawLotService.list(facilityId, { includeClosed: true }).then(setRawLots).catch(() => { /* bỏ qua */ }) }
     catch (e: any) { message.error(e?.message || 'Không khai được (cần chạy SQL p10)') }
     finally { setKhaiBusy(false) }
   }

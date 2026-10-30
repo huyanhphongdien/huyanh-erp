@@ -47,6 +47,21 @@ export interface RawLotBalance {
 /** Sổ mã đang chạy (v_raw_lot_runs): một dòng cho mỗi đợt chạy, ended_at null = đang chạy */
 export interface RawLotRun { id: string; facility_id: string; raw_lot_id: string; ma: string; nguon: string; started_at: string; ended_at: string | null; note: string | null; started_name: string | null; ended_name: string | null; dang_chay: boolean }
 
+/** Tổng kết một mã (fn_nvl_tong_ket_ma): NVL vào / chèn / TP / theo ca / đợt chạy / người nhận BGĐ — dùng cho nút Kết thúc mã + mail */
+export interface RawLotTongKetCa { shift_date: string; shift_name: string; team: string | null; so_lan: number; kg_lay: number; kg_tra: number; tieu_hao: number; da_nhan: number; chua_tra: number; cho_ky: number }
+export interface RawLotTongKet {
+  raw_lot_id: string; ma: string; nguon: string; facility_code: string; rubber_type_name: string; trang_thai: RawLotTrangThai; dang_chay: boolean
+  so_xe: number; wet_kg: number; dry_kg: number; drc_pct: number | null; nhap_kho_kg: number | null; xuat_sx_kho_kg: number | null; ngay_dau: string | null; ngay_cuoi: string | null
+  so_ca_ep: number | null; tp_dat_kg: number | null; loi_dkl_kg: number | null; hieu_suat_pct: number | null; ty_le_loi_pct: number | null
+  chen: { chen_kg: number; so_phieu: number; so_banh: number; be_kg: number; mix_kg: number; loi_kg: number; dkl_kg: number; chuan_kg: number; khac_kg: number; ty_le_pct: number | null; chi_tiet: RawLotChenChiTiet[] } | null
+  phieu: { tong: number; chua_tra: number; cho_ky: number; da_nhan: number; so_ca: number; kg_lay: number; kg_tra: number; tieu_hao: number; tieu_hao_da_nhan: number; so_banh: number; be_slap: number; may_mix: number; lan_dau: string | null; lan_cuoi: string | null }
+  theo_ca: RawLotTongKetCa[]
+  dot_chay: { started_at: string; ended_at: string | null; started_name: string | null; ended_name: string | null; note: string | null }[]
+  bgd: { name: string; email: string; chuc_vu: string | null }[]
+  nguoi_lap: { name: string; email: string | null } | null
+  luc: string
+}
+
 export interface MaGoiY { ticket_id: string; ma_goc: string | null; ma: string | null; nguon: string | null; so: number | null; xe: string | null; raw_lot_id: string | null; raw_lot_status: string | null }
 export interface MaParse { ma: string; nguon: string; so: number | null; xe: string | null }
 
@@ -104,16 +119,37 @@ export const rawLotService = {
   async dangChay(facilityId: string): Promise<string[]> {
     return (await this.runs(facilityId)).map((r) => r.raw_lot_id)
   },
-  /** Khai mã bắt đầu chạy; thayThe = kết thúc các mã khác đang chạy */
-  async batDauChay(rawLotId: string, thayThe = false, note?: string | null): Promise<{ ma: string; da_chay: boolean }> {
+  /** Khai mã bắt đầu chạy; thayThe (mặc định) = kết thúc các mã khác đang chạy; da_thay = các mã vừa bị kết thúc */
+  async batDauChay(rawLotId: string, thayThe = true, note?: string | null): Promise<{ ma: string; da_chay: boolean; da_thay: string[] }> {
     const { data, error } = await supabase.rpc('fn_nvl_bat_dau_chay', { p_raw_lot_id: rawLotId, p_thay_the: thayThe, p_note: note ?? null })
     if (error) throw new Error(dichLoiNhapKho(error))
     const d: any = data ?? {}
-    return { ma: String(d.ma ?? ''), da_chay: !!d.da_chay }
+    return { ma: String(d.ma ?? ''), da_chay: !!d.da_chay, da_thay: Array.isArray(d.da_thay) ? d.da_thay.map(String) : [] }
   },
   async ketThucChay(rawLotId: string, note?: string | null): Promise<void> {
     const { error } = await supabase.rpc('fn_nvl_ket_thuc_chay', { p_raw_lot_id: rawLotId, p_note: note ?? null })
     if (error) throw new Error(dichLoiNhapKho(error))
+  },
+  /** Tổng kết mã (NVL vào, chèn, TP, theo ca, đợt chạy, BGĐ nhận mail) — SQL p12 */
+  async tongKetMa(rawLotId: string): Promise<RawLotTongKet> {
+    const { data, error } = await supabase.rpc('fn_nvl_tong_ket_ma', { p_raw_lot_id: rawLotId })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    const r: any = data ?? {}
+    const c = r.chen
+    const p = r.phieu ?? {}
+    return {
+      ...r, dang_chay: !!r.dang_chay, so_xe: num(r.so_xe), wet_kg: num(r.wet_kg), dry_kg: num(r.dry_kg), drc_pct: numOrNull(r.drc_pct), nhap_kho_kg: numOrNull(r.nhap_kho_kg), xuat_sx_kho_kg: numOrNull(r.xuat_sx_kho_kg),
+      so_ca_ep: numOrNull(r.so_ca_ep), tp_dat_kg: numOrNull(r.tp_dat_kg), loi_dkl_kg: numOrNull(r.loi_dkl_kg), hieu_suat_pct: numOrNull(r.hieu_suat_pct), ty_le_loi_pct: numOrNull(r.ty_le_loi_pct),
+      chen: c ? { chen_kg: num(c.chen_kg), so_phieu: num(c.so_phieu), so_banh: num(c.so_banh), be_kg: num(c.be_kg), mix_kg: num(c.mix_kg), loi_kg: num(c.loi_kg), dkl_kg: num(c.dkl_kg), chuan_kg: num(c.chuan_kg), khac_kg: num(c.khac_kg), ty_le_pct: numOrNull(c.ty_le_pct),
+        chi_tiet: (Array.isArray(c.chi_tiet) ? c.chi_tiet : []).map((d: any) => ({ ...d, kg: num(d.kg), so_banh: numOrNull(d.so_banh), so_phieu: num(d.so_phieu), co_chung: !!d.co_chung })) } : null,
+      phieu: { tong: num(p.tong), chua_tra: num(p.chua_tra), cho_ky: num(p.cho_ky), da_nhan: num(p.da_nhan), so_ca: num(p.so_ca), kg_lay: num(p.kg_lay), kg_tra: num(p.kg_tra), tieu_hao: num(p.tieu_hao), tieu_hao_da_nhan: num(p.tieu_hao_da_nhan),
+        so_banh: num(p.so_banh), be_slap: num(p.be_slap), may_mix: num(p.may_mix), lan_dau: p.lan_dau ?? null, lan_cuoi: p.lan_cuoi ?? null },
+      theo_ca: (Array.isArray(r.theo_ca) ? r.theo_ca : []).map((x: any) => ({ ...x, so_lan: num(x.so_lan), kg_lay: num(x.kg_lay), kg_tra: num(x.kg_tra), tieu_hao: num(x.tieu_hao), da_nhan: num(x.da_nhan), chua_tra: num(x.chua_tra), cho_ky: num(x.cho_ky) })),
+      dot_chay: Array.isArray(r.dot_chay) ? r.dot_chay : [],
+      bgd: Array.isArray(r.bgd) ? r.bgd : [],
+      nguoi_lap: r.nguoi_lap ?? null,
+      luc: r.luc ?? new Date().toISOString(),
+    }
   },
 
   /** Chuẩn hoá chữ gõ → mã (gọi DB để dùng chung bảng bí danh) */

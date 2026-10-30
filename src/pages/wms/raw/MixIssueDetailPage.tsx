@@ -36,7 +36,7 @@ export default function MixIssueDetailPage() {
   const [shifts, setShifts] = useState<ShiftLite[]>([])
   const [retShiftId, setRetShiftId] = useState<string | undefined>(undefined)
   const [retTeam, setRetTeam] = useState('')
-  const [retDungHet, setRetDungHet] = useState(true)
+  const [retDungHet, setRetDungHet] = useState(false)   // dùng hết → bỏ cân 2
   const [retGross, setRetGross] = useState<number | null>(null)
   const [retBi, setRetBi] = useState<number | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -75,14 +75,20 @@ export default function MixIssueDetailPage() {
     finally { setBusy(null) }
   }
 
-  const biEff = retBi ?? issue?.pallet_kg ?? 15
-  const kgEff = retDungHet ? (retGross !== null && retGross > 0 ? 0 : null) : retGross !== null ? Math.round((retGross - biEff) * 100) / 100 : kgReturn
-  const kgOutEff = issue ? (issue.gross_kg !== null && (retDungHet || retGross !== null) ? Math.round((issue.gross_kg - (retDungHet ? (retGross ?? biEff) : biEff)) * 100) / 100 : issue.kg_out) : 0
+  // trả theo 3 lần cân (đồng bộ điện thoại): cân 1 lúc lấy (có sẵn) · cân 2 hàng trả + pallet (bỏ nếu dùng hết) · cân 3 pallet rỗng = bì
+  const coCan1 = issue?.gross_kg !== null && issue?.gross_kg !== undefined
+  const biEff = retBi ?? issue?.return_pallet_kg ?? issue?.pallet_kg ?? 15
+  const kgEff = coCan1
+    ? (retDungHet ? (biEff > 0 ? 0 : null) : (retGross !== null ? Math.round((retGross - biEff) * 100) / 100 : null))
+    : (retDungHet ? 0 : kgReturn)
+  const kgOutEff = issue ? (coCan1 ? Math.round(((issue.gross_kg ?? 0) - biEff) * 100) / 100 : issue.kg_out) : 0
   const ghiTra = async () => {
-    if (!issue || kgEff === null) { message.warning(retDungHet ? 'Cân pallet rỗng, nhập số trên cân' : 'Nhập cân hàng trả + pallet (hoặc kg trả)'); return }
+    if (!issue || kgEff === null) { message.warning(coCan1 ? (retDungHet ? 'Cân 3: gõ bì pallet rỗng' : 'Cân 2: gõ số trên cân hàng trả + pallet') : 'Nhập kg trả'); return }
+    if (kgEff < 0) { message.warning('Cân 2 nhỏ hơn bì pallet (cân 3)'); return }
+    if (coCan1 && kgOutEff <= 0) { message.warning('Bì pallet lớn hơn cân 1 lúc lấy'); return }
     if (!issue.shift_id && !retShiftId) { message.warning('Phiếu bàn giao chưa có ca, chọn ca trước'); return }
     await run('tra', () => mixService.tra(issue.id, kgEff, handover, retNote.trim() || null, null, issue.shift_id ? null : retShiftId ?? null, issue.shift_id ? null : (retTeam.trim() || null),
-      { grossKg: retDungHet ? null : retGross, palletKg: retDungHet ? retGross : (retGross !== null ? biEff : null), dungHet: retDungHet }), `Đã ghi trả ${fmtKg(kgEff)} kg · tiêu hao ${fmtKg(kgOutEff - kgEff)} kg`)
+      { grossKg: coCan1 && !retDungHet ? retGross : null, palletKg: coCan1 ? biEff : null, dungHet: retDungHet }), `Đã ghi trả ${fmtKg(kgEff)} kg · tiêu hao ${fmtKg(kgOutEff - kgEff)} kg`)
   }
 
   const ky = async (buoc: 'submit' | 'qc_confirm' | 'receive') => {
@@ -175,27 +181,29 @@ export default function MixIssueDetailPage() {
             <Card size="small" style={{ marginTop: 12 }} title={<Space>2 · Trả cuối ca{issue.kg_return !== null && (missRet.length ? <Tag color="red">thiếu {missRet.length} ảnh bắt buộc</Tag> : <Tag color="green">đủ ảnh</Tag>)}</Space>}>
               {st === 'issued' ? (
                 <Space direction="vertical" size={10} style={{ width: '100%' }}>
-                  <Alert type="info" showIcon message="Cuối ca: dùng hết thì cân pallet rỗng (số trên cân = bì chính xác); còn dư thì cân hàng trả + pallet và khai bì. Máy tính lại kg lấy = cân tổng lúc lấy − bì. 2 ảnh lúc trả bắt buộc." />
+                  <Alert type="info" showIcon message="Ba lần cân như điện thoại: cân 1 lúc lấy (cả hàng + pallet, đã có) · cân 2 hàng trả + pallet (bỏ nếu dùng hết) · cân 3 pallet rỗng = bì. Máy tính: hàng trả = cân 2 − cân 3; kg lấy = cân 1 − cân 3; tiêu hao = kg lấy − hàng trả. 2 ảnh lúc trả bắt buộc." />
                   {!issue.shift_id && (
                     <Row gutter={12}>
                       <Col span={12}><Text>Ca (phiếu bàn giao chưa có ca) *</Text><Select style={{ width: '100%' }} value={retShiftId} onChange={setRetShiftId} options={shifts.map((s) => ({ value: s.id, label: s.name || s.code }))} placeholder="Chọn ca" /></Col>
                       <Col span={12}><Text>Tổ trưởng</Text><Select style={{ width: '100%' }} allowClear value={retTeam || undefined} onChange={(v) => setRetTeam(v ?? '')} options={[{ value: 'Vang', label: 'Ca Vang' }, { value: 'Hiền', label: 'Ca Hiền' }]} placeholder="Ca Vang / Ca Hiền" /></Col>
                     </Row>
                   )}
-                  <Checkbox checked={retDungHet} onChange={(e) => { setRetDungHet(e.target.checked); setRetGross(null) }}>Dùng hết · cân pallet rỗng</Checkbox>
-                  <Row gutter={12}>
-                    {retDungHet ? (
-                      <Col span={10}><Text>Cân pallet rỗng (kg) = bì *</Text><InputNumber style={{ width: '100%' }} min={0} value={retGross} onChange={(v) => setRetGross(v === null || v === undefined ? null : Number(v))} onPressEnter={ghiTra} /></Col>
-                    ) : (
-                      <>
-                        <Col span={7}><Text>Hàng trả + pallet (kg)</Text><InputNumber style={{ width: '100%' }} min={0} value={retGross} onChange={(v) => setRetGross(v === null || v === undefined ? null : Number(v))} /></Col>
-                        <Col span={5}><Text>Bì pallet (kg)</Text><InputNumber style={{ width: '100%' }} min={0} value={retBi ?? issue.pallet_kg ?? 15} onChange={(v) => setRetBi(v === null || v === undefined ? null : Number(v))} /></Col>
-                        <Col span={5}><Text>Kg trả {retGross !== null ? '(tự tính)' : '*'}</Text><InputNumber style={{ width: '100%' }} min={0} value={retGross !== null ? kgEff : kgReturn} disabled={retGross !== null} onChange={(v) => setKgReturn(v === null || v === undefined ? null : Number(v))} onPressEnter={ghiTra} /></Col>
-                      </>
-                    )}
-                    <Col span={retDungHet ? 14 : 7}><Text>Ghi chú</Text><Input value={retNote} onChange={(e) => setRetNote(e.target.value)} /></Col>
-                  </Row>
-                  {kgEff !== null && <Text>Kg lấy tính lại: <Text strong>{fmtKg(kgOutEff, 1)} kg</Text> · trả {fmtKg(kgEff, 1)} kg · tiêu hao sẽ ghi: <Text strong>{fmtKg(kgOutEff - kgEff, 1)} kg</Text></Text>}
+                  {coCan1 ? (
+                    <Row gutter={12} align="bottom">
+                      <Col span={5}><Text>Cân 1 · lúc lấy (hàng + pallet)</Text><InputNumber style={{ width: '100%' }} value={issue.gross_kg} disabled /></Col>
+                      <Col span={7}><Text>Cân 2 · hàng trả + pallet {retDungHet ? '· bỏ qua' : '*'}</Text><InputNumber style={{ width: '100%' }} min={0} value={retGross} disabled={retDungHet} onChange={(v) => setRetGross(v === null || v === undefined ? null : Number(v))} />
+                        <Checkbox checked={retDungHet} onChange={(e) => { setRetDungHet(e.target.checked); setRetGross(null) }}>Dùng hết · bỏ cân 2</Checkbox></Col>
+                      <Col span={5}><Text>Cân 3 · pallet rỗng = bì *</Text><InputNumber style={{ width: '100%' }} min={0} value={biEff} onChange={(v) => setRetBi(v === null || v === undefined ? null : Number(v))} onPressEnter={ghiTra} /></Col>
+                      <Col span={7}><Text>Ghi chú</Text><Input value={retNote} onChange={(e) => setRetNote(e.target.value)} /></Col>
+                    </Row>
+                  ) : (
+                    <Row gutter={12} align="bottom">
+                      <Col span={6}><Text>Kg trả *</Text><InputNumber style={{ width: '100%' }} min={0} value={retDungHet ? 0 : kgReturn} disabled={retDungHet} onChange={(v) => setKgReturn(v === null || v === undefined ? null : Number(v))} onPressEnter={ghiTra} /></Col>
+                      <Col span={6}><Checkbox checked={retDungHet} onChange={(e) => setRetDungHet(e.target.checked)}>Dùng hết · trả 0 kg</Checkbox></Col>
+                      <Col span={12}><Text>Ghi chú</Text><Input value={retNote} onChange={(e) => setRetNote(e.target.value)} /></Col>
+                    </Row>
+                  )}
+                  {kgEff !== null && <Text>Hàng trả{coCan1 ? ` = ${retDungHet ? '0 (dùng hết)' : `${fmtKg(retGross, 1)} − ${fmtKg(biEff, 1)}`}` : ''}: <Text strong>{fmtKg(kgEff, 1)} kg</Text>{coCan1 && <> · kg lấy = cân 1 − cân 3 = <Text strong>{fmtKg(kgOutEff, 1)} kg</Text></>} · tiêu hao sẽ ghi: <Text strong>{fmtKg(kgOutEff - kgEff, 1)} kg</Text></Text>}
                   {settings.chen_ban_giao_ca && <Checkbox checked={handover} onChange={(e) => setHandover(e.target.checked)}>Phần trả vẫn để ở dây chuyền, bàn giao cho ca sau (tự mở phiếu lấy mới khi thủ kho nhận)</Checkbox>}
                   <Button type="primary" icon={<CheckOutlined />} onClick={ghiTra} loading={busy === 'tra'} disabled={kgEff === null}>Ghi trả cuối ca</Button>
                 </Space>

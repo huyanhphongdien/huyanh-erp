@@ -39,6 +39,8 @@ export default function KhoMix() {
   const [runs, setRuns] = useState<RawLotRun[]>([])
   const [maMo, setMaMo] = useState<RawLotBalance[]>([])
   const [chonMa, setChonMa] = useState(false)
+  const [hoiThay, setHoiThay] = useState<RawLotBalance | null>(null)   // bắt đầu mã khi đang có mã khác chạy: mặc định thay thế, hỏi một chạm
+  const [hoiKetThuc, setHoiKetThuc] = useState<RawLotRun | null>(null)
   const [busyMa, setBusyMa] = useState<string | null>(null)
   const [msgMa, setMsgMa] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -95,17 +97,18 @@ export default function KhoMix() {
   } : null
   const lanKe = (cur?.items.length ?? 0) + 1
   const maChuaChay = maMo.filter((x) => !runs.some((r) => r.raw_lot_id === x.raw_lot_id)).sort((a, b) => (b.ngay_cuoi ?? '').localeCompare(a.ngay_cuoi ?? '')).slice(0, 8)
-  async function batDau(m: RawLotBalance) {
-    setBusyMa(m.raw_lot_id); setMsgMa(null)
-    try { const r = await rawLotService.batDauChay(m.raw_lot_id); setMsgMa(r.da_chay ? `${r.ma} đã đang chạy rồi` : `Đã khai ${r.ma} bắt đầu chạy`); setChonMa(false); await load() }
+  async function batDau(m: RawLotBalance, thayThe?: boolean) {
+    if (runs.length && thayThe === undefined) { setHoiThay(m); return }   // 30/10: mặc định THAY THẾ mã cũ, có thể chọn chạy chung
+    setBusyMa(m.raw_lot_id); setMsgMa(null); setHoiThay(null)
+    try { const r = await rawLotService.batDauChay(m.raw_lot_id, thayThe ?? true); setMsgMa(r.da_chay ? `${r.ma} đã đang chạy rồi` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng ${r.ma}` : `Đã khai ${r.ma} bắt đầu chạy`); setChonMa(false); await load() }
     catch (e: any) { setMsgMa(e?.message || 'Không khai được') }
     finally { setBusyMa(null) }
   }
+  // kết thúc mã → sang trang tổng kết (khối lượng chèn + mail BGĐ)
   async function ketThuc(r: RawLotRun) {
-    setBusyMa(r.id); setMsgMa(null)
-    try { await rawLotService.ketThucChay(r.raw_lot_id); setMsgMa(`${r.ma} đã kết thúc chạy`); await load() }
-    catch (e: any) { setMsgMa(e?.message || 'Không kết thúc được') }
-    finally { setBusyMa(null) }
+    setBusyMa(r.id); setMsgMa(null); setHoiKetThuc(null)
+    try { await rawLotService.ketThucChay(r.raw_lot_id); nav(`/m/kho/chen/ma/${r.raw_lot_id}/tong-ket?vua=1`) }
+    catch (e: any) { setMsgMa(e?.message || 'Không kết thúc được'); setBusyMa(null) }
   }
   // gom các lần của ca theo MÃ GỐC đang chạy (số L vẫn đếm theo ca)
   const nhomMa = useMemo(() => {
@@ -145,16 +148,35 @@ export default function KhoMix() {
               {canTake && <button type="button" className="kmx-pill sm" onClick={() => setChonMa((v) => !v)}>{chonMa ? 'Đóng' : 'Bắt đầu mã…'}</button>}
             </div>
             {msgMa && <span className="kmx-sm" style={{ color: '#1B4D3E', fontWeight: 600 }}>{msgMa}</span>}
+            {hoiKetThuc && (
+              <div className="kmx-tint col" style={{ alignItems: 'stretch', gap: 6 }}>
+                <span className="kmx-sm" style={{ color: '#0D2E25' }}>Kết thúc mã <b>{hoiKetThuc.ma}</b>? Phiếu ca, phiếu chèn, lô TP sẽ không tự gắn mã này nữa. Máy tổng kết chèn và soạn mail BGĐ ngay sau.</span>
+                <div className="kmx-row" style={{ gap: 6 }}>
+                  <button type="button" className="kmx-pill sm" style={{ background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', flex: 1 }} disabled={busyMa === hoiKetThuc.id} onClick={() => ketThuc(hoiKetThuc)}>{busyMa === hoiKetThuc.id ? '…' : 'Kết thúc và tổng kết'}</button>
+                  <button type="button" className="kmx-pill sm" onClick={() => setHoiKetThuc(null)}>Hủy</button>
+                </div>
+              </div>
+            )}
+            {hoiThay && (
+              <div className="kmx-tint col" style={{ alignItems: 'stretch', gap: 6 }}>
+                <span className="kmx-sm" style={{ color: '#0D2E25' }}>Bắt đầu <b>{hoiThay.ma}</b>: đang chạy {runs.map((r) => r.ma).join(', ')}. Mặc định kết thúc mã cũ, thay bằng mã mới.</span>
+                <div className="kmx-row" style={{ gap: 6 }}>
+                  <button type="button" className="kmx-pill sm" style={{ background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', flex: 1 }} disabled={busyMa === hoiThay.raw_lot_id} onClick={() => batDau(hoiThay, true)}>Thay thế</button>
+                  <button type="button" className="kmx-pill sm" disabled={busyMa === hoiThay.raw_lot_id} onClick={() => batDau(hoiThay, false)}>Chạy chung</button>
+                  <button type="button" className="kmx-pill sm" onClick={() => setHoiThay(null)}>Hủy</button>
+                </div>
+              </div>
+            )}
             {runs.length ? runs.map((r) => (
               <div key={r.id} className="kmx-row" style={{ alignItems: 'center' }}>
                 <span className="kmx-col" style={{ gap: 1 }}><span className="kmx-mono" style={{ fontSize: 16, fontWeight: 800, color: '#0D2E25' }}>{r.ma}</span><span className="kmx-sm">chạy từ {fmtDt(r.started_at)}{r.started_name ? ` · ${firstName(r.started_name)}` : ''}</span></span>
-                {canTake && <button type="button" className="kmx-pill sm" disabled={busyMa === r.id} onClick={() => ketThuc(r)}>{busyMa === r.id ? '…' : 'Kết thúc'}</button>}
+                <span className="kmx-row" style={{ gap: 6 }}><button type="button" className="kmx-pill sm" onClick={() => nav(`/m/kho/chen/ma/${r.raw_lot_id}/tong-ket`)}>Tổng kết</button>{canTake && <button type="button" className="kmx-pill sm" disabled={busyMa === r.id} onClick={() => setHoiKetThuc(r)}>{busyMa === r.id ? '…' : 'Kết thúc'}</button>}</span>
               </div>
             )) : <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Chưa khai mã đang chạy. Khai một lần, mọi ca sau tự theo mã này (phiếu ca, phiếu chèn, lô thành phẩm).</span>}
             {chonMa && (
               <div className="kmx-col" style={{ gap: 6 }}>
                 {maChuaChay.length ? <div className="kmx-seg">{maChuaChay.map((m) => <button key={m.raw_lot_id} type="button" disabled={busyMa === m.raw_lot_id} onClick={() => batDau(m)}>{m.ma}</button>)}</div> : <span className="kmx-sm">Không còn mã nào chưa chạy. Mã mới sinh ra khi nhận phiếu cân vào kho.</span>}
-                {runs.length > 0 && <span className="kmx-sm">Chạm mã = chạy chung với mã đang chạy. Muốn thay thế thì bấm Kết thúc mã cũ trước.</span>}
+                {runs.length > 0 && <span className="kmx-sm">Chạm mã = thay thế mã đang chạy (máy hỏi lại một chạm, có thể chọn chạy chung).</span>}
               </div>
             )}
           </section>

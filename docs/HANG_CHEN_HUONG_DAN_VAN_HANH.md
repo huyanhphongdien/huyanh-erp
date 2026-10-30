@@ -34,6 +34,8 @@ Quy tắc: không có số lô thì không nhập được. Lô **DKL** phải b
 - Hai mã cùng chạy: phiếu ca mới không tự điền (chọn tay), phiếu chèn gắn cả hai (kg chia đều khi gom).
 - Chip "Đang chạy" ở tab Lô NVL theo sổ này.
 
+**Khi đang có mã khác chạy** (từ 30/10 tối): bấm mã mới → máy hỏi một lần, mặc định **Thay thế** (kết thúc mã cũ, ghi "thay bằng …" vào sổ mã). Chỉ chọn **Chạy chung** khi hai mã thật sự vào máy cùng lúc (khi đó phiếu ca không tự điền mã, phải chọn tay).
+
 ## 3. Lấy hàng chèn — mỗi pallet một lần (QS)
 
 Trang chính tab Chèn → nút **Lấy lần n** (máy đếm theo ca).
@@ -76,6 +78,16 @@ Nhiều phiếu một ca: thẻ đầu trang **"Ký tất cả N phiếu · ngà
 | Phiếu chưa gắn mã | Máy tính: bảng "Phiếu chưa gắn mã hàng" → mở phiếu → Đổi mã |
 | Tồn kho chèn theo lô, số bành | Kho chèn (điện thoại / máy tính) |
 | Lịch sử mọi phiếu | Điện thoại: Lịch sử phiếu |
+
+### 6b. Kết thúc mã · tổng kết · mail Ban Giám đốc (SQL p12)
+
+Khi mã chạy xong (hết NVL vào máy, phiếu chèn cuối đã trả):
+1. **Điện thoại** tab Chèn, thẻ "Mã nguyên liệu đang chạy" → **Kết thúc** → xác nhận → máy mở trang **Tổng kết mã**. **Máy tính** /wms/chen, khung "Phiếu theo mã hàng đang chạy" → **Kết thúc mã** → xác nhận → cửa sổ tổng kết.
+2. Tổng kết gồm: tiêu hao chèn (kg, % hàng vào máy, bể Slap / máy Mix, theo nguồn lỗi / DKL / chuẩn / khác, theo lô chèn, theo ca), NVL nhập kho / xuất vào máy / còn kho, thành phẩm đạt + hiệu suất, đợt chạy, và cảnh báo phiếu chưa trả / chờ ký.
+3. Mail **soạn sẵn** cho Ban Giám đốc (người nhận = nhân viên chức vụ level ≤ 3 có email trong Nhân sự, sửa được): **Gửi mail cho BGĐ** (gửi qua hệ thống, tài khoản mail công ty) · **Mở ứng dụng mail** (Outlook/Mail điền sẵn, tự bấm gửi) · **Sao chép nội dung** (dán Zalo/Teams).
+4. Xem lại bất cứ lúc nào: nút **Tổng kết mã · mail BGĐ** (máy tính) hoặc **Tổng kết** cạnh mã (điện thoại), kể cả mã đã kết thúc. Nếu còn phiếu chờ ký, gửi lại sau khi thủ kho nhận để số chốt.
+
+**Số bành:** lúc lấy máy ước theo (cân − 15) / kg mỗi bành; lúc trả máy **tính lại** theo kg lấy thật (cân 1 − bì). Tổ đã bấm − / + lúc lấy thì giữ nguyên số tổ chỉnh.
 
 ## 7. Sửa khi sai
 

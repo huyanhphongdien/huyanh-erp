@@ -9,6 +9,8 @@ import { Alert, Button, Card, Col, Input, InputNumber, Modal, Row, Select, Space
 import type { ColumnsType } from 'antd/es/table'
 import { DatabaseOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
+import MaTongKetModal from '../../../components/wms/MaTongKetModal'
+import { xacNhanBatDauMa } from '../../../components/wms/xacNhanBatDauMa'
 import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPurpose, type MixViTri, type ShiftLite } from '../../../services/wms/mixService'
 import { rawIssueService, type ProductionOrderLite } from '../../../services/wms/rawIssueService'
 import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type RawLotBalance, type RawLotChen } from '../../../services/wms/rawLotService'
@@ -49,6 +51,7 @@ export default function MixShiftPage() {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [chayBusy, setChayBusy] = useState(false)
+  const [tk, setTk] = useState<{ open: boolean; vua: boolean }>({ open: false, vua: false })   // tổng kết mã + mail BGĐ
   const [f, setF] = useState({ lotId: undefined as string | undefined, kg: null as number | null, shiftId: undefined as string | undefined, team: '', purpose: 'chay_lai' as MixPurpose, targetIndex: '', targetValue: null as number | null, poId: undefined as string | undefined, note: '', rawLotIds: [] as string[], soBanh: null as number | null, grossKg: null as number | null, palletKg: 15 as number | null, viTri: undefined as MixViTri | undefined })
 
   useEffect(() => {
@@ -120,15 +123,31 @@ export default function MixShiftPage() {
   // kg hàng chèn: gõ thẳng, hoặc = hàng + pallet − bì (như sổ tay tổ ép)
   const kgNet = f.kg ?? f.grossKg   // cân tổng; bì khai lúc trả
   // khai / kết thúc mã đang chạy ngay trên máy tính (sổ mã đang chạy, SQL p10)
+  //   · bắt đầu: mặc định THAY THẾ mã đang chạy (hỏi một lần, có thể chọn chạy chung) — 30/10
+  //   · kết thúc: xác nhận → kết thúc → mở tổng kết khối lượng chèn + mail BGĐ (SQL p12)
   const doiChay = async (batDau: boolean) => {
     if (!maChon) return
-    setChayBusy(true)
-    try {
-      if (batDau) { const r = await rawLotService.batDauChay(maChon.raw_lot_id); message.success(r.da_chay ? `${r.ma} đã đang chạy` : `Đã khai ${r.ma} đang chạy — phiếu ca, phiếu chèn, lô TP từ giờ tự theo mã này`) }
-      else { await rawLotService.ketThucChay(maChon.raw_lot_id); message.success(`${maChon.ma} đã kết thúc chạy`) }
-      await load()
-    } catch (e: any) { message.error(e?.message || 'Không khai được (cần chạy SQL p10)') }
-    finally { setChayBusy(false) }
+    if (batDau) {
+      const khac = maAll.filter((x) => x.dang_chay_tu && x.raw_lot_id !== maChon.raw_lot_id).map((x) => x.ma)
+      const thayThe = await xacNhanBatDauMa({ ma: maChon.ma, dangChay: khac })
+      if (thayThe === null) return
+      setChayBusy(true)
+      try { const r = await rawLotService.batDauChay(maChon.raw_lot_id, thayThe); message.success(`${r.da_chay ? `${r.ma} đã đang chạy` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng ${r.ma}` : `Đã khai ${r.ma} đang chạy`} — phiếu ca, phiếu chèn, lô TP từ giờ tự theo mã này`); await load() }
+      catch (e: any) { message.error(e?.message || 'Không khai được (cần chạy SQL p10)') }
+      finally { setChayBusy(false) }
+      return
+    }
+    Modal.confirm({
+      title: `Kết thúc mã ${maChon.ma}?`,
+      content: 'Mã sẽ không còn tự gắn vào phiếu ca, phiếu chèn, lô thành phẩm. Ngay sau đó máy tổng kết khối lượng chèn của mã và soạn sẵn mail báo cáo Ban Giám đốc.',
+      okText: 'Kết thúc mã và tổng kết', cancelText: 'Hủy',
+      onOk: async () => {
+        setChayBusy(true)
+        try { await rawLotService.ketThucChay(maChon.raw_lot_id); message.success(`${maChon.ma} đã kết thúc chạy`); await load(); setTk({ open: true, vua: true }) }
+        catch (e: any) { message.error(e?.message || 'Không kết thúc được') }
+        finally { setChayBusy(false) }
+      },
+    })
   }
 
   const submit = async () => {
@@ -215,8 +234,9 @@ export default function MixShiftPage() {
               options={maAll.map((m) => ({ value: m.raw_lot_id, label: `${m.ma} · ${RAW_LOT_TRANG_THAI_LABELS[m.trang_thai]}${m.rubber_type_name ? ' · ' + m.rubber_type_name : ''}` }))} />
             {maChon && <Tag color={maChon.trang_thai === 'dang_chay' ? 'green' : maChon.trang_thai === 'san_sang' ? 'blue' : 'default'}>{RAW_LOT_TRANG_THAI_LABELS[maChon.trang_thai]}</Tag>}
             {maChon && (maChon.dang_chay_tu
-              ? <Button size="small" loading={chayBusy} onClick={() => doiChay(false)}>Kết thúc chạy</Button>
+              ? <Button size="small" danger ghost loading={chayBusy} disabled={!canWrite} onClick={() => doiChay(false)}>Kết thúc mã</Button>
               : <Button size="small" type="primary" ghost loading={chayBusy} disabled={!canWrite} onClick={() => doiChay(true)}>Khai mã này đang chạy</Button>)}
+            {maChon && <Button size="small" onClick={() => setTk({ open: true, vua: false })}>Tổng kết mã · mail BGĐ</Button>}
             {maChon && <Text type="secondary">{maChon.ngay_dau ? `về ${new Date(maChon.ngay_dau).toLocaleDateString('vi-VN')}` : ''}{maChon.ngay_cuoi && maChon.ngay_cuoi !== maChon.ngay_dau ? ` → ${new Date(maChon.ngay_cuoi).toLocaleDateString('vi-VN')}` : ''} · {maChon.so_xe} xe · xuất SX {fmtKg(maChon.xuat_sx_kho_kg)} kg khô</Text>}
           </Space>}>
           {maId && (
@@ -290,6 +310,7 @@ export default function MixShiftPage() {
             <Col span={24}><Text>Ghi chú</Text><Input value={f.note} onChange={(e) => setF((x) => ({ ...x, note: e.target.value }))} /></Col>
           </Row>
         </Modal>
+        <MaTongKetModal open={tk.open} vuaKetThuc={tk.vua} rawLotId={maId ?? null} onClose={() => setTk({ open: false, vua: false })} />
       </Space>
     </div>
   )

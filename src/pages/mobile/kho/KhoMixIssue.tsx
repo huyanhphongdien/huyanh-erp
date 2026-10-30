@@ -37,6 +37,7 @@ export default function KhoMixIssue() {
   // trả cũng cân cả pallet như sổ tay: số bành còn · hàng + pallet · bì → trả = cân − bì
   const [retMode, setRetMode] = useState<'pallet' | 'kg'>(() => { try { return localStorage.getItem('kmx_can_mode') === 'kg' ? 'kg' : 'pallet' } catch { return 'pallet' } })
   const [retSoBanh, setRetSoBanh] = useState('')
+  const [dungHet, setDungHet] = useState(true)   // mặc định: dùng hết → cân pallet rỗng
   const [retGross, setRetGross] = useState('')
   const [retPallet, setRetPallet] = useState(() => { try { return localStorage.getItem('kmx_pallet_kg') || '15' } catch { return '15' } })
   // đổi mã nguyên liệu gốc của phiếu
@@ -86,12 +87,12 @@ export default function KhoMixIssue() {
     detectShift(user?.employee_id || null).then((d) => { if (alive) { setShifts(d.shifts); setShift((cur) => cur ?? d.pick) } }).catch(() => { /* bỏ qua */ })
     return () => { alive = false }
   }, [i?.id, i?.shift_id, i?.status]) // eslint-disable-line react-hooks/exhaustive-deps
+  // bì tạm lúc lấy → điền sẵn, QS khai lại cho đúng ở lần trả
+  useEffect(() => { if (i && i.pallet_kg !== null) setRetPallet(String(i.pallet_kg)) }, [i?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const required = settings.anh_bat_buoc?.length ? settings.anh_bat_buoc : ['toan_canh', 'man_hinh_can']
   const missOut = rawPhotoService.missing(pOut, required)
   const missRet = rawPhotoService.missing(pRet, required)
-  // trả 0 kg (dùng hết) thì không bắt ảnh trả
-  const missRetEff = (i?.kg_return ?? 0) > 0.005 ? missRet : []
   const editable = !!i && ['issued', 'returned'].includes(i.status)
 
   async function run(key: string, fn: () => Promise<any>, ok: string) {
@@ -103,7 +104,14 @@ export default function KhoMixIssue() {
 
   const retGrossN = retGross === '' ? null : Number(retGross)
   const retPalletN = retPallet === '' ? 0 : Number(retPallet)
-  const kgRetN = retMode === 'pallet' && !editRet ? (retGrossN !== null && Number.isFinite(retGrossN) && Number.isFinite(retPalletN) ? Math.round((retGrossN - retPalletN) * 100) / 100 : null) : kgRet === '' ? null : Number(kgRet)
+  // bì khai ở lần trả: dùng hết → số trên cân chính là pallet rỗng
+  const biN = dungHet ? (retGrossN ?? retPalletN) : retPalletN
+  const kgRetN = editRet ? (kgRet === '' ? null : Number(kgRet))
+    : dungHet ? (retGrossN !== null && Number.isFinite(retGrossN) && retGrossN > 0 ? 0 : null)
+    : retMode === 'pallet' ? (retGrossN !== null && Number.isFinite(retGrossN) && Number.isFinite(biN) ? Math.round((retGrossN - biN) * 100) / 100 : null)
+    : kgRet === '' ? null : Number(kgRet)
+  // kg lấy tính lại theo bì chính xác (chỉ khi lúc lấy có cân cả pallet)
+  const kgOutNew = i ? (i.gross_kg !== null && !editRet && (dungHet || retMode === 'pallet') && Number.isFinite(biN) ? Math.round((i.gross_kg - biN) * 100) / 100 : i.kg_out) : 0
   const kgTxt = (n: number | null) => (n === null ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }))
   const retSoBanhAuto = i && kgRetN !== null && Number.isFinite(kgRetN) && kgRetN >= 0 ? Math.round(kgRetN / (i.lot_kg_per_banh || 35)) : null
   const retSoBanhN = retSoBanh === '' ? retSoBanhAuto : Math.round(Number(retSoBanh))
@@ -119,13 +127,13 @@ export default function KhoMixIssue() {
     if (i.gross_kg !== null) { setLMode('pallet'); setLGross(String(i.gross_kg)); setLPallet(String(i.pallet_kg ?? 0)) } else { setLMode('kg'); setLKg(String(i.kg_out)) }
     setLBanh(''); setEditLay(true)
   }
-  const kgRetOk = !!i && kgRetN !== null && Number.isFinite(kgRetN) && kgRetN >= 0 && kgRetN <= i.kg_out + 0.01
+  const kgRetOk = !!i && kgRetN !== null && Number.isFinite(kgRetN) && kgRetN >= 0 && kgOutNew > 0 && kgRetN <= kgOutNew + 0.01
 
   async function traVaKy() {
     if (!i || !kgRetOk) return
     setBusy('tra'); setMsg(null)
     try {
-      const r = await mixService.tra(i.id, kgRetN!, handover, note.trim() || null, null, i.shift_id ? null : shift?.id ?? null, i.shift_id ? null : (team.trim() || null), { grossKg: retMode === 'pallet' ? retGrossN : null, palletKg: retMode === 'pallet' ? retPalletN : null, soBanhTra: retSoBanhN })
+      const r = await mixService.tra(i.id, kgRetN!, handover, note.trim() || null, null, i.shift_id ? null : shift?.id ?? null, i.shift_id ? null : (team.trim() || null), { grossKg: dungHet ? null : retMode === 'pallet' ? retGrossN : null, palletKg: dungHet || retMode === 'pallet' ? biN : null, soBanhTra: retSoBanhN, dungHet })
       let signed = false
       try { await mixService.ky(i.id, 'submit'); signed = true }
       catch (e: any) { setMsg({ ok: false, text: `Đã ghi trả nhưng chưa ký được: ${e?.message || ''}` }) }
@@ -236,9 +244,9 @@ export default function KhoMixIssue() {
 
   // ── màn TRẢ CUỐI CA (đang ở dây chuyền) ──
   if (st === 'issued') {
-    const tieuHao = kgRetN !== null && Number.isFinite(kgRetN) ? Math.max(i.kg_out - kgRetN, 0) : null
-    const p = tieuHao !== null && i.kg_out > 0 ? Math.round((100 * tieuHao) / i.kg_out) : 0
-    const ready = kgRetOk && (kgRetN === 0 || missRet.length === 0) && missOut.length === 0 && (!!i.shift_id || !!shift)
+    const tieuHao = kgRetN !== null && Number.isFinite(kgRetN) ? Math.max(kgOutNew - kgRetN, 0) : null
+    const p = tieuHao !== null && kgOutNew > 0 ? Math.round((100 * tieuHao) / kgOutNew) : 0
+    const ready = kgRetOk && missRet.length === 0 && missOut.length === 0 && (!!i.shift_id || !!shift)
     return (
       <div className="kmx">
         <header className="kmx-hd">
@@ -269,30 +277,47 @@ export default function KhoMixIssue() {
             </section>
           )}
           <section className="kmx-card" aria-label="Cân phần còn lại" style={{ gap: 10 }}>
-            <div className="kmx-row">
-              <span className="kmx-strong" style={{ fontSize: 13 }}>{retMode === 'pallet' ? 'Cân phần còn lại cả pallet' : 'Cân phần còn lại, đọc số trên cân'}</span>
-              <button type="button" className="kmx-pill sm" onClick={() => setRetMode(retMode === 'pallet' ? 'kg' : 'pallet')}>{retMode === 'pallet' ? 'Gõ thẳng kg' : 'Cân cả pallet'}</button>
+            <span className="kmx-strong" style={{ fontSize: 13 }}>Cuối ca còn hàng trên pallet không?</span>
+            <div className="kmx-seg">
+              <button type="button" className={dungHet ? 'on' : ''} onClick={() => { setDungHet(true); setRetGross(''); setRetSoBanh('') }}>Dùng hết · cân pallet rỗng</button>
+              <button type="button" className={!dungHet ? 'on' : ''} onClick={() => { setDungHet(false); setRetGross(''); setRetSoBanh('') }}>Còn hàng dư</button>
             </div>
-            {retMode === 'pallet' ? (
+            {dungHet ? (
               <>
-                <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Bì pallet (kg) · sửa nếu khác</span><input className="kmx-text" type="number" inputMode="decimal" value={retPallet} onChange={(e) => setRetPallet(e.target.value)} aria-label="Bì pallet" /></label>
-                <label htmlFor="kmx-ret" className="kmx-lbl">Hàng + pallet · số trên cân</label>
+                <label htmlFor="kmx-ret" className="kmx-lbl">Đặt pallet rỗng lên cân · số trên cân = bì pallet</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input id="kmx-ret" className={`kmx-input${retGross !== '' && !kgRetOk ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={retGross} onChange={(e) => { setRetGross(e.target.value); setRetSoBanh('') }} />
+                  <input id="kmx-ret" className={`kmx-input${retGross !== '' && !kgRetOk ? ' red' : ''}`} type="number" inputMode="decimal" placeholder={retPallet || '15'} value={retGross} onChange={(e) => { setRetGross(e.target.value); setRetSoBanh('') }} />
                   <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
                 </div>
-                <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>Trả = {retGross || '0'} − bì {retPallet || '0'}</span><span className="kmx-num sm">{kgRetN === null ? '—' : `${kgTxt(kgRetN)} kg`}</span></div>
+                <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>Trả 0 kg · bì pallet {retGross ? `${kgTxt(retGrossN)} kg` : 'chưa cân'}</span><span className="kmx-num sm">{retGrossN !== null && retGrossN > 0 ? `tiêu hao ${kgTxt(kgOutNew)} kg` : '—'}</span></div>
               </>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input id="kmx-ret" className={`kmx-input${kgRet !== '' && !kgRetOk ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={kgRet} onChange={(e) => { setKgRet(e.target.value); setRetSoBanh('') }} />
-                <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
-              </div>
+              <>
+                <div className="kmx-row">
+                  <span className="kmx-sm" style={{ fontWeight: 600 }}>{retMode === 'pallet' ? 'Cân hàng trả + pallet, khai bì' : 'Gõ thẳng kg hàng trả'}</span>
+                  <button type="button" className="kmx-pill sm" onClick={() => setRetMode(retMode === 'pallet' ? 'kg' : 'pallet')}>{retMode === 'pallet' ? 'Gõ thẳng kg' : 'Cân cả pallet'}</button>
+                </div>
+                {retMode === 'pallet' ? (
+                  <>
+                    <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Bì pallet (kg) · khai ở đây là số chính xác</span><input className="kmx-text" type="number" inputMode="decimal" value={retPallet} onChange={(e) => { setRetPallet(e.target.value); setRetSoBanh('') }} aria-label="Bì pallet" /></label>
+                    <label htmlFor="kmx-ret" className="kmx-lbl">Hàng trả + pallet · số trên cân</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <input id="kmx-ret" className={`kmx-input${retGross !== '' && !kgRetOk ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={retGross} onChange={(e) => { setRetGross(e.target.value); setRetSoBanh('') }} />
+                      <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
+                    </div>
+                    <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>Trả = {retGross || '0'} − bì {retPallet || '0'}</span><span className="kmx-num sm">{kgRetN === null ? '—' : `${kgTxt(kgRetN)} kg`}</span></div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input id="kmx-ret" className={`kmx-input${kgRet !== '' && !kgRetOk ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={kgRet} onChange={(e) => { setKgRet(e.target.value); setRetSoBanh('') }} />
+                    <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
+                  </div>
+                )}
+              </>
             )}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" className="kmx-pill" onClick={() => { setRetMode('kg'); setKgRet('0') }}>Dùng hết · 0 kg</button>
-              <button type="button" className="kmx-pill" onClick={() => { setRetMode('kg'); setKgRet(String(i.kg_out)) }}>Chưa dùng · {fmtKg(i.kg_out)} kg</button>
-            </div>
+            {i.gross_kg !== null && (dungHet || retMode === 'pallet') && Number.isFinite(biN) && (dungHet ? retGrossN !== null : true) && (
+              <span className="kmx-sm">Lúc lấy cân cả pallet <b>{kgTxt(i.gross_kg)} kg</b>. Với bì {kgTxt(biN)} kg, kg lấy tính lại = <b>{kgTxt(kgOutNew)} kg</b>{Math.abs(kgOutNew - i.kg_out) > 0.05 ? ` (lúc lấy tạm ghi ${kgTxt(i.kg_out)})` : ''}.</span>
+            )}
             <div className="kmx-row" style={{ alignItems: 'center' }}>
               <span className="kmx-col"><span className="kmx-lbl">Số bành còn</span><span className="kmx-sm">tự tính {i.lot_kg_per_banh} kg/bành{i.so_banh !== null ? ` · lấy ${i.so_banh} bành` : ''}{retSoBanh !== '' ? ' · bạn đã chỉnh' : ''}</span></span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -308,7 +333,7 @@ export default function KhoMixIssue() {
                 <div className="kmx-row" style={{ fontSize: 11, fontWeight: 600, color: '#4B5563' }}><span>Đã dùng {fmtKg(tieuHao)} kg ({p} %)</span><span>Trả {fmtKg(kgRetN)} kg</span></div>
               </div>
             )}
-            {kgRetN !== null && !kgRetOk && <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Số trả phải từ 0 đến {fmtKg(i.kg_out)} kg</span>}
+            {kgRetN !== null && !kgRetOk && <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Số trả phải từ 0 đến {fmtKg(kgOutNew)} kg</span>}
             {settings.chen_ban_giao_ca && (
               <label className="kmx-check-row" htmlFor="kmx-handover">
                 <input id="kmx-handover" type="checkbox" checked={handover} onChange={(e) => setHandover(e.target.checked)} />
@@ -316,11 +341,11 @@ export default function KhoMixIssue() {
               </label>
             )}
           </section>
-          {kgRetN === 0 ? <div className="kmx-note ok">{I.info}<span><b>Dùng hết, trả 0 kg:</b> không cần chụp ảnh trả. Chỉ khi còn hàng dư mang về mới cần 2 ảnh.</span></div> : <section className="kmx-card" aria-label="Chụp ảnh lúc trả">
-            <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Chụp 2 ảnh phần trả</span><span className={`kmx-chip ${missRet.length ? 'red' : 'ok'}`}>{required.length - missRet.length}/{required.length}{missRet.length ? ` · thiếu ${missRet.length}` : ' đã chụp'}</span></div>
-            <KmxPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={required} facilityCode={i.facility_code || undefined} labels={{ toan_canh: 'Toàn cảnh phần trả', man_hinh_can: 'Màn hình cân' }} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />
-            <span className="kmx-sm">Đủ 2 ảnh thì nút dưới mới sáng. Ảnh bổ sung không bắt buộc.</span>
-          </section>}
+          <section className="kmx-card" aria-label="Chụp ảnh lúc trả">
+            <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>{dungHet ? 'Chụp 2 ảnh pallet rỗng trên cân' : 'Chụp 2 ảnh phần trả'}</span><span className={`kmx-chip ${missRet.length ? 'red' : 'ok'}`}>{required.length - missRet.length}/{required.length}{missRet.length ? ` · thiếu ${missRet.length}` : ' đã chụp'}</span></div>
+            <KmxPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={required} facilityCode={i.facility_code || undefined} labels={{ toan_canh: dungHet ? 'Pallet rỗng toàn cảnh' : 'Toàn cảnh phần trả', man_hinh_can: 'Màn hình cân' }} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />
+            <span className="kmx-sm">Đủ 2 ảnh thì nút dưới mới sáng, kể cả dùng hết (ảnh pallet rỗng là bằng chứng bì). Ảnh bổ sung không bắt buộc.</span>
+          </section>
           <div className="kmx-col" style={{ gap: 6 }}>
             <label htmlFor="kmx-rnote" className="kmx-sm" style={{ fontWeight: 600 }}>Ghi chú (không bắt buộc)</label>
             <input id="kmx-rnote" className="kmx-text" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -395,7 +420,7 @@ export default function KhoMixIssue() {
           </div></div>
           <div className={`kmx-tl${i.return_at ? '' : ' todo'}`}><span className={`kmx-tl-dot ${i.return_at ? 'done' : 'todo'}`}>{i.return_at ? I.checkSm : '·'}</span><div className="kmx-tl-body">
             <span className="kmx-row"><span className="kmx-strong" style={i.return_at ? undefined : { color: '#6B7280' }}>Trả cuối ca{i.return_at ? ` · ${fmtKg(i.kg_return)} kg` : ''}</span><span className="kmx-sm">{hm(i.return_at)}</span></span>
-            {i.return_at && <span className="kmx-sm">{i.return_name || ''} · {i.handover_to_next ? 'để lại dây chuyền, bàn giao ca sau' : (i.kg_return ?? 0) <= 0.005 ? 'dùng hết, không cần ảnh trả' : 'về kho, không bàn giao'}{missRetEff.length ? ` · thiếu ${missRetEff.length} ảnh` : ''}</span>}
+            {i.return_at && <span className="kmx-sm">{i.return_name || ''} · {i.handover_to_next ? 'để lại dây chuyền, bàn giao ca sau' : i.dung_het || (i.kg_return ?? 0) <= 0.005 ? `dùng hết · cân pallet rỗng${i.return_pallet_kg !== null ? ` ${kgTxt(i.return_pallet_kg)} kg` : ''}` : 'về kho, không bàn giao'}{missRet.length ? ` · thiếu ${missRet.length} ảnh` : ''}</span>}
             {pRet.length > 0 && <div className="kmx-thumbs">{thumbs(pRet)}</div>}
           </div></div>
           <div className={`kmx-tl${i.submitted_at ? '' : ' todo'}`}><span className={`kmx-tl-dot ${i.submitted_at ? 'done' : st === 'returned' ? 'now' : 'todo'}`}>{i.submitted_at ? I.checkSm : '1'}</span><div className="kmx-tl-body">
@@ -416,10 +441,10 @@ export default function KhoMixIssue() {
         {st === 'returned' && (
           <section className="kmx-card" aria-label="Ký khai báo" style={{ gap: 10 }}>
             <h2 className="kmx-h2">Bước 1/3 · QS ký khai báo</h2>
-            {(missOut.length > 0 || missRetEff.length > 0) && <div className="kmx-note red" style={{ padding: '8px 10px' }}>{I.info}<span>Thiếu ảnh bắt buộc{missOut.length ? ` lúc lấy (${missOut.length})` : ''}{missRetEff.length ? ` lúc trả (${missRetEff.length})` : ''}. Chụp đủ rồi mới ký được.</span></div>}
+            {(missOut.length > 0 || missRet.length > 0) && <div className="kmx-note red" style={{ padding: '8px 10px' }}>{I.info}<span>Thiếu ảnh bắt buộc{missOut.length ? ` lúc lấy (${missOut.length})` : ''}{missRet.length ? ` lúc trả (${missRet.length})` : ''}. Chụp đủ rồi mới ký được.</span></div>}
             {missOut.length > 0 && <KmxPhotoTiles refType="mix_issue_out" refId={i.id} photos={pOut} required={required} facilityCode={i.facility_code || undefined} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />}
-            {missRetEff.length > 0 && <KmxPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={required} facilityCode={i.facility_code || undefined} labels={{ toan_canh: 'Toàn cảnh phần trả', man_hinh_can: 'Màn hình cân' }} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />}
-            <button type="button" className="kmx-btn md" disabled={!canSubmit || missOut.length > 0 || missRetEff.length > 0 || busy === 'submit'} onClick={() => ky('submit')}>{I.pen}Ký khai báo (QS)</button>
+            {missRet.length > 0 && <KmxPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={required} facilityCode={i.facility_code || undefined} labels={{ toan_canh: 'Toàn cảnh phần trả', man_hinh_can: 'Màn hình cân' }} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />}
+            <button type="button" className="kmx-btn md" disabled={!canSubmit || missOut.length > 0 || missRet.length > 0 || busy === 'submit'} onClick={() => ky('submit')}>{I.pen}Ký khai báo (QS)</button>
             {!editRet ? <button type="button" className="kmx-btn sec" onClick={() => { setKgRet(String(i.kg_return ?? '')); setHandover(i.handover_to_next); setEditRet(true) }}>Sửa kg trả</button> : (
               <div className="kmx-col" style={{ gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" type="number" inputMode="decimal" value={kgRet} onChange={(e) => { setKgRet(e.target.value); setRetSoBanh('') }} aria-label="Kg trả" /><span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span></div>

@@ -6,10 +6,10 @@ Dành cho QS tại xưởng, QC, thủ kho và chủ doanh nghiệp. Điện tho
 
 | Việc | Ở đâu | Ghi chú |
 |---|---|---|
-| Chạy SQL theo thứ tự p4 → p5 → p6 → p7 → p8 | Supabase SQL Editor | p4–p7 đã chạy 30/10; **p8** (`docs/migrations/wms_mix_p8_sua_can_lay.sql`) chạy khi cần nút Sửa cân lúc lấy |
+| Chạy SQL theo thứ tự p4 → p5 → p6 → p7 → p8 → p9 | Supabase SQL Editor | p4–p7 đã chạy 30/10; **p8** (`wms_mix_p8_sua_can_lay.sql`) và **p9** (`wms_mix_p9_tra_bi_pallet.sql`) chạy tiếp theo thứ tự |
 | Phân công | Máy tính: Hàng chèn → tab **Phân công** | Bước 1 QS khai báo · Bước 2 QC duyệt (Lê Thành Nhân, Lê Thị Lệ Trinh, chủ DN) · Bước 3 Thủ kho nhận (tạm: chủ DN). Gõ tên → Thêm; Thu để bỏ. BGĐ level ≤ 3 làm được mọi bước |
 | Cỡ bành | Danh mục chủng loại (`weight_per_unit`) | mặc định 35 kg/bành; lô TP / hàng chuẩn lấy cỡ bành của chủng loại |
-| Bì pallet | Không cần cấu hình | mặc định 15 kg, sửa ngay trên phiếu, máy nhớ số vừa gõ |
+| Bì pallet | Không cần cấu hình | lúc lấy chỉ là số tạm (15); **khai chính xác ở lần trả**: dùng hết thì cân pallet rỗng, số trên cân chính là bì |
 
 Ai không có tên ở bước 1 sẽ thấy "chưa được phân công khai báo (QS)" và không lấy / nhập lô được.
 
@@ -40,19 +40,19 @@ Trang chính tab Chèn → nút **Lấy lần n** (máy đếm theo ca).
 1. **Chọn lô:** quét tem CH-… hoặc gõ / quét đúng số lô trên bao, hoặc chạm thẻ lô. Thẻ xám phía trên liệt kê các lần đã lấy của ca (L1, L2…) để đối chiếu sổ.
 2. **Ca:** tự nhận theo chấm công hoặc giờ, bấm Đổi ca nếu khác. Tổ trưởng: **Ca Vang** hoặc **Ca Hiền**. Dùng để: Chạy lại / Nâng chỉ số.
 3. **Chèn vào đâu:** Chèn bể Slap hoặc Chèn máy Mix (bắt buộc, máy nhớ lần trước).
-4. **Cân:** mặc định "Cân cả pallet": bì pallet (15, sửa nếu khác) + số trên cân "Hàng + pallet" → máy trừ bì ra kg hàng chèn, tự tính **số bành** (− + nếu đếm khác). Bấm "Gõ thẳng kg" nếu không cân cả pallet.
+4. **Cân:** chỉ cần số trên cân "Hàng + pallet" (cân tổng). Bì 15 là tạm, sẽ khai chính xác ở lần trả. Máy tạm trừ bì ra kg hàng chèn và tính **số bành** (− + nếu đếm khác). Bấm "Gõ thẳng kg" nếu không cân cả pallet.
 5. **Chèn vào mã:** chip mã tự sáng theo phiếu ca; chạm thêm mã nếu chèn chung.
 6. **Chụp 2 ảnh** tại cân (toàn cảnh, màn hình cân) → Tiếp tục → xem lại → **Ghi lần n**.
 7. Pallet tiếp theo: **Lấy lần n+1**. Lần 1 chưa trả vẫn lấy lần 2, 3 bình thường.
 
 ## 4. Trả cuối ca (QS)
 
-Trang chính, dòng **L1 · Trả L1** (từng lần có nút riêng):
-- Dùng hết: bấm **Dùng hết · 0 kg** → không cần ảnh trả → **Ghi trả và ký khai báo** (một chạm = ghi trả + chữ ký bước 1).
-- Còn dư mang về kho: cân cả pallet (bì + hàng + pallet) hoặc gõ kg, số bành còn tự tính, chụp 2 ảnh phần trả, rồi ghi và ký.
+Trang chính, dòng **L1 · Trả L1** (từng lần có nút riêng). Bì pallet khai ở bước này mới là số chính xác.
+- **Dùng hết** (mặc định): đặt pallet rỗng lên cân, gõ số trên cân → đó là bì; trả 0 kg. Máy tính lại kg lấy = cân tổng lúc lấy − bì. Chụp 2 ảnh pallet rỗng trên cân → **Ghi trả và ký khai báo** (một chạm = ghi trả + chữ ký bước 1).
+- **Còn hàng dư:** gõ bì pallet chính xác và số trên cân "Hàng trả + pallet" → kg trả = cân − bì, kg lấy cũng tính lại theo bì này. Chụp 2 ảnh phần trả, rồi ghi và ký.
 - Để phần dư lại dây chuyền cho ca sau: tick "Để lại dây chuyền cho ca sau" (máy tự mở phiếu lấy cho ca kế khi thủ kho nhận; ca kế phải chọn ca khi trả).
 
-Tiêu hao = lấy − trả. Kho chèn chỉ trừ khi thủ kho nhận.
+Tiêu hao = cân lúc lấy − cân lúc trả (bì triệt tiêu). Kho chèn chỉ trừ khi thủ kho nhận.
 
 ## 5. Ký 3 bước
 
@@ -89,6 +89,7 @@ Nhiều phiếu một ca: thẻ đầu trang **"Ký tất cả N phiếu · ngà
 
 - Mỗi phiếu = một pallet = một lần chèn; số lần đếm theo ca, gom theo mã gốc.
 - Bành 35 kg (hoặc cỡ bành của chủng loại), máy tự quy; chỉ chỉnh khi đếm khác.
-- 2 ảnh lúc lấy luôn bắt buộc; ảnh trả chỉ khi còn hàng dư.
+- Bì pallet: lúc lấy tạm, lúc trả chính xác; máy tự tính lại kg lấy theo bì lúc trả.
+- 2 ảnh lúc lấy và 2 ảnh lúc trả luôn bắt buộc, kể cả dùng hết (ảnh pallet rỗng trên cân là bằng chứng bì).
 - Kho chèn, sổ ca, gom theo mã chỉ thay đổi ở bước thủ kho nhận.
-- Chi tiết kiểm thử từng màn: `docs/HANG_CHEN_TEST_TU_DAU_TOI_CUOI.md` (mục 14–20).
+- Chi tiết kiểm thử từng màn: `docs/HANG_CHEN_TEST_TU_DAU_TOI_CUOI.md` (mục 14–21).

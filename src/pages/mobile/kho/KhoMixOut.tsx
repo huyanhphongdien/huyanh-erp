@@ -193,7 +193,7 @@ export default function KhoMixOut() {
             {maChon.length > 0 && <span>{maChon.length ? <>Chèn vào mã <b className="kmx-mono" style={{ color: '#fff' }}>{maLabel}</b></> : 'Mã gốc theo phiếu ca'}</span>}
             <span>{caTo} · {purpose === 'chay_lai' ? 'chạy lại' : `nâng ${targetIndex}${targetValue ? ' → ' + targetValue : ''}`} · {photos.length} ảnh · {firstName(user?.full_name) || ''}</span>
           </div>
-          <div className="kmx-note gold" style={{ width: '100%', boxSizing: 'border-box', textAlign: 'left' }}>{I.clock}<span><b>Việc tiếp theo, cuối ca:</b> mở trang chính, bấm <b>Trả cuối ca</b>, cân phần còn lại (dùng hết thì một chạm, không cần ảnh).</span></div>
+          <div className="kmx-note gold" style={{ width: '100%', boxSizing: 'border-box', textAlign: 'left' }}>{I.clock}<span><b>Việc tiếp theo, cuối ca:</b> mở trang chính, bấm <b>Trả cuối ca</b>, dùng hết thì cân pallet rỗng (bì chính xác), còn dư thì cân hàng + pallet, chụp 2 ảnh.</span></div>
         </div>
         <div className="kmx-done-foot">
           <button type="button" className="kmx-btn white" onClick={() => nav('/m/kho/chen')}>Về trang chính</button>
@@ -307,7 +307,7 @@ export default function KhoMixOut() {
             </div>
             {mode === 'pallet' ? (
               <>
-                <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Bì pallet (kg) · sửa nếu khác</span><input className="kmx-text" type="number" inputMode="decimal" value={pallet} onChange={(e) => doiPallet(e.target.value)} aria-label="Bì pallet" /></label>
+                <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Bì pallet (kg) · tạm, khai chính xác lúc trả</span><input className="kmx-text" type="number" inputMode="decimal" value={pallet} onChange={(e) => doiPallet(e.target.value)} aria-label="Bì pallet" /></label>
                 <label htmlFor="kmx-kg" className="kmx-lbl">Hàng + pallet · số trên cân</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <input id="kmx-kg" className={`kmx-input${qua || (kgN !== null && kgN <= 0) ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={gross} onChange={(e) => { setGross(e.target.value); setSoBanh('') }} autoFocus />

@@ -106,6 +106,7 @@ export interface MixIssue {
   out_edit_by: string | null
   out_edit_name: string | null
   out_kg_truoc: number | null
+  dung_het: boolean
   production_order_id: string | null
   production_code: string | null
   output_batch_id: string | null
@@ -192,7 +193,7 @@ const normIssue = (r: any): MixIssue => ({
   kg_out: num(r.kg_out), kg_return: numOrNull(r.kg_return), kg_used: numOrNull(r.kg_used), handover_to_next: !!r.handover_to_next,
   so_anh_lay: num(r.so_anh_lay), so_anh_tra: num(r.so_anh_tra), lot_kg_per_banh: num(r.lot_kg_per_banh) || 35,
   so_banh: numOrNull(r.so_banh), gross_kg: numOrNull(r.gross_kg), pallet_kg: numOrNull(r.pallet_kg),
-  so_banh_tra: numOrNull(r.so_banh_tra), return_gross_kg: numOrNull(r.return_gross_kg), return_pallet_kg: numOrNull(r.return_pallet_kg), out_kg_truoc: numOrNull(r.out_kg_truoc),
+  so_banh_tra: numOrNull(r.so_banh_tra), return_gross_kg: numOrNull(r.return_gross_kg), return_pallet_kg: numOrNull(r.return_pallet_kg), out_kg_truoc: numOrNull(r.out_kg_truoc), dung_het: !!r.dung_het,
   raw_lot_ids: Array.isArray(r.raw_lot_ids) ? r.raw_lot_ids : null, ma_goc: r.ma_goc ?? null, ma_goc_all: r.ma_goc_all ?? null,
 })
 
@@ -295,13 +296,14 @@ export const mixService = {
   },
 
   async tra(issueId: string, kgReturn: number, handover: boolean, note?: string | null, outputBatchId?: string | null, shiftId?: string | null, team?: string | null,
-    can?: { grossKg?: number | null; palletKg?: number | null; soBanhTra?: number | null } | null): Promise<{ kg_used: number }> {
+    can?: { grossKg?: number | null; palletKg?: number | null; soBanhTra?: number | null; dungHet?: boolean } | null): Promise<{ kg_used: number; kg_out: number; kg_return: number; bi: number | null }> {
     const { data, error } = await supabase.rpc('fn_mix_tra', {
       p_issue_id: issueId, p_kg_return: kgReturn, p_handover: handover, p_note: note ?? null, p_output_batch_id: outputBatchId ?? null, p_shift_id: shiftId ?? null, p_team: team ?? null,
-      p_gross_kg: can?.grossKg ?? null, p_pallet_kg: can?.palletKg ?? null, p_so_banh_tra: can?.soBanhTra ?? null,
+      p_gross_kg: can?.grossKg ?? null, p_pallet_kg: can?.palletKg ?? null, p_so_banh_tra: can?.soBanhTra ?? null, p_dung_het: can?.dungHet ?? false,
     })
     if (error) throw new Error(dichLoiNhapKho(error))
-    return { kg_used: num((data as any)?.kg_used) }
+    const d: any = data ?? {}
+    return { kg_used: num(d.kg_used), kg_out: num(d.kg_out), kg_return: num(d.kg_return), bi: numOrNull(d.bi) }
   },
 
   /** Sửa cân lúc lấy (bì, hàng + pallet hoặc kg, số bành) khi phiếu chưa qua bước QS ký; máy tính lại kg lấy, dây chuyền, tiêu hao */

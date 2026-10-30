@@ -270,6 +270,18 @@ Quy trình chốt 30/10: **Bước 1 QS khai báo** (nhập lô chèn, lấy đ�
 | 20.3 | Ô thống kê "Tiêu hao mã … đã nhận" | khớp dòng tóm tắt |
 | 20.4 | Phiếu chưa gắn mã | bảng cam riêng bên dưới; mở phiếu → Đổi mã là biến mất |
 
+## 21. Bì pallet khai ở lần trả, ảnh trả luôn bắt buộc (sau SQL `wms_mix_p9_tra_bi_pallet.sql`, chạy SAU p8, 30/10)
+
+| # | Việc | Kỳ vọng |
+|---|---|---|
+| 21.1 | Chạy SQL → kiểm chứng | `f_tra_v5` khác null, `so_ban_fn_mix_tra_phai_la_1` = 1, `cot_moi_phai_la_2` = 2 |
+| 21.2 | Lấy lần 1: cân cả pallet 191,5, bì tạm 15 | phiếu ghi lấy 176,5 kg (tạm) |
+| 21.3 | Trả L1, chọn **Dùng hết · cân pallet rỗng**, cân pallet rỗng 16,5 | dòng xanh "Trả 0 kg · bì pallet 16,5 kg · tiêu hao 175 kg"; dòng nhỏ "Lúc lấy cân cả pallet 191,5 kg. Với bì 16,5 kg, kg lấy tính lại = 175 kg (lúc lấy tạm ghi 176,5)"; phải chụp 2 ảnh pallet rỗng mới sáng nút; sau ghi: phiếu lấy 175, trả 0, tiêu hao 175, kho chèn "ở dây chuyền" giảm 1,5 |
+| 21.4 | Trả còn dư: **Còn hàng dư**, bì 16,5, hàng + pallet 86,5 | trả 70 kg, kg lấy tính lại 175, tiêu hao 105 = 191,5 − 86,5 (bì triệt tiêu) |
+| 21.5 | Phiếu lấy kiểu "gõ thẳng kg" (không có cân tổng) | kg lấy giữ nguyên, chỉ tính kg trả |
+| 21.6 | Ký khai báo khi thiếu ảnh trả dù trả 0 kg | báo thiếu ảnh (THIEU_ANH), không ký được |
+| 21.7 | Máy tính /wms/chen/phieu/:id | ô "Dùng hết · cân pallet rỗng" + cân pallet rỗng, hoặc hàng + pallet · bì · kg trả tự tính; dòng "Kg lấy tính lại · trả · tiêu hao" |
+
 ## Lỗi hay gặp
 
 | Màn hình báo | Nguyên nhân | Làm gì |

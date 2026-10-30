@@ -132,7 +132,7 @@ export default function KhoMixSign() {
                 <div className="kmx-stat ok"><span className="kmx-lbl ok" style={{ fontSize: 10 }}>Tiêu hao</span><span className="kmx-num md ok">{fmtKg(i.kg_used)}</span></div>
               </div>
               <div className="kmx-col" style={{ gap: 6 }}>
-                <span className="kmx-lbl">{outs.length + rets.length} ảnh{(i.kg_return ?? 0) <= 0.005 ? ' · dùng hết, không cần ảnh trả' : ''} · chạm để xem to</span>
+                <span className="kmx-lbl">{outs.length + rets.length} ảnh{i.dung_het ? ` · dùng hết, bì ${i.return_pallet_kg ?? '?'} kg` : ''} · chạm để xem to</span>
                 <PhotoStrip out={outs} ret={rets} onOpen={(p, cap) => setBig({ src: p.public_url!, cap: `${cap} · ${fmtDt(p.taken_at)}` })} />
               </div>
               <span className="kmx-sm">{i.return_name ? `Trả: ${i.return_name}` : ''}{i.submitted_name ? ` · QS ${i.submitted_name} ký ${hm(i.submitted_at)}` : ''}{i.qc_confirmed_name ? ` · QC ${i.qc_confirmed_name} duyệt ${hm(i.qc_confirmed_at)}` : ''}{i.handover_to_next ? ' · bàn giao ca sau' : ''}</span>

@@ -141,7 +141,7 @@ export default function MixShiftPage() {
           <Col>
             <div>
               <Title level={3} style={{ margin: 0 }}>Hàng chèn</Title>
-              <Text type="secondary">QS lấy đầu ca → trả cuối ca → QS ký → QC duyệt → thủ kho nhận · tiêu hao = lấy − trả · 2 ảnh lúc lấy (trả 0 kg không cần ảnh) · dòng CHÈN sổ ca tự điền</Text>
+              <Text type="secondary">QS lấy đầu ca → trả cuối ca → QS ký → QC duyệt → thủ kho nhận · tiêu hao = lấy − trả · 2 ảnh lúc lấy và lúc trả · bì pallet khai ở lần trả (dùng hết = cân pallet rỗng) · dòng CHÈN sổ ca tự điền</Text>
             </div>
           </Col>
           <Col>

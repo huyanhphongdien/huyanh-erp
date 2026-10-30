@@ -11,7 +11,7 @@ import { DatabaseOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icon
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import MaTongKetModal from '../../../components/wms/MaTongKetModal'
 import { xacNhanBatDauMa } from '../../../components/wms/xacNhanBatDauMa'
-import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPurpose, type MixSourceType, type MixViTri, type ShiftLite } from '../../../services/wms/mixService'
+import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_COLORS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPurpose, type MixSourceType, type MixViTri, type ShiftLite } from '../../../services/wms/mixService'
 import { rawIssueService, type ProductionOrderLite } from '../../../services/wms/rawIssueService'
 import { fgLotService, type FgLot } from '../../../services/wms/fgLotService'
 import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type LenhChay, type RawLotBalance, type RawLotChen } from '../../../services/wms/rawLotService'
@@ -114,7 +114,7 @@ export default function MixShiftPage() {
     return rows.reverse()   // mới nhất trên cùng, lũy kế vẫn tính theo thời gian
   }, [maIssues])
   const tongMa = useMemo(() => {
-    const s = { lan: maIssues.length, lay: 0, tra: 0, tieuHao: 0, daNhan: 0, choKy: 0, dayChuyen: 0, be: 0, mix: 0, banh: 0, ca: new Set<string>() }
+    const s = { lan: maIssues.length, lay: 0, tra: 0, tieuHao: 0, daNhan: 0, choKy: 0, dayChuyen: 0, be: 0, mix: 0, bt: 0, banh: 0, ca: new Set<string>() }
     for (const i of maIssues) {
       s.lay += i.kg_out; s.tra += i.kg_return ?? 0; s.tieuHao += i.kg_used ?? 0; s.banh += i.so_banh ?? 0; s.ca.add(`${i.shift_date}|${i.shift_id ?? ''}`)
       if (i.status === 'received') s.daNhan += i.kg_used ?? 0
@@ -122,6 +122,7 @@ export default function MixShiftPage() {
       else s.choKy += i.kg_used ?? 0
       if (i.vi_tri === 'be_slap') s.be += i.kg_used ?? 0
       if (i.vi_tri === 'may_mix') s.mix += i.kg_used ?? 0
+      if (i.vi_tri === 'bang_tai') s.bt += i.kg_used ?? 0
     }
     return s
   }, [maIssues])
@@ -129,7 +130,9 @@ export default function MixShiftPage() {
   const lotsCoHang = useMemo(() => lots.filter((l) => l.ton_kg > 0.005), [lots])
   const lotChon = lotsCoHang.find((l) => l.id === f.lotId)
   // kg hàng chèn: gõ thẳng, hoặc = hàng + pallet − bì (như sổ tay tổ ép)
-  const kgNet = f.kg ?? f.grossKg   // cân tổng; bì khai lúc trả
+  const kpbChon = lotChon?.kg_per_banh || 35
+  // băng tải: bành × kg/bành, không pallet, không bì; còn lại: cân tổng, bì khai lúc trả
+  const kgNet = f.viTri === 'bang_tai' ? (f.kg ?? (f.soBanh ? Math.round(f.soBanh * kpbChon * 100) / 100 : null)) : (f.kg ?? f.grossKg)
   // lệnh chạy (SQL p13): bắt đầu 1..n mã — thay thế (mặc định 30/10) / song song / gộp; kết thúc lệnh → tổng kết chèn + mail BGĐ
   const doiChay = async (batDau: boolean) => {
     if (!maChon) return
@@ -192,7 +195,7 @@ export default function MixShiftPage() {
       const lotId = f.cach === 'nguon'
         ? await mixService.timHoacTaoLo({ facilityId, sourceType: f.nguon ?? null, soLo: f.fgLotId ? null : f.soLoMoi, fgLotId: f.fgLotId ?? null, metalCleared: f.nguon === 'dkl' ? f.raKimLoai : null })
         : f.lotId as string
-      const id = await mixService.lay({ lotId, kg: kgNet, viTri: f.viTri, rawLotIds: f.rawLotIds, soBanh: f.soBanh, grossKg: f.grossKg, palletKg: null, shiftDate: date, shiftId: f.shiftId ?? null, team: f.team.trim() || null, purpose: f.purpose, targetIndex: f.purpose === 'nang_chi_so' ? f.targetIndex.trim() || null : null, targetValue: f.purpose === 'nang_chi_so' ? f.targetValue : null, productionOrderId: f.poId ?? null, note: f.note.trim() || null })
+      const id = await mixService.lay({ lotId, kg: kgNet, viTri: f.viTri, rawLotIds: f.rawLotIds, soBanh: f.soBanh, grossKg: f.viTri === 'bang_tai' ? null : f.grossKg, palletKg: null, shiftDate: date, shiftId: f.shiftId ?? null, team: f.team.trim() || null, purpose: f.purpose, targetIndex: f.purpose === 'nang_chi_so' ? f.targetIndex.trim() || null : null, targetValue: f.purpose === 'nang_chi_so' ? f.targetValue : null, productionOrderId: f.poId ?? null, note: f.note.trim() || null })
       message.success('Đã ghi lấy đầu ca — chụp 2 ảnh ở trang phiếu'); setOpen(false)
       setF({ lotId: undefined, kg: null, shiftId: undefined, team: '', purpose: 'chay_lai', targetIndex: '', targetValue: null, poId: undefined, note: '', rawLotIds: [], soBanh: null, grossKg: null, palletKg: 15, viTri: undefined, cach: 'nguon', nguon: undefined, fgLotId: undefined, soLoMoi: '', raKimLoai: false })
       navigate(`/wms/chen/phieu/${id}`)
@@ -204,7 +207,7 @@ export default function MixShiftPage() {
     { title: 'Phiếu', dataIndex: 'code', key: 'code', render: (v, r) => <a onClick={() => navigate(`/wms/chen/phieu/${r.id}`)}><Text code>{v}</Text></a> },
     { title: 'Ngày · ca', key: 'ca', render: (_, r) => <span>{new Date(r.shift_date).toLocaleDateString('vi-VN')}{r.shift_name ? ` · ${r.shift_name}` : ''}{r.team ? <Text type="secondary"> · {r.team}</Text> : null}</span> },
     { title: 'Lô chèn', key: 'lot', render: (_, r) => <span>{r.lot_so_lo ? <Text strong>{r.lot_so_lo} </Text> : null}<Text code>{r.lot_code}</Text> <Text type="secondary">{MIX_SOURCE_LABELS[r.source_type]}{r.lot_grade ? ` · ${r.lot_grade}` : ''}</Text></span> },
-    { title: 'Chèn vào', key: 'vi_tri', render: (_, r) => <span>{r.vi_tri ? <Tag color={r.vi_tri === 'be_slap' ? 'cyan' : 'purple'}>{MIX_VI_TRI_LABELS[r.vi_tri]}</Tag> : null}{r.ma_goc_all ? <Tag color="geekblue">{r.ma_goc_all}</Tag> : <Text type="secondary">mã: theo phiếu ca</Text>}{r.so_banh !== null ? <Text type="secondary"> · {r.so_banh} bành</Text> : null}</span> },
+    { title: 'Chèn vào', key: 'vi_tri', render: (_, r) => <span>{r.vi_tri ? <Tag color={MIX_VI_TRI_COLORS[r.vi_tri]}>{MIX_VI_TRI_LABELS[r.vi_tri]}</Tag> : null}{r.ma_goc_all ? <Tag color="geekblue">{r.ma_goc_all}</Tag> : <Text type="secondary">mã: theo phiếu ca</Text>}{r.so_banh !== null ? <Text type="secondary"> · {r.so_banh} bành</Text> : null}</span> },
     { title: 'Mục đích', dataIndex: 'purpose', key: 'purpose', render: (v: MixPurpose, r) => <span>{MIX_PURPOSE_LABELS[v]}{r.target_index ? <Text type="secondary"> · {r.target_index} {r.target_value ?? ''}</Text> : null}</span> },
     { title: 'Lấy', dataIndex: 'kg_out', key: 'kg_out', align: 'right', render: (v) => fmtKg(v) },
     { title: 'Trả', dataIndex: 'kg_return', key: 'kg_return', align: 'right', render: (v) => fmtKg(v) },
@@ -304,6 +307,7 @@ export default function MixShiftPage() {
               <Space wrap size={[8, 4]} style={{ marginTop: 6 }}>
                 {tongMa.be > 0 && <Tag color="cyan">bể Slap {fmtKg(tongMa.be)} kg</Tag>}
                 {tongMa.mix > 0 && <Tag color="purple">máy Mix {fmtKg(tongMa.mix)} kg</Tag>}
+                {tongMa.bt > 0 && <Tag color="geekblue">băng tải {fmtKg(tongMa.bt)} kg</Tag>}
                 {chenMa && chenMa.chen_kg > 0 && <>
                   {chenMa.chen_loi_kg > 0 && <Tag>lỗi {fmtKg(chenMa.chen_loi_kg)}</Tag>}
                   {chenMa.chen_dkl_kg > 0 && <Tag>DKL {fmtKg(chenMa.chen_dkl_kg)}</Tag>}
@@ -366,9 +370,19 @@ export default function MixShiftPage() {
               <Select mode="multiple" style={{ width: '100%' }} allowClear showSearch optionFilterProp="label" value={f.rawLotIds} onChange={(v) => setF((x) => ({ ...x, rawLotIds: v }))} placeholder="Để trống = lấy theo phiếu ca của ca này" options={maList.map((m) => ({ value: m.raw_lot_id, label: `${m.ma}${m.trang_thai === 'dang_chay' ? ' · đang chạy' : ''}` }))} />
               <Text type="secondary">Chọn nhiều mã nếu ca chạy chung (ví dụ KHMN-15 + 17): khi gom, kg chia đều.</Text>
             </Col>
+            {f.viTri === 'bang_tai' ? (
+              <>
+                <Col span={8}><Text>Số bành (× {kpbChon} kg, không pallet) *</Text><InputNumber style={{ width: '100%' }} min={0} value={f.soBanh} onChange={(v) => setF((x) => ({ ...x, soBanh: v === null || v === undefined ? null : Number(v), kg: null, grossKg: null }))} /></Col>
+                <Col span={8}><Text>Kg (tự tính, sửa được)</Text><InputNumber style={{ width: '100%' }} min={0} step={5} value={kgNet} onChange={(v) => setF((x) => ({ ...x, kg: v === null || v === undefined ? null : Number(v), grossKg: null }))} /></Col>
+                <Col span={8}><Text type="secondary">Băng tải: tính theo bành, không cân pallet, lúc trả gõ số bành còn.</Text></Col>
+              </>
+            ) : (
+              <>
             <Col span={6}><Text>Số bành <Text type="secondary">(tự tính)</Text></Text><InputNumber style={{ width: '100%' }} min={0} value={f.soBanh ?? (kgNet && lotChon ? Math.max(Math.round(Math.max(kgNet - (f.grossKg !== null ? 15 : 0), 0) / (lotChon.kg_per_banh || 35)), 1) : null)} onChange={(v) => setF((x) => ({ ...x, soBanh: v === null || v === undefined ? null : Number(v) }))} /></Col>
             <Col span={9}><Text>Cân cả pallet (kg) · bì khai lúc trả</Text><InputNumber style={{ width: '100%' }} min={0} step={10} value={f.grossKg} onChange={(v) => setF((x) => ({ ...x, grossKg: v === null || v === undefined ? null : Number(v), kg: null }))} /></Col>
             <Col span={9}><Text>Kg lấy (tạm = cân tổng) *</Text><InputNumber style={{ width: '100%' }} min={1} step={10} max={lotChon?.ton_kg} value={kgNet} onChange={(v) => setF((x) => ({ ...x, kg: v === null || v === undefined ? null : Number(v) }))} /></Col>
+              </>
+            )}
             <Col span={8}><Text>Ngày ca</Text><Input type="date" value={date} onChange={(e) => setDate(e.target.value || todayLocal())} /></Col>
             <Col span={8}><Text>Ca</Text><Select style={{ width: '100%' }} allowClear value={f.shiftId} onChange={(v) => setF((x) => ({ ...x, shiftId: v }))} options={shifts.map((s) => ({ value: s.id, label: s.name || s.code }))} placeholder="Ca sản xuất" /></Col>
             <Col span={8}><Text>Tổ trưởng (ca của ai)</Text><Select style={{ width: '100%' }} allowClear value={f.team || undefined} onChange={(v) => setF((x) => ({ ...x, team: v ?? '' }))} options={[{ value: 'Vang', label: 'Ca Vang' }, { value: 'Hiền', label: 'Ca Hiền' }]} placeholder="Ca Vang / Ca Hiền" /></Col>

@@ -136,7 +136,7 @@ export default function KhoLots() {
                 {(() => {
                   const c = chen.get(l.raw_lot_id)
                   if (!c || c.chen_kg <= 0) return null
-                  const loai = [c.chen_be_kg > 0 ? `bể Slap ${fmtKg(c.chen_be_kg)}` : '', c.chen_mix_kg > 0 ? `máy Mix ${fmtKg(c.chen_mix_kg)}` : '', c.chen_loi_kg > 0 ? `lỗi ${fmtKg(c.chen_loi_kg)}` : '', c.chen_dkl_kg > 0 ? `DKL ${fmtKg(c.chen_dkl_kg)}` : '', c.chen_chuan_kg > 0 ? `chuẩn ${fmtKg(c.chen_chuan_kg)}` : '', c.chen_khac_kg > 0 ? `khác ${fmtKg(c.chen_khac_kg)}` : ''].filter(Boolean).join(' · ')
+                  const loai = [c.chen_be_kg > 0 ? `bể Slap ${fmtKg(c.chen_be_kg)}` : '', c.chen_mix_kg > 0 ? `máy Mix ${fmtKg(c.chen_mix_kg)}` : '', c.chen_bt_kg > 0 ? `băng tải ${fmtKg(c.chen_bt_kg)}` : '', c.chen_loi_kg > 0 ? `lỗi ${fmtKg(c.chen_loi_kg)}` : '', c.chen_dkl_kg > 0 ? `DKL ${fmtKg(c.chen_dkl_kg)}` : '', c.chen_chuan_kg > 0 ? `chuẩn ${fmtKg(c.chen_chuan_kg)}` : '', c.chen_khac_kg > 0 ? `khác ${fmtKg(c.chen_khac_kg)}` : ''].filter(Boolean).join(' · ')
                   return (
                     <div className="ops-sm" style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '6px 8px', background: 'var(--tint, #FFF7E6)', borderRadius: 8 }}>
                       <span><b>Chèn vào mã:</b> <span className="ops-mono">{fmtKg(c.chen_kg)} kg</span>{c.so_banh_chen ? ` · ${c.so_banh_chen} bành` : ''} · {c.so_phieu_chen} phiếu{c.ty_le_chen_pct !== null ? ` · ${c.ty_le_chen_pct} % hàng vào máy` : ''}</span>

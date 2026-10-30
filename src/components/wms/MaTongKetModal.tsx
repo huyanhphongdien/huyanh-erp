@@ -80,6 +80,7 @@ export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onC
           <Space wrap size={[6, 4]}>
             <Tag color="cyan">bể Slap {fmtKg(tk.chen?.be_kg ?? tk.phieu.be_slap)} kg</Tag>
             <Tag color="purple">máy Mix {fmtKg(tk.chen?.mix_kg ?? tk.phieu.may_mix)} kg</Tag>
+            <Tag color="geekblue">băng tải {fmtKg(tk.chen?.bt_kg ?? tk.phieu.bang_tai)} kg</Tag>
             {tk.chen && <>
               {tk.chen.loi_kg > 0 && <Tag>lỗi {fmtKg(tk.chen.loi_kg)}</Tag>}
               {tk.chen.dkl_kg > 0 && <Tag>DKL {fmtKg(tk.chen.dkl_kg)}</Tag>}

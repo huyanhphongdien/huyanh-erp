@@ -130,8 +130,10 @@ export interface MixIssue {
 }
 
 /** Vị trí chèn: chèn bể slap hay chèn máy mix (sổ tay tổ ép có 2 bảng riêng) */
-export type MixViTri = 'be_slap' | 'may_mix'
-export const MIX_VI_TRI_LABELS: Record<MixViTri, string> = { be_slap: 'Bể Slap', may_mix: 'Máy Mix' }
+export type MixViTri = 'be_slap' | 'may_mix' | 'bang_tai'
+export const MIX_VI_TRI_LABELS: Record<MixViTri, string> = { be_slap: 'Bể Slap', may_mix: 'Máy Mix', bang_tai: 'Băng tải' }
+/** màu tag theo vị trí chèn */
+export const MIX_VI_TRI_COLORS: Record<MixViTri, string> = { be_slap: 'cyan', may_mix: 'purple', bang_tai: 'geekblue' }
 
 /** Quy trình ký hàng chèn (30/10): bước 1 khai báo = QS · bước 2 duyệt QC · bước 3 thủ kho nhận (tạm thời chủ DN) */
 export type MixBuoc = 'khai_bao' | 'duyet_qc' | 'nhan_kho'

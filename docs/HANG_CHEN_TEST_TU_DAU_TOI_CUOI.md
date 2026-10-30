@@ -340,7 +340,18 @@ Quy trình chốt 30/10: **Bước 1 QS khai báo** (nhập lô chèn, lấy đ�
 | 25.9 | Máy tính /wms/chen → Lấy đầu ca | mặc định "Theo nguồn + số lô": Nguồn · Lô TP còn tồn (với chuẩn / lỗi / DKL) · Số lô trên bao · tick DKL; chuyển "Chọn lô đã nhập trước" vẫn có Select lô cũ |
 | 25.10 | Máy tính Kho chèn | nút đổi thành "Nhập trước lô chèn", form không còn Po / Mooney / PRI / % trộn; bảng không còn 2 cột QC; trả cuối ca, ký, tổng kết lệnh như trước |
 
-## Lỗi hay gặp
+## 26. Chèn băng tải theo bành (sau SQL `wms_mix_p17_chen_bang_tai.sql`, chạy SAU p16, 30/10 tối)
+
+| # | Thao tác | Mong đợi |
+|---|---|---|
+| 26.1 | Chạy p17, dòng kiểm chứng | `rang_buoc_vi_tri` chứa bang_tai, `cot_chen_bt_kg` = 1, `tong_ket_lenh_bt` = true |
+| 26.2 | Lấy lần n → nguồn Hàng chuẩn, lô TP → màn Cân → chạm **Chèn băng tải** | ô cân đổi thành "Số bành (× 35 kg/bành)" + "Hoặc gõ kg"; không còn "Cân cả pallet" / bì |
+| 26.3 | Gõ 18 bành | kg tự ra 630; xem lại ghi "băng tải · 18 bành × 35 = 630 kg · không pallet"; Ghi → phiếu kg lấy 630, số bành 18 |
+| 26.4 | Trả phiếu băng tải | không có cân 1/2/3; dòng "Băng tải: bấm − + số bành còn, hoặc gõ kg"; bấm + tới 3 bành → hàng trả 105 kg, tiêu hao 525; nút "Dùng hết · trả 0 bành" → trả 0 |
+| 26.5 | Máy tính Lấy đầu ca, Chèn vào đâu = Chèn băng tải | ô Số bành + Kg tự tính, không có ô Cân cả pallet; phiếu máy tính: ô "Số bành còn (× 35)" điền kg trả |
+| 26.6 | Tổng kết mã / lệnh, mail | có chip và dòng "băng tải … kg" bên cạnh bể Slap, máy Mix |
+
+
 
 | Màn hình báo | Nguyên nhân | Làm gì |
 |---|---|---|

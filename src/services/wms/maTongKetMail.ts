@@ -56,7 +56,7 @@ export function soanMailTongKet(tk: RawLotTongKet): MailTongKet {
     '2. HÀNG CHÈN VÀO MÃ NÀY',
     `   - Tiêu hao: ${kg(tieuHao)} kg${tyLe !== null ? ` = ${pct(tyLe)} hàng vào máy` : ''} (thủ kho đã nhận ${kg(p.tieu_hao_da_nhan)} kg${p.cho_ky > 0 ? ` · chờ ký ${kg(p.tieu_hao - p.tieu_hao_da_nhan)} kg` : ''})`,
     `   - Số lần chèn: ${p.tong} lần / ${p.so_ca} ca · ${p.so_banh} bành · đã lấy ${kg(p.kg_lay)} kg · trả lại ${kg(p.kg_tra)} kg`,
-    `   - Vị trí: bể Slap ${kg(c?.be_kg ?? p.be_slap)} kg · máy Mix ${kg(c?.mix_kg ?? p.may_mix)} kg`,
+    `   - Vị trí: bể Slap ${kg(c?.be_kg ?? p.be_slap)} kg · máy Mix ${kg(c?.mix_kg ?? p.may_mix)} kg · băng tải ${kg(c?.bt_kg ?? p.bang_tai)} kg`,
     c ? `   - Theo nguồn: hàng lỗi ${kg(c.loi_kg)} kg · DKL ${kg(c.dkl_kg)} kg · hàng chuẩn ${kg(c.chuan_kg)} kg · mua ngoài/khác ${kg(c.khac_kg)} kg` : '',
     dongLo.length ? '   - Theo lô chèn:' : '',
     ...dongLo,
@@ -87,7 +87,7 @@ export function soanMailTongKet(tk: RawLotTongKet): MailTongKet {
 <table style="border-collapse:collapse;font-size:14px;margin:8px 0">
 ${tr(['Tiêu hao hàng chèn', `<b style="font-size:18px;color:#1B4D3E">${kg(tieuHao)} kg</b>${tyLe !== null ? ` &nbsp;= ${pct(tyLe)} hàng vào máy` : ''}`])}
 ${tr(['Số lần chèn', `${p.tong} lần / ${p.so_ca} ca · ${p.so_banh} bành · lấy ${kg(p.kg_lay)} · trả ${kg(p.kg_tra)} kg`])}
-${tr(['Vị trí', `bể Slap ${kg(c?.be_kg ?? p.be_slap)} kg · máy Mix ${kg(c?.mix_kg ?? p.may_mix)} kg`])}
+${tr(['Vị trí', `bể Slap ${kg(c?.be_kg ?? p.be_slap)} kg · máy Mix ${kg(c?.mix_kg ?? p.may_mix)} kg · băng tải ${kg(c?.bt_kg ?? p.bang_tai)} kg`])}
 ${c ? tr(['Theo nguồn', `lỗi ${kg(c.loi_kg)} · DKL ${kg(c.dkl_kg)} · chuẩn ${kg(c.chuan_kg)} · khác ${kg(c.khac_kg)} kg`]) : ''}
 ${tr(['NVL nhập kho', `${tk.so_xe} xe · ${kg(tk.wet_kg)} kg tươi · ${kg(tk.nhap_kho_kg ?? tk.dry_kg)} kg khô${tk.drc_pct !== null ? ` (DRC ${pct(tk.drc_pct)})` : ''}`])}
 ${nhieuMa ? tr(['Theo mã', (tk.ma_list ?? []).map((m) => `${esc(m.ma)}: nhập ${kg(m.nhap_kho_kg ?? m.dry_kg)} · xuất ${kg(m.xuat_sx_kho_kg)} · còn ${kg(m.dry_kg)} kg`).join('<br/>')]) : ''}

@@ -86,6 +86,7 @@ export default function KhoMixMaTongKet() {
             <div className="kmx-row" style={{ gap: 6, flexWrap: 'wrap' }}>
               <span className="kmx-chip">bể Slap {fmtKg(tk.chen?.be_kg ?? tk.phieu.be_slap)} kg</span>
               <span className="kmx-chip">máy Mix {fmtKg(tk.chen?.mix_kg ?? tk.phieu.may_mix)} kg</span>
+              <span className="kmx-chip">băng tải {fmtKg(tk.chen?.bt_kg ?? tk.phieu.bang_tai)} kg</span>
               {tk.chen && tk.chen.loi_kg > 0 && <span className="kmx-chip">lỗi {fmtKg(tk.chen.loi_kg)}</span>}
               {tk.chen && tk.chen.dkl_kg > 0 && <span className="kmx-chip">DKL {fmtKg(tk.chen.dkl_kg)}</span>}
               {tk.chen && tk.chen.chuan_kg > 0 && <span className="kmx-chip">chuẩn {fmtKg(tk.chen.chuan_kg)}</span>}

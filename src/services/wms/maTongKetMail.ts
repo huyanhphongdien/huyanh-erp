@@ -56,6 +56,7 @@ export function soanMailTongKet(tk: RawLotTongKet, phieu: PhieuAnh[] = []): Mail
   const laLenh = !!tk.lenh_code
   const nhieuMa = (tk.ma_list?.length ?? 0) > 1
   const tieuHao = p.tieu_hao                       // mọi phiếu chưa hủy (kể cả chờ ký) — số đã nhận ghi kèm
+  const daNhan = p.tieu_hao_da_nhan
   const choKy = Math.max(p.tieu_hao - p.tieu_hao_da_nhan, 0)
   const dotCuoi = tk.dot_chay.length ? tk.dot_chay[tk.dot_chay.length - 1] : null
   const dotDau = tk.dot_chay.length ? tk.dot_chay[0] : null
@@ -112,11 +113,11 @@ export function soanMailTongKet(tk: RawLotTongKet, phieu: PhieuAnh[] = []): Mail
   ].filter((x) => x !== '').join('\n')
 
   // ── HTML: mẫu báo cáo thu mua mủ (bảng, dải xanh #1B4D3E, hợp điện thoại ≤ 600px), kèm ảnh từng lần chèn ──
-  const kpi = (title: string, value: string, sub: string, bg = '#F0F9F4', border = '#cde8d8', color = '#1B4D3E') =>
-    `<td width="50%" style="padding:4px;vertical-align:top;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border:1px solid ${border};border-radius:10px;"><tr><td style="padding:10px 12px;">
-      <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">${esc(title)}</div>
-      <div style="font-size:22px;font-weight:800;color:${color};margin-top:2px;">${value}</div>
-      <div style="font-size:12px;color:#475569;margin-top:2px;">${sub}</div></td></tr></table></td>`
+  const kpi = (title: string, value: string, sub: string, color = '#1B4D3E') =>
+    `<tr><td style="padding:9px 12px;border-bottom:1px solid #e3ece7;vertical-align:middle;">
+      <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;">${esc(title)}</div>
+      <div style="font-size:12px;color:#475569;margin-top:2px;line-height:1.4;">${sub}</div></td>
+      <td style="padding:9px 12px;border-bottom:1px solid #e3ece7;text-align:right;white-space:nowrap;vertical-align:middle;font-size:21px;font-weight:800;color:${color};">${value}</td></tr>`
   const anhTd = (a: RawPhoto, nhan: string) => `<td width="50%" style="padding:6px 3px 0 3px;vertical-align:top;">
       ${a.public_url ? `<a href="${a.public_url}"><img src="${a.public_url}" alt="${esc(nhan)}" width="270" style="display:block;width:100%;max-width:270px;height:auto;border-radius:8px;border:1px solid #d9e7df;"></a>` : ''}
       <div style="font-size:11px;color:#64748b;margin-top:3px;">${esc(nhan)} · ${hm(a.taken_at)}</div></td>`
@@ -135,10 +136,13 @@ export function soanMailTongKet(tk: RawLotTongKet, phieu: PhieuAnh[] = []): Mail
       ${anh.length ? anhRows(anh) : '<div style="font-size:12px;color:#B45309;margin-top:6px;">Chưa có ảnh.</div>'}
     </td></tr></table></td></tr>`
   }).join('')
-  const tr = (cells: string[], head = false) => `<tr>${cells.map((x, k) => `<${head ? 'th' : 'td'} style="border-top:1px solid #eef1f0;padding:6px 8px;text-align:${k === 0 ? 'left' : 'right'};font-size:13px;${head ? 'background:#F5F7FA;color:#475569;font-weight:600;' : ''}">${x}</${head ? 'th' : 'td'}>`).join('')}</tr>`
-  const bangCa = tk.theo_ca.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${tr(['Ca', 'Lần', 'Lấy', 'Trả', 'Tiêu hao'], true)}${tk.theo_ca.map((x) => tr([esc(`${dd(x.shift_date)} ${x.shift_name}${x.team ? ` · Ca ${x.team}` : ''}`), String(x.so_lan), kg(x.kg_lay), kg(x.kg_tra), `<b>${kg(x.tieu_hao)}</b>`])).join('')}${tr(['<b>Tổng</b>', `<b>${p.tong}</b>`, `<b>${kg(p.kg_lay)}</b>`, `<b>${kg(p.kg_tra)}</b>`, `<b>${kg(p.tieu_hao)}</b>`])}</table>` : ''
+  const tr = (cells: string[], head = false) => `<tr>${cells.map((x, k) => `<${head ? 'th' : 'td'} style="border-top:1px solid #eef1f0;padding:6px 8px;text-align:${k === 0 ? 'left' : 'right'};font-size:12.5px;${k === 0 ? '' : 'white-space:nowrap;'}${head ? 'background:#F5F7FA;color:#475569;font-weight:600;' : ''}">${x}</${head ? 'th' : 'td'}>`).join('')}</tr>`
+  const bangCa = tk.theo_ca.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${tr(['Ca', 'Lần', 'Lấy', 'Trả', 'Tiêu hao'], true)}${tk.theo_ca.map((x) => tr([esc(`${dd(x.shift_date)} · ${x.shift_name}${x.team ? ` · ${x.team}` : ''}`), String(x.so_lan), kg1(x.kg_lay), kg1(x.kg_tra), `<b>${kg1(x.tieu_hao)}</b>`])).join('')}${tr(['<b>Tổng</b>', `<b>${p.tong}</b>`, `<b>${kg(p.kg_lay)}</b>`, `<b>${kg(p.kg_tra)}</b>`, `<b>${kg(p.tieu_hao)}</b>`])}</table>` : ''
   const h3 = (s: string) => `<tr><td style="padding:14px 20px 4px 20px;"><div style="font-size:14px;font-weight:800;color:#0D2E25;border-left:4px solid #1B4D3E;padding-left:8px;">${s}</div></td></tr>`
 
+  const viTriTxt = ([[`bể Slap`, p.be_slap], [`máy Mix`, p.may_mix], [`băng tải`, p.bang_tai]] as [string, number][]).filter(([, v]) => Number(v) > 0).map(([n, v]) => `${n} <b>${kg1(v)}</b>`).join(' · ')
+  const nguonTxt = c ? ([[`hàng lỗi`, c.loi_kg], [`DKL`, c.dkl_kg], [`hàng chuẩn`, c.chuan_kg], [`mua ngoài / khác`, c.khac_kg]] as [string, number][]).filter(([, v]) => Number(v) > 0).map(([n, v]) => `${n} <b>${kg1(v)}</b>`).join(' · ') : ''
+  const maTxt = nhieuMa ? (tk.ma_list ?? []).map((m) => `${esc(m.ma)}: nhập ${kg1(m.nhap_kho_kg ?? m.dry_kg ?? 0)} · xuất ${kg1(m.xuat_sx_kho_kg ?? 0)} kg`).join(' · ') : ''
   const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#eef1f0;font-family:Arial,'Helvetica Neue',sans-serif;color:#1f2937;">
   <div style="display:none;max-height:0;overflow:hidden;color:#eef1f0;">Mã ${esc(tk.ma)}: tiêu hao chèn ${kg1(tieuHao)} kg · ${p.tong} lần · ${soAnh} ảnh.</div>
@@ -151,13 +155,13 @@ export function soanMailTongKet(tk: RawLotTongKet, phieu: PhieuAnh[] = []): Mail
         <div style="color:#cfe3d8;font-size:12px;margin-top:3px;">${laLenh ? `Lệnh ${esc(tk.lenh_code ?? '')} · ` : ''}${esc(thoiGian)}${tk.rubber_type_name ? ` · ${esc(tk.rubber_type_name)}` : ''}</div>
       </td></tr>
       <tr><td style="padding:16px 20px 2px 20px;"><div style="font-size:14px;line-height:1.6;"><b>Kính gửi Quý Anh/Chị Ban Giám đốc,</b><br>Hệ thống Hàng chèn xin gửi báo cáo chèn hàng cho mã sản xuất <b>${esc(tk.ma)}</b>${tk.dang_chay ? ' (đang chạy, số tới giờ gửi)' : ' (đã kết thúc)'}:</div></td></tr>
-      <tr><td style="padding:8px 16px 0 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-        <tr>${kpi('Tiêu hao hàng chèn', `${kg1(tieuHao)} kg`, `${tyLe !== null ? `= ${pct(tyLe)} hàng vào máy · ` : ''}đã nhận ${kg1(p.tieu_hao_da_nhan)}${choKy > 0 ? ` · chờ ký ${kg1(choKy)}` : ''}`)}
-            ${kpi('Số lần chèn', `${p.tong}`, `${p.so_ca} ca · ${p.so_banh} bành · lấy ${kg(p.kg_lay)} · trả ${kg(p.kg_tra)} kg`, '#FFF8EC', '#f3e1bd', '#B45309')}</tr>
-        <tr>${kpi('NVL vào máy', `${kg(tk.xuat_sx_kho_kg)} kg`, `nhập ${kg(tk.nhap_kho_kg ?? tk.dry_kg)} kg khô · ${tk.so_xe} xe · còn kho ${kg(tk.dry_kg)}`, '#F5F7FA', '#e2e8f0', '#1f2937')}
-            ${kpi('Thành phẩm đạt', `${kg(tk.tp_dat_kg)} kg`, `${tk.so_ca_ep ?? 0} ca ép · hiệu suất ${pct(tk.hieu_suat_pct)}`, '#F5F7FA', '#e2e8f0', '#1f2937')}</tr>
+      <tr><td style="padding:10px 16px 0 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7FAF8;border:1px solid #d9e7df;border-radius:10px;border-collapse:separate;">
+        ${kpi('Tiêu hao hàng chèn', `${kg1(tieuHao)} kg`, `${tyLe !== null ? `= ${pct(tyLe)} hàng vào máy · ` : ''}thủ kho đã nhận ${kg1(daNhan)}${choKy > 0 ? ` · chờ ký ${kg1(choKy)}` : ''}`)}
+        ${kpi('Số lần chèn', `${p.tong ?? 0}`, `${p.so_ca ?? 0} ca · ${p.so_banh ?? 0} bành · lấy ${kg1(p.kg_lay)} · trả ${kg1(p.kg_tra)} kg`, '#B45309')}
+        ${kpi('NVL vào máy', `${kg1(tk.xuat_sx_kho_kg ?? 0)} kg`, `nhập ${kg1(tk.nhap_kho_kg ?? tk.dry_kg ?? 0)} kg khô · ${tk.so_xe ?? 0} xe · còn kho ${kg1(tk.dry_kg ?? 0)} kg`, '#1f2937')}
+        ${kpi('Thành phẩm đạt', `${kg1(tk.tp_dat_kg ?? 0)} kg`, `${tk.so_ca_ep ?? 0} ca ép · hiệu suất ${pct(tk.hieu_suat_pct)}`, '#1f2937')}
       </table></td></tr>
-      <tr><td style="padding:8px 20px 0 20px;font-size:13px;color:#475569;">Vị trí: bể Slap <b>${kg1(p.be_slap)}</b> · máy Mix <b>${kg1(p.may_mix)}</b> · băng tải <b>${kg1(p.bang_tai)}</b> kg${c ? `<br>Theo nguồn (đã nhận): lỗi ${kg(c.loi_kg)} · DKL ${kg(c.dkl_kg)} · chuẩn ${kg(c.chuan_kg)} · mua ngoài/khác ${kg(c.khac_kg)} kg` : ''}${nhieuMa ? `<br>Theo mã: ${(tk.ma_list ?? []).map((m) => `${esc(m.ma)} nhập ${kg(m.nhap_kho_kg ?? m.dry_kg)} · xuất ${kg(m.xuat_sx_kho_kg)} kg`).join(' · ')}` : ''}</td></tr>
+      <tr><td style="padding:10px 20px 0 20px;font-size:13px;color:#475569;line-height:1.6;">${viTriTxt ? `Vị trí: ${viTriTxt} kg` : 'Chưa có tiêu hao theo vị trí'}${nguonTxt ? `<br>Theo nguồn (thủ kho đã nhận): ${nguonTxt} kg` : ''}${maTxt ? `<br>Theo mã: ${maTxt}` : ''}</td></tr>
       ${phieu.length ? h3(`Từng lần chèn · ${phieu.length} lần · ${soAnh} ảnh`) + theLan : ''}
       ${bangCa ? h3('Chèn theo ca') + `<tr><td style="padding:4px 20px;">${bangCa}</td></tr>` : ''}
       ${luuY.length ? h3('Lưu ý') + `<tr><td style="padding:4px 20px;"><ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:#B45309;">${luuY.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></td></tr>` : h3('Tất cả phiếu chèn đã đủ 3 chữ ký, số liệu chốt.')}
@@ -190,7 +194,7 @@ export async function guiMailTongKet(to: string[], m: MailTongKet): Promise<{ ok
 /** Luôn nhận thêm ngoài BGĐ trong Nhân sự (chủ DN 31/10) — đồng bộ với MAIL_THEM trong supabase/functions/mix-lenh-report */
 export const MAIL_THEM_TU_DONG = ['minhld@huyanhrubber.com']
 /** ★ CHẾ ĐỘ THỬ (chủ DN 31/10): chỉ gửi MAIL_THEM_TU_DONG, bỏ qua BGĐ. Thử xong đổi thành false (và cờ CHE_DO_TEST trong supabase/functions/mix-lenh-report). */
-export const CHE_DO_TEST = true
+export const CHE_DO_TEST = false   // 31/10: thử xong, gửi BGĐ + minhld
 /** Danh sách người nhận tự động của một bản tổng kết (BGĐ level ≤ 3 có email + MAIL_THEM_TU_DONG) */
 export function nguoiNhanTuDong(tk: RawLotTongKet): string[] {
   const s = new Set<string>()

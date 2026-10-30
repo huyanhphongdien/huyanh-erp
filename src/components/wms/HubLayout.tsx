@@ -31,9 +31,9 @@ const HUBS: Record<string, Hub> = {
     ],
   },
   kho: {
-    title: 'Kho vật tư & thành phẩm',
+    title: 'Kho vật tư (ngoài menu)',
     tabs: [
-      { to: '/wms', label: 'Tồn kho', end: true, also: ['/wms/inventory'] },
+      { to: '/wms/vat-tu', label: 'Tồn kho', end: true, also: ['/wms/inventory'] },
       { to: '/wms/stock-in', label: 'Nhập kho' },
       { to: '/wms/stock-out', label: 'Xuất kho' },
       { to: '/wms/transfer', label: 'Chuyển kho NM' },

@@ -421,17 +421,17 @@ const getMenuGroups = (
   // ★ KHO (WMS) — Phase B consolidation: 10 → 8 items, inline tabs trong /wms, /wms/qc, /wms/reports, /wms/config
   // ============================================================
   {
-    title: 'KHO (WMS)',
+    title: 'KHO NGUYÊN LIỆU',
     icon: <Warehouse size={18} />,
     collapsible: true,
     executiveOnly: true,
     rawKeeperAllowed: true,   // GĐ0 kho NVL: thủ kho / QC theo raw_store_keepers
     items: [
-      // 2026-10-30 gom menu KHO 17 → 7 mục (quyết định chủ DN): mỗi hub 1 mục, trang con đi bằng thanh tab (HubLayout).
+      // 2026-10-30 gom menu KHO 17 → 6 mục (quyết định chủ DN): mỗi hub 1 mục, trang con đi bằng thanh tab (HubLayout).
       { path: '/wms/nvl', label: 'Kho NVL mủ', icon: <Warehouse size={18} />, extraActivePaths: ['/wms/nvl'] },
       { path: '/wms/chen', label: 'Hàng chèn', icon: <ArrowRightLeft size={18} />, extraActivePaths: ['/wms/chen'] },
       { path: '/wms/weighbridge/list', label: 'Phiếu cân (đa NM)', icon: <Scale size={18} />, extraActivePaths: ['/wms/weighbridge'] },
-      { path: '/wms', label: 'Kho vật tư & thành phẩm', icon: <Boxes size={18} />, extraActivePaths: ['/wms/stock-in', '/wms/stock-out', '/wms/transfer', '/wms/inventory'] }, // tab: Tồn kho | Nhập kho | Xuất kho | Chuyển kho NM
+      // Kho vật tư (tồn kho / nhập / xuất / chuyển kho vật tư) ĐÃ RÚT KHỎI MENU 30/10 theo chủ DN: "kho này là kho nguyên liệu thôi". Route vẫn sống ở /wms/vat-tu, /wms/stock-in… cho ai cần.
       { path: '/wms/qc', label: 'QC / DRC', icon: <FlaskConical size={18} /> }, // tabs: dashboard | recheck | quick-scan | standards
       { path: '/wms/reports', label: 'Báo cáo WMS', icon: <BarChart3 size={18} /> }, // tabs: dashboard | stock-movement | supplier-quality | inventory-value | supplier-scoring
       { path: '/wms/config', label: 'Cấu hình', icon: <Settings size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] }, // tabs: materials | warehouses | settings
@@ -511,7 +511,7 @@ export function Sidebar() {
     // Mặc định MỞ: module đang dùng nhiều
     'CHẤM CÔNG': false,
     'ĐƠN HÀNG BÁN': false,
-    'KHO (WMS)': false,
+    'KHO NGUYÊN LIỆU': false,
     'VẬN TẢI': false,
     // Mặc định ĐÓNG: module ít dùng hàng ngày
     'QUẢN LÝ SẢN XUẤT': true,

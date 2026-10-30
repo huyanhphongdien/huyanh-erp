@@ -78,7 +78,7 @@ const WMSSettingsPage = () => {
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
           <Space>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms')} type="text" />
+            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/nvl')} type="text" />
             <div>
               <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
                 <SettingOutlined style={{ marginRight: 8 }} />

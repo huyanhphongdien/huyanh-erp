@@ -571,9 +571,11 @@ function App() {
 
               {/* ===== WMS MODULE ===== */}
               <Route path="wms">
-                {/* Hub Kho vật tư & thành phẩm — tab: Tồn kho | Nhập kho | Xuất kho | Chuyển kho NM (menu trái chỉ 1 mục) */}
+                {/* /wms = kho nguyên liệu (quyết định 30/10: "kho này là kho nguyên liệu thôi, bỏ vật tư ra") */}
+                <Route index element={<Navigate to="/wms/nvl" replace />} />
+                {/* Kho vật tư cũ — RÚT KHỎI MENU, giữ route ở /wms/vat-tu + stock-in/out/transfer cho ai còn cần */}
                 <Route element={<HubLayout hub="kho" />}>
-                  <Route index element={<WMSInventoryTabbedPage />} />
+                  <Route path="vat-tu" element={<WMSInventoryTabbedPage />} />
                   <Route path="stock-in" element={<StockInListPage />} />
                   <Route path="stock-in/new" element={<StockInCreatePage />} />
                   <Route path="stock-in/:id" element={<StockInDetailPage />} />
@@ -586,13 +588,13 @@ function App() {
                   <Route path="transfer/:id" element={<TransferDetailPage />} />
                   <Route path="inventory/:materialId" element={<InventoryDetailPage />} />
                 </Route>
-                <Route path="nvl-dashboard" element={<Navigate to="/wms?tab=nvl" replace />} />
+                <Route path="nvl-dashboard" element={<Navigate to="/wms/vat-tu?tab=nvl" replace />} />
                 <Route path="materials" element={<WMSMaterialListPage />} />
                 <Route path="warehouses" element={<WMSWarehouseListPage />} />
                 <Route path="warehouses/:id/locations" element={<WMSWarehouseLocationPage />} />
                 {/* Phase A: redirect to consolidated /wms inventory tabbed */}
-                <Route path="alerts" element={<Navigate to="/wms?tab=alerts" replace />} />
-                <Route path="stock-check" element={<Navigate to="/wms?tab=stock-check" replace />} />
+                <Route path="alerts" element={<Navigate to="/wms/vat-tu?tab=alerts" replace />} />
+                <Route path="stock-check" element={<Navigate to="/wms/vat-tu?tab=stock-check" replace />} />
                 {/* Phase A: QC tabbed wrapper — dashboard | recheck | quick-scan | standards */}
                 <Route path="qc" element={<WMSQCTabbedPage />} />
                 <Route path="qc/recheck" element={<Navigate to="/wms/qc?tab=recheck" replace />} />

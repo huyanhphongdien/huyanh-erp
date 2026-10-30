@@ -254,7 +254,7 @@ const StockOutListPage: React.FC = () => {
   }
 
   const handleGoBack = () => {
-    navigate('/wms')
+    navigate('/wms/vat-tu')
   }
 
   // ============================================================================

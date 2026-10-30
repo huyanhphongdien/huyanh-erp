@@ -167,7 +167,7 @@ const StockCheckPage = () => {
       setSaving(true)
       const result = await stockCheckService.finalizeStockCheck(stockCheck, user.employee_id || user.id)
       message.success(`Kiểm kê hoàn tất! ${result.adjustments} dòng chênh lệch, ${result.transactions_created} phiếu điều chỉnh`)
-      navigate('/wms')
+      navigate('/wms/vat-tu')
     } catch (err: any) {
       message.error(err.message || 'Lỗi hoàn tất kiểm kê')
     } finally {

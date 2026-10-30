@@ -214,6 +214,17 @@ Sổ tay thực tế có **2 bảng**: *"Ca Vàng chèn vào KHMN-15 + 17 · L1:
 | 15.9 | Quét tem | quét tem CH-… như cũ; quét/gõ đúng số lô trên bao cũng chọn được lô |
 | 15.10 | Phiếu chèn, bảng /wms/chen, chi tiết phiếu, dòng chèn theo mã | hiện số lô thay cho mã CH (mã CH nhỏ kèm) |
 
+## 16. Bành 35 kg, máy tự quy kg ↔ bành (sau SQL `wms_mix_p6_banh_35.sql`, chạy SAU p5, 30/10)
+
+| # | Việc | Kỳ vọng |
+|---|---|---|
+| 16.1 | Chạy SQL → kiểm chứng | `f_tao_lo_v3`, `f_sua_lo_v3` khác null, `so_ban_fn_mix_lay_phai_la_1` = 1; bảng lô có `kg_per_banh` (35, hoặc cỡ bành chủng loại), `so_banh_in`, `ton_banh` |
+| 16.2 | Nhập lô chèn gõ tay (điện thoại) | ô to đầu tiên là **Số bành**; gõ 20 → dòng "= 20 × 35 kg → 700 kg"; ô kg bên dưới chỉ gõ khi cân khác (gõ kg thì số bành quy ngược ≈). Cỡ bành sửa trong mục "Chỉ số và QC" |
+| 16.3 | Máy tính Nhập lô chèn | ô Số bành · kg/bành · Khối lượng; gõ bành là ra kg |
+| 16.4 | Lấy đầu ca | không còn ô gõ số bành; sau khi gõ cân, dòng "Số bành · tự tính 35 kg/bành" hiện số với nút − +; 176,5 kg → 5 bành |
+| 16.5 | Trả cuối ca | dòng "Số bành còn · tự tính" với − +; "Dùng hết · 0 kg" → 0 bành |
+| 16.6 | Kho chèn | mỗi lô hiện "kg · N bành"; phiếu cũ chưa có số bành đã được tính lại khi chạy SQL |
+
 ## Lỗi hay gặp
 
 | Màn hình báo | Nguyên nhân | Làm gì |

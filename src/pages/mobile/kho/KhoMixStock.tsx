@@ -98,10 +98,10 @@ export default function KhoMixStock() {
                   <span style={{ fontSize: 14, fontWeight: 600 }}>{l.source_desc || MIX_SOURCE_LABELS[l.source_type]}{l.grade ? ` · ${l.grade}` : ''}</span>
                   <span className="kmx-sm">{l.po !== null ? `Po ${l.po}` : ''}{l.mooney !== null ? ` · Mooney ${l.mooney}` : ''}{l.pri !== null ? ` · PRI ${l.pri}` : ''}{l.qc_allow_mix_pct !== null ? ` · trộn ≤ ${l.qc_allow_mix_pct} %` : ''}{!l.qc_allow_rerun ? ' · KHÔNG chạy lại' : ''} · nhập {new Date(l.received_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} · {l.tuoi_ngay} ng</span>
                 </span>
-                <span className="kmx-col" style={{ alignItems: 'flex-end' }}><span className={`kmx-num lg${khoa || l.ton_kg <= 0.005 ? ' mut' : ''}`}>{fmtKg(l.ton_kg)}</span><span className="kmx-sm" style={{ fontWeight: 600 }}>kg tại kho</span></span>
+                <span className="kmx-col" style={{ alignItems: 'flex-end' }}><span className={`kmx-num lg${khoa || l.ton_kg <= 0.005 ? ' mut' : ''}`}>{fmtKg(l.ton_kg)}</span><span className="kmx-sm" style={{ fontWeight: 600 }}>kg · {l.ton_banh} bành</span></span>
               </div>
               <div className="kmx-grid3" style={{ gap: 6 }}>
-                <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Nhập</span><span className="kmx-num sm">{fmtKg(l.kg_in)}</span></div>
+                <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Nhập{l.so_banh_in !== null ? ` · ${l.so_banh_in} bành` : ''}</span><span className="kmx-num sm">{fmtKg(l.kg_in)}</span></div>
                 <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Tiêu hao</span><span className="kmx-num sm">{fmtKg(l.kg_used)}</span></div>
                 <div className="kmx-stat" style={l.kg_at_line > 0 ? { background: '#FEF3C7' } : undefined}><span className="kmx-lbl" style={{ fontSize: 10 }}>Dây chuyền</span><span className="kmx-num sm" style={l.kg_at_line > 0 ? { color: '#B45309' } : undefined}>{fmtKg(l.kg_at_line)}</span></div>
               </div>

@@ -96,13 +96,16 @@ export default function KhoMixIssue() {
   const retPalletN = retPallet === '' ? 0 : Number(retPallet)
   const kgRetN = retMode === 'pallet' && !editRet ? (retGrossN !== null && Number.isFinite(retGrossN) && Number.isFinite(retPalletN) ? Math.round((retGrossN - retPalletN) * 100) / 100 : null) : kgRet === '' ? null : Number(kgRet)
   const kgTxt = (n: number | null) => (n === null ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }))
+  const retSoBanhAuto = i && kgRetN !== null && Number.isFinite(kgRetN) && kgRetN >= 0 ? Math.round(kgRetN / (i.lot_kg_per_banh || 35)) : null
+  const retSoBanhN = retSoBanh === '' ? retSoBanhAuto : Math.round(Number(retSoBanh))
+  const chinhBanhTra = (d: number) => setRetSoBanh(String(Math.max((retSoBanhN ?? 0) + d, 0)))
   const kgRetOk = !!i && kgRetN !== null && Number.isFinite(kgRetN) && kgRetN >= 0 && kgRetN <= i.kg_out + 0.01
 
   async function traVaKy() {
     if (!i || !kgRetOk) return
     setBusy('tra'); setMsg(null)
     try {
-      const r = await mixService.tra(i.id, kgRetN!, handover, note.trim() || null, null, i.shift_id ? null : shift?.id ?? null, i.shift_id ? null : (team.trim() || null), retMode === 'pallet' ? { grossKg: retGrossN, palletKg: retPalletN, soBanhTra: retSoBanh === '' ? null : Math.round(Number(retSoBanh)) } : null)
+      const r = await mixService.tra(i.id, kgRetN!, handover, note.trim() || null, null, i.shift_id ? null : shift?.id ?? null, i.shift_id ? null : (team.trim() || null), { grossKg: retMode === 'pallet' ? retGrossN : null, palletKg: retMode === 'pallet' ? retPalletN : null, soBanhTra: retSoBanhN })
       let signed = false
       try { await mixService.ky(i.id, 'submit'); signed = true }
       catch (e: any) { setMsg({ ok: false, text: `Đã ghi trả nhưng chưa ký được: ${e?.message || ''}` }) }
@@ -207,26 +210,31 @@ export default function KhoMixIssue() {
             </div>
             {retMode === 'pallet' ? (
               <>
-                <div className="kmx-grid2">
-                  <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Số bành còn</span><input className="kmx-text" type="number" inputMode="numeric" placeholder={i.so_banh !== null ? `lấy ${i.so_banh}` : ''} value={retSoBanh} onChange={(e) => setRetSoBanh(e.target.value)} aria-label="Số bành còn" /></label>
-                  <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Bì pallet (kg)</span><input className="kmx-text" type="number" inputMode="decimal" value={retPallet} onChange={(e) => setRetPallet(e.target.value)} aria-label="Bì pallet" /></label>
-                </div>
+                <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Bì pallet (kg) · sửa nếu khác</span><input className="kmx-text" type="number" inputMode="decimal" value={retPallet} onChange={(e) => setRetPallet(e.target.value)} aria-label="Bì pallet" /></label>
                 <label htmlFor="kmx-ret" className="kmx-lbl">Hàng + pallet · số trên cân</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input id="kmx-ret" className={`kmx-input${retGross !== '' && !kgRetOk ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={retGross} onChange={(e) => setRetGross(e.target.value)} />
+                  <input id="kmx-ret" className={`kmx-input${retGross !== '' && !kgRetOk ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={retGross} onChange={(e) => { setRetGross(e.target.value); setRetSoBanh('') }} />
                   <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
                 </div>
                 <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>Trả = {retGross || '0'} − bì {retPallet || '0'}</span><span className="kmx-num sm">{kgRetN === null ? '—' : `${kgTxt(kgRetN)} kg`}</span></div>
               </>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input id="kmx-ret" className={`kmx-input${kgRet !== '' && !kgRetOk ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={kgRet} onChange={(e) => setKgRet(e.target.value)} />
+                <input id="kmx-ret" className={`kmx-input${kgRet !== '' && !kgRetOk ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={kgRet} onChange={(e) => { setKgRet(e.target.value); setRetSoBanh('') }} />
                 <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" className="kmx-pill" onClick={() => { setRetMode('kg'); setKgRet('0') }}>Dùng hết · 0 kg</button>
               <button type="button" className="kmx-pill" onClick={() => { setRetMode('kg'); setKgRet(String(i.kg_out)) }}>Chưa dùng · {fmtKg(i.kg_out)} kg</button>
+            </div>
+            <div className="kmx-row" style={{ alignItems: 'center' }}>
+              <span className="kmx-col"><span className="kmx-lbl">Số bành còn</span><span className="kmx-sm">tự tính {i.lot_kg_per_banh} kg/bành{i.so_banh !== null ? ` · lấy ${i.so_banh} bành` : ''}{retSoBanh !== '' ? ' · bạn đã chỉnh' : ''}</span></span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button type="button" className="kmx-pill sm" style={{ width: 44, padding: 0, fontSize: 20 }} aria-label="Bớt 1 bành" disabled={retSoBanhN === null || retSoBanhN <= 0} onClick={() => chinhBanhTra(-1)}>−</button>
+                <span className="kmx-num md" style={{ minWidth: 40, textAlign: 'center' }}>{retSoBanhN ?? '—'}</span>
+                <button type="button" className="kmx-pill sm" style={{ width: 44, padding: 0, fontSize: 20 }} aria-label="Thêm 1 bành" disabled={retSoBanhN === null} onClick={() => chinhBanhTra(1)}>+</button>
+              </div>
             </div>
             {tieuHao !== null && (
               <div className="kmx-tint col">
@@ -347,7 +355,7 @@ export default function KhoMixIssue() {
             <button type="button" className="kmx-btn md" disabled={!canSubmit || missOut.length > 0 || missRet.length > 0 || busy === 'submit'} onClick={() => ky('submit')}>{I.pen}Ký bên giao</button>
             {!editRet ? <button type="button" className="kmx-btn sec" onClick={() => { setKgRet(String(i.kg_return ?? '')); setHandover(i.handover_to_next); setEditRet(true) }}>Sửa kg trả</button> : (
               <div className="kmx-col" style={{ gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" type="number" inputMode="decimal" value={kgRet} onChange={(e) => setKgRet(e.target.value)} aria-label="Kg trả" /><span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" type="number" inputMode="decimal" value={kgRet} onChange={(e) => { setKgRet(e.target.value); setRetSoBanh('') }} aria-label="Kg trả" /><span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span></div>
                 {settings.chen_ban_giao_ca && <label className="kmx-check-row" htmlFor="kmx-handover2"><input id="kmx-handover2" type="checkbox" checked={handover} onChange={(e) => setHandover(e.target.checked)} /><span>Để lại dây chuyền cho ca sau</span></label>}
                 <div className="kmx-grid2">
                   <button type="button" className="kmx-btn sec" style={{ background: '#1B4D3E', color: '#fff' }} disabled={!kgRetOk || busy === 'sua'} onClick={async () => { await run('sua', () => mixService.tra(i.id, kgRetN!, handover, null), 'Đã sửa kg trả'); setEditRet(false) }}>Lưu</button>

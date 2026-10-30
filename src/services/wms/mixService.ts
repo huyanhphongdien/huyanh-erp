@@ -29,6 +29,9 @@ export interface MixLot {
   id: string
   code: string
   so_lo: string | null
+  kg_per_banh: number
+  so_banh_in: number | null
+  ton_banh: number
   facility_id: string
   facility_code: string | null
   source_type: MixSourceType
@@ -63,6 +66,7 @@ export interface MixIssue {
   mix_lot_id: string
   lot_code: string
   lot_so_lo: string | null
+  lot_kg_per_banh: number
   source_type: MixSourceType
   source_desc: string | null
   lot_grade: string | null
@@ -162,14 +166,14 @@ export interface MixNguonQc {
 export interface MixNguonTp { facility_id: string; material_id: string; code: string; material_name: string; weight_per_unit: number | null; ton_banh: number; ton_kg: number }
 
 const normLot = (r: any): MixLot => ({
-  ...r, kg_in: num(r.kg_in), kg_used: num(r.kg_used), kg_at_line: num(r.kg_at_line), ton_kg: num(r.ton_kg),
+  ...r, kg_in: num(r.kg_in), kg_used: num(r.kg_used), kg_at_line: num(r.kg_at_line), ton_kg: num(r.ton_kg), kg_per_banh: num(r.kg_per_banh) || 35, so_banh_in: numOrNull(r.so_banh_in), ton_banh: num(r.ton_banh),
   po: numOrNull(r.po), mooney: numOrNull(r.mooney), pri: numOrNull(r.pri), qc_allow_mix_pct: numOrNull(r.qc_allow_mix_pct),
   qc_allow_rerun: !!r.qc_allow_rerun, metal_cleared: !!r.metal_cleared, tuoi_ngay: num(r.tuoi_ngay), so_anh: num(r.so_anh),
 })
 const normIssue = (r: any): MixIssue => ({
   ...r, po: numOrNull(r.po), mooney: numOrNull(r.mooney), pri: numOrNull(r.pri), target_value: numOrNull(r.target_value),
   kg_out: num(r.kg_out), kg_return: numOrNull(r.kg_return), kg_used: numOrNull(r.kg_used), handover_to_next: !!r.handover_to_next,
-  so_anh_lay: num(r.so_anh_lay), so_anh_tra: num(r.so_anh_tra),
+  so_anh_lay: num(r.so_anh_lay), so_anh_tra: num(r.so_anh_tra), lot_kg_per_banh: num(r.lot_kg_per_banh) || 35,
   so_banh: numOrNull(r.so_banh), gross_kg: numOrNull(r.gross_kg), pallet_kg: numOrNull(r.pallet_kg),
   so_banh_tra: numOrNull(r.so_banh_tra), return_gross_kg: numOrNull(r.return_gross_kg), return_pallet_kg: numOrNull(r.return_pallet_kg),
   raw_lot_ids: Array.isArray(r.raw_lot_ids) ? r.raw_lot_ids : null, ma_goc: r.ma_goc ?? null, ma_goc_all: r.ma_goc_all ?? null,
@@ -197,14 +201,15 @@ export const mixService = {
     return data ? normLot(data) : null
   },
 
+  /** Nhập lô chèn gõ tay: kg hoặc số bành (kg = bành × cỡ bành, mặc định 35) */
   async createLot(input: {
-    facilityId: string; sourceType: MixSourceType; sourceDesc?: string | null; grade?: string | null; kgIn: number
+    facilityId: string; sourceType: MixSourceType; sourceDesc?: string | null; grade?: string | null; kgIn: number | null; soBanhIn?: number | null; kgPerBanh?: number | null
     po?: number | null; mooney?: number | null; pri?: number | null; qcAllowMixPct?: number | null; qcAllowRerun?: boolean; metalCleared?: boolean
     receivedDate?: string | null; note?: string | null; sourceRefType?: string | null; sourceRefId?: string | null; soLo: string
   }): Promise<string> {
     const { data, error } = await supabase.rpc('fn_mix_tao_lo', {
-      p_so_lo: input.soLo,
-      p_facility_id: input.facilityId, p_source_type: input.sourceType, p_source_desc: input.sourceDesc ?? null, p_grade: input.grade ?? null, p_kg_in: input.kgIn,
+      p_so_lo: input.soLo, p_so_banh: input.soBanhIn ?? null, p_kg_per_banh: input.kgPerBanh ?? null,
+      p_facility_id: input.facilityId, p_source_type: input.sourceType, p_source_desc: input.sourceDesc ?? null, p_grade: input.grade ?? null, p_kg_in: input.kgIn ?? null,
       p_po: input.po ?? null, p_mooney: input.mooney ?? null, p_pri: input.pri ?? null, p_qc_allow_mix_pct: input.qcAllowMixPct ?? null,
       p_qc_allow_rerun: input.qcAllowRerun ?? true, p_metal_cleared: input.metalCleared ?? false, p_received_date: input.receivedDate ?? null,
       p_note: input.note ?? null, p_source_ref_type: input.sourceRefType ?? null, p_source_ref_id: input.sourceRefId ?? null,
@@ -293,8 +298,8 @@ export const mixService = {
   },
 
   /** Sửa lô chèn từ điện thoại (đã xử lý kim loại, QC cho phép, mô tả) hoặc hủy lô chưa dùng */
-  async suaLo(lotId: string, patch: { metalCleared?: boolean | null; qcAllowRerun?: boolean | null; qcAllowMixPct?: number | null; sourceDesc?: string | null; grade?: string | null; note?: string | null; huy?: boolean; soLo?: string | null }): Promise<void> {
-    const { error } = await supabase.rpc('fn_mix_sua_lo', { p_lot_id: lotId, p_metal_cleared: patch.metalCleared ?? null, p_qc_allow_rerun: patch.qcAllowRerun ?? null, p_qc_allow_mix_pct: patch.qcAllowMixPct ?? null, p_source_desc: patch.sourceDesc ?? null, p_grade: patch.grade ?? null, p_note: patch.note ?? null, p_huy: patch.huy ?? false, p_so_lo: patch.soLo ?? null })
+  async suaLo(lotId: string, patch: { metalCleared?: boolean | null; qcAllowRerun?: boolean | null; qcAllowMixPct?: number | null; sourceDesc?: string | null; grade?: string | null; note?: string | null; huy?: boolean; soLo?: string | null; kgPerBanh?: number | null }): Promise<void> {
+    const { error } = await supabase.rpc('fn_mix_sua_lo', { p_lot_id: lotId, p_metal_cleared: patch.metalCleared ?? null, p_qc_allow_rerun: patch.qcAllowRerun ?? null, p_qc_allow_mix_pct: patch.qcAllowMixPct ?? null, p_source_desc: patch.sourceDesc ?? null, p_grade: patch.grade ?? null, p_note: patch.note ?? null, p_huy: patch.huy ?? false, p_so_lo: patch.soLo ?? null, p_kg_per_banh: patch.kgPerBanh ?? null })
     if (error) throw new Error(dichLoiNhapKho(error))
   },
 

@@ -107,9 +107,12 @@ export default function KhoMixOut() {
   const missing = rawPhotoService.missing(photos, required)
   const grossN = gross === '' ? null : Number(gross)
   const palletN = pallet === '' ? 0 : Number(pallet)
-  const soBanhN = soBanh === '' ? null : Math.round(Number(soBanh))
   const kgN = mode === 'pallet' ? (grossN !== null && Number.isFinite(grossN) && Number.isFinite(palletN) ? Math.round((grossN - palletN) * 100) / 100 : null) : kg === '' ? null : Number(kg)
   const kgTxt = (n: number | null) => (n === null ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }))
+  // số bành tự tính theo cỡ bành của lô (35 kg); tổ chỉ chỉnh ± khi đếm khác
+  const soBanhAuto = kgN !== null && kgN > 0 && lot ? Math.max(Math.round(kgN / (lot.kg_per_banh || 35)), 1) : null
+  const soBanhN = soBanh === '' ? soBanhAuto : Math.round(Number(soBanh))
+  const chinhBanh = (d: number) => setSoBanh(String(Math.max((soBanhN ?? 0) + d, 0)))
   const maLabel = maChon.map((id) => maList.find((x) => x.raw_lot_id === id)?.ma || '?').join(' + ')
   const doiMode = (m: 'pallet' | 'kg') => { setMode(m); try { localStorage.setItem('kmx_can_mode', m) } catch { /* bỏ qua */ } }
   const doiPallet = (v: string) => { setPallet(v); try { localStorage.setItem('kmx_pallet_kg', v) } catch { /* bỏ qua */ } }
@@ -218,7 +221,7 @@ export default function KhoMixOut() {
                     <span style={{ fontSize: 14, fontWeight: 600, color: khoa ? '#6B7280' : '#1F2937' }}>{l.source_desc || MIX_SOURCE_LABELS[l.source_type]}{l.grade ? ` · ${l.grade}` : ''}</span>
                     <span className="kmx-sm" style={khoa ? { color: '#B91C1C', fontWeight: 600 } : undefined}>{khoa ? 'Chưa xử lý kim loại, chưa lấy được. Báo thủ kho.' : `${l.po !== null ? `Po ${l.po}` : ''}${l.mooney !== null ? ` · Mooney ${l.mooney}` : ''}${l.pri !== null ? ` · PRI ${l.pri}` : ''}${l.qc_allow_mix_pct !== null ? ` · QC: trộn ≤ ${l.qc_allow_mix_pct} %` : ''}${l.qc_allow_rerun ? ', chạy lại được' : ' · KHÔNG chạy lại'}`}</span>
                   </span>
-                  <span className="kmx-col" style={{ alignItems: 'flex-end' }}><span className={`kmx-num lg${khoa ? ' mut' : ''}`}>{fmtKg(l.ton_kg)}</span><span className="kmx-sm" style={{ fontWeight: 600 }}>kg trong kho</span></span>
+                  <span className="kmx-col" style={{ alignItems: 'flex-end' }}><span className={`kmx-num lg${khoa ? ' mut' : ''}`}>{fmtKg(l.ton_kg)}</span><span className="kmx-sm" style={{ fontWeight: 600 }}>kg · {l.ton_banh} bành</span></span>
                 </span>
                 {!khoa && <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, fontSize: 13, fontWeight: 700, color: '#1B4D3E' }}>Chọn lô này{I.next}</span>}
               </>
@@ -263,24 +266,29 @@ export default function KhoMixOut() {
             </div>
             {mode === 'pallet' ? (
               <>
-                <div className="kmx-grid2">
-                  <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Số bành</span><input className="kmx-text" type="number" inputMode="numeric" placeholder="vd 5" value={soBanh} onChange={(e) => setSoBanh(e.target.value)} aria-label="Số bành" /></label>
-                  <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Bì pallet (kg)</span><input className="kmx-text" type="number" inputMode="decimal" value={pallet} onChange={(e) => doiPallet(e.target.value)} aria-label="Bì pallet" /></label>
-                </div>
+                <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Bì pallet (kg) · sửa nếu khác</span><input className="kmx-text" type="number" inputMode="decimal" value={pallet} onChange={(e) => doiPallet(e.target.value)} aria-label="Bì pallet" /></label>
                 <label htmlFor="kmx-kg" className="kmx-lbl">Hàng + pallet · số trên cân</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input id="kmx-kg" className={`kmx-input${qua || (kgN !== null && kgN <= 0) ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={gross} onChange={(e) => setGross(e.target.value)} autoFocus />
+                  <input id="kmx-kg" className={`kmx-input${qua || (kgN !== null && kgN <= 0) ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={gross} onChange={(e) => { setGross(e.target.value); setSoBanh('') }} autoFocus />
                   <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
                 </div>
                 <div className="kmx-tint" style={kgN !== null && kgN <= 0 ? { background: '#FEE2E2', color: '#B91C1C' } : { background: '#E8F5F0', color: '#0D2E25' }}><span>Hàng chèn = {gross || '0'} − bì {pallet || '0'}</span><span className="kmx-num sm" style={kgN !== null && kgN <= 0 ? { color: '#B91C1C' } : undefined}>{kgN === null ? '—' : `${kgTxt(kgN)} kg`}</span></div>
               </>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input id="kmx-kg" className={`kmx-input${qua ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={kg} onChange={(e) => setKg(e.target.value)} autoFocus />
+                <input id="kmx-kg" className={`kmx-input${qua ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={kg} onChange={(e) => { setKg(e.target.value); setSoBanh('') }} autoFocus />
                 <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
               </div>
             )}
             <div className="kmx-tint" style={qua ? { background: '#FEE2E2', color: '#B91C1C' } : undefined}><span>{qua ? 'Lấy nhiều hơn tồn của lô' : 'Lô còn lại sau khi lấy'}</span><span className="kmx-num sm" style={qua ? { color: '#B91C1C' } : undefined}>{conLai === null ? `${fmtKg(lot.ton_kg)} kg trong kho` : `${fmtKg(Math.max(conLai, 0))} kg`}</span></div>
+            <div className="kmx-row" style={{ alignItems: 'center' }}>
+              <span className="kmx-col"><span className="kmx-lbl">Số bành</span><span className="kmx-sm">tự tính {lot.kg_per_banh} kg/bành{soBanh !== '' ? ' · bạn đã chỉnh' : ''}</span></span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button type="button" className="kmx-pill sm" style={{ width: 44, padding: 0, fontSize: 20 }} aria-label="Bớt 1 bành" disabled={soBanhN === null || soBanhN <= 0} onClick={() => chinhBanh(-1)}>−</button>
+                <span className="kmx-num md" style={{ minWidth: 40, textAlign: 'center' }}>{soBanhN ?? '—'}</span>
+                <button type="button" className="kmx-pill sm" style={{ width: 44, padding: 0, fontSize: 20 }} aria-label="Thêm 1 bành" disabled={soBanhN === null} onClick={() => chinhBanh(1)}>+</button>
+              </div>
+            </div>
           </section>
 
           <section className="kmx-card" aria-label="Ca và tổ" style={{ gap: 10 }}>

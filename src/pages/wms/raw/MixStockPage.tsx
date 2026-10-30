@@ -23,9 +23,9 @@ const GRADES = ['SVR 3L', 'SVR 5', 'SVR 10', 'SVR 20', 'SVR CV50', 'SVR CV60', '
 interface NewLot {
   sourceType: MixSourceType; sourceDesc: string; grade: string | undefined; kgIn: number | null
   po: number | null; mooney: number | null; pri: number | null; qcAllowMixPct: number | null; qcAllowRerun: boolean; metalCleared: boolean
-  receivedDate: string; note: string; soLo: string
+  receivedDate: string; note: string; soLo: string; soBanhIn: number | null; kgPerBanh: number
 }
-const EMPTY: NewLot = { sourceType: 'loi', sourceDesc: '', grade: undefined, kgIn: null, po: null, mooney: null, pri: null, qcAllowMixPct: null, qcAllowRerun: true, metalCleared: false, receivedDate: todayLocal(), note: '', soLo: '' }
+const EMPTY: NewLot = { sourceType: 'loi', sourceDesc: '', grade: undefined, kgIn: null, po: null, mooney: null, pri: null, qcAllowMixPct: null, qcAllowRerun: true, metalCleared: false, receivedDate: todayLocal(), note: '', soLo: '', soBanhIn: null, kgPerBanh: 35 }
 
 export default function MixStockPage() {
   const navigate = useNavigate()
@@ -66,13 +66,13 @@ export default function MixStockPage() {
   const facilityCode = useMemo(() => facilities?.find((f) => f.id === facilityId)?.code ?? '', [facilities, facilityId])
 
   const submit = async () => {
-    if (!facilityId || !form.kgIn || form.kgIn <= 0) { message.warning('Nhập khối lượng (kg)'); return }
+    if (!facilityId || ((!form.kgIn || form.kgIn <= 0) && !(form.soBanhIn && form.soBanhIn > 0))) { message.warning('Nhập số bành hoặc khối lượng (kg)'); return }
     if (!form.soLo.trim()) { message.warning('Nhập số lô của hàng chèn'); return }
     if (form.sourceType === 'dkl' && !form.metalCleared) { message.warning('Lô dính kim loại phải đánh dấu "đã xử lý kim loại" trước khi được lấy chèn — vẫn nhập được, nhưng chưa lấy được'); }
     setSaving(true)
     try {
       await mixService.createLot({
-        facilityId, sourceType: form.sourceType, sourceDesc: form.sourceDesc.trim() || null, grade: form.grade ?? null, kgIn: form.kgIn,
+        facilityId, sourceType: form.sourceType, sourceDesc: form.sourceDesc.trim() || null, grade: form.grade ?? null, kgIn: form.kgIn, soBanhIn: form.soBanhIn, kgPerBanh: form.kgPerBanh || 35,
         po: form.po, mooney: form.mooney, pri: form.pri, qcAllowMixPct: form.qcAllowMixPct, qcAllowRerun: form.qcAllowRerun, metalCleared: form.metalCleared,
         receivedDate: form.receivedDate || null, note: form.note.trim() || null, soLo: form.soLo.trim().toUpperCase(),
       })
@@ -86,10 +86,10 @@ export default function MixStockPage() {
     { title: 'Mã lô', dataIndex: 'code', key: 'code', render: (v, r) => <a onClick={() => navigate(`/wms/chen?lot=${r.id}`)}><Text code>{v}</Text></a> },
     { title: 'Nguồn', dataIndex: 'source_type', key: 'source_type', render: (v: MixSourceType, r) => <span><Tag>{MIX_SOURCE_LABELS[v]}</Tag>{r.source_type === 'dkl' && (r.metal_cleared ? <Tag color="green">đã xử lý KL</Tag> : <Tag color="red">chưa xử lý KL</Tag>)}</span> },
     { title: 'Mô tả', dataIndex: 'source_desc', key: 'source_desc', render: (v, r) => <span>{v || '—'}{r.grade && <Text type="secondary"> · {r.grade}</Text>}</span> },
-    { title: 'Nhập', dataIndex: 'kg_in', key: 'kg_in', align: 'right', render: (v) => fmtKg(v) },
+    { title: 'Nhập', dataIndex: 'kg_in', key: 'kg_in', align: 'right', render: (v, r) => <span>{fmtKg(v)}{r.so_banh_in !== null ? <Text type="secondary"> · {r.so_banh_in} b</Text> : null}</span> },
     { title: 'Tiêu hao', dataIndex: 'kg_used', key: 'kg_used', align: 'right', render: (v) => fmtKg(v) },
     { title: 'Ở dây chuyền', dataIndex: 'kg_at_line', key: 'kg_at_line', align: 'right', render: (v) => (v > 0 ? <Text type="warning">{fmtKg(v)}</Text> : '—') },
-    { title: 'Tồn kho', dataIndex: 'ton_kg', key: 'ton_kg', align: 'right', render: (v) => <Text strong>{fmtKg(v)}</Text> },
+    { title: 'Tồn kho', dataIndex: 'ton_kg', key: 'ton_kg', align: 'right', render: (v, r) => <span><Text strong>{fmtKg(v)}</Text><Text type="secondary"> · {r.ton_banh} b</Text></span> },
     { title: 'Po / Mooney / PRI', key: 'idx', render: (_, r) => <Text type="secondary">{[r.po, r.mooney, r.pri].map((x) => (x === null ? '—' : x)).join(' / ')}</Text> },
     { title: 'QC cho phép', key: 'qc', render: (_, r) => <span>{r.qc_allow_mix_pct !== null ? `trộn ≤ ${r.qc_allow_mix_pct} %` : 'không giới hạn'}{!r.qc_allow_rerun && <Tag color="red" style={{ marginLeft: 6 }}>không chạy lại</Tag>}</span> },
     { title: 'Tuổi', dataIndex: 'tuoi_ngay', key: 'tuoi_ngay', align: 'right', render: (v) => `${v} ng` },
@@ -155,7 +155,9 @@ export default function MixStockPage() {
             <Col span={12}><Text>Grade</Text><Select style={{ width: '100%' }} allowClear showSearch value={form.grade} onChange={(v) => up({ grade: v })} options={GRADES.map((g) => ({ value: g, label: g }))} placeholder="SVR 3L…" /></Col>
             <Col span={24}><Text>Số lô *</Text><Input value={form.soLo} onChange={(e) => up({ soLo: e.target.value })} placeholder="Số lô trên bao / chứng từ (vd S2308AB, SBR 1502 lô 2408)" style={{ textTransform: 'uppercase', fontWeight: 600 }} /></Col>
             <Col span={24}><Text>Mô tả nguồn</Text><Input value={form.sourceDesc} onChange={(e) => up({ sourceDesc: e.target.value })} placeholder="Hàng lỗi Po thấp tổ Đen 27/10 · SVR 3L kho TP · Cty Đại Lộc…" /></Col>
-            <Col span={8}><Text>Khối lượng (kg) *</Text><InputNumber style={{ width: '100%' }} min={1} step={10} value={form.kgIn} onChange={(v) => up({ kgIn: v === null || v === undefined ? null : Number(v) })} /></Col>
+            <Col span={8}><Text>Số bành</Text><InputNumber style={{ width: '100%' }} min={0} value={form.soBanhIn} onChange={(v) => { const n = v === null || v === undefined ? null : Number(v); up({ soBanhIn: n, kgIn: n ? Math.round(n * (form.kgPerBanh || 35) * 10) / 10 : form.kgIn }) }} /></Col>
+            <Col span={8}><Text>kg/bành</Text><InputNumber style={{ width: '100%' }} min={1} value={form.kgPerBanh} onChange={(v) => { const k = v === null || v === undefined ? 35 : Number(v); up({ kgPerBanh: k, kgIn: form.soBanhIn ? Math.round(form.soBanhIn * k * 10) / 10 : form.kgIn }) }} /></Col>
+            <Col span={8}><Text>Khối lượng (kg) *</Text><InputNumber style={{ width: '100%' }} min={1} step={10} value={form.kgIn} onChange={(v) => up({ kgIn: v === null || v === undefined ? null : Number(v), soBanhIn: null })} /></Col>
             <Col span={8}><Text>Ngày nhập</Text><Input type="date" value={form.receivedDate} onChange={(e) => up({ receivedDate: e.target.value })} /></Col>
             <Col span={8}><Text>Trộn tối đa (%)</Text><InputNumber style={{ width: '100%' }} min={0} max={100} value={form.qcAllowMixPct} onChange={(v) => up({ qcAllowMixPct: v === null || v === undefined ? null : Number(v) })} placeholder="để trống = không giới hạn" /></Col>
             <Col span={8}><Text>Po</Text><InputNumber style={{ width: '100%' }} value={form.po} onChange={(v) => up({ po: v === null || v === undefined ? null : Number(v) })} /></Col>

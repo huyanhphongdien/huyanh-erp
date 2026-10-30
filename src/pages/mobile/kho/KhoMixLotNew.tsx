@@ -47,6 +47,8 @@ export default function KhoMixLotNew() {
   const [grade, setGrade] = useState('')
   const [gradeOther, setGradeOther] = useState(false)
   const [kg, setKg] = useState('')
+  const [banhIn, setBanhIn] = useState('')        // gõ tay: số bành → kg = bành × cỡ bành
+  const [kgPerBanh, setKgPerBanh] = useState('35')
   const [date, setDate] = useState(todayLocal())
   const [more, setMore] = useState(false)
   const [po, setPo] = useState(''); const [mooney, setMooney] = useState(''); const [pri, setPri] = useState('')
@@ -69,6 +71,10 @@ export default function KhoMixLotNew() {
 
   const kgN = kg === '' ? null : Number(kg)
   const kgOk = kgN !== null && Number.isFinite(kgN) && kgN > 0
+  const kpbN = Number(kgPerBanh) > 0 ? Number(kgPerBanh) : 35
+  const banhTay = kgOk ? Math.round(kgN! / kpbN) : null
+  const goBanh = (v: string) => { setBanhIn(v); const n = Number(v); setKg(v === '' ? '' : Number.isFinite(n) && n > 0 ? String(Math.round(n * kpbN * 10) / 10) : '') }
+  const goKg = (v: string) => { setKg(v); setBanhIn('') }
   const soLoClean = soLo.trim().toUpperCase()
   const soLoOk = soLoClean.length > 0
   const trung = soLoOk ? existing.find((x) => x.status !== 'cancelled' && (x.so_lo || '').toUpperCase() === soLoClean) : undefined
@@ -91,8 +97,8 @@ export default function KhoMixLotNew() {
     if (!facilityId || !kgOk) return
     setBusy(true); setMsg(null)
     try {
-      await mixService.createLot({ facilityId, sourceType, sourceDesc: desc.trim() || null, grade: grade.trim() || null, kgIn: kgN!, po: num(po), mooney: num(mooney), pri: num(pri), qcAllowMixPct: num(mixPct), qcAllowRerun: rerun, metalCleared: sourceType === 'dkl' ? metal : true, receivedDate: date || null, note: note.trim() || null, soLo: soLoClean })
-      done(`Đã nhập lô chèn ${soLoClean} · ${fmtKg(kgN)} kg (${code(MIX_SOURCE_LABELS[sourceType])})`)
+      await mixService.createLot({ facilityId, sourceType, sourceDesc: desc.trim() || null, grade: grade.trim() || null, kgIn: kgN!, po: num(po), mooney: num(mooney), pri: num(pri), qcAllowMixPct: num(mixPct), qcAllowRerun: rerun, metalCleared: sourceType === 'dkl' ? metal : true, receivedDate: date || null, note: note.trim() || null, soLo: soLoClean, soBanhIn: banhIn !== '' ? Math.round(Number(banhIn)) : banhTay, kgPerBanh: kpbN })
+      done(`Đã nhập lô chèn ${soLoClean} · ${banhIn !== '' ? banhIn : banhTay ?? ''} bành · ${fmtKg(kgN)} kg (${code(MIX_SOURCE_LABELS[sourceType])})`)
     } catch (e: any) { setMsg(e?.message || 'Không nhập được') }
     finally { setBusy(false) }
   }
@@ -300,10 +306,16 @@ export default function KhoMixLotNew() {
               </div>
             </section>
             <section className="kmx-card" aria-label="Khối lượng" style={{ gap: 8 }}>
-              <label htmlFor="lot-kg" className="kmx-strong" style={{ fontSize: 13 }}>Khối lượng nhập (kg)</label>
+              <label htmlFor="lot-banh" className="kmx-strong" style={{ fontSize: 13 }}>Số bành nhập <span style={{ fontWeight: 500, color: '#6B7280' }}>· máy quy ra kg ({kpbN} kg/bành)</span></label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input id="lot-kg" className="kmx-input" type="number" inputMode="decimal" placeholder="0" value={kg} onChange={(e) => setKg(e.target.value)} />
-                <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
+                <input id="lot-banh" className="kmx-input" type="number" inputMode="numeric" placeholder="0" value={banhIn} onChange={(e) => goBanh(e.target.value)} />
+                <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>bành</span>
+              </div>
+              <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>{banhIn !== '' ? `= ${banhIn} × ${kpbN} kg` : kgOk ? `≈ ${banhTay} bành` : 'Hoặc gõ thẳng kg bên dưới'}</span><span className="kmx-num sm">{kgOk ? `${fmtKg(kgN)} kg` : '—'}</span></div>
+              <label htmlFor="lot-kg" className="kmx-lbl">Khối lượng (kg) · gõ nếu cân khác</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input id="lot-kg" className="kmx-text" style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 17, textAlign: 'right' }} type="number" inputMode="decimal" placeholder="0" value={kg} onChange={(e) => goKg(e.target.value)} />
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#6B7280' }}>kg</span>
               </div>
               <div className="kmx-col" style={{ gap: 4 }}><label htmlFor="lot-date" className="kmx-lbl">Ngày nhập</label><input id="lot-date" className="kmx-text" type="date" value={date} max={todayLocal()} onChange={(e) => setDate(e.target.value)} /></div>
             </section>
@@ -324,6 +336,7 @@ export default function KhoMixLotNew() {
                     <div className="kmx-col" style={{ gap: 4 }}><label htmlFor="lot-mooney" className="kmx-lbl">Mooney</label><input id="lot-mooney" className="kmx-text" type="number" inputMode="decimal" value={mooney} onChange={(e) => setMooney(e.target.value)} /></div>
                     <div className="kmx-col" style={{ gap: 4 }}><label htmlFor="lot-pri" className="kmx-lbl">PRI</label><input id="lot-pri" className="kmx-text" type="number" inputMode="decimal" value={pri} onChange={(e) => setPri(e.target.value)} /></div>
                   </div>
+                  <div className="kmx-col" style={{ gap: 4 }}><label htmlFor="lot-kpb" className="kmx-lbl">Cỡ bành (kg/bành) · mặc định 35</label><input id="lot-kpb" className="kmx-text" type="number" inputMode="decimal" value={kgPerBanh} onChange={(e) => { setKgPerBanh(e.target.value); if (banhIn !== '') { const n = Number(banhIn); const k = Number(e.target.value) > 0 ? Number(e.target.value) : 35; setKg(Number.isFinite(n) && n > 0 ? String(Math.round(n * k * 10) / 10) : '') } }} /></div>
                   <div className="kmx-col" style={{ gap: 4 }}><label htmlFor="lot-mix" className="kmx-lbl">Trộn tối đa (%) · trống = không giới hạn</label><input id="lot-mix" className="kmx-text" type="number" inputMode="decimal" value={mixPct} onChange={(e) => setMixPct(e.target.value)} /></div>
                   <label className="kmx-check-row" htmlFor="lot-rerun"><input id="lot-rerun" type="checkbox" checked={rerun} onChange={(e) => setRerun(e.target.checked)} /><span>QC cho phép chạy lại</span></label>
                   <div className="kmx-col" style={{ gap: 4 }}><label htmlFor="lot-note" className="kmx-lbl">Ghi chú</label><input id="lot-note" className="kmx-text" value={note} onChange={(e) => setNote(e.target.value)} /></div>

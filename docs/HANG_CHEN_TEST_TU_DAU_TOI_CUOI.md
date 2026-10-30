@@ -325,6 +325,23 @@ Quy trình chốt 30/10: **Bước 1 QS khai báo** (nhập lô chèn, lấy đ�
 
 
 
+## 25. Lấy theo nguồn + số lô, không nhập kho chèn trước (sau SQL `wms_mix_p15_lo_chen_ngam.sql`, chạy SAU p14, 30/10 tối)
+
+| # | Thao tác | Mong đợi |
+|---|---|---|
+| 25.1 | Chạy p15, dòng kiểm chứng | `f_tim_hoac_tao` có giá trị, `lay_khong_chan` = true, `so_ban_fn_mix_lay_phai_la_1` = 1 |
+| 25.2 | Điện thoại Chèn → Lấy lần 1 | màn 1 là "Nguồn và số lô": 4 nút nguồn; chưa cần Kho chèn có lô |
+| 25.3 | Chạm **SBR / mua ngoài** → gõ 1502 → Dùng | sang màn Cân, đầu màn ghi "lô 1502"; Kho chèn xuất hiện lô CH-… số lô 1502 nguồn mua ngoài, nhập 0 |
+| 25.4 | Cân 221 → Ghi | dòng tồn báo "Lô tồn 0 kg → máy ghi nhập thêm 221 kg", không chặn; sau ghi: Kho chèn lô 1502 nhập 221 · ở dây chuyền 221 |
+| 25.5 | Lấy lần 2, chạm SBR | chip gợi ý "1502 · tồn …" hiện sẵn; chạm → Dùng → lấy tiếp từ cùng lô (không tạo lô mới) |
+| 25.6 | Chạm **Hàng chuẩn** | danh sách lô TP đạt còn tồn (số lô, chủng loại, còn n bành); chạm lô → cân 360 → Ghi → lô TP đó giảm 11 bành chèn (ceil(360/35)), Kho chèn có lô "Lô TP S… · SVR 3L" nhập 360 |
+| 25.7 | Hàng chuẩn, cân vượt số bành còn lại của lô TP | ô cân đỏ "Lấy nhiều hơn tồn lô TP (n bành)", không ghi được |
+| 25.8 | Chạm **DKL** không tick "Đã rà kim loại" → gõ số lô → Dùng | báo đỏ "Hàng DKL: tick Đã rà kim loại trước khi lấy"; tick rồi → qua |
+| 25.9 | Máy tính /wms/chen → Lấy đầu ca | mặc định "Theo nguồn + số lô": Nguồn · Lô TP còn tồn (với chuẩn / lỗi / DKL) · Số lô trên bao · tick DKL; chuyển "Chọn lô đã nhập trước" vẫn có Select lô cũ |
+| 25.10 | Máy tính Kho chèn | nút đổi thành "Nhập trước lô chèn", form không còn Po / Mooney / PRI / % trộn; bảng không còn 2 cột QC; trả cuối ca, ký, tổng kết lệnh như trước |
+
+## Lỗi hay gặp
+
 | Màn hình báo | Nguyên nhân | Làm gì |
 |---|---|---|
 | "Could not find the function … fn_mix_lay" hoặc nút Ghi báo lỗi tham số | chưa chạy `wms_mix_p2_lay_truoc_anh.sql` | chạy SQL rồi F5 |

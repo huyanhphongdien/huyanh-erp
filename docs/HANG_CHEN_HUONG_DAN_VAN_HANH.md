@@ -6,14 +6,16 @@ Dành cho QS tại xưởng, QC, thủ kho và chủ doanh nghiệp. Điện tho
 
 | Việc | Ở đâu | Ghi chú |
 |---|---|---|
-| Chạy SQL theo thứ tự p4 → … → p13 | Supabase SQL Editor | p4–p10 đã chạy 30/10. Còn lại, chạy đúng thứ tự: **p11** `wms_mix_p11_bi_chi_luc_tra.sql` (bỏ bì lúc lấy + sửa audit) → **p12** `wms_nvl_p12_ket_thuc_ma.sql` (số bành tính lại, thay thế mã, tổng kết + BGĐ) → **p13** `wms_nvl_p13_lenh_chay.sql` (lệnh chạy nhiều mã) → **p14** `wms_nvl_p14_sua_chuan_hoa_ma.sql` (sửa lỗi gõ TMHG-15 thành TMHG-1 — chạy ngay trước khi nhập thật). Mỗi file có dòng kiểm chứng cuối |
+| Chạy SQL theo thứ tự p4 → … → p13 | Supabase SQL Editor | p4–p10 đã chạy 30/10. Còn lại, chạy đúng thứ tự: **p11** `wms_mix_p11_bi_chi_luc_tra.sql` (bỏ bì lúc lấy + sửa audit) → **p12** `wms_nvl_p12_ket_thuc_ma.sql` (số bành tính lại, thay thế mã, tổng kết + BGĐ) → **p13** `wms_nvl_p13_lenh_chay.sql` (lệnh chạy nhiều mã) → **p14** `wms_nvl_p14_sua_chuan_hoa_ma.sql` (sửa lỗi gõ TMHG-15 thành TMHG-1) → **p15** `wms_mix_p15_lo_chen_ngam.sql` (phương án B: lấy theo nguồn + số lô, không cần nhập kho chèn trước). Mỗi file có dòng kiểm chứng cuối |
 | Phân công | Máy tính: Hàng chèn → tab **Phân công** | Bước 1 QS khai báo · Bước 2 QC duyệt (Lê Thành Nhân, Lê Thị Lệ Trinh, chủ DN) · Bước 3 Thủ kho nhận (tạm: chủ DN). Gõ tên → Thêm; Thu để bỏ. BGĐ level ≤ 3 làm được mọi bước |
 | Cỡ bành | Danh mục chủng loại (`weight_per_unit`) | mặc định 35 kg/bành; lô TP / hàng chuẩn lấy cỡ bành của chủng loại |
 | Bì pallet | Không cần cấu hình | **không hỏi lúc lấy**; chỉ khai ở lần trả: dùng hết thì cân pallet rỗng (số trên cân = bì), còn dư thì gõ bì |
 
 Ai không có tên ở bước 1 sẽ thấy "chưa được phân công khai báo (QS)" và không lấy / nhập lô được.
 
-## 1. Đưa hàng vào kho chèn (QS, một lần cho mỗi đợt hàng)
+## 1. Kho chèn — chỉ cần khi nhập trước (từ phương án B, SQL p15)
+
+**Bình thường không cần nhập kho chèn.** Lúc lấy (mục 3), QS chạm nguồn + gõ số lô trên bao (hoặc chạm lô TP), máy tự tạo lô chèn và ghi nhập = lấy. Hàng từ kho TP trừ thẳng bành lô TP; SBR / số lô gõ tay không chặn tồn. Kho chèn trở thành **sổ theo số lô** (nhập · tiêu hao · ở dây chuyền · tồn). Bảng dưới chỉ dùng khi muốn **nhập trước** (SBR về kho, hàng nhập sẵn) để theo dõi tồn, hoặc kiểm kê.
 
 Điện thoại: Chèn → **Kho chèn** → **Nhập lô chèn**. Máy tính: Hàng chèn → Kho chèn → Nhập lô chèn.
 
@@ -45,7 +47,7 @@ Một **lệnh chạy** = một đợt chạy máy gồm **một hay nhiều mã
 
 Trang chính tab Chèn → nút **Lấy lần n** (máy đếm theo ca).
 
-1. **Chọn lô:** quét tem CH-… hoặc gõ / quét đúng số lô trên bao, hoặc chạm thẻ lô. Thẻ xám phía trên liệt kê các lần đã lấy của ca (L1, L2…) để đối chiếu sổ.
+1. **Nguồn và số lô (phương án B):** chạm nguồn *Hàng chuẩn* / *Hàng lỗi* / *DKL* / *SBR – mua ngoài*. Nguồn kho TP → chạm lô TP còn tồn (số lô tự điền, bành trừ thẳng lô TP). SBR hoặc hàng ghi số lô trên bao → gõ số lô (máy gợi ý số lô dùng gần đây, ví dụ 1502) → **Dùng**. DKL phải tick **"Đã rà kim loại"**. Máy tự tạo lô chèn nếu chưa có, nhập = lấy. Lô đã nhập trước vẫn chọn được ở "Quét tem CH / chọn lô đã nhập trước". Thẻ xám phía trên liệt kê các lần đã lấy của ca (L1, L2…) để đối chiếu sổ.
 2. **Ca:** tự nhận theo chấm công hoặc giờ, bấm Đổi ca nếu khác. Tổ trưởng: **Ca Vang** hoặc **Ca Hiền**. Dùng để: Chạy lại / Nâng chỉ số.
 3. **Chèn vào đâu:** Chèn bể Slap hoặc Chèn máy Mix (bắt buộc, máy nhớ lần trước).
 4. **Cân:** chỉ gõ số trên cân "Cân cả pallet". Không hỏi bì ở bước này; kg lấy tạm bằng số cân tổng, máy ước **số bành** (− + nếu đếm khác). Bì khai ở lần trả, khi đó kg lấy tính lại. Bấm "Gõ thẳng kg" nếu không cân cả pallet.
@@ -115,4 +117,5 @@ Khi lệnh chạy xong (hết NVL vào máy, phiếu chèn cuối đã trả):
 - Bì pallet: lúc lấy không hỏi, lúc trả khai; máy tự tính lại kg lấy = cân tổng − bì.
 - 2 ảnh lúc lấy và 2 ảnh lúc trả luôn bắt buộc, kể cả dùng hết (ảnh pallet rỗng trên cân là bằng chứng bì).
 - Kho chèn, sổ ca, gom theo mã chỉ thay đổi ở bước thủ kho nhận.
+- Kho chèn **không chặn**: SBR / số lô gõ tay lấy quá tồn thì máy ghi nhập thêm (chỉ báo trên màn); chỉ hàng từ lô TP chặn theo bành còn lại của lô TP.
 - Chi tiết kiểm thử từng màn: `docs/HANG_CHEN_TEST_TU_DAU_TOI_CUOI.md` (mục 14–24).

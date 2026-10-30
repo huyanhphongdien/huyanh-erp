@@ -268,6 +268,13 @@ export const mixService = {
    * Lấy đầu ca theo sổ tay tổ ép: một phiếu = một pallet (số bành, cân cả pallet, bì pallet → kg hàng chèn = cân − bì)
    * và mang mã nguyên liệu gốc đang chạy (một hay nhiều mã, ví dụ KHMN-15 + 17). Không có mã → máy lấy theo phiếu ca.
    */
+  /** Phương án B (SQL p15): tìm / tạo lô chèn ngầm theo nguồn + số lô trên bao, hoặc theo lô TP → trả id lô để lấy ngay */
+  async timHoacTaoLo(input: { facilityId: string; sourceType?: MixSourceType | null; soLo?: string | null; fgLotId?: string | null; metalCleared?: boolean | null; note?: string | null }): Promise<string> {
+    const { data, error } = await supabase.rpc('fn_mix_tim_hoac_tao_lo', { p_facility_id: input.facilityId, p_source_type: input.sourceType ?? null, p_so_lo: input.soLo ?? null, p_fg_lot_id: input.fgLotId ?? null, p_metal_cleared: input.metalCleared ?? null, p_note: input.note ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    return String(data)
+  },
+
   async lay(input: {
     id?: string | null; lotId: string; kg: number | null; shiftDate?: string | null; shiftId?: string | null; team?: string | null; purpose: MixPurpose
     targetIndex?: string | null; targetValue?: number | null; productionOrderId?: string | null; note?: string | null

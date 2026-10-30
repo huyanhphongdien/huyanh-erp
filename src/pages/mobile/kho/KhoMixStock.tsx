@@ -84,7 +84,7 @@ export default function KhoMixStock() {
           <button type="button" className="kmx-pill sm" onClick={() => setAll((v) => !v)}>{all ? 'Chỉ lô còn hàng' : 'Cả lô đã hết / hủy'}</button>
         </div>
         {loading && !lots.length && <div className="kmx-skel" />}
-        {!loading && !lots.length && <div className="kmx-card muted kmx-center" style={{ fontSize: 13 }}>Kho chèn trống. Bấm "Nhập lô chèn" để nhập tồn.</div>}
+        {!loading && !lots.length && <div className="kmx-card muted kmx-center" style={{ fontSize: 13 }}>Kho chèn trống. Lô tự tạo khi lấy theo nguồn + số lô; "Nhập lô chèn" chỉ để nhập tồn.</div>}
         {lots.map((l) => {
           const khoa = l.source_type === 'dkl' && !l.metal_cleared
           return (

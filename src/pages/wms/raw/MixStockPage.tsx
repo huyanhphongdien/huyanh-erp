@@ -90,8 +90,6 @@ export default function MixStockPage() {
     { title: 'Tiêu hao', dataIndex: 'kg_used', key: 'kg_used', align: 'right', render: (v) => fmtKg(v) },
     { title: 'Ở dây chuyền', dataIndex: 'kg_at_line', key: 'kg_at_line', align: 'right', render: (v) => (v > 0 ? <Text type="warning">{fmtKg(v)}</Text> : '—') },
     { title: 'Tồn kho', dataIndex: 'ton_kg', key: 'ton_kg', align: 'right', render: (v, r) => <span><Text strong>{fmtKg(v)}</Text><Text type="secondary"> · {r.ton_banh} b</Text></span> },
-    { title: 'Po / Mooney / PRI', key: 'idx', render: (_, r) => <Text type="secondary">{[r.po, r.mooney, r.pri].map((x) => (x === null ? '—' : x)).join(' / ')}</Text> },
-    { title: 'QC cho phép', key: 'qc', render: (_, r) => <span>{r.qc_allow_mix_pct !== null ? `trộn ≤ ${r.qc_allow_mix_pct} %` : 'không giới hạn'}{!r.qc_allow_rerun && <Tag color="red" style={{ marginLeft: 6 }}>không chạy lại</Tag>}</span> },
     { title: 'Tuổi', dataIndex: 'tuoi_ngay', key: 'tuoi_ngay', align: 'right', render: (v) => `${v} ng` },
     { title: 'Trạng thái', dataIndex: 'status', key: 'status', render: (v: MixLot['status']) => <Tag color={MIX_LOT_STATUS_COLORS[v]}>{MIX_LOT_STATUS_LABELS[v]}</Tag> },
   ]
@@ -117,7 +115,7 @@ export default function MixStockPage() {
               <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/chen')} />
               <div>
                 <Title level={3} style={{ margin: 0 }}>Kho hàng chèn</Title>
-                <Text type="secondary">Tồn = nhập − tiêu hao − đang ở dây chuyền · tính bằng kg · chỉ đổi khi phiếu chèn đủ 3 chữ ký</Text>
+                <Text type="secondary">Tồn = nhập − tiêu hao − đang ở dây chuyền · tính bằng kg · chỉ đổi khi phiếu chèn đủ 3 chữ ký · lô tự tạo lúc lấy theo nguồn + số lô, nhập = lấy</Text>
               </div>
             </Space>
           </Col>
@@ -126,7 +124,7 @@ export default function MixStockPage() {
               <FacilityPicker value={facilityId} onChange={(id) => setFacilityId(id)} allowAll={false} style={{ minWidth: 180 }} />
               <span><Switch checked={includeDone} onChange={setIncludeDone} size="small" /> <Text type="secondary">cả lô đã hết / hủy</Text></span>
               <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>Làm mới</Button>
-              <Button type="primary" icon={<PlusOutlined />} disabled={!canWrite} onClick={() => setOpen(true)}>Nhập lô chèn</Button>
+              <Button type="primary" icon={<PlusOutlined />} disabled={!canWrite} onClick={() => setOpen(true)}>Nhập trước lô chèn</Button>
             </Space>
           </Col>
         </Row>
@@ -142,14 +140,14 @@ export default function MixStockPage() {
 
         <Card size="small" bodyStyle={{ padding: 0 }} title="Lô chèn">
           <Table<MixLot> rowKey="id" columns={columns} dataSource={lots} size="small" loading={loading} pagination={{ pageSize: 20, showSizeChanger: false }}
-            locale={{ emptyText: 'Chưa có lô chèn nào. Bấm "Nhập lô chèn" để nhập tồn.' }} />
+            locale={{ emptyText: 'Chưa có lô chèn. Lô tự tạo khi QS lấy theo nguồn + số lô (SQL p15); "Nhập trước" chỉ dùng cho SBR về kho.' }} />
         </Card>
 
         <Card size="small" bodyStyle={{ padding: 0 }} title="Sổ chuyển động kho chèn · 14 ngày">
           <Table<MixMovement> rowKey={(r) => `${r.loai}-${r.lot_id}-${r.issue_id ?? ''}-${r.thoi_diem}`} columns={moveCols} dataSource={moves} size="small" pagination={{ pageSize: 15, showSizeChanger: false }} locale={{ emptyText: 'Chưa có chuyển động' }} />
         </Card>
 
-        <Modal open={open} title={`Nhập lô chèn · ${facilityCode}`} onCancel={() => setOpen(false)} onOk={submit} okText="Nhập kho chèn" cancelText="Hủy" confirmLoading={saving} width={640}>
+        <Modal open={open} title={`Nhập trước lô chèn (SBR về kho, hàng nhập sẵn) · ${facilityCode}`} onCancel={() => setOpen(false)} onOk={submit} okText="Nhập kho chèn" cancelText="Hủy" confirmLoading={saving} width={640}>
           <Row gutter={[12, 10]}>
             <Col span={12}><Text>Nguồn hàng</Text><Select style={{ width: '100%' }} value={form.sourceType} onChange={(v) => up({ sourceType: v })} options={(Object.keys(MIX_SOURCE_LABELS) as MixSourceType[]).map((k) => ({ value: k, label: MIX_SOURCE_LABELS[k] }))} /></Col>
             <Col span={12}><Text>Grade</Text><Select style={{ width: '100%' }} allowClear showSearch value={form.grade} onChange={(v) => up({ grade: v })} options={GRADES.map((g) => ({ value: g, label: g }))} placeholder="SVR 3L…" /></Col>
@@ -159,12 +157,7 @@ export default function MixStockPage() {
             <Col span={8}><Text>kg/bành</Text><InputNumber style={{ width: '100%' }} min={1} value={form.kgPerBanh} onChange={(v) => { const k = v === null || v === undefined ? 35 : Number(v); up({ kgPerBanh: k, kgIn: form.soBanhIn ? Math.round(form.soBanhIn * k * 10) / 10 : form.kgIn }) }} /></Col>
             <Col span={8}><Text>Khối lượng (kg) *</Text><InputNumber style={{ width: '100%' }} min={1} step={10} value={form.kgIn} onChange={(v) => up({ kgIn: v === null || v === undefined ? null : Number(v), soBanhIn: null })} /></Col>
             <Col span={8}><Text>Ngày nhập</Text><Input type="date" value={form.receivedDate} onChange={(e) => up({ receivedDate: e.target.value })} /></Col>
-            <Col span={8}><Text>Trộn tối đa (%)</Text><InputNumber style={{ width: '100%' }} min={0} max={100} value={form.qcAllowMixPct} onChange={(v) => up({ qcAllowMixPct: v === null || v === undefined ? null : Number(v) })} placeholder="để trống = không giới hạn" /></Col>
-            <Col span={8}><Text>Po</Text><InputNumber style={{ width: '100%' }} value={form.po} onChange={(v) => up({ po: v === null || v === undefined ? null : Number(v) })} /></Col>
-            <Col span={8}><Text>Mooney</Text><InputNumber style={{ width: '100%' }} value={form.mooney} onChange={(v) => up({ mooney: v === null || v === undefined ? null : Number(v) })} /></Col>
-            <Col span={8}><Text>PRI</Text><InputNumber style={{ width: '100%' }} value={form.pri} onChange={(v) => up({ pri: v === null || v === undefined ? null : Number(v) })} /></Col>
-            <Col span={12}><Checkbox checked={form.qcAllowRerun} onChange={(e) => up({ qcAllowRerun: e.target.checked })}>QC cho phép chạy lại</Checkbox></Col>
-            <Col span={12}><Checkbox checked={form.metalCleared} onChange={(e) => up({ metalCleared: e.target.checked })}>Đã xử lý kim loại (bắt buộc với DKL)</Checkbox></Col>
+            <Col span={24}><Checkbox checked={form.metalCleared} onChange={(e) => up({ metalCleared: e.target.checked })}>Đã xử lý kim loại (bắt buộc với DKL)</Checkbox></Col>
             <Col span={24}><Text>Ghi chú</Text><Input value={form.note} onChange={(e) => up({ note: e.target.value })} /></Col>
           </Row>
         </Modal>

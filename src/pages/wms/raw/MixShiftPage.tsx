@@ -372,11 +372,6 @@ export default function MixShiftPage() {
             <Col span={8}><Text>Ngày ca</Text><Input type="date" value={date} onChange={(e) => setDate(e.target.value || todayLocal())} /></Col>
             <Col span={8}><Text>Ca</Text><Select style={{ width: '100%' }} allowClear value={f.shiftId} onChange={(v) => setF((x) => ({ ...x, shiftId: v }))} options={shifts.map((s) => ({ value: s.id, label: s.name || s.code }))} placeholder="Ca sản xuất" /></Col>
             <Col span={8}><Text>Tổ trưởng (ca của ai)</Text><Select style={{ width: '100%' }} allowClear value={f.team || undefined} onChange={(v) => setF((x) => ({ ...x, team: v ?? '' }))} options={[{ value: 'Vang', label: 'Ca Vang' }, { value: 'Hiền', label: 'Ca Hiền' }]} placeholder="Ca Vang / Ca Hiền" /></Col>
-            <Col span={8}><Text>Mục đích</Text><Select style={{ width: '100%' }} value={f.purpose} onChange={(v) => setF((x) => ({ ...x, purpose: v }))} options={(Object.keys(MIX_PURPOSE_LABELS) as MixPurpose[]).map((k) => ({ value: k, label: MIX_PURPOSE_LABELS[k] }))} /></Col>
-            {f.purpose === 'nang_chi_so' && <>
-              <Col span={8}><Text>Chỉ số</Text><Select style={{ width: '100%' }} value={f.targetIndex || undefined} onChange={(v) => setF((x) => ({ ...x, targetIndex: v }))} options={['Po', 'PRI', 'Mooney', 'Tạp chất', 'Khác'].map((v) => ({ value: v, label: v }))} /></Col>
-              <Col span={8}><Text>Mục tiêu</Text><InputNumber style={{ width: '100%' }} value={f.targetValue} onChange={(v) => setF((x) => ({ ...x, targetValue: v === null || v === undefined ? null : Number(v) }))} /></Col>
-            </>}
             <Col span={24}><Text>Lệnh sản xuất (tùy chọn)</Text><Select style={{ width: '100%' }} allowClear showSearch optionFilterProp="label" value={f.poId} onChange={(v) => setF((x) => ({ ...x, poId: v }))} options={pos.map((p) => ({ value: p.id, label: `${p.code}${p.target_grade ? ' · ' + p.target_grade : ''}` }))} /></Col>
             <Col span={24}><Text>Ghi chú</Text><Input value={f.note} onChange={(e) => setF((x) => ({ ...x, note: e.target.value }))} /></Col>
           </Row>

@@ -22,7 +22,6 @@ import { detectShift, hhmm, I, KmxPhotoTiles, newUuid, Steps, type ShiftPick } f
 import './khoMix.css'
 
 const DEFAULT_TEAMS = ['Vang', 'Hiền']   // tổ gọi theo tổ trưởng: Ca Vang, Ca Hiền
-const INDEXES = ['Po', 'PRI', 'Mooney', 'Tạp chất', 'Khác']
 
 export default function KhoMixOut() {
   const nav = useNavigate()
@@ -51,9 +50,8 @@ export default function KhoMixOut() {
   const [pickShift, setPickShift] = useState(false)
   const teams = DEFAULT_TEAMS
   const [team, setTeam] = useState('')
-  const [purpose, setPurpose] = useState<MixPurpose>('chay_lai')
-  const [targetIndex, setTargetIndex] = useState('Po')
-  const [targetValue, setTargetValue] = useState('')
+  const purpose: MixPurpose = 'chay_lai'   // 30/10: bỏ ô "Dùng để" (chủ DN: thừa) — mục đích luôn chạy lại
+  const targetIndex = ''; const targetValue = ''
   const [note, setNote] = useState('')
   const [issueId, setIssueId] = useState(() => newUuid())
   const [photos, setPhotos] = useState<RawPhoto[]>([])
@@ -196,7 +194,7 @@ export default function KhoMixOut() {
   function layThem() {
     setStep(1); setLot(null); setKg(''); setGross(''); setSoBanh(''); setNote('');
     if (facilityId) mixService.listIssues({ facilityId, date: todayLocal(), limit: 100 }).then((ci) => setCaIssues(ci.filter((x) => x.status !== 'cancelled'))).catch(() => { /* bỏ qua */ })
-    setPurpose('chay_lai'); setTargetValue(''); setPhotos([]); setIssueId(newUuid()); setCodeDone(''); setMsg(null)
+    setPhotos([]); setIssueId(newUuid()); setCodeDone(''); setMsg(null)
     setSoLoMoi(''); setRaKimLoai(false); setKhoCu(false); taiNguon()
     if (facilityId) mixService.listLots(facilityId).then((l) => setLots(l.filter((x) => x.ton_kg > 0.005))).catch(() => { /* bỏ qua */ })
   }
@@ -227,7 +225,7 @@ export default function KhoMixOut() {
             <span>Lô <span className="kmx-mono" style={{ fontWeight: 600, color: '#fff' }}>{lot?.so_lo || soLo.trim().toUpperCase() || lot?.code}</span> · {lot ? MIX_SOURCE_LABELS[lot.source_type].toLowerCase() : ''}{lot?.source_desc ? ` · ${lot.source_desc}` : ''}</span>
             <span>{viTri ? `Chèn ${MIX_VI_TRI_LABELS[viTri]}` : ''}{soBanhN !== null ? ` · ${soBanhN} bành` : ''}</span>
             {maChon.length > 0 && <span>{maChon.length ? <>Chèn vào mã <b className="kmx-mono" style={{ color: '#fff' }}>{maLabel}</b></> : 'Mã gốc theo phiếu ca'}</span>}
-            <span>{caTo} · {purpose === 'chay_lai' ? 'chạy lại' : `nâng ${targetIndex}${targetValue ? ' → ' + targetValue : ''}`} · {photos.length} ảnh · {firstName(user?.full_name) || ''}</span>
+            <span>{caTo} · {photos.length} ảnh · {firstName(user?.full_name) || ''}</span>
           </div>
           <div className="kmx-note gold" style={{ width: '100%', boxSizing: 'border-box', textAlign: 'left' }}>{I.clock}<span><b>Việc tiếp theo, cuối ca:</b> mở trang chính, bấm <b>Trả cuối ca</b>, dùng hết thì cân pallet rỗng (bì chính xác), còn dư thì cân hàng + pallet, chụp 2 ảnh.</span></div>
         </div>
@@ -347,19 +345,6 @@ export default function KhoMixOut() {
                 {teams.map((t) => <button key={t} type="button" className={team === t ? 'on' : ''} onClick={() => setTeam(t)}>Ca {t}</button>)}
               </div>
             </div>
-            <div className="kmx-col" style={{ gap: 6 }}>
-              <span className="kmx-lbl">Dùng để</span>
-              <div className="kmx-seg">
-                <button type="button" className={purpose === 'chay_lai' ? 'on' : ''} onClick={() => setPurpose('chay_lai')}>Chạy lại</button>
-                <button type="button" className={purpose === 'nang_chi_so' ? 'on' : ''} onClick={() => setPurpose('nang_chi_so')}>Nâng chỉ số</button>
-              </div>
-              {purpose === 'nang_chi_so' && (
-                <div className="kmx-grid2">
-                  <select className="kmx-text" value={targetIndex} onChange={(e) => setTargetIndex(e.target.value)} aria-label="Chỉ số">{INDEXES.map((v) => <option key={v} value={v}>{v}</option>)}</select>
-                  <input className="kmx-text" type="number" inputMode="decimal" placeholder="Mục tiêu" value={targetValue} onChange={(e) => setTargetValue(e.target.value)} aria-label="Mục tiêu" />
-                </div>
-              )}
-            </div>
           </section>
 
           {!lot.so_lo && (
@@ -461,7 +446,6 @@ export default function KhoMixOut() {
               <div className="kmx-kv"><span className="k">Cân</span><span className="v">{mode === 'pallet' ? `${soBanhN !== null ? `${soBanhN} bành${soBanh === '' ? ' (ước)' : ''} · ` : ''}cả pallet ${kgTxt(grossN)} kg · bì trừ lúc trả` : 'gõ thẳng kg hàng'}</span></div>
               <div className="kmx-kv"><span className="k">Chèn vào mã</span><span className="v">{maChon.length ? <span className="kmx-mono" style={{ color: '#0D2E25' }}>{maLabel}</span> : <span style={{ color: '#B45309' }}>chưa chọn · lấy theo phiếu ca</span>}</span></div>
               <div className="kmx-kv"><span className="k">Ca · tổ</span><span className="v">{caTo}</span></div>
-              <div className="kmx-kv"><span className="k">Dùng để</span><span className="v">{purpose === 'chay_lai' ? 'Chạy lại' : `Nâng ${targetIndex}${targetValue ? ' → ' + targetValue : ''}`}</span></div>
               <div className="kmx-kv" style={{ alignItems: 'center' }}><span className="k">Ảnh lúc lấy</span><span className="v" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{thumbs.map((p) => <span key={p.id} className="kmx-thumb" style={{ width: 46, height: 46 }}><img src={p.public_url || ''} alt="" /></span>)}<span style={{ fontSize: 12, fontWeight: 700, color: '#15803D' }}>{required.length - missing.length}/{required.length}</span></span></div>
             </div>
           </section>

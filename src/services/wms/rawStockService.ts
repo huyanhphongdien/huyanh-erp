@@ -199,11 +199,11 @@ export interface NhapKhoResult {
 /** Mã lỗi hàm DB → câu tiếng Việt cho người dùng */
 export function dichLoiNhapKho(err: unknown): string {
   const msg = String((err as any)?.message ?? err ?? '')
-  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|KHONG_CO_QUYEN|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO|LENH_TRONG|KHONG_TIM_THAY_LO|LO_KHAC_NHA_MAY|LO_DA_HET|VUOT_TON|KHONG_TIM_THAY_DONG|LENH_DA_GUI_KY|KHONG_TIM_THAY_LENH|SAI_TRANG_THAI|THIEU_KG_CAN|DA_TRU_SO|BUOC_KHONG_HOP_LE|CAN_LY_DO|DANG_CO_KIEM_KE_MO|KHO_TRONG|KHONG_TIM_THAY_KIEM_KE|CON_LO_CHUA_DEM|DA_DUYET|KY_DA_KHOA)(?::([^\n"]*))?/)
+  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|KHONG_CO_QUYEN|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO|LENH_TRONG|KHONG_TIM_THAY_LO|LO_KHAC_NHA_MAY|LO_DA_HET|VUOT_TON|KHONG_TIM_THAY_DONG|LENH_DA_GUI_KY|KHONG_TIM_THAY_LENH|SAI_TRANG_THAI|THIEU_KG_CAN|DA_TRU_SO|BUOC_KHONG_HOP_LE|CAN_LY_DO|DANG_CO_KIEM_KE_MO|KHO_TRONG|KHONG_TIM_THAY_KIEM_KE|CON_LO_CHUA_DEM|DA_DUYET|KY_DA_KHOA|DKL_CHUA_XU_LY|TRA_QUA_LAY|THIEU_ANH)(?::([^\n"]*))?/)
   if (!m) return msg || 'Lỗi không xác định'
   const chi_tiet = m[2] ? ` (${m[2]})` : ''
   switch (m[1]) {
-    case 'KHONG_TIM_THAY_PHIEU': return 'Không tìm thấy phiếu cân'
+    case 'KHONG_TIM_THAY_PHIEU': return 'Không tìm thấy phiếu'
     case 'PHIEU_CHUA_HOAN_TAT': return `Phiếu cân chưa hoàn tất${chi_tiet}`
     case 'PHIEU_KHONG_PHAI_NHAP': return `Phiếu không phải phiếu nhập${chi_tiet}`
     case 'THIEU_NHA_MAY': return `Phiếu chưa gắn nhà máy${chi_tiet}`
@@ -237,6 +237,9 @@ export function dichLoiNhapKho(err: unknown): string {
     case 'CON_LO_CHUA_DEM': return `Còn lô chưa đếm${chi_tiet}`
     case 'DA_DUYET': return `Phiếu đã duyệt, không hủy được${chi_tiet}`
     case 'KY_DA_KHOA': return `Kỳ đã khóa sổ, không ghi lùi ngày được${chi_tiet}`
+    case 'DKL_CHUA_XU_LY': return `Lô dính kim loại chưa đánh dấu đã xử lý, không lấy chèn được${chi_tiet}`
+    case 'TRA_QUA_LAY': return `Kg trả nhiều hơn kg lấy${chi_tiet}`
+    case 'THIEU_ANH': return `Thiếu ảnh bắt buộc, chụp đủ rồi mới ký${chi_tiet.replace('mix_issue_out', 'lúc lấy').replace('mix_issue_return', 'lúc trả').replace('toan_canh', 'toàn cảnh').replace('man_hinh_can', 'màn hình cân')}`
     default: return msg
   }
 }

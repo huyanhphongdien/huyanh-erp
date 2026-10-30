@@ -435,6 +435,10 @@ const getMenuGroups = (
       { path: '/wms/nvl/can-lai', label: 'Cân lại / DRC', icon: <FlaskConical size={18} /> },
       { path: '/wms/nvl/kiem-ke', label: 'Kiểm kê NVL', icon: <ClipboardList size={18} />, extraActivePaths: ['/wms/nvl/kiem-ke/'] },
       { path: '/wms/nvl/can-doi', label: 'Cân đối & hao hụt', icon: <BarChart3 size={18} /> },
+      { path: '/wms/nvl/doi-chieu', label: 'Đối chiếu giấy–máy', icon: <ClipboardCheck size={18} /> },
+      // GĐ4 hàng chèn (mix): phiếu theo ca + kho chèn
+      { path: '/wms/chen', label: 'Hàng chèn (ca)', icon: <ArrowRightLeft size={18} />, extraActivePaths: ['/wms/chen/phieu'] },
+      { path: '/wms/chen/ton', label: 'Kho chèn', icon: <Boxes size={18} /> },
       { path: '/wms/stock-in', label: 'Nhập kho', icon: <PackagePlus size={18} /> },
       { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
       { path: '/wms/transfer', label: 'Chuyển kho NM', icon: <PackageMinus size={18} /> },

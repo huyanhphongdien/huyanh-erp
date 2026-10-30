@@ -90,6 +90,14 @@ const OpsHome = lazy(() => import('./pages/mobile/OpsHome'));
 const OpsPatrol = lazy(() => import('./pages/mobile/OpsPatrol'));
 const OpsShift = lazy(() => import('./pages/mobile/OpsShift'));
 const OpsTimesheet = lazy(() => import('./pages/mobile/OpsTimesheet'));
+// ===== APP "Kho NVL" — vỏ mobile thủ kho nguyên liệu (GĐ3b/GĐ4): lô, nhập, hàng chèn =====
+const KhoShell = lazy(() => import('./pages/mobile/kho/KhoShell'));
+const KhoLots = lazy(() => import('./pages/mobile/kho/KhoLots'));
+const KhoLotDetail = lazy(() => import('./pages/mobile/kho/KhoLotDetail'));
+const KhoIntake = lazy(() => import('./pages/mobile/kho/KhoIntake'));
+const KhoMix = lazy(() => import('./pages/mobile/kho/KhoMix'));
+const KhoMixOut = lazy(() => import('./pages/mobile/kho/KhoMixOut'));
+const KhoMixIssue = lazy(() => import('./pages/mobile/kho/KhoMixIssue'));
 
 // ===== CHẤM CÔNG V2: Ca, Phân ca, Tăng ca =====
 const ShiftListPage = lazy(() => import('./features/shifts').then(m => ({ default: m.ShiftListPage })));
@@ -174,6 +182,11 @@ const RawRecheckPage = lazy(() => import('./pages/wms/raw/RawRecheckPage'));
 const RawStocktakeListPage = lazy(() => import('./pages/wms/raw/RawStocktakeListPage'));
 const RawStocktakeDetailPage = lazy(() => import('./pages/wms/raw/RawStocktakeDetailPage'));
 const RawBalanceReportPage = lazy(() => import('./pages/wms/raw/RawBalanceReportPage'));
+// GĐ4 hàng chèn (kho chèn + phiếu chèn theo ca) · GĐ5 đối chiếu giấy–máy
+const MixShiftPage = lazy(() => import('./pages/wms/raw/MixShiftPage'));
+const MixIssueDetailPage = lazy(() => import('./pages/wms/raw/MixIssueDetailPage'));
+const MixStockPage = lazy(() => import('./pages/wms/raw/MixStockPage'));
+const RawReconcilePage = lazy(() => import('./pages/wms/raw/RawReconcilePage'));
 const WeighbridgeDetailPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeDetailPage'));
 
 // ===== Rubber Supply Chain (lazy) =====
@@ -442,6 +455,16 @@ function App() {
               <Route path="cong" element={<Suspense fallback={<LoadingSpinner />}><OpsTimesheet /></Suspense>} />
             </Route>
 
+            {/* App "Kho NVL" — vỏ mobile cho thủ kho nguyên liệu mủ (đăng nhập): lô / nhập / hàng chèn */}
+            <Route path="/m/kho" element={<ProtectedRoute><Suspense fallback={<LoadingSpinner />}><KhoShell /></Suspense></ProtectedRoute>}>
+              <Route index element={<Suspense fallback={<LoadingSpinner />}><KhoLots /></Suspense>} />
+              <Route path="lo/:batchId" element={<Suspense fallback={<LoadingSpinner />}><KhoLotDetail /></Suspense>} />
+              <Route path="nhap" element={<Suspense fallback={<LoadingSpinner />}><KhoIntake /></Suspense>} />
+              <Route path="chen" element={<Suspense fallback={<LoadingSpinner />}><KhoMix /></Suspense>} />
+              <Route path="chen/lay" element={<Suspense fallback={<LoadingSpinner />}><KhoMixOut /></Suspense>} />
+              <Route path="chen/phieu/:id" element={<Suspense fallback={<LoadingSpinner />}><KhoMixIssue /></Suspense>} />
+            </Route>
+
             {/* ============================================================ */}
             {/* Protected Routes — ERP Internal                              */}
             {/* ============================================================ */}
@@ -580,6 +603,12 @@ function App() {
                 <Route path="nvl/kiem-ke" element={<RawStocktakeListPage />} />
                 <Route path="nvl/kiem-ke/:id" element={<RawStocktakeDetailPage />} />
                 <Route path="nvl/can-doi" element={<RawBalanceReportPage />} />
+                {/* GĐ5: đối chiếu giấy – máy (chạy song song) */}
+                <Route path="nvl/doi-chieu" element={<RawReconcilePage />} />
+                {/* GĐ4: hàng chèn theo ca + kho chèn */}
+                <Route path="chen" element={<MixShiftPage />} />
+                <Route path="chen/ton" element={<MixStockPage />} />
+                <Route path="chen/phieu/:id" element={<MixIssueDetailPage />} />
                 {/* Trang cân chuyển sang can.huyanhrubber.vn — ERP chỉ giữ lịch sử + chi tiết */}
                 <Route path="weighbridge" element={<WeighbridgeListPage />} />
                 <Route path="weighbridge/list" element={<WeighbridgeListPage />} />

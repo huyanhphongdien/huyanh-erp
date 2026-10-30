@@ -10,6 +10,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { ArrowLeftOutlined, ReloadOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import { rawIssueService, RAW_ISSUE_PURPOSE_LABELS, type FifoPick, type ProductionOrderLite, type RawIssuePurpose } from '../../../services/wms/rawIssueService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
+import { rawStockService, type RawStockByType } from '../../../services/wms/rawStockService'
 import { RAW_RUBBER_TYPE_LABELS, RAW_SETTINGS_DEFAULT, type RawRubberType, type RawSettings } from '../../../services/wms/raw.types'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import { useRawRole } from '../../../hooks/useRawRole'
@@ -31,6 +32,8 @@ export default function RawIssueCreatePage() {
   const [targetGrade, setTargetGrade] = useState<string | undefined>(undefined)
   const [needDry, setNeedDry] = useState<number>(10000)
   const [types, setTypes] = useState<RawRubberType[]>(['mu_dong', 'mu_tap', 'mu_chen'])
+  const [inStock, setInStock] = useState<RawStockByType[]>([])
+  const [typesInit, setTypesInit] = useState(false)
   const [maxTap, setMaxTap] = useState<number | null>(40)
   const [note, setNote] = useState('')
   const [picks, setPicks] = useState<FifoPick[]>([])
@@ -46,6 +49,22 @@ export default function RawIssueCreatePage() {
 
   useEffect(() => { rawIssueService.listProductionOrders().then(setProductionOrders).catch(() => setProductionOrders([])) }, [])
   useEffect(() => { if (facilityId) rawSettingsService.getForFacility(facilityId).then(setSettings).catch(() => undefined) }, [facilityId])
+
+  // Loại đang có hàng ở nhà máy: lần đầu mặc định chọn đúng các loại đó (ưu tiên mủ thô), tránh bảng trống
+  useEffect(() => {
+    if (!facilityId) return
+    rawStockService.getBalanceByType(facilityId).then((rows) => {
+      const stocked = rows.filter((r) => r.dry_kg > 0.005)
+      setInStock(stocked)
+      setTypes((cur) => {
+        const hasOverlap = cur.some((t) => stocked.some((s) => s.rubber_type === t))
+        if (typesInit && hasOverlap) return cur
+        const all = stocked.map((s) => s.rubber_type)
+        return all.length ? all : cur
+      })
+      setTypesInit(true)
+    }).catch(() => undefined)
+  }, [facilityId, typesInit])
 
   // Chọn lệnh SX → lấy grade + giới hạn chèn theo grade làm gợi ý
   useEffect(() => {
@@ -132,7 +151,13 @@ export default function RawIssueCreatePage() {
           </Row>
           <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
             <Col xs={24} md={12}><Text type="secondary" style={{ fontSize: 12 }}>Loại hàng cho phép</Text>
-              <Select mode="multiple" value={types} onChange={setTypes} style={{ width: '100%' }} options={RAW_TYPES_FOR_PRODUCTION.map((t) => ({ value: t, label: RAW_RUBBER_TYPE_LABELS[t] }))} /></Col>
+              <Select mode="multiple" value={types} onChange={setTypes} style={{ width: '100%' }} options={RAW_TYPES_FOR_PRODUCTION.map((t) => ({ value: t, label: RAW_RUBBER_TYPE_LABELS[t] }))} />
+              <div style={{ marginTop: 4, fontSize: 12, color: '#6B7280' }}>
+                {inStock.length === 0 ? 'Kho này chưa có lô nào còn hàng.' : (
+                  <span>Đang có hàng: {inStock.map((s) => `${s.rubber_type_name} ${fmtKg(s.dry_kg)} kg khô`).join(' · ')}
+                    {' · '}<a onClick={() => setTypes(inStock.map((s) => s.rubber_type))}>chọn tất cả loại đang có</a></span>
+                )}
+              </div></Col>
             <Col xs={12} md={4}><Text type="secondary" style={{ fontSize: 12 }}>Mủ tạp tối đa (% khô)</Text>
               <InputNumber value={maxTap} min={0} max={100} onChange={(v) => setMaxTap(v === null ? null : Number(v))} style={{ width: '100%' }} disabled={mucDich !== 'production'} /></Col>
             <Col xs={24} md={8}><Text type="secondary" style={{ fontSize: 12 }}>Ghi chú</Text>

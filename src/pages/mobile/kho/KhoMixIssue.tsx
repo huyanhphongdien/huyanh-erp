@@ -62,7 +62,7 @@ export default function KhoMixIssue() {
   const [shifts, setShifts] = useState<OpsShiftOption[]>([])
   const [pickShift, setPickShift] = useState(false)
   const [team, setTeam] = useState('')
-  const [teams, setTeams] = useState<string[]>(['Đen', 'Vàng'])
+  const [teams, setTeams] = useState<string[]>(['Vang', 'Hiền'])
   const [big, setBig] = useState<{ src: string; cap: string } | null>(null)
   const role = useMixRole(i?.facility_id ?? null)
 
@@ -84,7 +84,7 @@ export default function KhoMixIssue() {
     if (!i || i.shift_id || i.status !== 'issued') return
     let alive = true
     detectShift(user?.employee_id || null).then((d) => { if (alive) { setShifts(d.shifts); setShift((cur) => cur ?? d.pick) } }).catch(() => { /* bỏ qua */ })
-    mixService.listTeams(i.facility_id).then((t) => { if (alive) setTeams([...new Set([...t, 'Đen', 'Vàng'])]) }).catch(() => { /* bỏ qua */ })
+    mixService.listTeams(i.facility_id).then((t) => { if (alive) setTeams([...new Set(['Vang', 'Hiền', ...t])]) }).catch(() => { /* bỏ qua */ })
     return () => { alive = false }
   }, [i?.id, i?.shift_id, i?.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -198,7 +198,7 @@ export default function KhoMixIssue() {
   if (!i) return <div className="kmx"><header className="kmx-hd"><button type="button" className="kmx-back" aria-label="Quay lại" onClick={() => nav('/m/kho/chen')}>{I.back}</button><div className="kmx-hd-txt"><span className="kmx-title">Phiếu chèn</span></div></header><div className="kmx-body"><div className="kmx-skel" /><div className="kmx-skel" /></div></div>
 
   const st = i.status
-  const caTo = `${i.shift_name || fmtD(i.shift_date)}${i.team ? ` · Tổ ${i.team}` : ''}`
+  const caTo = `${i.shift_name || fmtD(i.shift_date)}${i.team ? ` · Ca ${i.team}` : ''}`
   const canSubmit = role.khaiBao
   const canQc = role.duyetQc
   const canReceive = role.nhanKho
@@ -221,7 +221,7 @@ export default function KhoMixIssue() {
           </section>
           <section className="kmx-card" aria-label="Tiến độ ký" style={{ gap: 0 }}>
             <h2 className="kmx-h2" style={{ marginBottom: 10 }}>{justDone.signed ? 'Còn 2 chữ ký nữa' : 'Còn 3 chữ ký'}</h2>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className={`kmx-tl-dot ${justDone.signed ? 'done' : 'now'}`} style={{ position: 'static' }}>{justDone.signed ? I.checkSm : '1'}</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong">{justDone.signed ? 'QS đã ký khai báo' : 'QS ký khai báo · chưa'}</span><span className="kmx-sm">{i.submitted_name || i.return_name || ''}{i.team ? ` · Tổ ${i.team}` : ''}{i.submitted_at ? ` · ${hm(i.submitted_at)}` : ''}</span></span></div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className={`kmx-tl-dot ${justDone.signed ? 'done' : 'now'}`} style={{ position: 'static' }}>{justDone.signed ? I.checkSm : '1'}</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong">{justDone.signed ? 'QS đã ký khai báo' : 'QS ký khai báo · chưa'}</span><span className="kmx-sm">{i.submitted_name || i.return_name || ''}{i.team ? ` · Ca ${i.team}` : ''}{i.submitted_at ? ` · ${hm(i.submitted_at)}` : ''}</span></span></div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className={`kmx-tl-dot ${justDone.signed ? 'now' : 'todo'}`} style={{ position: 'static' }}>2</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong" style={{ color: justDone.signed ? '#B45309' : '#6B7280' }}>QC duyệt · đang chờ</span><span className="kmx-sm">QC thấy phiếu trong mục Chờ ký, ký được cả ca một chạm</span></span></div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className="kmx-tl-dot todo" style={{ position: 'static' }}>3</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong" style={{ color: '#6B7280' }}>Thủ kho nhận</span><span className="kmx-sm">Lúc này kho chèn mới trừ {fmtKg(i.kg_used)} kg, sổ ca tự điền dòng CHÈN</span></span></div>
           </section>
@@ -266,7 +266,7 @@ export default function KhoMixIssue() {
                 <button type="button" className="kmx-pill sm" onClick={() => setPickShift((v) => !v)}>{pickShift ? 'Đóng' : 'Đổi ca'}</button>
               </div>
               {pickShift && <div className="kmx-seg">{shifts.map((s) => <button key={s.id} type="button" className={shift?.id === s.id ? 'on' : ''} onClick={() => { setShift({ id: s.id, name: s.name, code: s.code, start_time: s.start_time, end_time: s.end_time, nguon: 'tay' }); setPickShift(false) }}>{s.name}</button>)}</div>}
-              <div className="kmx-col" style={{ gap: 6 }}><span className="kmx-lbl">Tổ</span><div className="kmx-seg">{teams.map((t) => <button key={t} type="button" className={team === t ? 'on' : ''} onClick={() => setTeam(t)}>Tổ {t}</button>)}</div></div>
+              <div className="kmx-col" style={{ gap: 6 }}><span className="kmx-lbl">Tổ trưởng · ca của ai</span><div className="kmx-seg">{teams.map((t) => <button key={t} type="button" className={team === t ? 'on' : ''} onClick={() => setTeam(t)}>Ca {t}</button>)}</div></div>
             </section>
           )}
           <section className="kmx-card" aria-label="Cân phần còn lại" style={{ gap: 10 }}>
@@ -391,7 +391,7 @@ export default function KhoMixIssue() {
         <section className="kmx-card" aria-label="Dòng thời gian" style={{ gap: 0 }}>
           <div className="kmx-tl"><span className="kmx-tl-dot done">{I.checkSm}</span><div className="kmx-tl-body">
             <span className="kmx-row"><span className="kmx-strong">Lấy đầu ca · {fmtKg(i.kg_out)} kg</span><span className="kmx-sm">{hm(i.out_at)}</span></span>
-            <span className="kmx-sm">{i.out_name || ''}{i.team ? ` · Tổ ${i.team}` : ''}{missOut.length ? ` · thiếu ${missOut.length} ảnh` : ''}</span>
+            <span className="kmx-sm">{i.out_name || ''}{i.team ? ` · Ca ${i.team}` : ''}{missOut.length ? ` · thiếu ${missOut.length} ảnh` : ''}</span>
             {pOut.length > 0 && <div className="kmx-thumbs">{thumbs(pOut)}</div>}
           </div></div>
           <div className={`kmx-tl${i.return_at ? '' : ' todo'}`}><span className={`kmx-tl-dot ${i.return_at ? 'done' : 'todo'}`}>{i.return_at ? I.checkSm : '·'}</span><div className="kmx-tl-body">

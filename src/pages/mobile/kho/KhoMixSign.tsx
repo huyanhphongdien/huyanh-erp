@@ -60,7 +60,7 @@ export default function KhoMixSign() {
       if (!canFor(i)) continue
       const buoc = buocOf(i.status)
       const key = `${i.shift_date}|${i.shift_id ?? ''}|${buoc}`
-      const g = m.get(key) ?? { key, label: `${fmtD(i.shift_date)} · ${i.shift_name || 'ca ?'}${i.team ? ` · Tổ ${i.team}` : ''} · ${STEP[buoc].who}`, buoc, ids: [], boQua: 0, kg: 0 }
+      const g = m.get(key) ?? { key, label: `${fmtD(i.shift_date)} · ${i.shift_name || 'ca ?'}${i.team ? ` · Ca ${i.team}` : ''} · ${STEP[buoc].who}`, buoc, ids: [], boQua: 0, kg: 0 }
       if (buoc === 'submit' && i.thieu_anh) g.boQua += 1
       else { g.ids.push(i.id); g.kg += i.kg_used ?? 0 }
       m.set(key, g)
@@ -125,7 +125,7 @@ export default function KhoMixSign() {
           return (
             <section key={i.id} className="kmx-card" aria-label={`Phiếu ${i.code}`} style={{ gap: 10 }}>
               <div className="kmx-row"><span className="kmx-mono" style={{ fontSize: 15, fontWeight: 700, color: '#0D2E25' }}>{i.code}</span><span className={`kmx-chip ${step.cls}`}>Bước {step.n} · {step.who}</span></div>
-              <span className="kmx-md">{fmtD(i.shift_date)} · {i.shift_name || 'ca ?'}{i.team ? ` · Tổ ${i.team}` : ''} · lô {i.lot_so_lo || i.lot_code} {MIX_SOURCE_LABELS[i.source_type].toLowerCase()}{i.vi_tri ? ` · chèn ${MIX_VI_TRI_LABELS[i.vi_tri].toLowerCase()}` : ''}{i.ma_goc_all ? ` · vào mã ${i.ma_goc_all}` : ''} · {MIX_PURPOSE_LABELS[i.purpose].toLowerCase()}</span>
+              <span className="kmx-md">{fmtD(i.shift_date)} · {i.shift_name || 'ca ?'}{i.team ? ` · Ca ${i.team}` : ''} · lô {i.lot_so_lo || i.lot_code} {MIX_SOURCE_LABELS[i.source_type].toLowerCase()}{i.vi_tri ? ` · chèn ${MIX_VI_TRI_LABELS[i.vi_tri].toLowerCase()}` : ''}{i.ma_goc_all ? ` · vào mã ${i.ma_goc_all}` : ''} · {MIX_PURPOSE_LABELS[i.purpose].toLowerCase()}</span>
               <div className="kmx-grid3">
                 <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Lấy {hm(i.out_at)}{i.so_banh !== null ? ` · ${i.so_banh} b` : ''}</span><span className="kmx-num md">{fmtKg(i.kg_out)}</span></div>
                 <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Trả {hm(i.return_at)}</span><span className="kmx-num md">{fmtKg(i.kg_return)}</span></div>

@@ -286,7 +286,7 @@ export const mixService = {
       supabase.from('shift_production_reports').select('team').eq('facility_id', facilityId).gte('report_date', d).not('team', 'is', null).limit(300),
       supabase.from('mix_issues').select('team').eq('facility_id', facilityId).gte('shift_date', d).not('team', 'is', null).limit(300),
     ])
-    const names = [...((a.data ?? []) as any[]), ...((b.data ?? []) as any[])].map((r) => String(r.team ?? '').trim()).filter(Boolean)
+    const names = [...((a.data ?? []) as any[]), ...((b.data ?? []) as any[])].map((r) => String(r.team ?? '').trim().replace(/^(tổ|ca)\s+/i, '')).filter(Boolean)
     const count = new Map<string, number>()
     for (const n of names) count.set(n, (count.get(n) ?? 0) + 1)
     return [...count.entries()].sort((x, y) => y[1] - x[1]).map(([n]) => n).slice(0, 6)

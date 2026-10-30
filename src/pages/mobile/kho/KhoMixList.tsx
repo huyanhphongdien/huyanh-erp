@@ -74,7 +74,7 @@ export default function KhoMixList() {
             <span className="kmx-row" style={{ alignItems: 'flex-end' }}>
               <span className="kmx-col">
                 <span style={{ fontSize: 13.5, fontWeight: 600 }}>{i.lot_code} · {MIX_SOURCE_LABELS[i.source_type].replace(/ \(.*\)/, '')}</span>
-                <span className="kmx-sm">{fmtD(i.shift_date)}{i.shift_name ? ` · ${i.shift_name}` : ''}{i.team ? ` · Tổ ${i.team}` : ''} · lấy {hm(i.out_at)}{i.return_at ? ` · trả ${hm(i.return_at)}` : ''} · {i.out_name || ''}{i.handover_to_next ? ' · bàn giao' : ''}</span>
+                <span className="kmx-sm">{fmtD(i.shift_date)}{i.shift_name ? ` · ${i.shift_name}` : ''}{i.team ? ` · Ca ${i.team}` : ''} · lấy {hm(i.out_at)}{i.return_at ? ` · trả ${hm(i.return_at)}` : ''} · {i.out_name || ''}{i.handover_to_next ? ' · bàn giao' : ''}</span>
               </span>
               <span className="kmx-col" style={{ alignItems: 'flex-end' }}>
                 <span className={`kmx-num md${i.status === 'received' ? ' ok' : i.status === 'cancelled' ? ' mut' : ''}`}>{i.kg_used !== null ? fmtKg(i.kg_used) : fmtKg(i.kg_out)}</span>

@@ -33,7 +33,7 @@ export default function KhoFgLots() {
   const [shift, setShift] = useState<ShiftPick | null>(null)
   const [shifts, setShifts] = useState<OpsShiftOption[]>([])
   const [pickShift, setPickShift] = useState(false)
-  const [teams, setTeams] = useState<string[]>(['Đen', 'Vàng'])
+  const [teams, setTeams] = useState<string[]>(['Vang', 'Hiền'])
   const [team, setTeam] = useState('')
   const [materialId, setMaterialId] = useState('')
   const [soLo, setSoLo] = useState('')
@@ -118,7 +118,7 @@ export default function KhoFgLots() {
                   <button type="button" className="kmx-pill sm" onClick={() => setPickShift((v) => !v)}>{pickShift ? 'Đóng' : 'Đổi ca'}</button>
                 </div>
                 {pickShift && <div className="kmx-seg">{shifts.map((s) => <button key={s.id} type="button" className={shift?.id === s.id ? 'on' : ''} onClick={() => { setShift({ id: s.id, name: s.name, code: s.code, start_time: s.start_time, end_time: s.end_time, nguon: 'tay' }); setPickShift(false) }}>{s.name}</button>)}</div>}
-                <div className="kmx-seg">{teams.map((t) => <button key={t} type="button" className={team === t ? 'on' : ''} style={{ height: 40 }} onClick={() => setTeam(t)}>Tổ {t}</button>)}</div>
+                <div className="kmx-seg">{teams.map((t) => <button key={t} type="button" className={team === t ? 'on' : ''} style={{ height: 40 }} onClick={() => setTeam(t)}>Ca {t}</button>)}</div>
                 <div className="kmx-col" style={{ gap: 4 }}>
                   <label htmlFor="fg-ma" className="kmx-lbl">Mã nguyên liệu đang chạy</label>
                   <select id="fg-ma" className="kmx-text" value={rawLotId} onChange={(e) => setRawLotId(e.target.value)}><option value="">— chưa rõ —</option>{rawLots.map((r) => <option key={r.raw_lot_id} value={r.raw_lot_id}>{r.ma} · {r.rubber_type_name} · {r.trang_thai === 'dang_chay' ? 'đang chạy' : r.trang_thai === 'san_sang' ? 'sẵn sàng' : 'đã chạy xong'}</option>)}</select>

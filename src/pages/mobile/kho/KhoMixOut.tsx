@@ -20,7 +20,7 @@ import { fmtKg, parseKhoScan, todayLocal, useKhoFacility } from './khoCommon'
 import { detectShift, hhmm, I, KmxPhotoTiles, newUuid, Steps, type ShiftPick } from './khoMixUtil'
 import './khoMix.css'
 
-const DEFAULT_TEAMS = ['Đen', 'Vàng']
+const DEFAULT_TEAMS = ['Vang', 'Hiền']   // tổ gọi theo tổ trưởng: Ca Vang, Ca Hiền
 const INDEXES = ['Po', 'PRI', 'Mooney', 'Tạp chất', 'Khác']
 
 export default function KhoMixOut() {
@@ -72,7 +72,7 @@ export default function KhoMixOut() {
         if (!alive) return
         const ok = l.filter((x) => x.ton_kg > 0.005)
         setLots(ok); setSettings(s); setShifts(d.shifts); setShift(d.pick); setMaList(m); setCaIssues(ci.filter((x) => x.status !== 'cancelled'))
-        const tl = [...new Set([...t, ...DEFAULT_TEAMS])]; setTeams(tl)
+        const tl = [...new Set([...DEFAULT_TEAMS, ...t])]; setTeams(tl)
         const pre = sp.get('lot'); const hit = pre ? ok.find((x) => x.id === pre) : null
         if (hit && !(hit.source_type === 'dkl' && !hit.metal_cleared)) { setLot(hit); setStep(2) }
       })
@@ -173,7 +173,7 @@ export default function KhoMixOut() {
       <div className="kmx-hd-txt"><span className="kmx-eyebrow">{eyebrow}</span><span className="kmx-title">{title}</span></div>
     </header>
   )
-  const caTo = `${shift?.name || 'Ca ?'}${teamFinal ? ` · Tổ ${teamFinal}` : ''}`
+  const caTo = `${shift?.name || 'Ca ?'}${teamFinal ? ` · Ca ${teamFinal}` : ''}`
   // các lần đã chèn của ca này (theo ca tự nhận) → lần kế tiếp = n + 1
   const prevLan = caIssues.filter((x) => (shift ? x.shift_id === shift.id : true)).sort((a, b) => a.out_at.localeCompare(b.out_at))
   const lan = prevLan.length + 1
@@ -256,6 +256,39 @@ export default function KhoMixOut() {
         <Steps cur={2} />
         <div className="kmx-body"><div className="kmx-inner">
           {msg && <div className="kmx-msg err">{msg}</div>}
+          <section className="kmx-card" aria-label="Ca và tổ" style={{ gap: 10 }}>
+            <div className="kmx-row">
+              <span className="kmx-col"><span className="kmx-lbl">Ca</span><span className="kmx-strong" style={{ fontSize: 15 }}>{shift ? `${shift.name}${shift.start_time ? ` · ${hhmm(shift.start_time)}–${hhmm(shift.end_time)}` : ''}` : 'Chưa chọn ca'}</span><span className="kmx-sm" style={{ color: shift ? '#15803D' : '#B45309' }}>{shift?.nguon === 'cham_cong' ? 'tự nhận theo chấm công của bạn' : shift?.nguon === 'gio' ? 'tự nhận theo giờ hiện tại' : shift ? 'bạn chọn' : 'chọn ca để sổ ca tự điền'}</span></span>
+              <button type="button" className="kmx-pill sm" onClick={() => setPickShift((v) => !v)}>{pickShift ? 'Đóng' : 'Đổi ca'}</button>
+            </div>
+            {pickShift && (
+              <div className="kmx-seg">
+                {shifts.map((s) => <button key={s.id} type="button" className={shift?.id === s.id ? 'on' : ''} onClick={() => { setShift({ id: s.id, name: s.name, code: s.code, start_time: s.start_time, end_time: s.end_time, nguon: 'tay' }); setPickShift(false) }}>{s.name}</button>)}
+              </div>
+            )}
+            <div className="kmx-col" style={{ gap: 6 }}>
+              <span className="kmx-lbl">Tổ trưởng · ca của ai</span>
+              <div className="kmx-seg">
+                {teams.map((t) => <button key={t} type="button" className={!teamOther && team === t ? 'on' : ''} onClick={() => { setTeam(t); setTeamOther(false) }}>Ca {t}</button>)}
+                <button type="button" className={teamOther ? 'on' : ''} onClick={() => { setTeamOther(true); setTeam('') }}>Khác…</button>
+              </div>
+              {teamOther && <input className="kmx-text" placeholder="Tên tổ trưởng (vd Vang)" value={team} onChange={(e) => setTeam(e.target.value)} aria-label="Tên tổ" />}
+            </div>
+            <div className="kmx-col" style={{ gap: 6 }}>
+              <span className="kmx-lbl">Dùng để</span>
+              <div className="kmx-seg">
+                <button type="button" className={purpose === 'chay_lai' ? 'on' : ''} onClick={() => setPurpose('chay_lai')}>Chạy lại</button>
+                <button type="button" className={purpose === 'nang_chi_so' ? 'on' : ''} onClick={() => setPurpose('nang_chi_so')}>Nâng chỉ số</button>
+              </div>
+              {purpose === 'nang_chi_so' && (
+                <div className="kmx-grid2">
+                  <select className="kmx-text" value={targetIndex} onChange={(e) => setTargetIndex(e.target.value)} aria-label="Chỉ số">{INDEXES.map((v) => <option key={v} value={v}>{v}</option>)}</select>
+                  <input className="kmx-text" type="number" inputMode="decimal" placeholder="Mục tiêu" value={targetValue} onChange={(e) => setTargetValue(e.target.value)} aria-label="Mục tiêu" />
+                </div>
+              )}
+            </div>
+          </section>
+
           {!lot.so_lo && (
             <section className="kmx-card" aria-label="Số lô" style={{ gap: 8, borderColor: soLo.trim() ? '#E5E7EB' : '#FECACA' }}>
               <label htmlFor="kmx-solo" className="kmx-strong" style={{ fontSize: 13 }}>Lô {lot.code} chưa có số lô <span style={{ fontWeight: 500, color: '#B45309' }}>· gõ số lô trên bao</span></label>
@@ -300,39 +333,6 @@ export default function KhoMixOut() {
                 <span className="kmx-num md" style={{ minWidth: 40, textAlign: 'center' }}>{soBanhN ?? '—'}</span>
                 <button type="button" className="kmx-pill sm" style={{ width: 44, padding: 0, fontSize: 20 }} aria-label="Thêm 1 bành" disabled={soBanhN === null} onClick={() => chinhBanh(1)}>+</button>
               </div>
-            </div>
-          </section>
-
-          <section className="kmx-card" aria-label="Ca và tổ" style={{ gap: 10 }}>
-            <div className="kmx-row">
-              <span className="kmx-col"><span className="kmx-lbl">Ca</span><span className="kmx-strong" style={{ fontSize: 15 }}>{shift ? `${shift.name}${shift.start_time ? ` · ${hhmm(shift.start_time)}–${hhmm(shift.end_time)}` : ''}` : 'Chưa chọn ca'}</span><span className="kmx-sm" style={{ color: shift ? '#15803D' : '#B45309' }}>{shift?.nguon === 'cham_cong' ? 'tự nhận theo chấm công của bạn' : shift?.nguon === 'gio' ? 'tự nhận theo giờ hiện tại' : shift ? 'bạn chọn' : 'chọn ca để sổ ca tự điền'}</span></span>
-              <button type="button" className="kmx-pill sm" onClick={() => setPickShift((v) => !v)}>{pickShift ? 'Đóng' : 'Đổi ca'}</button>
-            </div>
-            {pickShift && (
-              <div className="kmx-seg">
-                {shifts.map((s) => <button key={s.id} type="button" className={shift?.id === s.id ? 'on' : ''} onClick={() => { setShift({ id: s.id, name: s.name, code: s.code, start_time: s.start_time, end_time: s.end_time, nguon: 'tay' }); setPickShift(false) }}>{s.name}</button>)}
-              </div>
-            )}
-            <div className="kmx-col" style={{ gap: 6 }}>
-              <span className="kmx-lbl">Tổ</span>
-              <div className="kmx-seg">
-                {teams.map((t) => <button key={t} type="button" className={!teamOther && team === t ? 'on' : ''} onClick={() => { setTeam(t); setTeamOther(false) }}>Tổ {t}</button>)}
-                <button type="button" className={teamOther ? 'on' : ''} onClick={() => { setTeamOther(true); setTeam('') }}>Khác…</button>
-              </div>
-              {teamOther && <input className="kmx-text" placeholder="Tên tổ" value={team} onChange={(e) => setTeam(e.target.value)} aria-label="Tên tổ" />}
-            </div>
-            <div className="kmx-col" style={{ gap: 6 }}>
-              <span className="kmx-lbl">Dùng để</span>
-              <div className="kmx-seg">
-                <button type="button" className={purpose === 'chay_lai' ? 'on' : ''} onClick={() => setPurpose('chay_lai')}>Chạy lại</button>
-                <button type="button" className={purpose === 'nang_chi_so' ? 'on' : ''} onClick={() => setPurpose('nang_chi_so')}>Nâng chỉ số</button>
-              </div>
-              {purpose === 'nang_chi_so' && (
-                <div className="kmx-grid2">
-                  <select className="kmx-text" value={targetIndex} onChange={(e) => setTargetIndex(e.target.value)} aria-label="Chỉ số">{INDEXES.map((v) => <option key={v} value={v}>{v}</option>)}</select>
-                  <input className="kmx-text" type="number" inputMode="decimal" placeholder="Mục tiêu" value={targetValue} onChange={(e) => setTargetValue(e.target.value)} aria-label="Mục tiêu" />
-                </div>
-              )}
             </div>
           </section>
 

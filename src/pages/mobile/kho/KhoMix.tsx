@@ -108,7 +108,7 @@ export default function KhoMix() {
       <header className="kmx-hd">
         <div className="kmx-hd-txt">
           <span className="kmx-eyebrow">Hàng chèn · {facility?.name || facility?.code || ''}</span>
-          <span className="kmx-title">{cur ? `${cur.shift_name}${cur.team ? ` · Tổ ${cur.team}` : ''}` : 'Hôm nay'}</span>
+          <span className="kmx-title">{cur ? `${cur.shift_name}${cur.team ? ` · Ca ${cur.team}` : ''}` : 'Hôm nay'}</span>
         </div>
         <span className="kmx-hd-right">{now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} · {hm(now.toISOString())}<br />{firstName(user?.full_name) || ''}</span>
         <FacilitySelect value={facilityId} onChange={setFacilityId} facilities={facilities} />
@@ -182,7 +182,7 @@ export default function KhoMix() {
               <div className="kmx-list">
                 {otherIssued.map((i) => (
                   <Link key={i.id} to={`/m/kho/chen/phieu/${i.id}`} className="kmx-li" style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <span className="kmx-col"><span className="kmx-mono" style={{ fontSize: 13, fontWeight: 700, color: '#0D2E25' }}>{i.code}</span><span className="kmx-sm">{fmtD(i.shift_date)} · {i.shift_name || 'chưa gắn ca'}{i.team ? ` · Tổ ${i.team}` : ''} · {i.lot_so_lo || i.lot_code} · {hm(i.out_at)}</span></span>
+                    <span className="kmx-col"><span className="kmx-mono" style={{ fontSize: 13, fontWeight: 700, color: '#0D2E25' }}>{i.code}</span><span className="kmx-sm">{fmtD(i.shift_date)} · {i.shift_name || 'chưa gắn ca'}{i.team ? ` · Ca ${i.team}` : ''} · {i.lot_so_lo || i.lot_code} · {hm(i.out_at)}</span></span>
                     <span className="kmx-num sm">{fmtKg(i.kg_out)} <span className="kmx-sm">kg</span></span>
                   </Link>
                 ))}
@@ -205,7 +205,7 @@ export default function KhoMix() {
                 <span className="kmx-ico amb">{I.pen}</span>
                 <span className="kmx-col" style={{ flex: 1 }}>
                   <span className="kmx-mono" style={{ fontSize: 14, fontWeight: 700, color: '#0D2E25' }}>{choKy[0].code}</span>
-                  <span className="kmx-sm">{choKy[0].shift_name || fmtD(choKy[0].shift_date)}{choKy[0].team ? ` · Tổ ${choKy[0].team}` : ''} · tiêu hao {fmtKg(choKy[0].kg_used)} kg · {MIX_ISSUE_STATUS_LABELS[choKy[0].status]}{choKy.length > 1 ? ` · và ${choKy.length - 1} phiếu khác` : ''}</span>
+                  <span className="kmx-sm">{choKy[0].shift_name || fmtD(choKy[0].shift_date)}{choKy[0].team ? ` · Ca ${choKy[0].team}` : ''} · tiêu hao {fmtKg(choKy[0].kg_used)} kg · {MIX_ISSUE_STATUS_LABELS[choKy[0].status]}{choKy.length > 1 ? ` · và ${choKy.length - 1} phiếu khác` : ''}</span>
                 </span>
                 {I.chev}
               </Link>
@@ -242,7 +242,7 @@ export default function KhoMix() {
               <div className="kmx-list">
                 {done.map((i) => (
                   <Link key={i.id} to={`/m/kho/chen/phieu/${i.id}`} className="kmx-li" style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <span className="kmx-col"><span className="kmx-mono" style={{ fontSize: 13, fontWeight: 700, color: '#0D2E25' }}>{i.code}</span><span className="kmx-sm">{fmtD(i.shift_date)}{i.shift_name ? ` · ${i.shift_name}` : ''}{i.team ? ` · Tổ ${i.team}` : ''} · {i.lot_so_lo || i.lot_code}</span></span>
+                    <span className="kmx-col"><span className="kmx-mono" style={{ fontSize: 13, fontWeight: 700, color: '#0D2E25' }}>{i.code}</span><span className="kmx-sm">{fmtD(i.shift_date)}{i.shift_name ? ` · ${i.shift_name}` : ''}{i.team ? ` · Ca ${i.team}` : ''} · {i.lot_so_lo || i.lot_code}</span></span>
                     <span className="kmx-num sm ok">{fmtKg(i.kg_used)} <span className="kmx-sm">kg</span></span>
                   </Link>
                 ))}

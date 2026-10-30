@@ -93,10 +93,10 @@ export default function RawIssueDetailPage() {
     { title: 'Tồn ướt', dataIndex: 'ton_wet_kg', key: 'ton_wet_kg', align: 'right', render: (v) => fmtKg(v) },
     { title: 'KH ướt', dataIndex: 'planned_wet_kg', key: 'planned_wet_kg', align: 'right', render: (v) => fmtKg(v) },
     { title: 'DRC', key: 'drc', align: 'right', render: (_, r) => fmtPct(r.actual_drc_pct ?? r.ton_drc_pct ?? r.planned_drc_pct) },
-    { title: 'Cân thực (kg ướt)', key: 'actual', width: 220, render: (_, r) => isDraft ? (
+    { title: 'Cân thực (kg ướt) · gõ rồi bấm Lưu', key: 'actual', width: 260, render: (_, r) => isDraft ? (
       <Space.Compact style={{ width: '100%' }}>
-        <InputNumber min={0} max={r.ton_wet_kg ?? undefined} step={10} value={draft[r.id] ?? null} onChange={(v) => setDraft((d) => ({ ...d, [r.id]: v === null || v === undefined ? null : Number(v) }))} style={{ flex: 1 }} disabled={!rawRole.perms.submit} />
-        <Button icon={<SaveOutlined />} loading={savingLine === r.id} disabled={!rawRole.perms.submit || draft[r.id] === null || draft[r.id] === undefined || draft[r.id] === r.actual_wet_kg} onClick={() => saveLine(r)} />
+        <InputNumber min={0} max={r.ton_wet_kg ?? undefined} step={10} value={draft[r.id] ?? null} onChange={(v) => setDraft((d) => ({ ...d, [r.id]: v === null || v === undefined ? null : Number(v) }))} onPressEnter={() => saveLine(r)} style={{ flex: 1 }} disabled={!rawRole.perms.submit} placeholder="kg cân" />
+        <Button type={draft[r.id] !== null && draft[r.id] !== undefined && draft[r.id] !== r.actual_wet_kg ? 'primary' : 'default'} icon={<SaveOutlined />} loading={savingLine === r.id} disabled={!rawRole.perms.submit || draft[r.id] === null || draft[r.id] === undefined || draft[r.id] === r.actual_wet_kg} onClick={() => saveLine(r)}>Lưu</Button>
       </Space.Compact>
     ) : <Text strong>{fmtKg(r.actual_wet_kg)}</Text> },
     { title: 'Khô trừ sổ', key: 'dry', align: 'right', render: (_, r) => r.actual_dry_kg !== null ? <Text strong>{fmtKg(r.actual_dry_kg)}</Text> : r.actual_wet_kg ? <Text type="secondary">≈ {fmtKg(r.actual_wet_kg * (r.ton_drc_pct ?? r.planned_drc_pct) / 100)}</Text> : <Text type="secondary">—</Text> },

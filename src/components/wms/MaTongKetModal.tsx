@@ -4,12 +4,12 @@
 //   · mail BGĐ soạn sẵn: gửi qua hệ thống (send-email) · mở Outlook/Mail (mailto) · sao chép
 // File: src/components/wms/MaTongKetModal.tsx
 // ============================================================================
-import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Col, Input, Modal, Row, Select, Space, Statistic, Table, Tag, Typography, message } from 'antd'
-import { CopyOutlined, MailOutlined, SendOutlined } from '@ant-design/icons'
+import { useEffect, useState } from 'react'
+import { Alert, Button, Col, Modal, Row, Space, Statistic, Table, Tag, Typography, message } from 'antd'
+import { MailOutlined, SendOutlined } from '@ant-design/icons'
 import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type RawLotTongKet, type RawLotTongKetCa } from '../../services/wms/rawLotService'
 import { MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS } from '../../services/wms/mixService'
-import { guiMailTongKet, mailtoTongKet, soanMailTongKet, taiPhieuAnh, type PhieuAnh } from '../../services/wms/maTongKetMail'
+import { guiMailKetThuc, nguoiNhanTuDong, taiPhieuAnh, type PhieuAnh } from '../../services/wms/maTongKetMail'
 
 const { Text, Title } = Typography
 const fmtKg = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: Math.max(d, 1), minimumFractionDigits: 0 }))   // không làm tròn kg (chủ DN 31/10): giữ số lẻ khi có
@@ -21,7 +21,6 @@ export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onC
   const [tk, setTk] = useState<RawLotTongKet | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [to, setTo] = useState<string[]>([])
   const [sending, setSending] = useState(false)
   const [phieu, setPhieu] = useState<PhieuAnh[]>([])   // từng lần chèn + ảnh kèm trong mail
 
@@ -31,29 +30,22 @@ export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onC
     setLoading(true); setErr(null); setTk(null); setPhieu([])
     const req = lenhId ? rawLotService.tongKetLenh(lenhId) : rawLotService.tongKetMa(rawLotId ?? '')
     req
-      .then((r) => { if (!alive) return; setTk(r); setTo(r.bgd.map((b) => b.email)); taiPhieuAnh(r).then((x) => { if (alive) setPhieu(x) }).catch(() => { if (alive) setPhieu([]) }) })
+      .then((r) => { if (!alive) return; setTk(r); taiPhieuAnh(r).then((x) => { if (alive) setPhieu(x) }).catch(() => { if (alive) setPhieu([]) }) })
       .catch((e: any) => { if (alive) setErr(e?.message || 'Không tổng kết được (cần chạy SQL p12 + p13)') })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [open, rawLotId, lenhId])
 
-  const mail = useMemo(() => (tk ? soanMailTongKet(tk, phieu) : null), [tk, phieu])
   const soAnh = phieu.reduce((s, r) => s + r.anhLay.length + r.anhTra.length, 0)
-  const toOk = to.filter(okEmail)
-
-  const gui = async () => {
-    if (!mail || !toOk.length) { message.warning('Chọn ít nhất một địa chỉ nhận'); return }
+  const guiLai = async () => {
+    if (!rawLotId && !lenhId) return
     setSending(true)
     try {
-      const r = await guiMailTongKet(toOk, mail)
-      if (r.ok.length) message.success(`Đã gửi cho ${r.ok.join(', ')}`)
-      if (r.loi.length) message.error(`Không gửi được: ${r.loi.map((x) => `${x.email} (${x.msg})`).join('; ')} — dùng nút "Mở ứng dụng mail"`)
+      const r = await guiMailKetThuc(lenhId ? { lenhId } : { rawLotId })
+      if (!r.to.length) message.warning('Không có người nhận: Nhân sự chưa có email chức vụ Ban Giám đốc')
+      else if (r.loi.length) message.warning(`Đã gửi ${r.ok.length}, lỗi: ${r.loi.map((x) => `${x.email} (${x.msg})`).join('; ')}`)
+      else message.success(`Đã gửi lại mail cho ${r.ok.join(', ')}`)
     } finally { setSending(false) }
-  }
-  const copy = async () => {
-    if (!mail) return
-    try { await navigator.clipboard.writeText(`${mail.subject}\n\n${mail.text}`); message.success('Đã sao chép tiêu đề + nội dung') }
-    catch { message.error('Trình duyệt không cho sao chép, bôi đen ô nội dung rồi Ctrl+C') }
   }
 
   const caCols = [
@@ -70,7 +62,7 @@ export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onC
       title={<Space wrap>{tk ? <>{tk.lenh_code ? <>Tổng kết lệnh <Text strong style={{ fontSize: 18 }}>{tk.lenh_code}</Text><Text strong>{tk.ma}</Text></> : <>Tổng kết mã <Text strong style={{ fontSize: 18 }}>{tk.ma}</Text></>}<Tag color={tk.dang_chay ? 'green' : 'default'}>{tk.dang_chay ? 'Đang chạy' : RAW_LOT_TRANG_THAI_LABELS[tk.trang_thai]}</Tag>{tk.rubber_type_name && <Text type="secondary">{tk.rubber_type_name}</Text>}</> : 'Tổng kết mã'}</Space>}>
       {err && <Alert type="error" showIcon message={err} />}
       {loading && <Text type="secondary">Đang tổng kết…</Text>}
-      {tk && mail && (
+      {tk && (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           {vuaKetThuc && <Alert type="success" showIcon message={`Đã kết thúc ${tk.lenh_code ? `lệnh ${tk.lenh_code} (${tk.ma})` : `chạy mã ${tk.ma}`}. Mail báo cáo (kèm ảnh) đã tự gửi cho Ban Giám đốc — bản dưới để xem lại hoặc gửi thêm.`} />}
           <Row gutter={[16, 8]}>
@@ -113,22 +105,12 @@ export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onC
             </Col>
           </Row>
 
-          <div style={{ background: '#FAFAF7', border: '1px solid #E5E7EB', borderRadius: 8, padding: 12 }}>
-            <Space direction="vertical" size={8} style={{ width: '100%' }}>
-              <Space wrap><MailOutlined /><Text strong>Mail báo cáo Ban Giám đốc</Text><Text type="secondary">(soạn sẵn từ số trên, sửa người nhận nếu cần)</Text>{phieu.length > 0 && <Tag color="green">{phieu.length} lần chèn · {soAnh} ảnh kèm trong mail gửi qua hệ thống</Tag>}</Space>
-              <Select mode="tags" style={{ width: '100%' }} value={to} onChange={setTo} placeholder="Địa chỉ nhận" tokenSeparators={[',', ';', ' ']}
-                options={tk.bgd.map((b) => ({ value: b.email, label: `${b.name}${b.chuc_vu ? ` · ${b.chuc_vu}` : ''} <${b.email}>` }))} />
-              {!tk.bgd.length && <Text type="warning">Chưa tìm thấy nhân viên chức vụ Ban Giám đốc có email trong danh sách nhân sự — gõ địa chỉ nhận vào ô trên.</Text>}
-              <Input value={mail.subject} readOnly />
-              <Input.TextArea value={mail.text} readOnly autoSize={{ minRows: 6, maxRows: 18 }} style={{ fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12.5 }} />
-              <Space wrap>
-                <Button type="primary" icon={<SendOutlined />} loading={sending} disabled={!toOk.length} onClick={gui}>Gửi mail cho BGĐ ({toOk.length})</Button>
-                <Button icon={<MailOutlined />} href={mailtoTongKet(toOk, mail)}>Mở ứng dụng mail</Button>
-                <Button icon={<CopyOutlined />} onClick={copy}>Sao chép nội dung</Button>
-                <Button onClick={onClose}>Đóng</Button>
-              </Space>
-            </Space>
-          </div>
+          <Space wrap>
+            <MailOutlined /><Text strong>Mail báo cáo tự động</Text>
+            <Text type="secondary">gửi cho {nguoiNhanTuDong(tk).join(', ')}{phieu.length ? ` · kèm ${phieu.length} lần chèn, ${soAnh} ảnh` : ''}</Text>
+            <Button size="small" icon={<SendOutlined />} loading={sending} onClick={guiLai}>Gửi lại</Button>
+            <Button size="small" onClick={onClose}>Đóng</Button>
+          </Space>
         </Space>
       )}
     </Modal>

@@ -119,7 +119,7 @@ export default function KhoMix() {
     try { await rawLotService.ketThucLenh(g.id) }
     catch (e: any) { setMsgMa(e?.message || 'Không kết thúc được'); setBusyMa(null); return }
     let q = 'vua=1'
-    try { const r = await guiMailKetThuc({ lenhId: g.id }); q += r.to.length ? `&mail=${r.ok.length}&loi=${r.loi.length}` : '&mail=none' }
+    try { const r = await guiMailKetThuc({ lenhId: g.id, nguoiLap: user?.full_name ?? null }); q += r.to.length ? `&mail=${r.ok.length}&loi=${r.loi.length}` : '&mail=none' }
     catch { q += '&mail=err' }
     nav(`/m/kho/chen/lenh/${g.id}/tong-ket?${q}`)
   }

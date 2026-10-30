@@ -187,12 +187,32 @@ export async function guiMailTongKet(to: string[], m: MailTongKet): Promise<{ ok
   return { ok, loi }
 }
 
-/** Sau khi Kết thúc lệnh / mã: tổng kết → tải ảnh từng lần → gửi mail cho mọi người BGĐ có email (tự động, không cần bấm thêm) */
-export async function guiMailKetThuc(opts: { lenhId?: string | null; rawLotId?: string | null }): Promise<{ tk: RawLotTongKet; to: string[]; ok: string[]; loi: { email: string; msg: string }[] }> {
+/** Luôn nhận thêm ngoài BGĐ trong Nhân sự (chủ DN 31/10) — đồng bộ với MAIL_THEM trong supabase/functions/mix-lenh-report */
+export const MAIL_THEM_TU_DONG = ['minhld@huyanhrubber.com']
+/** Danh sách người nhận tự động của một bản tổng kết (BGĐ level ≤ 3 có email + MAIL_THEM_TU_DONG) */
+export function nguoiNhanTuDong(tk: RawLotTongKet): string[] {
+  const s = new Set<string>()
+  for (const b of tk.bgd) if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) s.add(b.email.toLowerCase())
+  for (const e of MAIL_THEM_TU_DONG) s.add(e.toLowerCase())
+  return [...s]
+}
+
+export interface KetQuaMail { to: string[]; ok: string[]; loi: { email: string; msg: string }[]; cach: 'server' | 'app' }
+
+/** Sau khi Kết thúc lệnh / mã: mail TỰ ĐỘNG như báo cáo thu mua mủ — ưu tiên edge function mix-lenh-report (server dựng HTML + logo, gửi Graph);
+ *  function chưa deploy / lỗi → dự phòng dựng và gửi từ app qua send-email. Không hỏi người dùng. */
+export async function guiMailKetThuc(opts: { lenhId?: string | null; rawLotId?: string | null; nguoiLap?: string | null }): Promise<KetQuaMail> {
+  try {
+    const { data, error } = await supabase.functions.invoke('mix-lenh-report', { body: { lenh_id: opts.lenhId ?? null, raw_lot_id: opts.rawLotId ?? null, nguoi_lap: opts.nguoiLap ?? null } })
+    if (!error && data && !data.error && Array.isArray(data.to)) {
+      return { to: data.to.map(String), ok: Array.isArray(data.ok) ? data.ok.map(String) : [], loi: Array.isArray(data.loi) ? data.loi : [], cach: 'server' }
+    }
+    console.warn('[mix-lenh-report] không dùng được, gửi từ app:', error?.message || data?.error)
+  } catch (e) { console.warn('[mix-lenh-report] lỗi, gửi từ app:', (e as Error).message) }
   const tk = opts.lenhId ? await rawLotService.tongKetLenh(opts.lenhId) : await rawLotService.tongKetMa(opts.rawLotId ?? '')
   const phieu = await taiPhieuAnh(tk).catch(() => [] as PhieuAnh[])
-  const to = tk.bgd.map((b) => b.email).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
-  if (!to.length) return { tk, to, ok: [], loi: [] }
+  const to = nguoiNhanTuDong(tk)
+  if (!to.length) return { to, ok: [], loi: [], cach: 'app' }
   const r = await guiMailTongKet(to, soanMailTongKet(tk, phieu))
-  return { tk, to, ...r }
+  return { to, ...r, cach: 'app' }
 }

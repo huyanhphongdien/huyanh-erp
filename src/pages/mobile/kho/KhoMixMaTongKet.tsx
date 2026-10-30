@@ -4,11 +4,11 @@
 //   · mail BGĐ soạn sẵn: gửi qua hệ thống · mở ứng dụng mail · sao chép
 // File: src/pages/mobile/kho/KhoMixMaTongKet.tsx · Route: /m/kho/chen/ma/:id/tong-ket
 // ============================================================================
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type RawLotTongKet } from '../../../services/wms/rawLotService'
 import { MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS } from '../../../services/wms/mixService'
-import { guiMailTongKet, mailtoTongKet, soanMailTongKet, taiPhieuAnh, type PhieuAnh } from '../../../services/wms/maTongKetMail'
+import { guiMailKetThuc, nguoiNhanTuDong, taiPhieuAnh, type PhieuAnh } from '../../../services/wms/maTongKetMail'
 import { fmtD, fmtDt, fmtKg } from './khoCommon'
 import { I } from './khoMixUtil'
 import './khoMix.css'
@@ -25,8 +25,6 @@ export default function KhoMixMaTongKet() {
   const laLenh = useLocation().pathname.includes('/lenh/')   // /m/kho/chen/lenh/:id/tong-ket = tổng kết theo lệnh (gộp mã)
   const [tk, setTk] = useState<RawLotTongKet | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const [to, setTo] = useState<string[]>([])
-  const [them, setThem] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [phieu, setPhieu] = useState<PhieuAnh[]>([])   // từng lần chèn + ảnh kèm trong mail
@@ -35,28 +33,20 @@ export default function KhoMixMaTongKet() {
     if (!id) return
     let alive = true
     const req = laLenh ? rawLotService.tongKetLenh(id) : rawLotService.tongKetMa(id)
-    req.then((r) => { if (!alive) return; setTk(r); setTo(r.bgd.map((b) => b.email)); taiPhieuAnh(r).then((x) => { if (alive) setPhieu(x) }).catch(() => { if (alive) setPhieu([]) }) }).catch((e: any) => { if (alive) setErr(e?.message || 'Không tổng kết được (cần chạy SQL p12 + p13)') })
+    req.then((r) => { if (!alive) return; setTk(r); taiPhieuAnh(r).then((x) => { if (alive) setPhieu(x) }).catch(() => { if (alive) setPhieu([]) }) }).catch((e: any) => { if (alive) setErr(e?.message || 'Không tổng kết được (cần chạy SQL p12 + p13)') })
     return () => { alive = false }
   }, [id, laLenh])
 
-  const mail = useMemo(() => (tk ? soanMailTongKet(tk, phieu) : null), [tk, phieu])
   const soAnh = phieu.reduce((s, r) => s + r.anhLay.length + r.anhTra.length, 0)
-  const toOk = to.filter(okEmail)
-  const toggle = (email: string) => setTo((cur) => (cur.includes(email) ? cur.filter((x) => x !== email) : [...cur, email]))
-  const themEmail = () => { const e = them.trim().toLowerCase(); if (!okEmail(e)) { setMsg({ ok: false, text: 'Địa chỉ mail chưa đúng' }); return } if (!to.includes(e)) setTo([...to, e]); setThem('') }
-
-  const gui = async () => {
-    if (!mail || !toOk.length) return
+  // gửi lại mail tự động (khi lần tự gửi lúc kết thúc bị lỗi)
+  const guiLai = async () => {
+    if (!id) return
     setBusy('gui'); setMsg(null)
     try {
-      const r = await guiMailTongKet(toOk, mail)
-      setMsg(r.loi.length ? { ok: r.ok.length > 0, text: `${r.ok.length ? `Đã gửi ${r.ok.length}. ` : ''}Không gửi được: ${r.loi.map((x) => x.email).join(', ')} — dùng nút Mở ứng dụng mail` } : { ok: true, text: `Đã gửi cho ${r.ok.join(', ')}` })
-    } finally { setBusy(null) }
-  }
-  const copy = async () => {
-    if (!mail) return
-    try { await navigator.clipboard.writeText(`${mail.subject}\n\n${mail.text}`); setMsg({ ok: true, text: 'Đã sao chép tiêu đề + nội dung' }) }
-    catch { setMsg({ ok: false, text: 'Máy không cho sao chép, dùng nút Mở ứng dụng mail' }) }
+      const r = await guiMailKetThuc(laLenh ? { lenhId: id } : { rawLotId: id })
+      setMsg(!r.to.length ? { ok: false, text: 'Không có người nhận: Nhân sự chưa có email chức vụ Ban Giám đốc' } : r.loi.length ? { ok: r.ok.length > 0, text: `Đã gửi ${r.ok.length}, lỗi: ${r.loi.map((x) => x.email).join(', ')}` } : { ok: true, text: `Đã gửi lại mail cho ${r.ok.join(', ')}` })
+    } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không gửi được' }) }
+    finally { setBusy(null) }
   }
 
   const hd = (
@@ -66,7 +56,7 @@ export default function KhoMixMaTongKet() {
     </header>
   )
   if (err) return <div className="kmx">{hd}<div className="kmx-body"><div className="kmx-inner"><div className="kmx-msg err">{err}</div></div></div></div>
-  if (!tk || !mail) return <div className="kmx">{hd}<div className="kmx-body"><div className="kmx-inner"><div className="kmx-skel" /><div className="kmx-skel" /></div></div></div>
+  if (!tk) return <div className="kmx">{hd}<div className="kmx-body"><div className="kmx-inner"><div className="kmx-skel" /><div className="kmx-skel" /></div></div></div>
 
   const tieuHao = tk.chen?.chen_kg ?? tk.phieu.tieu_hao_da_nhan
   const luuY = [tk.phieu.chua_tra > 0 ? `${tk.phieu.chua_tra} phiếu chưa trả` : '', tk.phieu.cho_ky > 0 ? `${tk.phieu.cho_ky} phiếu chờ ký` : '', tk.dang_chay ? 'mã vẫn đang khai đang chạy' : ''].filter(Boolean)
@@ -128,24 +118,10 @@ export default function KhoMixMaTongKet() {
             </> : null}
           </section>
 
-          <section className="kmx-card" style={{ gap: 8 }}>
-            <span className="kmx-strong" style={{ fontSize: 13 }}>Mail báo cáo Ban Giám đốc</span>
-            <span className="kmx-sm">Chạm tên để bỏ / chọn người nhận.{phieu.length > 0 ? ` Mail gửi qua hệ thống kèm ${phieu.length} lần chèn · ${soAnh} ảnh.` : ''}</span>
-            <div className="kmx-row" style={{ gap: 6, flexWrap: 'wrap' }}>
-              {tk.bgd.map((b) => <button key={b.email} type="button" className="kmx-pill sm" style={to.includes(b.email) ? chipOn : undefined} onClick={() => toggle(b.email)}>{b.name}{b.chuc_vu ? ` · ${b.chuc_vu}` : ''}</button>)}
-              {to.filter((e) => !tk.bgd.some((b) => b.email === e)).map((e) => <button key={e} type="button" className="kmx-pill sm" style={chipOn} onClick={() => toggle(e)}>{e}</button>)}
-            </div>
-            <div className="kmx-row" style={{ gap: 6 }}>
-              <input className="kmx-text" type="email" inputMode="email" placeholder="Thêm địa chỉ mail" value={them} onChange={(e) => setThem(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); themEmail() } }} aria-label="Thêm địa chỉ mail" />
-              <button type="button" className="kmx-pill sm" onClick={themEmail}>Thêm</button>
-            </div>
-            <div className="kmx-tint col" style={{ alignItems: 'stretch', gap: 4 }}>
-              <span className="kmx-strong" style={{ fontSize: 13 }}>{mail.subject}</span>
-              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12, lineHeight: 1.45, color: '#374151' }}>{mail.text}</pre>
-            </div>
-            <button type="button" className="kmx-btn" disabled={!toOk.length || busy === 'gui'} onClick={gui}>{busy === 'gui' ? 'Đang gửi…' : `Gửi mail cho BGĐ (${toOk.length})`}</button>
-            <a className="kmx-btn sec" href={mailtoTongKet(toOk, mail)} style={{ textAlign: 'center', textDecoration: 'none' }}>Mở ứng dụng mail</a>
-            <button type="button" className="kmx-btn ghost" onClick={copy}>Sao chép nội dung</button>
+          <section className="kmx-card" style={{ gap: 6 }}>
+            <span className="kmx-strong" style={{ fontSize: 13 }}>Mail báo cáo tự động</span>
+            <span className="kmx-sm">Gửi cho: {nguoiNhanTuDong(tk).join(', ')}{phieu.length ? ` · kèm ${phieu.length} lần chèn, ${soAnh} ảnh` : ''}.</span>
+            {(mailTuDong === 'none' || mailTuDong === 'err' || mailLoi > 0) && <button type="button" className="kmx-btn sec" disabled={busy === 'gui'} onClick={guiLai}>{busy === 'gui' ? 'Đang gửi…' : 'Gửi lại mail cho BGĐ'}</button>}
           </section>
         </div>
       </div>

@@ -95,12 +95,26 @@ export default function MixShiftPage() {
   const maChon = maAll.find((x) => x.raw_lot_id === maId)
   const chenMa = chenAll.find((x) => x.raw_lot_id === maId)
   // phiếu của mã: xếp theo ngày · ca, đánh số lần L1, L2… trong từng ca
+  // phiếu của mã: xếp theo thời gian, đánh số lần L1, L2… trong từng ca, cộng dồn tiêu hao (lũy kế) qua các lần chèn
   const maRows = useMemo(() => {
-    const sorted = [...maIssues].sort((a, b) => b.shift_date.localeCompare(a.shift_date) || (a.shift_id ?? '').localeCompare(b.shift_id ?? '') || a.out_at.localeCompare(b.out_at))
-    const dem = new Map<string, number>()
-    return sorted.map((i) => { const k = `${i.shift_date}|${i.shift_id ?? ''}`; const n = (dem.get(k) ?? 0) + 1; dem.set(k, n); return { ...i, lan: n } })
+    const asc = [...maIssues].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || (a.shift_id ?? '').localeCompare(b.shift_id ?? '') || a.out_at.localeCompare(b.out_at))
+    const dem = new Map<string, number>(); let luyKe = 0
+    const rows = asc.map((i) => { const k = `${i.shift_date}|${i.shift_id ?? ''}`; const n = (dem.get(k) ?? 0) + 1; dem.set(k, n); luyKe += i.kg_used ?? 0; return { ...i, lan: n, luyKe } })
+    return rows.reverse()   // mới nhất trên cùng, lũy kế vẫn tính theo thời gian
   }, [maIssues])
-  const tieuHaoMa = useMemo(() => maIssues.filter((i) => i.status === 'received').reduce((s, i) => s + (i.kg_used ?? 0), 0), [maIssues])
+  const tongMa = useMemo(() => {
+    const s = { lan: maIssues.length, lay: 0, tra: 0, tieuHao: 0, daNhan: 0, choKy: 0, dayChuyen: 0, be: 0, mix: 0, banh: 0, ca: new Set<string>() }
+    for (const i of maIssues) {
+      s.lay += i.kg_out; s.tra += i.kg_return ?? 0; s.tieuHao += i.kg_used ?? 0; s.banh += i.so_banh ?? 0; s.ca.add(`${i.shift_date}|${i.shift_id ?? ''}`)
+      if (i.status === 'received') s.daNhan += i.kg_used ?? 0
+      else if (i.status === 'issued') s.dayChuyen += i.kg_out
+      else s.choKy += i.kg_used ?? 0
+      if (i.vi_tri === 'be_slap') s.be += i.kg_used ?? 0
+      if (i.vi_tri === 'may_mix') s.mix += i.kg_used ?? 0
+    }
+    return s
+  }, [maIssues])
+  const tieuHaoMa = tongMa.daNhan
   const lotsCoHang = useMemo(() => lots.filter((l) => l.ton_kg > 0.005), [lots])
   const lotChon = lotsCoHang.find((l) => l.id === f.lotId)
   // kg hàng chèn: gõ thẳng, hoặc = hàng + pallet − bì (như sổ tay tổ ép)
@@ -144,6 +158,16 @@ export default function MixShiftPage() {
     { title: 'Ảnh', key: 'anh', render: (_, r) => <span><Tag color={r.so_anh_lay >= 2 ? 'green' : 'red'}>lấy {r.so_anh_lay}</Tag><Tag color={r.so_anh_tra >= 2 ? 'green' : r.kg_return === null ? 'default' : 'red'}>trả {r.so_anh_tra}</Tag></span> },
     { title: 'Trạng thái', dataIndex: 'status', key: 'status', render: (v: MixIssue['status'], r) => <span><Tag color={MIX_ISSUE_STATUS_COLORS[v]}>{MIX_ISSUE_STATUS_LABELS[v]}</Tag>{r.handover_to_next && <Tag color="purple">bàn giao</Tag>}</span> },
     { title: 'Người lấy', dataIndex: 'out_name', key: 'out_name' },
+  ]
+
+  // bảng theo mã: Lần + cột gốc + Lũy kế (sau Tiêu hao)
+  const kgUsedIdx = columns.findIndex((c) => c.key === 'kg_used')
+  const luyKeIdx = kgUsedIdx + 2   // +1 cột Lần, +1 vị trí sau Tiêu hao
+  const maColumns: ColumnsType<MixIssue> = [
+    { title: 'Lần', key: 'lan', width: 56, render: (_, r) => <Text strong>L{(r as MixIssue & { lan: number }).lan}</Text> },
+    ...columns.slice(0, kgUsedIdx + 1),
+    { title: 'Lũy kế', key: 'luy_ke', align: 'right', render: (_, r) => <Text type="secondary">{fmtKg((r as MixIssue & { luyKe: number }).luyKe)}</Text> },
+    ...columns.slice(kgUsedIdx + 1),
   ]
 
   return (
@@ -195,22 +219,42 @@ export default function MixShiftPage() {
               : <Button size="small" type="primary" ghost loading={chayBusy} disabled={!canWrite} onClick={() => doiChay(true)}>Khai mã này đang chạy</Button>)}
             {maChon && <Text type="secondary">{maChon.ngay_dau ? `về ${new Date(maChon.ngay_dau).toLocaleDateString('vi-VN')}` : ''}{maChon.ngay_cuoi && maChon.ngay_cuoi !== maChon.ngay_dau ? ` → ${new Date(maChon.ngay_cuoi).toLocaleDateString('vi-VN')}` : ''} · {maChon.so_xe} xe · xuất SX {fmtKg(maChon.xuat_sx_kho_kg)} kg khô</Text>}
           </Space>}>
-          {chenMa && chenMa.chen_kg > 0 && (
-            <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
-              <Space wrap size={[14, 4]}>
-                <Text>Đã nhận <Text strong>{fmtKg(chenMa.chen_kg)} kg</Text>{chenMa.so_banh_chen ? ` · ${chenMa.so_banh_chen} bành` : ''} · {chenMa.so_phieu_chen} phiếu</Text>
-                {chenMa.chen_be_kg > 0 && <Tag color="cyan">bể Slap {fmtKg(chenMa.chen_be_kg)}</Tag>}
-                {chenMa.chen_mix_kg > 0 && <Tag color="purple">máy Mix {fmtKg(chenMa.chen_mix_kg)}</Tag>}
-                {chenMa.chen_loi_kg > 0 && <Tag>lỗi {fmtKg(chenMa.chen_loi_kg)}</Tag>}
-                {chenMa.chen_dkl_kg > 0 && <Tag>DKL {fmtKg(chenMa.chen_dkl_kg)}</Tag>}
-                {chenMa.chen_chuan_kg > 0 && <Tag>chuẩn {fmtKg(chenMa.chen_chuan_kg)}</Tag>}
-                {chenMa.chen_khac_kg > 0 && <Tag>mua ngoài / khác {fmtKg(chenMa.chen_khac_kg)}</Tag>}
-                {chenMa.ty_le_chen_pct !== null && <Text type="secondary">{chenMa.ty_le_chen_pct} % hàng vào máy</Text>}
+          {maId && (
+            <div style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', background: '#FAFAF7' }}>
+              <Row gutter={[16, 8]}>
+                <Col xs={12} md={4}><Statistic title="Số lần chèn" value={tongMa.lan} suffix={<Text type="secondary" style={{ fontSize: 12 }}>· {tongMa.ca.size} ca{tongMa.banh ? ` · ${tongMa.banh} bành` : ''}</Text>} /></Col>
+                <Col xs={12} md={4}><Statistic title="Đã lấy (kg)" value={tongMa.lay} precision={0} /></Col>
+                <Col xs={12} md={4}><Statistic title="Đã trả (kg)" value={tongMa.tra} precision={0} /></Col>
+                <Col xs={12} md={6}><Statistic title="Tiêu hao lũy kế (kg)" value={tongMa.tieuHao} precision={0} valueStyle={{ color: '#1B4D3E', fontWeight: 700 }} suffix={<Text type="secondary" style={{ fontSize: 12 }}>· đã nhận {fmtKg(tongMa.daNhan)}{tongMa.choKy > 0 ? ` · chờ ký ${fmtKg(tongMa.choKy)}` : ''}</Text>} /></Col>
+                <Col xs={12} md={6}><Statistic title="Đang ở dây chuyền (kg)" value={tongMa.dayChuyen} precision={0} valueStyle={{ color: tongMa.dayChuyen > 0 ? '#B7791F' : undefined }} suffix={<Text type="secondary" style={{ fontSize: 12 }}>chưa trả, chưa tính tiêu hao</Text>} /></Col>
+              </Row>
+              <Space wrap size={[8, 4]} style={{ marginTop: 6 }}>
+                {tongMa.be > 0 && <Tag color="cyan">bể Slap {fmtKg(tongMa.be)} kg</Tag>}
+                {tongMa.mix > 0 && <Tag color="purple">máy Mix {fmtKg(tongMa.mix)} kg</Tag>}
+                {chenMa && chenMa.chen_kg > 0 && <>
+                  {chenMa.chen_loi_kg > 0 && <Tag>lỗi {fmtKg(chenMa.chen_loi_kg)}</Tag>}
+                  {chenMa.chen_dkl_kg > 0 && <Tag>DKL {fmtKg(chenMa.chen_dkl_kg)}</Tag>}
+                  {chenMa.chen_chuan_kg > 0 && <Tag>chuẩn {fmtKg(chenMa.chen_chuan_kg)}</Tag>}
+                  {chenMa.chen_khac_kg > 0 && <Tag>mua ngoài / khác {fmtKg(chenMa.chen_khac_kg)}</Tag>}
+                  {chenMa.ty_le_chen_pct !== null && <Text type="secondary">{chenMa.ty_le_chen_pct} % hàng vào máy (đã nhận)</Text>}
+                </>}
               </Space>
             </div>
           )}
-          <Table<MixIssue> rowKey="id" columns={[{ title: 'Lần', key: 'lan', width: 56, render: (_, r) => <Text strong>L{(r as MixIssue & { lan: number }).lan}</Text> }, ...columns]} dataSource={maRows} size="small" loading={loading}
-            pagination={{ pageSize: 30, showSizeChanger: false }} locale={{ emptyText: maId ? 'Mã này chưa có phiếu chèn nào' : 'Chọn mã nguyên liệu' }} />
+          <Table<MixIssue> rowKey="id" columns={maColumns} dataSource={maRows} size="small" loading={loading}
+            pagination={{ pageSize: 30, showSizeChanger: false }} locale={{ emptyText: maId ? 'Mã này chưa có phiếu chèn nào' : 'Chọn mã nguyên liệu' }}
+            summary={() => maRows.length ? (
+              <Table.Summary fixed>
+                <Table.Summary.Row style={{ background: '#F6FBF8' }}>
+                  <Table.Summary.Cell index={0} colSpan={luyKeIdx - 2}><Text strong>Tổng {tongMa.lan} lần · {tongMa.ca.size} ca</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={luyKeIdx - 2} align="right"><Text strong>{fmtKg(tongMa.lay)}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={luyKeIdx - 1} align="right"><Text strong>{fmtKg(tongMa.tra)}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={luyKeIdx} align="right"><Text strong style={{ color: '#1B4D3E' }}>{fmtKg(tongMa.tieuHao)}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={luyKeIdx + 1} align="right"><Text type="secondary">lũy kế</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={luyKeIdx + 2} colSpan={3} />
+                </Table.Summary.Row>
+              </Table.Summary>
+            ) : null} />
         </Card>
 
         {chuaMa.length > 0 && (

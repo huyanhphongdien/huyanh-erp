@@ -110,10 +110,20 @@ export default function ShiftBookEntryPage() {
   const [rawLots, setRawLots] = useState<RawLotBalance[]>([])
   useEffect(() => { if (facilityId) rawLotService.list(facilityId, { includeClosed: true }).then(setRawLots).catch(() => setRawLots([])) }, [facilityId])
   // GĐ6b: phiếu mới tự theo sổ mã đang chạy (đúng một mã) — người dùng vẫn đổi được
+  const [runIds, setRunIds] = useState<string[] | null>(null)   // null = chưa tải / chưa chạy SQL p10
+  const [khaiBusy, setKhaiBusy] = useState(false)
+  const taiSoChay = (fid: string) => rawLotService.dangChay(fid).then((ids) => { setRunIds(ids); return ids }).catch(() => { setRunIds(null); return [] as string[] })
   useEffect(() => {
-    if (!facilityId || (id && id !== 'new')) return
-    rawLotService.dangChay(facilityId).then((ids) => { if (ids.length === 1) setRawLotId((cur) => cur ?? ids[0]) }).catch(() => { /* bỏ qua */ })
+    if (!facilityId) return
+    taiSoChay(facilityId).then((ids) => { if (ids.length === 1 && !(id && id !== 'new')) setRawLotId((cur) => cur ?? ids[0]) })
   }, [facilityId, id])
+  const khaiDangChay = async () => {
+    if (!facilityId || !rawLotId) return
+    setKhaiBusy(true)
+    try { const r = await rawLotService.batDauChay(rawLotId); message.success(r.da_chay ? `${r.ma} đã đang chạy` : `Đã khai ${r.ma} đang chạy — các ca sau tự theo mã này`); await taiSoChay(facilityId); rawLotService.list(facilityId, { includeClosed: true }).then(setRawLots).catch(() => { /* bỏ qua */ }) }
+    catch (e: any) { message.error(e?.message || 'Không khai được (cần chạy SQL p10)') }
+    finally { setKhaiBusy(false) }
+  }
   const [soNguoi, setSoNguoi] = useState<number | null>(null)
   const [suCo, setSuCo] = useState<string>('')
 
@@ -559,13 +569,19 @@ export default function ShiftBookEntryPage() {
               disabled={daKhoa} style={{ width: '100%' }}
             />
           </Col>
-          <Col xs={24} md={5}>
+          <Col xs={24} md={7}>
             <Text type="secondary" style={{ fontSize: 12 }}>Mã nguyên liệu · tự theo sổ mã đang chạy</Text>
             <Select
               value={rawLotId} onChange={(v) => { setRawLotId(v); setDirty(true) }} disabled={daKhoa} allowClear showSearch optionFilterProp="label"
-              placeholder="TMHG-40…" style={{ width: '100%' }}
-              options={rawLots.filter((l) => l.trang_thai !== 'huy').map((l) => ({ value: l.raw_lot_id, label: `${l.ma} · ${l.rubber_type_name}${l.trang_thai === 'dang_chay' ? ' · đang chạy' : l.trang_thai === 'da_chay_xong' ? ' · đã chạy xong' : ''}` }))}
+              placeholder="TMHG-40…" style={{ width: '100%' }} optionLabelProp="label"
+              options={rawLots.filter((l) => l.trang_thai !== 'huy').map((l) => ({ value: l.raw_lot_id, label: `${l.ma}${l.trang_thai === 'dang_chay' ? ' · đang chạy' : l.trang_thai === 'da_chay_xong' ? ' · đã chạy xong' : ''}${l.rubber_type_name ? ' · ' + l.rubber_type_name : ''}` }))}
             />
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              {runIds === null ? 'Sổ mã đang chạy chưa có (chạy SQL p10) — chọn tay.'
+                : rawLotId && runIds.includes(rawLotId) ? 'Đúng theo sổ mã đang chạy.'
+                : runIds.length === 0 ? 'Chưa khai mã nào đang chạy. ' : 'Khác mã trong sổ đang chạy. '}
+              {runIds !== null && rawLotId && !runIds.includes(rawLotId) && !daKhoa && <a onClick={khaiBusy ? undefined : khaiDangChay}>{khaiBusy ? 'đang khai…' : 'Khai mã này đang chạy từ giờ'}</a>}
+            </Text>
           </Col>
           <Col xs={24} md={5}>
             <Text type="secondary" style={{ fontSize: 12 }}>Lệnh sản xuất (nếu có)</Text>

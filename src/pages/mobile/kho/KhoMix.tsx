@@ -10,6 +10,7 @@ import { useAuthStore } from '../../../stores/authStore'
 import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot } from '../../../services/wms/mixService'
 import { useMixRole } from '../../../hooks/useMixRole'
 import { rawLotService, type LenhChay, type RawLotBalance, type RawLotChen } from '../../../services/wms/rawLotService'
+import { guiMailKetThuc } from '../../../services/wms/maTongKetMail'
 import { firstName } from '../opsUtil'
 import { FacilitySelect, fmtD, fmtDt, fmtKg, todayLocal, useKhoFacility } from './khoCommon'
 import { I } from './khoMixUtil'
@@ -112,10 +113,15 @@ export default function KhoMix() {
     finally { setBusyMa(null) }
   }
   // kết thúc lệnh → sang trang tổng kết (khối lượng chèn + mail BGĐ)
+  // kết thúc lệnh → máy tự tổng kết + gửi mail (kèm ảnh) cho BGĐ → sang trang tổng kết báo kết quả gửi
   async function ketThucLenh(g: LenhChay) {
     setBusyMa(g.id); setMsgMa(null); setHoiKetThuc(null)
-    try { await rawLotService.ketThucLenh(g.id); nav(`/m/kho/chen/lenh/${g.id}/tong-ket?vua=1`) }
-    catch (e: any) { setMsgMa(e?.message || 'Không kết thúc được'); setBusyMa(null) }
+    try { await rawLotService.ketThucLenh(g.id) }
+    catch (e: any) { setMsgMa(e?.message || 'Không kết thúc được'); setBusyMa(null); return }
+    let q = 'vua=1'
+    try { const r = await guiMailKetThuc({ lenhId: g.id }); q += r.to.length ? `&mail=${r.ok.length}&loi=${r.loi.length}` : '&mail=none' }
+    catch { q += '&mail=err' }
+    nav(`/m/kho/chen/lenh/${g.id}/tong-ket?${q}`)
   }
   // gom các lần của ca theo MÃ GỐC đang chạy (số L vẫn đếm theo ca)
   const nhomMa = useMemo(() => {
@@ -157,9 +163,9 @@ export default function KhoMix() {
             {msgMa && <span className="kmx-sm" style={{ color: '#1B4D3E', fontWeight: 600 }}>{msgMa}</span>}
             {hoiKetThuc && (
               <div className="kmx-tint col" style={{ alignItems: 'stretch', gap: 6 }}>
-                <span className="kmx-sm" style={{ color: '#0D2E25' }}>Kết thúc lệnh <b>{hoiKetThuc.ma_gop}</b> ({hoiKetThuc.code})? Phiếu ca, phiếu chèn, lô TP sẽ không tự gắn lệnh này nữa. Máy tổng kết chèn và soạn mail BGĐ ngay sau.</span>
+                <span className="kmx-sm" style={{ color: '#0D2E25' }}>Kết thúc lệnh <b>{hoiKetThuc.ma_gop}</b> ({hoiKetThuc.code})? Phiếu ca, phiếu chèn, lô TP sẽ không tự gắn lệnh này nữa. Máy tự tổng kết và gửi mail báo cáo (kèm ảnh từng lần chèn) cho Ban Giám đốc.</span>
                 <div className="kmx-row" style={{ gap: 6 }}>
-                  <button type="button" className="kmx-pill sm" style={{ background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', flex: 1 }} disabled={busyMa === hoiKetThuc.id} onClick={() => ketThucLenh(hoiKetThuc)}>{busyMa === hoiKetThuc.id ? '…' : 'Kết thúc và tổng kết'}</button>
+                  <button type="button" className="kmx-pill sm" style={{ background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', flex: 1 }} disabled={busyMa === hoiKetThuc.id} onClick={() => ketThucLenh(hoiKetThuc)}>{busyMa === hoiKetThuc.id ? 'Đang kết thúc, gửi mail…' : 'Kết thúc và gửi mail BGĐ'}</button>
                   <button type="button" className="kmx-pill sm" onClick={() => setHoiKetThuc(null)}>Hủy</button>
                 </div>
               </div>
@@ -171,8 +177,7 @@ export default function KhoMix() {
                   <span className="kmx-sm">{g.code} · từ {fmtDt(g.started_at)}{g.started_name ? ` · ${firstName(g.started_name)}` : ''}{g.chen_kg > 0 ? ` · chèn ${fmtKg(g.chen_kg)} kg` : ''}{g.phieu_mo ? ` · ${g.phieu_mo} phiếu mở` : ''}</span>
                 </span>
                 <span className="kmx-row" style={{ gap: 6 }}>
-                  <button type="button" className="kmx-pill sm" onClick={() => nav(`/m/kho/chen/lenh/${g.id}/tong-ket`)}>Tổng kết</button>
-                  {canTake && <button type="button" className="kmx-pill sm" disabled={busyMa === g.id} onClick={() => setHoiKetThuc(g)}>{busyMa === g.id ? '…' : 'Kết thúc'}</button>}
+                  {canTake && <button type="button" className="kmx-pill sm" disabled={busyMa === g.id} onClick={() => setHoiKetThuc(g)}>{busyMa === g.id ? 'Đang gửi…' : 'Kết thúc'}</button>}
                 </span>
               </div>
             )) : <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Chưa khai lệnh đang chạy. Khai một lần (một hay nhiều mã gộp, ví dụ KHMN-15 + 17), mọi ca sau tự theo lệnh này (phiếu ca, phiếu chèn, lô thành phẩm).</span>}
@@ -243,7 +248,7 @@ export default function KhoMix() {
                 )
               })}
               {btnLay('kmx-btn')}
-              <span className="kmx-sm kmx-center">Mỗi lần lấy = một pallet: chạm nguồn + số lô, cân cả pallet (băng tải: số bành), bì khai lúc trả. Cuối ca: 3 lần cân, chụp 2 ảnh. "Tổng kết" xem báo cáo + mail bất cứ lúc nào; "Kết thúc" đóng lệnh (QS, thủ kho NVL, BGĐ).</span>
+              <span className="kmx-sm kmx-center">Mỗi lần lấy = một pallet: chạm nguồn + số lô, cân cả pallet (băng tải: số bành), bì khai lúc trả. Cuối ca: 3 lần cân, chụp 2 ảnh. "Kết thúc" đóng lệnh và tự gửi mail báo cáo cho BGĐ (QS được phân công, thủ kho NVL, BGĐ).</span>
             </section>
           ) : (
             <section className="kmx-card hero" aria-label="Việc tiếp theo">

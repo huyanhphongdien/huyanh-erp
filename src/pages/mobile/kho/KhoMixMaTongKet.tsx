@@ -20,6 +20,8 @@ export default function KhoMixMaTongKet() {
   const nav = useNavigate()
   const [sp] = useSearchParams()
   const vua = sp.get('vua') === '1'
+  const mailTuDong = sp.get('mail')   // '3' = đã gửi 3 người · 'none' = không có email BGĐ · 'err' = lỗi; kèm loi=n
+  const mailLoi = Number(sp.get('loi') ?? 0)
   const laLenh = useLocation().pathname.includes('/lenh/')   // /m/kho/chen/lenh/:id/tong-ket = tổng kết theo lệnh (gộp mã)
   const [tk, setTk] = useState<RawLotTongKet | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -75,7 +77,7 @@ export default function KhoMixMaTongKet() {
       {hd}
       <div className="kmx-body">
         <div className="kmx-inner">
-          {vua && <div className="kmx-msg" style={{ background: '#E8F5F0', color: '#0D2E25', fontWeight: 600 }}>Đã kết thúc {tk.lenh_code ? `lệnh ${tk.lenh_code} (${tk.ma})` : `chạy mã ${tk.ma}`}. Kiểm tra số rồi gửi báo cáo Ban Giám đốc.</div>}
+          {vua && <div className="kmx-msg" style={{ background: mailTuDong === 'none' || mailTuDong === 'err' || mailLoi > 0 ? '#FEF3C7' : '#E8F5F0', color: '#0D2E25', fontWeight: 600 }}>Đã kết thúc {tk.lenh_code ? `lệnh ${tk.lenh_code} (${tk.ma})` : `chạy mã ${tk.ma}`}.{mailTuDong === null ? '' : mailTuDong === 'none' ? ' Chưa gửi mail: Nhân sự chưa có email cho chức vụ Ban Giám đốc — gõ địa chỉ bên dưới rồi gửi.' : mailTuDong === 'err' ? ' Gửi mail tự động bị lỗi — bấm "Gửi mail cho BGĐ" bên dưới để gửi lại.' : ` Đã tự gửi mail báo cáo (kèm ảnh) cho ${mailTuDong} người BGĐ${mailLoi > 0 ? `, ${mailLoi} người gửi lỗi — bấm gửi lại bên dưới` : ''}.`}</div>}
           {msg && <div className={`kmx-msg${msg.ok ? '' : ' err'}`}>{msg.text}</div>}
 
           <section className="kmx-card hero" style={{ gap: 6 }}>

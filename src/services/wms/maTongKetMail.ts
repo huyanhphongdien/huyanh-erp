@@ -9,7 +9,7 @@ import { supabase } from '../../lib/supabase'
 import { sendSimpleEmail } from '../emailService'
 import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue } from './mixService'
 import type { RawPhoto } from './rawPhotoService'
-import type { RawLotTongKet } from './rawLotService'
+import { rawLotService, type RawLotTongKet } from './rawLotService'
 
 const APP_URL = 'https://huyanhrubber.vn'
 const kg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
@@ -185,4 +185,14 @@ export async function guiMailTongKet(to: string[], m: MailTongKet): Promise<{ ok
     if (r.success) ok.push(email); else loi.push({ email, msg: r.error?.message || 'không gửi được' })
   }
   return { ok, loi }
+}
+
+/** Sau khi Kết thúc lệnh / mã: tổng kết → tải ảnh từng lần → gửi mail cho mọi người BGĐ có email (tự động, không cần bấm thêm) */
+export async function guiMailKetThuc(opts: { lenhId?: string | null; rawLotId?: string | null }): Promise<{ tk: RawLotTongKet; to: string[]; ok: string[]; loi: { email: string; msg: string }[] }> {
+  const tk = opts.lenhId ? await rawLotService.tongKetLenh(opts.lenhId) : await rawLotService.tongKetMa(opts.rawLotId ?? '')
+  const phieu = await taiPhieuAnh(tk).catch(() => [] as PhieuAnh[])
+  const to = tk.bgd.map((b) => b.email).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+  if (!to.length) return { tk, to, ok: [], loi: [] }
+  const r = await guiMailTongKet(to, soanMailTongKet(tk, phieu))
+  return { tk, to, ...r }
 }

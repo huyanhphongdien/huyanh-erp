@@ -72,7 +72,7 @@ export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onC
       {loading && <Text type="secondary">Đang tổng kết…</Text>}
       {tk && mail && (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          {vuaKetThuc && <Alert type="success" showIcon message={`Đã kết thúc ${tk.lenh_code ? `lệnh ${tk.lenh_code} (${tk.ma})` : `chạy mã ${tk.ma}`}. Kiểm tra số bên dưới rồi gửi báo cáo cho Ban Giám đốc.`} />}
+          {vuaKetThuc && <Alert type="success" showIcon message={`Đã kết thúc ${tk.lenh_code ? `lệnh ${tk.lenh_code} (${tk.ma})` : `chạy mã ${tk.ma}`}. Mail báo cáo (kèm ảnh) đã tự gửi cho Ban Giám đốc — bản dưới để xem lại hoặc gửi thêm.`} />}
           <Row gutter={[16, 8]}>
             <Col xs={12} md={6}><Statistic title="Tiêu hao hàng chèn (kg)" value={tk.chen?.chen_kg ?? tk.phieu.tieu_hao_da_nhan} precision={0} valueStyle={{ color: '#1B4D3E', fontWeight: 700 }} suffix={tk.chen?.ty_le_pct !== null && tk.chen?.ty_le_pct !== undefined ? <Text type="secondary" style={{ fontSize: 12 }}>= {tk.chen.ty_le_pct} % hàng vào máy</Text> : undefined} /></Col>
             <Col xs={12} md={6}><Statistic title="Số lần chèn" value={tk.phieu.tong} suffix={<Text type="secondary" style={{ fontSize: 12 }}>/ {tk.phieu.so_ca} ca · {tk.phieu.so_banh} bành</Text>} /></Col>

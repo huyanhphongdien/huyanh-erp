@@ -11,6 +11,7 @@ import { DatabaseOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icon
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import MaTongKetModal from '../../../components/wms/MaTongKetModal'
 import { xacNhanBatDauMa } from '../../../components/wms/xacNhanBatDauMa'
+import { guiMailKetThuc } from '../../../services/wms/maTongKetMail'
 import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_COLORS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPurpose, type MixSourceType, type MixViTri, type ShiftLite } from '../../../services/wms/mixService'
 import { rawIssueService, type ProductionOrderLite } from '../../../services/wms/rawIssueService'
 import { fgLotService, type FgLot } from '../../../services/wms/fgLotService'
@@ -149,22 +150,29 @@ export default function MixShiftPage() {
     Modal.confirm({
       title: `Kết thúc mã ${maChon.ma}?`,
       content: 'Mã sẽ không còn tự gắn vào phiếu ca, phiếu chèn, lô thành phẩm. Ngay sau đó máy tổng kết khối lượng chèn của mã và soạn sẵn mail báo cáo Ban Giám đốc.',
-      okText: 'Kết thúc mã và tổng kết', cancelText: 'Hủy',
+      okText: 'Kết thúc mã và gửi mail BGĐ', cancelText: 'Hủy',
       onOk: async () => {
         setChayBusy(true)
-        try { await rawLotService.ketThucChay(maChon.raw_lot_id); message.success(`${maChon.ma} đã kết thúc chạy`); await load(); taiLenh(); setTk({ open: true, vua: true, rawLotId: maChon.raw_lot_id }) }
+        try { await rawLotService.ketThucChay(maChon.raw_lot_id); await load(); taiLenh(); await baoMail(await guiMailKetThuc({ rawLotId: maChon.raw_lot_id }).catch(() => null), `${maChon.ma} đã kết thúc chạy`); setTk({ open: true, vua: true, rawLotId: maChon.raw_lot_id }) }
         catch (e: any) { message.error(e?.message || 'Không kết thúc được') }
         finally { setChayBusy(false) }
       },
     })
   }
+  // sau khi kết thúc: máy đã tự gửi mail cho BGĐ — báo kết quả
+  const baoMail = async (r: { to: string[]; ok: string[]; loi: { email: string; msg: string }[] } | null, dau: string) => {
+    if (!r) { message.warning(`${dau}. Gửi mail tự động bị lỗi — mở tổng kết và bấm gửi lại.`); return }
+    if (!r.to.length) { message.warning(`${dau}. Chưa gửi mail: Nhân sự chưa có email cho chức vụ Ban Giám đốc.`); return }
+    if (r.loi.length) message.warning(`${dau}. Đã gửi ${r.ok.length} người, lỗi: ${r.loi.map((x) => x.email).join(', ')}`)
+    else message.success(`${dau}. Đã gửi mail báo cáo (kèm ảnh) cho ${r.ok.join(', ')}`)
+  }
   const ketThucLenh = (g: LenhChay) => Modal.confirm({
     title: `Kết thúc lệnh ${g.code} · ${g.ma_gop}?`,
-    content: 'Phiếu ca, phiếu chèn, lô thành phẩm sẽ không tự gắn lệnh này nữa. Ngay sau đó máy tổng kết khối lượng chèn của lệnh và soạn sẵn mail báo cáo Ban Giám đốc.',
-    okText: 'Kết thúc lệnh và tổng kết', cancelText: 'Hủy',
+    content: 'Phiếu ca, phiếu chèn, lô thành phẩm sẽ không tự gắn lệnh này nữa. Máy tự tổng kết và gửi mail báo cáo (kèm ảnh từng lần chèn) cho Ban Giám đốc.',
+    okText: 'Kết thúc lệnh và gửi mail BGĐ', cancelText: 'Hủy',
     onOk: async () => {
       setChayBusy(true)
-      try { await rawLotService.ketThucLenh(g.id); message.success(`Đã kết thúc lệnh ${g.code}`); await load(); taiLenh(); setTk({ open: true, vua: true, lenhId: g.id }) }
+      try { await rawLotService.ketThucLenh(g.id); await load(); taiLenh(); await baoMail(await guiMailKetThuc({ lenhId: g.id }).catch(() => null), `Đã kết thúc lệnh ${g.code}`); setTk({ open: true, vua: true, lenhId: g.id }) }
       catch (e: any) { message.error(e?.message || 'Không kết thúc được') }
       finally { setChayBusy(false) }
     },
@@ -270,7 +278,6 @@ export default function MixShiftPage() {
                   <Text strong style={{ fontSize: 15 }}>{g.ma_gop}</Text>
                   <Tag>{g.code}</Tag>
                   <Text type="secondary">từ {new Date(g.started_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}{g.started_name ? ` · ${g.started_name}` : ''} · chèn đã nhận {fmtKg(g.chen_kg)} kg{g.tieu_hao_cho_ky > 0 ? ` · chờ ký ${fmtKg(g.tieu_hao_cho_ky)} kg` : ''}{g.phieu_mo ? ` · ${g.phieu_mo} phiếu mở` : ''}</Text>
-                  <Button size="small" onClick={() => setTk({ open: true, vua: false, lenhId: g.id })}>Tổng kết · mail BGĐ</Button>
                   <Button size="small" danger ghost disabled={!canWrite} loading={chayBusy} onClick={() => ketThucLenh(g)}>Kết thúc lệnh</Button>
                 </Space>
               ))}
@@ -292,7 +299,6 @@ export default function MixShiftPage() {
                   ? <Space size={4}><Tag color="green">lệnh {g.code}{g.so_ma > 1 ? ` · ${g.ma_gop}` : ''}</Tag><Button size="small" danger ghost loading={chayBusy} disabled={!canWrite} onClick={() => ketThucLenh(g)}>Kết thúc lệnh</Button></Space>
                   : <Button size="small" danger ghost loading={chayBusy} disabled={!canWrite} onClick={() => doiChay(false)}>Kết thúc mã</Button> })()
               : <Button size="small" type="primary" ghost loading={chayBusy} disabled={!canWrite} onClick={() => doiChay(true)}>Khai mã này đang chạy</Button>)}
-            {maChon && <Button size="small" onClick={() => setTk({ open: true, vua: false, rawLotId: maChon.raw_lot_id })}>Tổng kết mã · mail BGĐ</Button>}
             {maChon && <Text type="secondary">{maChon.ngay_dau ? `về ${new Date(maChon.ngay_dau).toLocaleDateString('vi-VN')}` : ''}{maChon.ngay_cuoi && maChon.ngay_cuoi !== maChon.ngay_dau ? ` → ${new Date(maChon.ngay_cuoi).toLocaleDateString('vi-VN')}` : ''} · {maChon.so_xe} xe · xuất SX {fmtKg(maChon.xuat_sx_kho_kg)} kg khô</Text>}
           </Space>}>
           {maId && (

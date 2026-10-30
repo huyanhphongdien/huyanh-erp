@@ -222,15 +222,15 @@ export default function KhoMixIssue() {
         <div className="kmx-body"><div className="kmx-inner">
           {msg && !msg.ok && <div className="kmx-msg err">{msg.text}</div>}
           <section className="kmx-card kmx-grid3" aria-label="Kết quả ca" style={{ display: 'grid' }}>
-            <div className="kmx-col kmx-center"><span className="kmx-lbl">Lấy</span><span className="kmx-num md">{fmtKg(i.kg_out)}</span></div>
-            <div className="kmx-col kmx-center"><span className="kmx-lbl">Trả</span><span className="kmx-num md">{fmtKg(i.kg_return)}</span></div>
-            <div className="kmx-col kmx-center kmx-stat ok"><span className="kmx-lbl ok">Tiêu hao</span><span className="kmx-num md ok">{fmtKg(i.kg_used)}</span></div>
+            <div className="kmx-col kmx-center"><span className="kmx-lbl">Lấy</span><span className="kmx-num md">{kgTxt(i.kg_out)}</span></div>
+            <div className="kmx-col kmx-center"><span className="kmx-lbl">Trả</span><span className="kmx-num md">{kgTxt(i.kg_return)}</span></div>
+            <div className="kmx-col kmx-center kmx-stat ok"><span className="kmx-lbl ok">Tiêu hao</span><span className="kmx-num md ok">{kgTxt(i.kg_used)}</span></div>
           </section>
           <section className="kmx-card" aria-label="Tiến độ ký" style={{ gap: 0 }}>
             <h2 className="kmx-h2" style={{ marginBottom: 10 }}>{justDone.signed ? 'Còn 2 chữ ký nữa' : 'Còn 3 chữ ký'}</h2>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className={`kmx-tl-dot ${justDone.signed ? 'done' : 'now'}`} style={{ position: 'static' }}>{justDone.signed ? I.checkSm : '1'}</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong">{justDone.signed ? 'QS đã ký khai báo' : 'QS ký khai báo · chưa'}</span><span className="kmx-sm">{i.submitted_name || i.return_name || ''}{i.team ? ` · Ca ${i.team}` : ''}{i.submitted_at ? ` · ${hm(i.submitted_at)}` : ''}</span></span></div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className={`kmx-tl-dot ${justDone.signed ? 'now' : 'todo'}`} style={{ position: 'static' }}>2</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong" style={{ color: justDone.signed ? '#B45309' : '#6B7280' }}>QC duyệt · đang chờ</span><span className="kmx-sm">QC thấy phiếu trong mục Chờ ký, ký được cả ca một chạm</span></span></div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className="kmx-tl-dot todo" style={{ position: 'static' }}>3</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong" style={{ color: '#6B7280' }}>Thủ kho nhận</span><span className="kmx-sm">Lúc này kho chèn mới trừ {fmtKg(i.kg_used)} kg, sổ ca tự điền dòng CHÈN</span></span></div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className="kmx-tl-dot todo" style={{ position: 'static' }}>3</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong" style={{ color: '#6B7280' }}>Thủ kho nhận</span><span className="kmx-sm">Lúc này kho chèn mới trừ {kgTxt(i.kg_used)} kg, sổ ca tự điền dòng CHÈN</span></span></div>
           </section>
           <div className="kmx-note info">{I.info}<span>{justDone.signed ? 'Bạn không cần làm gì thêm. Có gì sai thì mở phiếu để sửa kg trả trước khi QS ký.' : 'Mở phiếu để chụp ảnh còn thiếu rồi bấm Ký bên giao.'}</span></div>
         </div></div>
@@ -257,7 +257,7 @@ export default function KhoMixIssue() {
           {msg && <div className={`kmx-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>}
           <div className="kmx-card" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}>
             <span className="kmx-col"><span className="kmx-lbl">Đã lấy đầu ca</span><span className="kmx-md">{hm(i.out_at)} · lô {i.lot_so_lo || i.lot_code}{i.vi_tri ? ` · ${MIX_VI_TRI_LABELS[i.vi_tri].toLowerCase()}` : ''}{i.so_banh !== null ? ` · ${i.so_banh} bành` : ''}{i.ma_goc_all ? ` · vào mã ${i.ma_goc_all}` : ''} · {pOut.length} ảnh</span></span>
-            <span className="kmx-num md" style={{ whiteSpace: 'nowrap' }}>{fmtKg(i.kg_out)} <span className="kmx-sm">kg</span></span>
+            <span className="kmx-num md" style={{ whiteSpace: 'nowrap' }}>{kgTxt(i.kg_out)} <span className="kmx-sm">kg</span></span>
           </div>
           {suaLayBox()}
           {missOut.length > 0 && (
@@ -340,7 +340,7 @@ export default function KhoMixIssue() {
             {!cancelAsk ? <button type="button" className="kmx-btn ghost" style={{ color: '#B91C1C' }} onClick={() => setCancelAsk(true)}>Lấy nhầm? Hủy phiếu</button> : (
               <div className="kmx-card" style={{ borderColor: '#FECACA' }}>
                 <input className="kmx-text" placeholder="Lý do hủy" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} aria-label="Lý do hủy" />
-                <div className="kmx-grid2"><button type="button" className="kmx-btn red" disabled={busy === 'cancel'} onClick={() => run('cancel', () => mixService.ky(i.id, 'cancel', cancelReason.trim() || null), `Đã hủy, ${fmtKg(i.kg_out)} kg trả về tồn kho chèn`)}>Xác nhận hủy</button><button type="button" className="kmx-btn sec" onClick={() => setCancelAsk(false)}>Không</button></div>
+                <div className="kmx-grid2"><button type="button" className="kmx-btn red" disabled={busy === 'cancel'} onClick={() => run('cancel', () => mixService.ky(i.id, 'cancel', cancelReason.trim() || null), `Đã hủy, ${kgTxt(i.kg_out)} kg trả về tồn kho chèn`)}>Xác nhận hủy</button><button type="button" className="kmx-btn sec" onClick={() => setCancelAsk(false)}>Không</button></div>
               </div>
             )}
           </div>
@@ -372,9 +372,9 @@ export default function KhoMixIssue() {
         {msg && <div className={`kmx-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>}
         <section className="kmx-card" aria-label="Số liệu" style={{ gap: 10 }}>
           <div className="kmx-grid3">
-            <div className="kmx-col kmx-center"><span className="kmx-lbl">Lấy</span><span className="kmx-num md">{fmtKg(i.kg_out)}</span></div>
-            <div className="kmx-col kmx-center"><span className="kmx-lbl">Trả</span><span className="kmx-num md">{i.kg_return === null ? '—' : fmtKg(i.kg_return)}</span></div>
-            <div className="kmx-col kmx-center kmx-stat ok"><span className="kmx-lbl ok">Tiêu hao</span><span className="kmx-num md ok">{i.kg_used === null ? '—' : fmtKg(i.kg_used)}</span></div>
+            <div className="kmx-col kmx-center"><span className="kmx-lbl">Lấy</span><span className="kmx-num md">{kgTxt(i.kg_out)}</span></div>
+            <div className="kmx-col kmx-center"><span className="kmx-lbl">Trả</span><span className="kmx-num md">{i.kg_return === null ? '—' : kgTxt(i.kg_return)}</span></div>
+            <div className="kmx-col kmx-center kmx-stat ok"><span className="kmx-lbl ok">Tiêu hao</span><span className="kmx-num md ok">{i.kg_used === null ? '—' : kgTxt(i.kg_used)}</span></div>
           </div>
           {i.kg_used !== null && <div className="kmx-bar" style={{ height: 10 }}><span style={{ width: `${Math.min(pct, 100)}%` }} /></div>}
           <span className="kmx-md">Lô <span className="kmx-mono" style={{ fontWeight: 700, color: '#0D2E25' }}>{i.lot_so_lo || i.lot_code}</span>{i.lot_so_lo ? <span className="kmx-sm kmx-mono"> {i.lot_code}</span> : null} · {MIX_SOURCE_LABELS[i.source_type].toLowerCase()}{i.lot_grade ? ` · ${i.lot_grade}` : ''}{i.po !== null ? ` · Po ${i.po}` : ''} · {MIX_PURPOSE_LABELS[i.purpose].toLowerCase()}{i.target_index ? ` ${i.target_index}${i.target_value !== null ? ' → ' + i.target_value : ''}` : ''}</span>
@@ -400,12 +400,12 @@ export default function KhoMixIssue() {
 
         <section className="kmx-card" aria-label="Dòng thời gian" style={{ gap: 0 }}>
           <div className="kmx-tl"><span className="kmx-tl-dot done">{I.checkSm}</span><div className="kmx-tl-body">
-            <span className="kmx-row"><span className="kmx-strong">Lấy đầu ca · {fmtKg(i.kg_out)} kg</span><span className="kmx-sm">{hm(i.out_at)}</span></span>
+            <span className="kmx-row"><span className="kmx-strong">Lấy đầu ca · {kgTxt(i.kg_out)} kg</span><span className="kmx-sm">{hm(i.out_at)}</span></span>
             <span className="kmx-sm">{i.out_name || ''}{i.team ? ` · Ca ${i.team}` : ''}{missOut.length ? ` · thiếu ${missOut.length} ảnh` : ''}</span>
             {pOut.length > 0 && <div className="kmx-thumbs">{thumbs(pOut)}</div>}
           </div></div>
           <div className={`kmx-tl${i.return_at ? '' : ' todo'}`}><span className={`kmx-tl-dot ${i.return_at ? 'done' : 'todo'}`}>{i.return_at ? I.checkSm : '·'}</span><div className="kmx-tl-body">
-            <span className="kmx-row"><span className="kmx-strong" style={i.return_at ? undefined : { color: '#6B7280' }}>Trả cuối ca{i.return_at ? ` · ${fmtKg(i.kg_return)} kg` : ''}</span><span className="kmx-sm">{hm(i.return_at)}</span></span>
+            <span className="kmx-row"><span className="kmx-strong" style={i.return_at ? undefined : { color: '#6B7280' }}>Trả cuối ca{i.return_at ? ` · ${kgTxt(i.kg_return)} kg` : ''}</span><span className="kmx-sm">{hm(i.return_at)}</span></span>
             {i.return_at && <span className="kmx-sm">{i.return_name || ''} · {i.handover_to_next ? 'để lại dây chuyền, bàn giao ca sau' : i.dung_het || (i.kg_return ?? 0) <= 0.005 ? `dùng hết · cân pallet rỗng${i.return_pallet_kg !== null ? ` ${kgTxt(i.return_pallet_kg)} kg` : ''}` : 'về kho, không bàn giao'}{missRet.length ? ` · thiếu ${missRet.length} ảnh` : ''}</span>}
             {pRet.length > 0 && <div className="kmx-thumbs">{thumbs(pRet)}</div>}
           </div></div>
@@ -452,7 +452,7 @@ export default function KhoMixIssue() {
         {st === 'qc_confirmed' && (
           <section className="kmx-card" aria-label="Thủ kho nhận" style={{ gap: 8 }}>
             <h2 className="kmx-h2">Bước 3/3 · thủ kho nhận</h2>
-            {canReceive ? <button type="button" className="kmx-btn md" disabled={busy === 'receive'} onClick={() => ky('receive')}>{I.intake}Nhận · trừ kho chèn {fmtKg(i.kg_used)} kg</button> : <span className="kmx-md">Chờ thủ kho được phân công nhận. Sau bước này kho chèn mới trừ và sổ ca tự điền dòng CHÈN.</span>}
+            {canReceive ? <button type="button" className="kmx-btn md" disabled={busy === 'receive'} onClick={() => ky('receive')}>{I.intake}Nhận · trừ kho chèn {kgTxt(i.kg_used)} kg</button> : <span className="kmx-md">Chờ thủ kho được phân công nhận. Sau bước này kho chèn mới trừ và sổ ca tự điền dòng CHÈN.</span>}
           </section>
         )}
 
@@ -464,7 +464,7 @@ export default function KhoMixIssue() {
                 <div className="kmx-grid2"><button type="button" className="kmx-btn red" disabled={busy === 'cancel'} onClick={() => run('cancel', () => mixService.ky(i.id, 'cancel', cancelReason.trim() || null), 'Đã hủy phiếu, kg trả về tồn kho chèn')}>Xác nhận hủy</button><button type="button" className="kmx-btn sec" onClick={() => setCancelAsk(false)}>Không</button></div>
               </div>
             )}
-            <span className="kmx-sm kmx-center">Hủy thì {fmtKg(i.kg_out)} kg trả về tồn kho chèn. Sửa kg trả chỉ được trước khi QS ký.</span>
+            <span className="kmx-sm kmx-center">Hủy thì {kgTxt(i.kg_out)} kg trả về tồn kho chèn. Sửa kg trả chỉ được trước khi QS ký.</span>
           </div>
         )}
       </div></div>

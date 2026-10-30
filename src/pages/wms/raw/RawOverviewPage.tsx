@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Alert, Button, Card, Col, Empty, Row, Space, Spin, Statistic, Table, Tag, Tooltip, Typography } from 'antd'
+import { Alert, Button, Card, Col, Empty, Input, Row, Space, Spin, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { ReloadOutlined, PlusOutlined, WarningOutlined, RightOutlined } from '@ant-design/icons'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
@@ -48,7 +48,22 @@ export default function RawOverviewPage() {
   const [settings, setSettings] = useState<RawSettings>(RAW_SETTINGS_DEFAULT)
   const [stats, setStats] = useState<Awaited<ReturnType<typeof rawStockService.getOverviewStats>> | null>(null)
   const [rawLots, setRawLots] = useState<RawLotBalance[]>([])
+  const [maMoi, setMaMoi] = useState('')   // tạo mã trước khi hàng về
+  const [taoBusy, setTaoBusy] = useState(false)
   useEffect(() => { if (facilityId) rawLotService.list(facilityId, { onlyWithStock: true }).then(setRawLots).catch(() => setRawLots([])); else setRawLots([]) }, [facilityId])
+  // tạo mã trước khi hàng về (bình thường mã sinh lúc nhận phiếu cân vào kho) — để khai lệnh chạy / sổ ca sớm
+  const taoMa = async () => {
+    const raw = maMoi.trim(); if (!raw || !facilityId) return
+    setTaoBusy(true)
+    try {
+      const p = await rawLotService.parse(raw).catch(() => null)
+      const ma = p?.ma || raw.toUpperCase().replace(/\s+/g, '-')
+      await rawLotService.layHoacTao(facilityId, ma)
+      message.success(`Đã tạo mã ${ma} — chọn được ở Hàng chèn (Bắt đầu lệnh) và sổ ca; chưa có hàng nên chưa hiện trong bảng tồn`)
+      setMaMoi('')
+    } catch (e: any) { message.error(e?.message || 'Không tạo được mã') }
+    finally { setTaoBusy(false) }
+  }
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -158,7 +173,7 @@ export default function RawOverviewPage() {
 
         <Row gutter={[12, 12]}>
           <Col xs={24} xl={16}>
-            <Card size="small" title="Tồn theo mã nguyên liệu" extra={<Text type="secondary">đơn vị nhà máy chạy máy · {rawLots.length} mã còn hàng</Text>} style={{ marginBottom: 12 }}>
+            <Card size="small" title="Tồn theo mã nguyên liệu" extra={<Space wrap><Text type="secondary">đơn vị nhà máy chạy máy · {rawLots.length} mã còn hàng</Text>{(rawRole.isKeeper || rawRole.isQC || rawRole.isBGD) && <Space.Compact><Input size="small" style={{ width: 180, fontFamily: 'monospace' }} placeholder="Tạo mã trước: TMHG-41" value={maMoi} onChange={(e) => setMaMoi(e.target.value)} onPressEnter={taoMa} /><Button size="small" icon={<PlusOutlined />} loading={taoBusy} disabled={!maMoi.trim()} onClick={taoMa}>Tạo mã</Button></Space.Compact>}</Space>} style={{ marginBottom: 12 }}>
               <Table<RawLotBalance> rowKey="raw_lot_id" size="small" pagination={{ pageSize: 8, showSizeChanger: false }} dataSource={rawLots} locale={{ emptyText: 'Chưa có mã nào còn hàng' }}
                 columns={[
                   { title: 'Mã', dataIndex: 'ma', key: 'ma', render: (v) => <Text code strong>{v}</Text> },

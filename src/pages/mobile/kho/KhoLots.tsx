@@ -27,6 +27,7 @@ export default function KhoLots() {
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [maMoi, setMaMoi] = useState('')   // tạo mã trước khi hàng về
 
   const load = useCallback(async () => {
     if (!facilityId) return
@@ -64,6 +65,21 @@ export default function KhoLots() {
     finally { setBusy(null) }
   }
 
+  // tạo mã trước khi hàng về (bình thường mã sinh lúc nhận phiếu cân vào kho) — để khai lệnh chạy / sổ ca sớm; có thể gán ngay cho lô xe chưa mã
+  async function taoMa(text: string, ganCho?: RawBatchBalance) {
+    const raw = text.trim(); if (!raw || !facilityId) return
+    setBusy('ma_moi'); setMsg(null)
+    try {
+      const p = await rawLotService.parse(raw).catch(() => null)
+      const ma = p?.ma || raw.toUpperCase().replace(/\s+/g, '-')
+      const id = await rawLotService.layHoacTao(facilityId, ma)
+      if (ganCho) await rawStockService.ganMa(ganCho.batch_id, id)
+      setMsg({ ok: true, text: ganCho ? `✅ ${ganCho.batch_no} đã gán mã ${ma}` : `✅ Đã tạo mã ${ma} — chọn được ở tab Chèn (Bắt đầu lệnh) và sổ ca; chưa có hàng nên chưa hiện ở "Còn hàng"` })
+      setMaMoi(''); setGan(null); await load()
+    } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không tạo được mã' }) }
+    finally { setBusy(null) }
+  }
+
   const XeCard = ({ r }: { r: RawBatchBalance }) => (
     <div className="ops-card press" style={{ padding: '9px 12px', boxShadow: 'none', border: '1px solid var(--line)' }} onClick={() => nav(`/m/kho/lo/${r.batch_id}`)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && nav(`/m/kho/lo/${r.batch_id}`)}>
       <div className="ops-rw">
@@ -92,6 +108,12 @@ export default function KhoLots() {
               <button key={k} className={`ops-chip ${filter === k ? 'lime' : 'mut'}`} style={{ border: 0, cursor: 'pointer', padding: '7px 11px', fontSize: 12 }} onClick={() => setFilter(k)}>{t}</button>
             ))}
           </div>
+          {(role.isKeeper || role.isQC || role.isBGD) && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input style={{ ...inp, flex: 1 }} placeholder="Tạo mã trước khi hàng về: TMHG-41, KHMN 15…" value={maMoi} onChange={(e) => setMaMoi(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') taoMa(maMoi) }} aria-label="Mã mới" />
+              <button type="button" className="ops-btn o" style={{ width: 'auto', padding: '0 14px' }} disabled={!maMoi.trim() || busy === 'ma_moi'} onClick={() => taoMa(maMoi)}>{busy === 'ma_moi' ? '…' : 'Tạo mã'}</button>
+            </div>
+          )}
           {loading && !lots.length && <><div className="ops-skel" /><div className="ops-skel" /></>}
           {!loading && !list.length && <div className="ops-empty"><div className="em">📦</div><div className="et">Không có mã</div><div className="ed">{lots.length ? 'Đổi bộ lọc hoặc từ khóa' : 'Kho chưa có mã nguyên liệu nào — nhập từ phiếu cân ở tab Nhập'}</div></div>}
 
@@ -137,6 +159,8 @@ export default function KhoLots() {
                   {gan === r.batch_id ? (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {lots.filter((l) => l.status === 'mo').map((l) => <button key={l.raw_lot_id} type="button" className="ops-chip lime" style={{ border: 0, cursor: 'pointer', padding: '8px 11px', fontSize: 12.5 }} disabled={busy === r.batch_id} onClick={() => ganMa(r, l.raw_lot_id)}>{l.ma}</button>)}
+                      <input style={{ ...inp, width: 150, flex: '0 0 150px', padding: 8 }} placeholder="Mã mới…" value={maMoi} onChange={(e) => setMaMoi(e.target.value)} aria-label="Mã mới để gán" />
+                      <button type="button" className="ops-chip lime" style={{ border: 0, cursor: 'pointer', padding: '8px 11px', fontSize: 12.5 }} disabled={!maMoi.trim() || busy === 'ma_moi'} onClick={() => taoMa(maMoi, r)}>Tạo mã & gán</button>
                       <button type="button" className="ops-chip mut" style={{ border: 0, cursor: 'pointer', padding: '8px 11px', fontSize: 12.5 }} onClick={() => setGan(null)}>Thôi</button>
                     </div>
                   ) : <button type="button" className="ops-btn o" style={{ padding: 9, fontSize: 13 }} disabled={!(role.isKeeper || role.isQC || role.isBGD)} onClick={() => setGan(r.batch_id)}>Gán mã nguyên liệu</button>}

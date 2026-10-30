@@ -31,6 +31,8 @@ Quy tắc: không có số lô thì không nhập được. Lô **DKL** phải b
 
 Một **lệnh chạy** = một đợt chạy máy gồm **một hay nhiều mã** nguyên liệu (sổ tay tổ ép: "chèn MM vào KHMN-15 + 17" trong lúc "TMHG-39 chèn bể Slap" → lệnh 15 + 17 và lệnh 39 chạy song song). Máy đặt mã lệnh LC-PD-261030-01 và tên gộp "KHMN-15 + KHMN-17".
 
+- **Mã lấy từ đâu:** mã sinh lúc **nhận phiếu cân vào kho** (điện thoại tab **Nhập** → ô "Mã nguyên liệu": gợi ý từ phiếu cân, hoặc gõ nguồn + số, hoặc gõ nguyên chữ trên phiếu; máy tính Kho NVL → Nhận hàng vào kho → ô "Mã nguyên liệu"). Lô xe đã vào kho mà chưa có mã: tab **Lô NVL** → "Lô xe chưa gán mã" → **Gán mã nguyên liệu** → chạm mã (hoặc gõ "Mã mới…" → Tạo mã & gán). Hàng chưa về mà muốn khai lệnh trước: tab **Lô NVL** → ô **"Tạo mã trước khi hàng về"** (điện thoại) hoặc Tổng quan kho NVL → thẻ "Tồn theo mã nguyên liệu" → **Tạo mã** (máy tính). Mã mới chưa có hàng nên chưa hiện ở "Còn hàng", nhưng chọn được ở Bắt đầu lệnh và sổ ca.
+
 - **Khai một lần, không chọn trên từng phiếu ca.** Điện thoại tab Chèn, thẻ đầu **"Lệnh đang chạy"** → **Bắt đầu lệnh…** → chạm một hay nhiều mã → Bắt đầu. Máy tính: Hàng chèn → khung **Lệnh đang chạy** → Bắt đầu lệnh… (chọn nhiều mã). Sổ ca: ô mã có link "Khai mã này đang chạy từ giờ" (lệnh một mã).
 - **Đang có lệnh khác chạy** → máy hỏi một lần, mặc định **Thay thế** (kết thúc lệnh cũ, ghi "thay bằng …" vào sổ). Hai lựa chọn kia: **Chạy song song** (lệnh riêng, ví dụ TMHG-39 bên bể Slap trong lúc 15 + 17 vào máy Mix) và **Gộp vào lệnh đang chạy** (15 đang chạy, thêm 17 → lệnh 15 + 17).
 - Từ đó **phiếu ca** mới, **phiếu chèn** và **lô thành phẩm** tự gắn lệnh đang chạy. Lệnh chạy nhiều ngày, nhiều ca vẫn một dòng; xong thì bấm **Kết thúc** (mục 6b).

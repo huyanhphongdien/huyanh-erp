@@ -63,6 +63,9 @@ export interface RawBatchBalance {
   dry_kg: number
   drc_pct: number | null
   tuoi_ngay: number
+  raw_lot_id?: string | null
+  ma_nvl?: string | null
+  xe_no?: string | null
   ngay_can_lai: string | null
   ngay_tu_lan_do: number
   so_dong_so: number
@@ -198,7 +201,7 @@ export interface NhapKhoResult {
 /** Mã lỗi hàm DB → câu tiếng Việt cho người dùng */
 export function dichLoiNhapKho(err: unknown): string {
   const msg = String((err as any)?.message ?? err ?? '')
-  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|KHONG_CO_QUYEN|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO|LENH_TRONG|KHONG_TIM_THAY_LO|LO_KHAC_NHA_MAY|LO_DA_HET|VUOT_TON|KHONG_TIM_THAY_DONG|LENH_DA_GUI_KY|KHONG_TIM_THAY_LENH|SAI_TRANG_THAI|THIEU_KG_CAN|DA_TRU_SO|BUOC_KHONG_HOP_LE|CAN_LY_DO|DANG_CO_KIEM_KE_MO|KHO_TRONG|KHONG_TIM_THAY_KIEM_KE|CON_LO_CHUA_DEM|DA_DUYET|KY_DA_KHOA|DKL_CHUA_XU_LY|TRA_QUA_LAY|THIEU_ANH|THIEU_CA|CON_PHIEU_CAN_CHO_NHAP|PHIEU_CA_CHUA_MO|PHIEU_CA_DA_KY|THIEU_CO_BANH|DA_CHUYEN_HET|LO_NVL_CHI_SUA_QUA_SO_KHO)(?::([^\n"]*))?/)
+  const m = msg.match(/(KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|KHONG_CO_QUYEN|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO|LENH_TRONG|KHONG_TIM_THAY_LO|LO_KHAC_NHA_MAY|LO_DA_HET|VUOT_TON|KHONG_TIM_THAY_DONG|LENH_DA_GUI_KY|KHONG_TIM_THAY_LENH|SAI_TRANG_THAI|THIEU_KG_CAN|DA_TRU_SO|BUOC_KHONG_HOP_LE|CAN_LY_DO|DANG_CO_KIEM_KE_MO|KHO_TRONG|KHONG_TIM_THAY_KIEM_KE|CON_LO_CHUA_DEM|DA_DUYET|KY_DA_KHOA|DKL_CHUA_XU_LY|TRA_QUA_LAY|THIEU_ANH|THIEU_CA|CON_PHIEU_CAN_CHO_NHAP|PHIEU_CA_CHUA_MO|PHIEU_CA_DA_KY|THIEU_CO_BANH|DA_CHUYEN_HET|LO_NVL_CHI_SUA_QUA_SO_KHO|THIEU_MA_NVL|MA_KHONG_HOP_LE|THIEU_SO_LO|TRUNG_SO_LO|LO_TP_CHUA_QC|LO_TP_KHONG_DU)(?::([^\n"]*))?/)
   if (!m) return msg || 'Lỗi không xác định'
   const chi_tiet = m[2] ? ` (${m[2]})` : ''
   switch (m[1]) {
@@ -244,6 +247,12 @@ export function dichLoiNhapKho(err: unknown): string {
     case 'PHIEU_CA_DA_KY': return `Phiếu ca của ca này đã ký, ghi vào phiếu ca sau${chi_tiet}`
     case 'THIEU_CO_BANH': return `Chủng loại chưa khai cỡ bành (kg/bành), BGĐ cập nhật danh mục vật liệu${chi_tiet}`
     case 'DA_CHUYEN_HET': return `Dòng này đã chuyển hết sang kho chèn${chi_tiet}`
+    case 'THIEU_MA_NVL': return `Phiếu chưa có mã nguyên liệu, chọn hoặc tạo mã rồi nhận${chi_tiet}`
+    case 'MA_KHONG_HOP_LE': return `Mã không hợp lệ${chi_tiet}`
+    case 'THIEU_SO_LO': return 'Thiếu số lô thành phẩm'
+    case 'TRUNG_SO_LO': return `Số lô đã có rồi${chi_tiet}`
+    case 'LO_TP_CHUA_QC': return `Lô chưa bị QC đánh CXL / Loại, không chuyển chèn được${chi_tiet}`
+    case 'LO_TP_KHONG_DU': return `Lô không đủ bành${chi_tiet}`
     case 'LO_NVL_CHI_SUA_QUA_SO_KHO': return `Lô NVL chỉ sửa được qua sổ kho (cân lại / kiểm kê / lệnh xuất)${chi_tiet}`
     case 'THIEU_ANH': return `Thiếu ảnh bắt buộc, chụp đủ rồi mới ký${chi_tiet.replace('mix_issue_out', 'lúc lấy').replace('mix_issue_return', 'lúc trả').replace('toan_canh', 'toàn cảnh').replace('man_hinh_can', 'màn hình cân')}`
     default: return msg
@@ -354,11 +363,13 @@ export const rawStockService = {
    * NHẬP KHO: gọi hàm DB (một giao dịch). Trả danh sách lô đã tạo.
    * Sau đó ghi stock_in_orders + inventory_transactions như luồng cũ (best-effort).
    */
-  async nhapKho(ticketId: string, opts: { warehouseId?: string | null; nguonHang?: RawLotSource | null } = {}): Promise<NhapKhoResult[]> {
+  async nhapKho(ticketId: string, opts: { warehouseId?: string | null; nguonHang?: RawLotSource | null; rawLotId?: string | null; ma?: string | null } = {}): Promise<NhapKhoResult[]> {
     const { data, error } = await supabase.rpc('fn_nhap_kho_tu_phieu_can', {
       p_ticket_id: ticketId,
       p_warehouse_id: opts.warehouseId ?? null,
       p_nguon_hang: opts.nguonHang ?? null,
+      p_raw_lot_id: opts.rawLotId ?? null,
+      p_ma: opts.ma ?? null,
     })
     if (error) throw new Error(dichLoiNhapKho(error))
     const batches: NhapKhoResult[] = ((data ?? []) as any[]).map((b) => ({
@@ -370,6 +381,12 @@ export const rawStockService = {
   },
 
   /** Mở sổ tồn đầu từ raw_opening_stock_staging (dòng không lỗi, chưa xử lý) */
+  /** GĐ6: gán / đổi mã nguyên liệu cho một lô xe */
+  async ganMa(batchId: string, rawLotId: string, xe?: string | null): Promise<void> {
+    const { error } = await supabase.rpc('fn_nvl_gan_ma_lo_xe', { p_batch_id: batchId, p_raw_lot_id: rawLotId, p_xe: xe ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
+  },
+
   async moSoTonDau(facilityCode?: string | null): Promise<{ so_lo: number; kho_kg: number }> {
     const { data, error } = await supabase.rpc('fn_mo_so_ton_dau', { p_facility_code: facilityCode ?? null })
     if (error) throw new Error(dichLoiNhapKho(error))

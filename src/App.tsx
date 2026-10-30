@@ -104,6 +104,9 @@ const KhoMixStock = lazy(() => import('./pages/mobile/kho/KhoMixStock'));
 const KhoMixLotNew = lazy(() => import('./pages/mobile/kho/KhoMixLotNew'));
 const KhoMixList = lazy(() => import('./pages/mobile/kho/KhoMixList'));
 const KhoStocktake = lazy(() => import('./pages/mobile/kho/KhoStocktake'));
+const KhoRawIssue = lazy(() => import('./pages/mobile/kho/KhoRawIssue'));
+const KhoFgLots = lazy(() => import('./pages/mobile/kho/KhoFgLots'));
+const KhoFgLotDetail = lazy(() => import('./pages/mobile/kho/KhoFgLotDetail'));
 
 // ===== CHẤM CÔNG V2: Ca, Phân ca, Tăng ca =====
 const ShiftListPage = lazy(() => import('./features/shifts').then(m => ({ default: m.ShiftListPage })));
@@ -467,6 +470,9 @@ function App() {
               <Route path="lo/:batchId" element={<Suspense fallback={<LoadingSpinner />}><KhoLotDetail /></Suspense>} />
               <Route path="nhap" element={<Suspense fallback={<LoadingSpinner />}><KhoIntake /></Suspense>} />
               <Route path="kiem-ke" element={<Suspense fallback={<LoadingSpinner />}><KhoStocktake /></Suspense>} />
+              <Route path="xuat" element={<Suspense fallback={<LoadingSpinner />}><KhoRawIssue /></Suspense>} />
+              <Route path="tp" element={<Suspense fallback={<LoadingSpinner />}><KhoFgLots /></Suspense>} />
+              <Route path="tp/:id" element={<Suspense fallback={<LoadingSpinner />}><KhoFgLotDetail /></Suspense>} />
               <Route path="chen" element={<Suspense fallback={<LoadingSpinner />}><KhoMix /></Suspense>} />
               <Route path="chen/lay" element={<Suspense fallback={<LoadingSpinner />}><KhoMixOut /></Suspense>} />
               <Route path="chen/phieu/:id" element={<Suspense fallback={<LoadingSpinner />}><KhoMixIssue /></Suspense>} />

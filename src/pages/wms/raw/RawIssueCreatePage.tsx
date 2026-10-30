@@ -14,6 +14,7 @@ import { rawStockService, type RawStockByType } from '../../../services/wms/rawS
 import { RAW_RUBBER_TYPE_LABELS, RAW_SETTINGS_DEFAULT, type RawRubberType, type RawSettings } from '../../../services/wms/raw.types'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import { useRawRole } from '../../../hooks/useRawRole'
+import { rawLotService, type RawLotBalance } from '../../../services/wms/rawLotService'
 
 const { Title, Text } = Typography
 const fmtKg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
@@ -40,6 +41,25 @@ export default function RawIssueCreatePage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState<RawSettings>(RAW_SETTINGS_DEFAULT)
+  // GĐ6: xuất cả một MÃ nguyên liệu — một số cân, máy chia về từng lô xe
+  const [rawLots, setRawLots] = useState<RawLotBalance[]>([])
+  const [maId, setMaId] = useState<string | undefined>(undefined)
+  const [tongKg, setTongKg] = useState<number | null>(null)
+  const [savingMa, setSavingMa] = useState(false)
+  useEffect(() => { if (facilityId) rawLotService.list(facilityId, { onlyWithStock: true }).then(setRawLots).catch(() => setRawLots([])) }, [facilityId])
+  const maChon = rawLots.find((l) => l.raw_lot_id === maId)
+  const handleXuatMa = async () => {
+    if (!facilityId || !maChon || !tongKg || tongKg <= 0) { message.warning('Chọn mã và nhập tổng kg cân'); return }
+    if (tongKg > maChon.wet_kg + 0.01) { message.warning(`Mã ${maChon.ma} chỉ còn ${maChon.wet_kg.toLocaleString('vi-VN')} kg ướt`); return }
+    setSavingMa(true)
+    try {
+      const id = await rawLotService.taoLenhXuatTheoMa({ facilityId, rawLotId: maChon.raw_lot_id, mucDich, productionOrderId: productionOrderId ?? null, note: note.trim() || null })
+      const r = await rawLotService.ghiCanTheoMa(id, tongKg, null)
+      message.success(`${r.code}: xuất mã ${maChon.ma}, ${r.so_dong} xe, đã chia ${tongKg.toLocaleString('vi-VN')} kg · tiếp theo: ký 3 bước`)
+      navigate(`/wms/nvl/xuat/${id}`)
+    } catch (e: any) { message.error(e?.message || 'Không tạo được lệnh') }
+    finally { setSavingMa(false) }
+  }
 
   useEffect(() => {
     if (facilityId || !facilities?.length) return
@@ -134,6 +154,16 @@ export default function RawIssueCreatePage() {
         </Row>
 
         {!rawRole.loading && !rawRole.perms.submit && <Alert type="warning" showIcon message="Tài khoản chưa gắn hồ sơ nhân viên, không lập được lệnh." />}
+
+        <Card size="small" title="Xuất cả một mã nguyên liệu (cách nhà máy đang làm)" extra={<Text type="secondary">một số cân cho cả mã · máy chia về từng xe theo tỷ lệ ướt còn lại</Text>}>
+          <Row gutter={[12, 8]} align="bottom">
+            <Col xs={24} md={10}><Text>Mã nguyên liệu</Text><Select style={{ width: '100%' }} showSearch optionFilterProp="label" value={maId} onChange={setMaId} placeholder="TMHG-40…" options={rawLots.map((l) => ({ value: l.raw_lot_id, label: `${l.ma} · ${l.rubber_type_name} · ${l.so_xe_con_hang} xe · ${l.wet_kg.toLocaleString('vi-VN')} kg ướt / ${l.dry_kg.toLocaleString('vi-VN')} khô` }))} /></Col>
+            <Col xs={12} md={6}><Text>Tổng kg ướt cân được</Text><InputNumber style={{ width: '100%' }} min={1} step={100} value={tongKg} max={maChon?.wet_kg} onChange={(v) => setTongKg(v === null || v === undefined ? null : Number(v))} /></Col>
+            <Col xs={12} md={4}><Button block onClick={() => maChon && setTongKg(Math.round(maChon.wet_kg))} disabled={!maChon}>Lấy hết mã</Button></Col>
+            <Col xs={24} md={4}><Button type="primary" block loading={savingMa} disabled={!maChon || !tongKg} onClick={handleXuatMa}>Tạo lệnh theo mã</Button></Col>
+          </Row>
+          {maChon && <Text type="secondary">Lệnh sẽ gồm {maChon.so_xe_con_hang} lô xe của {maChon.ma}; mục đích và lệnh sản xuất lấy ở phần dưới.</Text>}
+        </Card>
 
         <Card size="small" title="Lệnh">
           <Row gutter={[12, 12]}>

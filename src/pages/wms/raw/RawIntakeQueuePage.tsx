@@ -19,6 +19,7 @@ import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_LOT_SOURCE_LABELS, RAW_SETTINGS_DEFAULT, type RawLotSource, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
 import { usePhoneRedirect } from '../../../hooks/useIsPhone'
+import { rawLotService, type MaGoiY } from '../../../services/wms/rawLotService'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import { ticketTypeLabel } from '../../../services/wms/wms.types'
 
@@ -95,6 +96,9 @@ export default function RawIntakeQueuePage() {
   }, [rows, search])
 
   const selected = useMemo(() => rows.find((r) => r.ticket_id === selectedId) ?? null, [rows, selectedId])
+  // GĐ6: mã nguyên liệu đọc sẵn từ ô "mã LLM gộp" của phiếu cân
+  const [goiY, setGoiY] = useState<Record<string, MaGoiY>>({})
+  useEffect(() => { rawLotService.goiY(rows.map((r) => r.ticket_id)).then(setGoiY).catch(() => setGoiY({})) }, [rows])
 
   const tongCho = rows.filter((r) => !r.da_nhap)
   const tongUot = tongCho.reduce((s, r) => s + r.net_weight, 0)
@@ -103,10 +107,12 @@ export default function RawIntakeQueuePage() {
 
   const handleNhapKho = () => {
     if (!selected) return
+    let maTyped = goiY[selected.ticket_id]?.ma || ''
     Modal.confirm({
       title: `Nhập kho phiếu ${selected.code}?`,
       content: (
         <div>
+          <p><Text strong>Mã nguyên liệu</Text> <Input size="small" defaultValue={goiY[selected.ticket_id]?.ma || ''} placeholder="TMHG-40 (bắt buộc)" style={{ width: 200, fontFamily: 'monospace' }} onChange={(e) => { maTyped = e.target.value }} />{goiY[selected.ticket_id]?.ma_goc && <Text type="secondary"> · phiếu gõ "{goiY[selected.ticket_id]?.ma_goc?.trim()}"</Text>}</p>
           <p>{selected.so_dong_lo > 0 ? `Tách thành ${selected.so_dong_lo} lô theo dòng lô trên phiếu.` : 'Tạo 1 lô cho cả phiếu.'}</p>
           <p>Ướt {fmtKg(selected.so_dong_lo > 0 ? selected.wet_kg_dong : selected.net_weight)} kg · DRC {fmtPct(selected.drc_dung)} · quy khô ≈ {fmtKg(selected.dry_kg_du_kien)} kg</p>
           <p>Nguồn hàng: {nguonHang ? RAW_LOT_SOURCE_LABELS[nguonHang] : 'tự suy từ phiếu'}</p>
@@ -117,7 +123,9 @@ export default function RawIntakeQueuePage() {
       onOk: async () => {
         setSubmitting(true)
         try {
-          const batches = await rawStockService.nhapKho(selected.ticket_id, { nguonHang: nguonHang ?? null })
+          const g = goiY[selected.ticket_id]
+          const ma = maTyped.trim()
+          const batches = await rawStockService.nhapKho(selected.ticket_id, { nguonHang: nguonHang ?? null, rawLotId: ma && g?.ma === ma ? g.raw_lot_id ?? null : null, ma: ma || null })
           setLastResult({ code: selected.code, batches })
           message.success(`Đã nhập ${batches.length} lô từ phiếu ${selected.code}`)
           setSelectedId(null); setNguonHang(undefined)
@@ -134,6 +142,7 @@ export default function RawIntakeQueuePage() {
     { title: 'Cân ra', dataIndex: 'completed_at', key: 'completed_at', render: (v) => fmtTime(v) },
     { title: 'Loại phiếu', dataIndex: 'ticket_type', key: 'ticket_type', render: (v) => ticketTypeLabel(v, 'short') },
     { title: 'Nhà cung cấp', dataIndex: 'supplier_name', key: 'supplier_name', ellipsis: true, render: (v, r) => v || r.vehicle_plate || <Text type="secondary">—</Text> },
+    { title: 'Mã NVL', key: 'ma', render: (_, r) => { const g = goiY[r.ticket_id]; return g?.ma ? <Tag color={g.raw_lot_id ? 'green' : 'gold'} style={{ fontFamily: 'monospace' }}>{g.ma}{g.xe ? ` xe ${g.xe}` : ''}</Tag> : <Tag color="red">chưa có mã</Tag> } },
     { title: 'Loại hàng', dataIndex: 'rubber_type_name', key: 'rubber_type_name', render: (v, r) => v ? <span>{v}{r.so_dong_lo > 1 && <Tag style={{ marginLeft: 6 }}>{r.so_dong_lo} dòng lô</Tag>}</span> : <Tag color="red">{r.rubber_type_goc || 'trống'}</Tag> },
     { title: 'Ướt (kg)', dataIndex: 'net_weight', key: 'net_weight', align: 'right', render: (v) => fmtKg(v) },
     { title: 'DRC', dataIndex: 'drc_dung', key: 'drc_dung', align: 'right', render: (v, r) => (

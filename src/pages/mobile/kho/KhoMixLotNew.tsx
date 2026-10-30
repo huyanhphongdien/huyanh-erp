@@ -10,19 +10,23 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../../stores/authStore'
 import { mixService, MIX_SOURCE_LABELS, type MixNguonLoi, type MixNguonQc, type MixNguonTp, type MixSourceType } from '../../../services/wms/mixService'
 import type { OpsShiftOption } from '../../../services/opsService'
+import { fgLotService, FG_QC_LABELS, type FgLot } from '../../../services/wms/fgLotService'
 import { fmtD, fmtKg, todayLocal, useKhoFacility } from './khoCommon'
 import { detectShift, hhmm, I, type ShiftPick } from './khoMixUtil'
 import './khoMix.css'
 
 const GRADES = ['SVR 3L', 'SVR 5', 'SVR 10', 'SVR 20', 'SVR CV50', 'SVR CV60', 'SVR L', 'RSS 3', 'SBR 1502']
-type Mode = 'so_ca' | 'so_qc' | 'tay'
+type Mode = 'lo_tp' | 'so_ca' | 'so_qc' | 'tay'
 
 export default function KhoMixLotNew() {
   const nav = useNavigate()
   const { facilityId, facility } = useKhoFacility()
   const user = useAuthStore((s) => s.user)
   const [sourceType, setSourceType] = useState<MixSourceType>('loi')
-  const [mode, setMode] = useState<Mode>('so_ca')
+  const [mode, setMode] = useState<Mode>('lo_tp')
+  const [tpLoi, setTpLoi] = useState<FgLot[]>([])
+  const [pickFg, setPickFg] = useState<FgLot | null>(null)
+  const [banh, setBanh] = useState('')
   // nguồn
   const [loi, setLoi] = useState<MixNguonLoi[]>([])
   const [qc, setQc] = useState<MixNguonQc[]>([])
@@ -51,8 +55,8 @@ export default function KhoMixLotNew() {
   useEffect(() => {
     if (!facilityId) return
     let alive = true
-    Promise.all([mixService.listNguonLoi(facilityId), mixService.listNguonQc(facilityId), mixService.listNguonTp(facilityId), detectShift(user?.employee_id || null)])
-      .then(([a, b, c, d]) => { if (!alive) return; setLoi(a); setQc(b); setTp(c); setShifts(d.shifts); setShift(d.pick) })
+    Promise.all([mixService.listNguonLoi(facilityId), mixService.listNguonQc(facilityId), mixService.listNguonTp(facilityId), detectShift(user?.employee_id || null), fgLotService.list(facilityId, { qc: ['cxl', 'loai'], onlyTon: true }).catch(() => [] as FgLot[])])
+      .then(([a, b, c, d, f]) => { if (!alive) return; setLoi(a); setQc(b); setTp(c); setShifts(d.shifts); setShift(d.pick); setTpLoi(f) })
       .catch((e) => alive && setMsg(e?.message || 'Không tải được nguồn hàng'))
     return () => { alive = false }
   }, [facilityId]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -63,7 +67,16 @@ export default function KhoMixLotNew() {
   const code = (s: string) => s.replace(/ \(.*\)/, '')
   const done = (text: string) => nav('/m/kho/chen/kho', { replace: true, state: { msg: text } })
 
-  const chonNguon = (t: MixSourceType) => { setSourceType(t); setPickLine(null); setPickQc(null); setPickTp(null); setKg(''); setMsg(null); setMode(t === 'loi' || t === 'dkl' ? 'so_ca' : 'tay') }
+  const chonNguon = (t: MixSourceType) => { setSourceType(t); setPickLine(null); setPickQc(null); setPickTp(null); setPickFg(null); setKg(''); setMsg(null); setMode(t === 'loi' || t === 'dkl' ? 'lo_tp' : 'tay') }
+  async function ghiTuFg() {
+    if (!pickFg) return
+    const n = Number(banh)
+    if (!Number.isInteger(n) || n <= 0 || n > pickFg.ton_banh) { setMsg(`Số bành phải từ 1 đến ${pickFg.ton_banh}`); return }
+    setBusy(true); setMsg(null)
+    try { await fgLotService.chuyenChen(pickFg.id, n, note.trim() || null, pickFg.material_code === 'DKL' ? metal : null); done(`Đã chuyển ${n} bành lô ${pickFg.so_lo} (${fmtKg(n * pickFg.kg_per_banh)} kg) vào kho chèn`) }
+    catch (e: any) { setMsg(e?.message || 'Không chuyển được') }
+    finally { setBusy(false) }
+  }
 
   async function ghiTay() {
     if (!facilityId || !kgOk) return
@@ -126,12 +139,45 @@ export default function KhoMixLotNew() {
           </div>
           {(sourceType === 'loi' || sourceType === 'dkl') && (
             <div className="kmx-seg">
-              <button type="button" className={mode === 'so_ca' ? 'on' : ''} style={{ height: 40, fontSize: 13 }} onClick={() => { setMode('so_ca'); setPickQc(null) }}>Từ sổ ca · {loi.filter((l) => l.material_code === (sourceType === 'loi' ? 'LOI' : 'DKL')).length}</button>
+              <button type="button" className={mode === 'lo_tp' ? 'on' : ''} style={{ height: 40, fontSize: 13 }} onClick={() => { setMode('lo_tp'); setPickLine(null); setPickQc(null) }}>Lô TP lỗi · {tpLoi.filter((f) => sourceType === 'dkl' ? f.material_code === 'DKL' : f.material_code !== 'DKL').length}</button>
+              <button type="button" className={mode === 'so_ca' ? 'on' : ''} style={{ height: 40, fontSize: 13 }} onClick={() => { setMode('so_ca'); setPickQc(null); setPickFg(null) }}>Từ sổ ca · {loi.filter((l) => l.material_code === (sourceType === 'loi' ? 'LOI' : 'DKL')).length}</button>
               {sourceType === 'loi' && <button type="button" className={mode === 'so_qc' ? 'on' : ''} style={{ height: 40, fontSize: 13 }} onClick={() => { setMode('so_qc'); setPickLine(null) }}>Từ sổ QC · {qc.filter((q) => !q.da_chuyen).length}</button>}
               <button type="button" className={mode === 'tay' ? 'on' : ''} style={{ height: 40, fontSize: 13 }} onClick={() => { setMode('tay'); setPickLine(null); setPickQc(null) }}>Gõ tay</button>
             </div>
           )}
         </section>
+
+        {/* ── Lô thành phẩm lỗi (GĐ7) ── */}
+        {(sourceType === 'loi' || sourceType === 'dkl') && mode === 'lo_tp' && !pickFg && (
+          <>
+            <h2 className="kmx-h2" style={{ padding: '0 2px' }}>Lô TP bị QC đánh CXL / Loại · chạm để chuyển</h2>
+            {!tpLoi.length && <div className="kmx-card muted kmx-center" style={{ fontSize: 13 }}>Không có lô TP lỗi còn tồn. Dùng "Từ sổ ca" hoặc "Gõ tay".</div>}
+            {tpLoi.filter((f) => sourceType === 'dkl' ? f.material_code === 'DKL' : f.material_code !== 'DKL').map((f) => (
+              <button key={f.id} type="button" className="kmx-card press" style={{ font: 'inherit', textAlign: 'left', width: '100%' }} onClick={() => { setPickFg(f); setBanh(String(f.ton_banh)) }}>
+                <span className="kmx-row"><span className="kmx-mono" style={{ fontSize: 15, fontWeight: 700, color: '#0D2E25' }}>{f.so_lo}</span><span className={`kmx-chip ${f.qc_status === 'loai' ? 'red' : 'amb'}`}>{FG_QC_LABELS[f.qc_status]}</span></span>
+                <span className="kmx-row" style={{ alignItems: 'flex-end' }}>
+                  <span className="kmx-col"><span style={{ fontSize: 14, fontWeight: 600 }}>{f.material_name}{f.ma_nvl ? ` · NVL ${f.ma_nvl}` : ''}</span><span className="kmx-sm">{fmtD(f.shift_date)}{f.team ? ` · tổ ${f.team}` : ''}{f.qc_ly_do ? ` · ${f.qc_ly_do}` : ''}</span></span>
+                  <span className="kmx-col" style={{ alignItems: 'flex-end' }}><span className="kmx-num lg">{f.ton_banh}</span><span className="kmx-sm" style={{ fontWeight: 600 }}>bành · {fmtKg(f.ton_kg)} kg</span></span>
+                </span>
+              </button>
+            ))}
+          </>
+        )}
+        {pickFg && (
+          <>
+            <div className="kmx-card" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span className="kmx-col"><span className="kmx-lbl">Đã chọn · lô TP</span><span className="kmx-strong kmx-mono">{pickFg.so_lo}</span><span className="kmx-sm">{pickFg.material_name} · còn {pickFg.ton_banh} bành · {pickFg.kg_per_banh} kg/bành</span></span>
+              <button type="button" className="kmx-pill sm" onClick={() => { setPickFg(null); setBanh('') }}>Đổi</button>
+            </div>
+            <section className="kmx-card" style={{ gap: 8 }}>
+              <label htmlFor="fg-banh" className="kmx-strong" style={{ fontSize: 13 }}>Số bành chuyển</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input id="fg-banh" className="kmx-input" type="number" inputMode="numeric" value={banh} onChange={(e) => setBanh(e.target.value)} /><span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>bành</span></div>
+              <div className="kmx-tint"><span>= {banh || 0} × {pickFg.kg_per_banh} kg</span><span className="kmx-num sm">{fmtKg(Number(banh || 0) * pickFg.kg_per_banh)} kg</span></div>
+              {pickFg.material_code === 'DKL' && <label className="kmx-check-row" htmlFor="lot-metal3"><input id="lot-metal3" type="checkbox" checked={metal} onChange={(e) => setMetal(e.target.checked)} /><span><b>Đã xử lý kim loại</b></span></label>}
+              <input className="kmx-text" placeholder="Ghi chú (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Ghi chú" />
+            </section>
+          </>
+        )}
 
         {/* ── LOI / DKL từ sổ ca ── */}
         {(sourceType === 'loi' || sourceType === 'dkl') && mode === 'so_ca' && !pickLine && (
@@ -216,7 +262,7 @@ export default function KhoMixLotNew() {
         )}
 
         {/* ── Gõ tay ── */}
-        {(mode === 'tay' || sourceType === 'mua_ngoai' || sourceType === 'khac') && !pickLine && !pickQc && (
+        {(mode === 'tay' || sourceType === 'mua_ngoai' || sourceType === 'khac') && !pickLine && !pickQc && !pickFg && (
           <>
             <section className="kmx-card" aria-label="Mô tả" style={{ gap: 10 }}>
               <div className="kmx-col" style={{ gap: 4 }}>
@@ -267,7 +313,8 @@ export default function KhoMixLotNew() {
         )}
       </div></div>
       <div className="kmx-foot">
-        {pickLine ? <button type="button" className="kmx-btn" disabled={!kgOk || busy || (kgN! > pickLine.con_lai_kg + 0.01)} onClick={ghiTuSoCa}>{I.check}{busy ? 'Đang chuyển…' : `Chuyển vào kho chèn · ${fmtKg(kgN)} kg`}</button>
+        {pickFg ? <button type="button" className="kmx-btn" disabled={busy || !(Number(banh) > 0)} onClick={ghiTuFg}>{I.check}{busy ? 'Đang chuyển…' : `Chuyển ${banh || 0} bành vào kho chèn`}</button>
+          : pickLine ? <button type="button" className="kmx-btn" disabled={!kgOk || busy || (kgN! > pickLine.con_lai_kg + 0.01)} onClick={ghiTuSoCa}>{I.check}{busy ? 'Đang chuyển…' : `Chuyển vào kho chèn · ${fmtKg(kgN)} kg`}</button>
           : pickQc ? <button type="button" className="kmx-btn" disabled={!kgOk || busy} onClick={ghiTuQc}>{I.check}{busy ? 'Đang chuyển…' : `Chuyển vào kho chèn · ${fmtKg(kgN)} kg`}</button>
           : pickTp ? <button type="button" className="kmx-btn" disabled={!kgOk || busy || !shift} onClick={ghiHangChuan}>{I.check}{busy ? 'Đang chuyển…' : banhTp ? `Chuyển ${banhTp} bành sang kho chèn` : 'Chuyển sang kho chèn'}</button>
           : (mode === 'tay' || sourceType === 'mua_ngoai' || sourceType === 'khac') ? <button type="button" className="kmx-btn" disabled={!kgOk || busy} onClick={ghiTay}>{I.check}{busy ? 'Đang nhập…' : kgOk ? `Nhập kho chèn · ${fmtKg(kgN)} kg` : 'Nhập kho chèn'}</button>

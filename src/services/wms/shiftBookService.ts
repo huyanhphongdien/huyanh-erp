@@ -104,6 +104,8 @@ export interface ShiftBook {
   shiftStart?: string | null
   /** Lệnh sản xuất của ca (tùy chọn) — nối sổ ca ↔ lệnh SX ↔ lô NVL (audit C2) */
   productionOrderId: string | null
+  /** Mã nguyên liệu ca này chạy (GĐ6) */
+  rawLotId: string | null
   team: string | null
   shiftFrom: string | null
   shiftTo: string | null
@@ -128,6 +130,7 @@ export interface ShiftBookInput {
   reportDate: string
   shiftId: string
   productionOrderId?: string | null
+  rawLotId?: string | null
   team?: string | null
   shiftFrom?: string | null
   shiftTo?: string | null
@@ -398,7 +401,7 @@ export const shiftBookService = {
   async listReports(opts?: { facilityId?: string; limit?: number }): Promise<ShiftBook[]> {
     let q = supabase
       .from('shift_production_reports')
-      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, production_order_id, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, submitted_by, qc_confirmed_by, received_by, ca:shifts!shift_id(code, name, start_time), nguoi_giao:employees!submitted_by(full_name), nguoi_qc:employees!qc_confirmed_by(full_name), nguoi_nhan:employees!received_by(full_name), facility:facilities!facility_id(name)')
+      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, production_order_id, raw_lot_id, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, submitted_by, qc_confirmed_by, received_by, ca:shifts!shift_id(code, name, start_time), nguoi_giao:employees!submitted_by(full_name), nguoi_qc:employees!qc_confirmed_by(full_name), nguoi_nhan:employees!received_by(full_name), facility:facilities!facility_id(name)')
       // ⚠ ĐỪNG sắp xếp phụ theo `shift` hay `shift_id`. Cột `shift` đã ngừng ghi nên
       //   luôn NULL — ORDER BY trên nó không sắp gì cả mà cũng chẳng báo lỗi (đúng lỗi này
       //   đã lọt qua một lượt kiểm hôm 28/08); còn `shift_id` là uuid, thứ tự của nó
@@ -421,7 +424,7 @@ export const shiftBookService = {
   async getReport(id: string): Promise<{ report: ShiftBook; lines: ShiftLine[] }> {
     const { data: r, error: rErr } = await supabase
       .from('shift_production_reports')
-      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, production_order_id, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, submitted_by, qc_confirmed_by, received_by, ca:shifts!shift_id(code, name, start_time), nguoi_giao:employees!submitted_by(full_name), nguoi_qc:employees!qc_confirmed_by(full_name), nguoi_nhan:employees!received_by(full_name), facility:facilities!facility_id(name)')
+      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, production_order_id, raw_lot_id, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, submitted_by, qc_confirmed_by, received_by, ca:shifts!shift_id(code, name, start_time), nguoi_giao:employees!submitted_by(full_name), nguoi_qc:employees!qc_confirmed_by(full_name), nguoi_nhan:employees!received_by(full_name), facility:facilities!facility_id(name)')
       .eq('id', id)
       .single()
     if (rErr) throw rErr
@@ -441,7 +444,7 @@ export const shiftBookService = {
   async findReport(facilityId: string, reportDate: string, shiftId: string): Promise<ShiftBook | null> {
     const { data, error } = await supabase
       .from('shift_production_reports')
-      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, production_order_id, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, submitted_by, qc_confirmed_by, received_by, ca:shifts!shift_id(code, name, start_time), nguoi_giao:employees!submitted_by(full_name), nguoi_qc:employees!qc_confirmed_by(full_name), nguoi_nhan:employees!received_by(full_name)')
+      .select('id, facility_id, report_date, shift_id, team, shift_from, shift_to, headcount, incidents, handover_notes, production_order_id, raw_lot_id, status, is_opening, submitted_at, qc_confirmed_at, received_at, created_at, submitted_by, qc_confirmed_by, received_by, ca:shifts!shift_id(code, name, start_time), nguoi_giao:employees!submitted_by(full_name), nguoi_qc:employees!qc_confirmed_by(full_name), nguoi_nhan:employees!received_by(full_name)')
       .eq('facility_id', facilityId)
       .eq('report_date', reportDate)
       .eq('shift_id', shiftId)
@@ -459,6 +462,7 @@ export const shiftBookService = {
         report_date: input.reportDate,
         shift_id: input.shiftId,
         production_order_id: input.productionOrderId ?? null,
+        raw_lot_id: input.rawLotId ?? null,
         team: input.team ?? null,
         shift_from: input.shiftFrom ?? null,
         shift_to: input.shiftTo ?? null,
@@ -477,6 +481,7 @@ export const shiftBookService = {
     const body: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (patch.team !== undefined) body.team = patch.team
     if (patch.productionOrderId !== undefined) body.production_order_id = patch.productionOrderId
+    if (patch.rawLotId !== undefined) body.raw_lot_id = patch.rawLotId
     if (patch.shiftFrom !== undefined) body.shift_from = patch.shiftFrom
     if (patch.shiftTo !== undefined) body.shift_to = patch.shiftTo
     if (patch.headcount !== undefined) body.headcount = patch.headcount
@@ -639,6 +644,7 @@ function mapReport(r: Record<string, unknown>): ShiftBook {
     shiftName: ca?.name ?? null,
     shiftStart: ca?.start_time ?? null,
     productionOrderId: (r.production_order_id as string) ?? null,
+    rawLotId: (r.raw_lot_id as string) ?? null,
     team: (r.team as string) ?? null,
     shiftFrom: (r.shift_from as string) ?? null,
     shiftTo: (r.shift_to as string) ?? null,

@@ -16,6 +16,7 @@ import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_RUBBER_GROUP_LABELS, RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
 import { usePhoneRedirect } from '../../../hooks/useIsPhone'
+import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type RawLotBalance } from '../../../services/wms/rawLotService'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 
 const { Title, Text } = Typography
@@ -46,6 +47,8 @@ export default function RawOverviewPage() {
   const [batches, setBatches] = useState<RawBatchBalance[]>([])
   const [settings, setSettings] = useState<RawSettings>(RAW_SETTINGS_DEFAULT)
   const [stats, setStats] = useState<Awaited<ReturnType<typeof rawStockService.getOverviewStats>> | null>(null)
+  const [rawLots, setRawLots] = useState<RawLotBalance[]>([])
+  useEffect(() => { if (facilityId) rawLotService.list(facilityId, { onlyWithStock: true }).then(setRawLots).catch(() => setRawLots([])); else setRawLots([]) }, [facilityId])
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -155,6 +158,19 @@ export default function RawOverviewPage() {
 
         <Row gutter={[12, 12]}>
           <Col xs={24} xl={16}>
+            <Card size="small" title="Tồn theo mã nguyên liệu" extra={<Text type="secondary">đơn vị nhà máy chạy máy · {rawLots.length} mã còn hàng</Text>} style={{ marginBottom: 12 }}>
+              <Table<RawLotBalance> rowKey="raw_lot_id" size="small" pagination={{ pageSize: 8, showSizeChanger: false }} dataSource={rawLots} locale={{ emptyText: 'Chưa có mã nào còn hàng' }}
+                columns={[
+                  { title: 'Mã', dataIndex: 'ma', key: 'ma', render: (v) => <Text code strong>{v}</Text> },
+                  { title: 'Loại', dataIndex: 'rubber_type_name', key: 't' },
+                  { title: 'Xe', dataIndex: 'so_xe_con_hang', key: 'x', align: 'right' },
+                  { title: 'Ướt', dataIndex: 'wet_kg', key: 'w', align: 'right', render: (v: number) => v.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) },
+                  { title: 'Khô', dataIndex: 'dry_kg', key: 'd', align: 'right', render: (v: number) => <Text strong>{v.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}</Text> },
+                  { title: 'DRC', dataIndex: 'drc_pct', key: 'drc', align: 'right', render: (v) => (v === null ? '—' : `${v} %`) },
+                  { title: 'Tuổi', dataIndex: 'tuoi_ngay', key: 'age', align: 'right', render: (v) => (v === null ? '—' : `${v} ng`) },
+                  { title: 'Trạng thái', dataIndex: 'trang_thai', key: 's', render: (v: RawLotBalance['trang_thai']) => <Tag color={v === 'dang_chay' ? 'gold' : v === 'san_sang' ? 'green' : 'default'}>{RAW_LOT_TRANG_THAI_LABELS[v]}</Tag> },
+                ]} />
+            </Card>
             <Card size="small" title="Tồn kho theo loại hàng" extra={<Text type="secondary">chỉ lô còn hàng</Text>}>
               <Table<RawStockByType> rowKey={(r) => `${r.facility_id}|${r.rubber_type}`} columns={typeColumns} dataSource={byType} size="small" pagination={false} loading={loading}
                 locale={{ emptyText: <Empty description="Chưa có lô nào trong sổ kho khô" /> }}

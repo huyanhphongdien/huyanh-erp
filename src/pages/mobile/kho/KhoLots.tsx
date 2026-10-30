@@ -1,89 +1,136 @@
 // ============================================================================
-// KhoLots — tab "Lô NVL": tồn theo lô của nhà máy, tìm nhanh, chip đến hạn cân lại
+// KhoLots — tab "Lô NVL": tồn theo MÃ NGUYÊN LIỆU (GĐ6), chạm mã → thấy từng lô xe,
+// chạm xe → cân lại; nút "Xuất cả mã" đi sang màn xuất sản xuất theo mã.
 // File: src/pages/mobile/kho/KhoLots.tsx · Route: /m/kho
 // ============================================================================
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { rawStockService, type RawBatchBalance } from '../../../services/wms/rawStockService'
+import { rawLotService, RAW_LOT_TRANG_THAI_CHIP, RAW_LOT_TRANG_THAI_LABELS, type RawLotBalance } from '../../../services/wms/rawLotService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
-import { FacilitySelect, KhoAppBar, fmtKg, inp, useKhoFacility } from './khoCommon'
+import { FacilitySelect, KhoAppBar, Msg, fmtD, fmtKg, inp, useKhoFacility } from './khoCommon'
 
 export default function KhoLots() {
   const nav = useNavigate()
   const { facilities, facilityId, facility, setFacilityId } = useKhoFacility()
   const role = useRawRole(facilityId)
+  const [lots, setLots] = useState<RawLotBalance[]>([])
   const [rows, setRows] = useState<RawBatchBalance[]>([])
   const [settings, setSettings] = useState<RawSettings>(RAW_SETTINGS_DEFAULT)
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<'all' | 'due' | 'old'>('all')
+  const [filter, setFilter] = useState<'all' | 'due' | 'done'>('all')
+  const [open, setOpen] = useState<string | null>(null)
+  const [gan, setGan] = useState<string | null>(null)   // batch đang gán mã
   const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState<string | null>(null)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!facilityId) return
-    setLoading(true); setErr(null)
+    setLoading(true)
     try {
-      const [b, s] = await Promise.all([rawStockService.getBatches({ facilityId, limit: 500 }), rawSettingsService.getForFacility(facilityId)])
-      setRows(b); setSettings(s)
-    } catch (e: any) { setErr(e?.message || 'Không tải được lô') }
+      const [l, b, s] = await Promise.all([rawLotService.list(facilityId, { includeClosed: true }), rawStockService.getBatches({ facilityId, limit: 1000 }), rawSettingsService.getForFacility(facilityId)])
+      setLots(l); setRows(b); setSettings(s)
+    } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không tải được lô' }) }
     finally { setLoading(false) }
   }, [facilityId])
   useEffect(() => { load() }, [load])
 
   const due = (r: RawBatchBalance) => r.ngay_tu_lan_do >= settings.chu_ky_can_lai_ngay
-  const old = (r: RawBatchBalance) => r.tuoi_ngay > settings.tuoi_lo_canh_bao_ngay
+  const byLot = useMemo(() => {
+    const m = new Map<string, RawBatchBalance[]>()
+    for (const r of rows) { const k = (r as any).raw_lot_id || '__none__'; (m.get(k) ?? m.set(k, []).get(k)!).push(r) }
+    return m
+  }, [rows])
   const list = useMemo(() => {
     const s = q.trim().toUpperCase()
-    return rows
-      .filter((r) => !s || r.batch_no.toUpperCase().includes(s) || r.rubber_type_name.toUpperCase().includes(s) || (r.supplier_name || '').toUpperCase().includes(s))
-      .filter((r) => (filter === 'due' ? due(r) : filter === 'old' ? old(r) : true))
-      .sort((a, b) => b.tuoi_ngay - a.tuoi_ngay)
-  }, [rows, q, filter, settings]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const tongKho = rows.reduce((s, r) => s + r.dry_kg, 0)
-  const tongUot = rows.reduce((s, r) => s + r.wet_kg, 0)
+    return lots
+      .filter((l) => filter === 'done' ? l.trang_thai === 'da_chay_xong' || l.status !== 'mo' : l.dry_kg > 0.005)
+      .filter((l) => filter !== 'due' || (byLot.get(l.raw_lot_id) ?? []).some(due))
+      .filter((l) => !s || l.ma.includes(s) || l.rubber_type_name.toUpperCase().includes(s) || (byLot.get(l.raw_lot_id) ?? []).some((r) => r.batch_no.toUpperCase().includes(s)))
+  }, [lots, q, filter, byLot]) // eslint-disable-line react-hooks/exhaustive-deps
+  const chuaGan = byLot.get('__none__') ?? []
+  const tongKho = lots.reduce((s, l) => s + l.dry_kg, 0)
+  const tongUot = lots.reduce((s, l) => s + l.wet_kg, 0)
   const nDue = rows.filter(due).length
-  const nOld = rows.filter(old).length
+
+  async function ganMa(batch: RawBatchBalance, rawLotId: string) {
+    setBusy(batch.batch_id); setMsg(null)
+    try { await rawStockService.ganMa(batch.batch_id, rawLotId); setMsg({ ok: true, text: `✅ ${batch.batch_no} đã gán mã` }); setGan(null); await load() }
+    catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không gán được' }) }
+    finally { setBusy(null) }
+  }
+
+  const XeCard = ({ r }: { r: RawBatchBalance }) => (
+    <div className="ops-card press" style={{ padding: '9px 12px', boxShadow: 'none', border: '1px solid var(--line)' }} onClick={() => nav(`/m/kho/lo/${r.batch_id}`)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && nav(`/m/kho/lo/${r.batch_id}`)}>
+      <div className="ops-rw">
+        <div><div className="ops-mono" style={{ fontWeight: 700, fontSize: 13 }}>{(r as any).xe_no ? `Xe ${(r as any).xe_no} · ` : ''}{r.batch_no}</div><div className="ops-sm">{r.supplier_name || ''}{r.received_date ? ` · ${fmtD(r.received_date)}` : ''} · {r.tuoi_ngay} ng{due(r) ? ' · cân lại' : ''}</div></div>
+        <div style={{ textAlign: 'right' }}><div className="ops-mono" style={{ fontWeight: 700 }}>{fmtKg(r.dry_kg)} <span className="ops-sm">khô</span></div><div className="ops-sm ops-mono">{fmtKg(r.wet_kg)} ướt · {r.drc_pct ?? '—'} %</div></div>
+      </div>
+    </div>
+  )
 
   return (
     <>
-      <KhoAppBar title="Kho NVL mủ" sub={<span>{facility?.name || facility?.code || ''} · {role.isKeeper ? 'Thủ kho' : role.isQC ? 'QC' : role.isBGD ? 'BGĐ' : 'Xem'}</span>}
+      <KhoAppBar title="Kho NVL mủ · theo mã" sub={<span>{facility?.name || facility?.code || ''} · {role.isKeeper ? 'Thủ kho' : role.isQC ? 'QC' : role.isBGD ? 'BGĐ' : 'Xem'}</span>}
         right={<FacilitySelect value={facilityId} onChange={setFacilityId} facilities={facilities} />} />
       <div className="ops-body">
         <div className="ops-inner">
           <div className="ops-card tint">
             <div className="ops-rw">
               <div><div className="ops-lbl">Tồn khô</div><div className="ops-big">{fmtKg(tongKho)}<span className="ops-sm"> kg</span></div></div>
-              <div style={{ textAlign: 'right' }}><div className="ops-lbl">Ướt · lô</div><div className="ops-mid">{fmtKg(tongUot)} kg</div><div className="ops-sm">{rows.length} lô còn hàng</div></div>
+              <div style={{ textAlign: 'right' }}><div className="ops-lbl">Ướt · mã</div><div className="ops-mid">{fmtKg(tongUot)} kg</div><div className="ops-sm">{lots.filter((l) => l.dry_kg > 0.005).length} mã còn hàng · {rows.length} lô xe</div></div>
             </div>
           </div>
-          <input style={inp} placeholder="Tìm mã lô, loại mủ, nhà cung cấp…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm lô" />
+          <Msg m={msg} />
+          <input style={inp} placeholder="Tìm mã (TMHG-40), loại mủ, mã lô xe…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm" />
           <div style={{ display: 'flex', gap: 6 }}>
-            {([['all', `Tất cả ${rows.length}`], ['due', `Đến hạn cân lại ${nDue}`], ['old', `Quá tuổi ${nOld}`]] as const).map(([k, t]) => (
+            {([['all', 'Còn hàng'], ['due', `Có xe đến hạn cân lại · ${nDue}`], ['done', 'Đã chạy xong / đóng']] as const).map(([k, t]) => (
               <button key={k} className={`ops-chip ${filter === k ? 'lime' : 'mut'}`} style={{ border: 0, cursor: 'pointer', padding: '7px 11px', fontSize: 12 }} onClick={() => setFilter(k)}>{t}</button>
             ))}
           </div>
-          {err && <div className="ops-card" style={{ color: 'var(--red)', fontWeight: 700 }}>{err}</div>}
-          {loading && !rows.length && <><div className="ops-skel" /><div className="ops-skel" /><div className="ops-skel" /></>}
-          {!loading && !list.length && <div className="ops-empty"><div className="em">📦</div><div className="et">Không có lô</div><div className="ed">{rows.length ? 'Đổi bộ lọc hoặc từ khóa' : 'Kho chưa có lô nào còn hàng'}</div></div>}
-          {list.map((r) => (
-            <div key={r.batch_id} className={`ops-card press${due(r) ? '' : ''}`} onClick={() => nav(`/m/kho/lo/${r.batch_id}`)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && nav(`/m/kho/lo/${r.batch_id}`)}>
-              <div className="ops-rw">
-                <div className="ops-mono" style={{ fontWeight: 800, fontSize: 14.5 }}>{r.batch_no}</div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {r.ton_dau_uoc && <span className="ops-chip amb">tồn đầu ước</span>}
-                  {due(r) && <span className="ops-chip red">cân lại · {r.ngay_tu_lan_do} ng</span>}
-                  {old(r) && !due(r) && <span className="ops-chip amb">{r.tuoi_ngay} ngày</span>}
+          {loading && !lots.length && <><div className="ops-skel" /><div className="ops-skel" /></>}
+          {!loading && !list.length && <div className="ops-empty"><div className="em">📦</div><div className="et">Không có mã</div><div className="ed">{lots.length ? 'Đổi bộ lọc hoặc từ khóa' : 'Kho chưa có mã nguyên liệu nào — nhập từ phiếu cân ở tab Nhập'}</div></div>}
+
+          {list.map((l) => {
+            const xe = byLot.get(l.raw_lot_id) ?? []
+            const isOpen = open === l.raw_lot_id
+            return (
+              <div key={l.raw_lot_id} className="ops-card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="ops-rw" onClick={() => setOpen(isOpen ? null : l.raw_lot_id)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setOpen(isOpen ? null : l.raw_lot_id)} style={{ cursor: 'pointer' }}>
+                  <div><div className="ops-mono" style={{ fontWeight: 800, fontSize: 17 }}>{l.ma}</div><div className="ops-sm">{l.rubber_type_name || '—'} · {l.so_xe} xe{l.ngay_dau ? ` · về ${fmtD(l.ngay_dau)}${l.ngay_cuoi && l.ngay_cuoi !== l.ngay_dau ? `→${fmtD(l.ngay_cuoi)}` : ''}` : ''}{l.tuoi_ngay !== null ? ` · ${l.tuoi_ngay} ng` : ''}</div></div>
+                  <div style={{ textAlign: 'right' }}><div className="ops-mid ops-mono">{fmtKg(l.dry_kg)} <span className="ops-sm">kg khô</span></div><div className="ops-sm ops-mono">{fmtKg(l.wet_kg)} ướt · DRC {l.drc_pct ?? '—'} %</div></div>
                 </div>
+                <div className="ops-rw">
+                  <span className={`ops-chip ${RAW_LOT_TRANG_THAI_CHIP[l.trang_thai]}`}>{RAW_LOT_TRANG_THAI_LABELS[l.trang_thai]}{l.xuat_sx_kho_kg ? ` · đã xuất ${fmtKg(l.xuat_sx_kho_kg)} khô` : ''}</span>
+                  <span style={{ display: 'flex', gap: 6 }}>
+                    {l.dry_kg > 0.005 && <Link to={`/m/kho/xuat?lot=${l.raw_lot_id}`} className="ops-chip lime" style={{ textDecoration: 'none', padding: '7px 11px', fontSize: 12 }}>Xuất cả mã ›</Link>}
+                    <button type="button" className="ops-chip mut" style={{ border: 0, cursor: 'pointer', padding: '7px 11px', fontSize: 12 }} onClick={() => setOpen(isOpen ? null : l.raw_lot_id)}>{isOpen ? 'Thu gọn' : `${xe.length} xe ›`}</button>
+                  </span>
+                </div>
+                {isOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{xe.map((r) => <XeCard key={r.batch_id} r={r} />)}{!xe.length && <span className="ops-sm">Mã chưa có lô xe còn hàng</span>}</div>}
               </div>
-              <div className="ops-rw" style={{ marginTop: 4 }}>
-                <div><div style={{ fontWeight: 700, fontSize: 13.5 }}>{r.rubber_type_name}</div><div className="ops-sm">{r.supplier_name || r.nguon_hang || ''}{r.received_date ? ` · nhập ${new Date(r.received_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}` : ''} · {r.tuoi_ngay} ng</div></div>
-                <div style={{ textAlign: 'right' }}><div className="ops-mid ops-mono">{fmtKg(r.dry_kg)} <span className="ops-sm">kg khô</span></div><div className="ops-sm ops-mono">{fmtKg(r.wet_kg)} ướt · DRC {r.drc_pct ?? '—'} %</div></div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
+
+          {chuaGan.length > 0 && (
+            <>
+              <div className="ops-sh">Lô xe chưa gán mã · {chuaGan.length}</div>
+              {chuaGan.map((r) => (
+                <div key={r.batch_id} className="ops-card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <XeCard r={r} />
+                  {gan === r.batch_id ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {lots.filter((l) => l.status === 'mo').map((l) => <button key={l.raw_lot_id} type="button" className="ops-chip lime" style={{ border: 0, cursor: 'pointer', padding: '8px 11px', fontSize: 12.5 }} disabled={busy === r.batch_id} onClick={() => ganMa(r, l.raw_lot_id)}>{l.ma}</button>)}
+                      <button type="button" className="ops-chip mut" style={{ border: 0, cursor: 'pointer', padding: '8px 11px', fontSize: 12.5 }} onClick={() => setGan(null)}>Thôi</button>
+                    </div>
+                  ) : <button type="button" className="ops-btn o" style={{ padding: 9, fontSize: 13 }} disabled={!(role.isKeeper || role.isQC || role.isBGD)} onClick={() => setGan(r.batch_id)}>Gán mã nguyên liệu</button>}
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
     </>

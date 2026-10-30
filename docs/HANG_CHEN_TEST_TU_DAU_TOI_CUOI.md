@@ -161,6 +161,27 @@ SELECT fn_mix_don_anh_mo_coi();   -- 0 vì đã xóa hết ở trên
 | 12.10 | Máy tính → Lệnh sản xuất có dòng NVL từ lệnh xuất → **Bắt đầu sản xuất** | không còn báo "không đủ NVL"; lệnh sang Đang sản xuất |
 | 12.11 | Thử sửa tay một lô NVL ở trang vật tư cũ `/wms/vat-tu` (xuất kho / kiểm kho) | báo "Lô NVL chỉ sửa được qua sổ kho" |
 
+## 13. Mã nguyên liệu (GĐ6) và lô thành phẩm (GĐ7) — sau SQL `wms_nvl_p6_ma_nguyen_lieu.sql` rồi `wms_tp_p1_lo_thanh_pham.sql`
+
+| # | Việc | Kỳ vọng |
+|---|---|---|
+| 13.1 | Chạy p6 → đọc 5 dòng kiểm chứng đầu | `TMHG-40 / TMHG / 40 / 1`, `TMMN-25 / 25 / 08`, `LASI-31`, `TMHG-31` (bí danh), `SBR-1502`; `lo_xe_da_gan_ma` = số lô NVL cũ đã tự gán mã từ phiếu cân |
+| 13.2 | Điện thoại **Nhập** (/m/kho/nhap) | mỗi phiếu có ô "Mã nguyên liệu" xanh (đọc từ phiếu, ví dụ TMHG-40 · xe 1) hoặc đỏ "Chưa có mã · phải chọn" |
+| 13.3 | Phiếu không mã → **Chọn mã** → chạm mã đang mở, hoặc chọn nguồn TMHG + số 41 → **Dùng** | ô chuyển xanh, nút thành "Nhận vào mã TMHG-41"; bấm nhận → thông báo "Mã TMHG-41: nhập 1 lô xe, … kg khô" |
+| 13.4 | Thử bấm nhận khi chưa chọn mã | báo "chưa có mã nguyên liệu" và tự mở bảng chọn |
+| 13.5 | Tab **Lô NVL** | thẻ theo mã: TMHG-41 · loại · số xe · tồn ướt/khô · chip Sẵn sàng; chạm "n xe ›" thấy từng lô xe; chạm xe → cân lại như cũ; lô xe cũ không mã nằm mục "chưa gán mã" với nút gán |
+| 13.6 | Thẻ mã → **Xuất cả mã ›** → gõ tổng kg (hoặc "Lấy hết mã") → **Xuất mã … · ký giao** | thông báo mã, số xe, kg; bên dưới lệnh hiện "Bên giao đã ký · chờ QS" với nút QS xác nhận → Thủ kho nhận; máy tính /wms/nvl/xuat/:id thấy kg cân đã chia về từng xe |
+| 13.7 | Máy tính /wms/nvl/xuat/new | thẻ "Xuất cả một mã nguyên liệu" ở trên: chọn mã, tổng kg, "Tạo lệnh theo mã" |
+| 13.8 | Máy tính sổ ca ép bành | ô "Mã nguyên liệu đang chạy" bên cạnh lệnh SX |
+| 13.9 | Chạy tp_p1 → kiểm chứng cuối: bảng chủng loại với `weight_per_unit` | chủng loại nào trống cỡ bành thì BGĐ cập nhật danh mục, nếu không tổ ép không ghi lô được (báo THIEU_CO_BANH) |
+| 13.10 | Điện thoại **Thành phẩm** (/m/kho/tp) → **Thêm lô vừa ép xong** → chủng loại SVR10 STD → số lô S2401AB → 40 bành → ca tự nhận → tổ → mã NVL đang chạy → Nhập kho TP | thông báo "40 bành (1.400 kg) đã vào kho TP, phiếu ca đã cộng"; sổ ca (máy tính) ca đó có dòng SVR10 STD nhập 40 bành, note "Từ lô TP" |
+| 13.11 | Thêm lô thứ hai cùng chủng loại | ô số lô tự gợi ý S2402AB |
+| 13.12 | Chạm lô → **Ghi kết quả** QC: Chờ xử lý, Po 26–28, lý do "Po thấp" → Lưu | chip đổi "Chờ xử lý"; máy tính Sổ hàng không đạt có dòng mới với mã NVL tự điền |
+| 13.13 | Cùng lô → **Chuyển 40 bành vào kho chèn** | kho chèn có lô CH-… nguồn hàng lỗi, mô tả "Lô TP S2401AB"; lô TP còn 0, trạng thái hết; sổ QC cột xử lý ghi "Đã chuyển kho chèn" |
+| 13.14 | Hàng chèn → Nhập lô chèn → Hàng lỗi → tab **Lô TP lỗi** | liệt kê lô CXL/Loại còn tồn, chạm → số bành → chuyển |
+| 13.15 | Lô đạt → **Xuất 10 bành** (thủ kho) | lô còn 30; tab Thành phẩm phần "đạt · chờ xuất" giảm 10 |
+| 13.16 | Mục "Tồn theo chủng loại (theo lô)" | đạt / chưa kiểm / lỗi đúng bằng các lô vừa làm; SQL `SELECT * FROM v_fg_doi_chieu_so_ca` so lệch với sổ ca (lệch do sổ ca xuất bành chưa gắn lô — chấp nhận trong giai đoạn song song) |
+
 ## Lỗi hay gặp
 
 | Màn hình báo | Nguyên nhân | Làm gì |

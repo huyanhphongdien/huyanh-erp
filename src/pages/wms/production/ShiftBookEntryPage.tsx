@@ -22,6 +22,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { rawIssueService, type ProductionOrderLite } from '../../../services/wms/rawIssueService'
+import { rawLotService, type RawLotBalance } from '../../../services/wms/rawLotService'
 import {
   Card, Table, Button, Space, Typography, Row, Col, Select, DatePicker,
   Input, InputNumber, Tag, Spin, Alert, Switch, Tooltip, Modal, message,
@@ -104,6 +105,10 @@ export default function ShiftBookEntryPage() {
   const [poId, setPoId] = useState<string | undefined>(undefined)
   const [pos, setPos] = useState<ProductionOrderLite[]>([])
   useEffect(() => { rawIssueService.listProductionOrders().then(setPos).catch(() => setPos([])) }, [])
+  // GĐ6: mã nguyên liệu ca này chạy
+  const [rawLotId, setRawLotId] = useState<string | undefined>(undefined)
+  const [rawLots, setRawLots] = useState<RawLotBalance[]>([])
+  useEffect(() => { if (facilityId) rawLotService.list(facilityId, { includeClosed: true }).then(setRawLots).catch(() => setRawLots([])) }, [facilityId])
   const [soNguoi, setSoNguoi] = useState<number | null>(null)
   const [suCo, setSuCo] = useState<string>('')
 
@@ -156,6 +161,7 @@ export default function ShiftBookEntryPage() {
         setNgay(dayjs(r.reportDate))
         setShiftId(r.shiftId)
         setPoId(r.productionOrderId ?? undefined)
+        setRawLotId(r.rawLotId ?? undefined)
         setSoNguoi(r.headcount)
         setSuCo(r.incidents ?? '')
         const map: Record<string, OWork> = {}
@@ -313,13 +319,14 @@ export default function ShiftBookEntryPage() {
           headcount: soNguoi,
           incidents: suCo || null,
           productionOrderId: poId ?? null,
+          rawLotId: rawLotId ?? null,
         })
         setReport(moi)
         rid = moi.id
         navigate(`/wms/production/shift-book/${moi.id}`, { replace: true })
       } else {
         await shiftBookService.updateReport(rid, {
-          headcount: soNguoi, incidents: suCo || null, productionOrderId: poId ?? null,
+          headcount: soNguoi, incidents: suCo || null, productionOrderId: poId ?? null, rawLotId: rawLotId ?? null,
         })
       }
 
@@ -545,6 +552,14 @@ export default function ShiftBookEntryPage() {
             <InputNumber
               min={0} value={soNguoi} onChange={(v) => { setSoNguoi(v === null ? null : Number(v)); setDirty(true) }}
               disabled={daKhoa} style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} md={5}>
+            <Text type="secondary" style={{ fontSize: 12 }}>Mã nguyên liệu đang chạy</Text>
+            <Select
+              value={rawLotId} onChange={(v) => { setRawLotId(v); setDirty(true) }} disabled={daKhoa} allowClear showSearch optionFilterProp="label"
+              placeholder="TMHG-40…" style={{ width: '100%' }}
+              options={rawLots.filter((l) => l.trang_thai !== 'huy').map((l) => ({ value: l.raw_lot_id, label: `${l.ma} · ${l.rubber_type_name}${l.trang_thai === 'dang_chay' ? ' · đang chạy' : l.trang_thai === 'da_chay_xong' ? ' · đã chạy xong' : ''}` }))}
             />
           </Col>
           <Col xs={24} md={5}>

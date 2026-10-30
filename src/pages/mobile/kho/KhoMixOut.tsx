@@ -134,6 +134,7 @@ export default function KhoMixOut() {
   const doiMode = (m: 'pallet' | 'kg') => { setMode(m); try { localStorage.setItem('kmx_can_mode', m) } catch { /* bỏ qua */ } }
   const doiViTri = (v: MixViTri) => { setViTri(v); try { localStorage.setItem('kmx_vi_tri', v) } catch { /* bỏ qua */ } }
   const kgOk = kgN !== null && Number.isFinite(kgN) && kgN > 0
+  const thieuLenh = lenhs.length > 1 && maChon.length === 0   // ≥ 2 lệnh song song: phải chạm lệnh pallet này chèn vào
   // phương án B: chỉ chặn vượt tồn với hàng lấy từ lô TP (tồn thật); SBR / số lô gõ tay lấy quá tồn → máy ghi nhập thêm, chỉ báo
   const fgCua = lot?.source_ref_type === 'fg_lot' ? fgLots.find((g) => g.id === lot.source_ref_id) ?? null : null
   const fgConKg = fgCua ? Math.max(fgCua.ton_banh, 0) * (fgCua.kg_per_banh || 35) : 0
@@ -435,7 +436,7 @@ export default function KhoMixOut() {
           </section>
         </div></div>
         <div className="kmx-foot">
-          <button type="button" className="kmx-btn" disabled={!kgOk || qua || missing.length > 0 || !viTri || !soLoOk} onClick={() => { setMsg(null); setStep(3) }}>{!soLoOk ? 'Gõ số lô của lô chèn' : viTri ? 'Tiếp tục' : 'Chọn chèn bể Slap hay máy Mix'}{I.next}</button>
+          <button type="button" className="kmx-btn" disabled={!kgOk || qua || missing.length > 0 || !viTri || !soLoOk || thieuLenh} onClick={() => { setMsg(null); setStep(3) }}>{!soLoOk ? 'Gõ số lô của lô chèn' : !viTri ? 'Chọn chèn bể Slap, máy Mix hay băng tải' : thieuLenh ? 'Chạm lệnh pallet này chèn vào' : 'Tiếp tục'}{I.next}</button>
         </div>
       </div>
     )

@@ -107,7 +107,7 @@ export default function KhoMix() {
     setBusyMa('lenh'); setMsgMa(null); setHoiThay(null)
     try {
       const r = await rawLotService.batDauLenh(ids, { thayThe: opts?.thayThe ?? true, gopVao: opts?.gopVao ?? null })
-      setMsgMa(r.da_chay ? `${r.ma_gop} đã đang chạy rồi (${r.code})` : r.gop ? `Đã gộp vào ${r.code}: ${r.ma_gop}` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng lệnh ${r.code} (${r.ma_gop})` : `Đã bắt đầu lệnh ${r.code}: ${r.ma_gop}`)
+      setMsgMa(r.da_chay ? `${r.ma_gop} đã đang chạy rồi (${r.code})` : r.gop ? `Đã gộp vào ${r.code}: ${r.ma_gop}` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng lệnh ${r.code} (${r.ma_gop})` : `Đã bắt đầu lệnh ${r.code}: ${r.ma_gop}${r.da_gan ? ` · đã gắn ${r.da_gan} lần chèn lấy trước đó` : ''}`)
       setChonMa(false); setChonIds([]); await load()
     } catch (e: any) { setMsgMa(e?.message || 'Không khai được (cần chạy SQL p13)') }
     finally { setBusyMa(null) }
@@ -122,6 +122,17 @@ export default function KhoMix() {
     try { const r = await guiMailKetThuc({ lenhId: g.id }); q += r.to.length ? `&mail=${r.ok.length}&loi=${r.loi.length}` : '&mail=none' }
     catch { q += '&mail=err' }
     nav(`/m/kho/chen/lenh/${g.id}/tong-ket?${q}`)
+  }
+  // phiếu lấy trước khi khai lệnh (nhóm "chưa gắn mã") → gắn cả nhóm vào một lệnh đang chạy
+  async function ganLenh(idx: number[], g: LenhChay) {
+    if (!cur) return
+    setBusyMa('gan'); setMsgMa(null)
+    try {
+      let n = 0
+      for (const k of idx) { const i = cur.items[k]; if (!i || i.status === 'received' || i.status === 'cancelled') continue; await mixService.doiMaGoc(i.id, g.raw_lot_ids); n++ }
+      setMsgMa(`Đã gắn ${n} lần chèn vào ${g.ma_gop}`); await load()
+    } catch (e: any) { setMsgMa(e?.message || 'Không gắn được (cần SQL p18)') }
+    finally { setBusyMa(null) }
   }
   // gom các lần của ca theo MÃ GỐC đang chạy (số L vẫn đếm theo ca)
   const nhomMa = useMemo(() => {
@@ -223,6 +234,7 @@ export default function KhoMix() {
                       </span>
                       <span className="kmx-chip blue" style={{ flex: '0 0 auto' }}>{g.idx.length} lần · {kg1(g.kg)} kg{g.banh ? ` · ${g.banh} b` : ''}</span>
                     </div>
+                    {!g.ma && canTake && lenhs.length > 0 && <div className="kmx-row" style={{ gap: 6, flexWrap: 'wrap' }}>{lenhs.map((l) => <button key={l.id} type="button" className="kmx-pill sm" disabled={busyMa === 'gan'} onClick={() => ganLenh(g.idx, l)}>{busyMa === 'gan' ? '…' : `Gắn ${g.idx.length} lần vào ${l.ma_gop}`}</button>)}</div>}
                     <div className="kmx-list">
                       {g.idx.map((k) => {
                         const i = cur.items[k]

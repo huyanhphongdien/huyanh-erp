@@ -184,11 +184,11 @@ export const rawLotService = {
   },
   async lenhDangChay(facilityId: string): Promise<LenhChay[]> { return this.lenh(facilityId) },
   /** Bắt đầu lệnh 1..n mã: thayThe (mặc định) kết thúc lệnh cũ · thayThe=false chạy song song · gopVao = gộp thêm mã vào lệnh đang chạy */
-  async batDauLenh(rawLotIds: string[], opts: { thayThe?: boolean; gopVao?: string | null; note?: string | null } = {}): Promise<{ lenh_id: string; code: string; ma_gop: string; da_chay: boolean; gop: boolean; da_thay: string[] }> {
+  async batDauLenh(rawLotIds: string[], opts: { thayThe?: boolean; gopVao?: string | null; note?: string | null } = {}): Promise<{ lenh_id: string; code: string; ma_gop: string; da_chay: boolean; gop: boolean; da_thay: string[]; da_gan: number }> {
     const { data, error } = await supabase.rpc('fn_nvl_bat_dau_lenh', { p_raw_lot_ids: rawLotIds, p_thay_the: opts.thayThe ?? true, p_gop_vao: opts.gopVao ?? null, p_note: opts.note ?? null })
     if (error) throw new Error(dichLoiNhapKho(error))
     const d: any = data ?? {}
-    return { lenh_id: String(d.lenh_id ?? ''), code: String(d.code ?? ''), ma_gop: String(d.ma_gop ?? ''), da_chay: !!d.da_chay, gop: !!d.gop, da_thay: Array.isArray(d.da_thay) ? d.da_thay.map(String) : [] }
+    return { lenh_id: String(d.lenh_id ?? ''), code: String(d.code ?? ''), ma_gop: String(d.ma_gop ?? ''), da_chay: !!d.da_chay, gop: !!d.gop, da_thay: Array.isArray(d.da_thay) ? d.da_thay.map(String) : [], da_gan: Number(d.da_gan ?? 0) }
   },
   async ketThucLenh(lenhId: string, note?: string | null): Promise<{ code: string; ma_gop: string }> {
     const { data, error } = await supabase.rpc('fn_nvl_ket_thuc_lenh', { p_lenh_id: lenhId, p_note: note ?? null })

@@ -38,6 +38,9 @@ export default function MixIssueDetailPage() {
   const [retTeam, setRetTeam] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
+  // sửa cân lúc lấy
+  const [suaOpen, setSuaOpen] = useState(false)
+  const [sg, setSg] = useState<number | null>(null); const [spk, setSpk] = useState<number | null>(15); const [sk, setSk] = useState<number | null>(null); const [sb, setSb] = useState<number | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const mixRole = useMixRole(issue?.facility_id ?? null)
 
@@ -147,6 +150,12 @@ export default function MixIssueDetailPage() {
                   <Text strong style={{ fontSize: 18 }}>{fmtKg(issue.kg_used)} kg</Text>
                   {issue.kg_used !== null && <Text type="secondary"> = lấy {fmtKg(issue.kg_out)} − trả {fmtKg(issue.kg_return)}</Text>}
                 </Descriptions.Item>
+                {(['issued', 'returned'].includes(st) || issue.out_edit_at) && (
+                  <Descriptions.Item label="Sửa cân lấy">
+                    {['issued', 'returned'].includes(st) && mixRole.khaiBao && <Button size="small" onClick={() => { setSg(issue.gross_kg); setSpk(issue.pallet_kg ?? 15); setSk(issue.gross_kg === null ? issue.kg_out : null); setSb(issue.so_banh); setSuaOpen(true) }}>Sửa cân lúc lấy</Button>}
+                    {issue.out_edit_at && <Text type="warning"> Đã sửa từ {fmtKg(issue.out_kg_truoc, 1)} kg · {issue.out_edit_name || ''} · {fmtDt(issue.out_edit_at)}</Text>}
+                  </Descriptions.Item>
+                )}
                 <Descriptions.Item label="Ghi chú">{issue.note || '—'}</Descriptions.Item>
                 {issue.cancel_reason && <Descriptions.Item label="Lý do hủy"><Text type="danger">{issue.cancel_reason}</Text></Descriptions.Item>}
               </Descriptions>
@@ -208,6 +217,16 @@ export default function MixIssueDetailPage() {
         <Modal open={cancelOpen} title={`Hủy phiếu ${issue.code}`} onCancel={() => setCancelOpen(false)} onOk={huy} okText="Hủy phiếu" okButtonProps={{ danger: true }} cancelText="Không">
           <Text>Kg đã lấy sẽ trả lại tồn kho chèn. Ghi lý do:</Text>
           <Input.TextArea rows={2} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} style={{ marginTop: 8 }} />
+        </Modal>
+        <Modal open={suaOpen} title={`Sửa cân lúc lấy · ${issue.code}`} onCancel={() => setSuaOpen(false)} okText="Lưu cân mới" cancelText="Thôi" confirmLoading={busy === 'sualay'}
+          onOk={async () => { const kgNet = sg !== null ? Math.round((sg - (spk ?? 0)) * 100) / 100 : sk; if (!kgNet || kgNet <= 0) { message.warning('Nhập hàng + pallet hoặc kg'); return } await run('sualay', () => mixService.suaLay(issue.id, { kg: sg !== null ? null : sk, grossKg: sg, palletKg: sg !== null ? spk : null, soBanh: sb }), 'Đã sửa cân lúc lấy'); setSuaOpen(false) }}>
+          <Row gutter={[12, 10]}>
+            <Col span={8}><Text>Hàng + pallet (kg)</Text><InputNumber style={{ width: '100%' }} min={0} value={sg} onChange={(v) => { setSg(v === null || v === undefined ? null : Number(v)); setSb(null) }} /></Col>
+            <Col span={8}><Text>Bì pallet (kg)</Text><InputNumber style={{ width: '100%' }} min={0} value={spk} onChange={(v) => { setSpk(v === null || v === undefined ? null : Number(v)); setSb(null) }} /></Col>
+            <Col span={8}><Text>Kg lấy {sg !== null ? '(tự tính)' : '*'}</Text><InputNumber style={{ width: '100%' }} min={0} value={sg !== null ? Math.round((sg - (spk ?? 0)) * 100) / 100 : sk} disabled={sg !== null} onChange={(v) => setSk(v === null || v === undefined ? null : Number(v))} /></Col>
+            <Col span={8}><Text>Số bành <Text type="secondary">(tự tính)</Text></Text><InputNumber style={{ width: '100%' }} min={0} value={sb ?? (() => { const k = sg !== null ? sg - (spk ?? 0) : sk; return k && k > 0 ? Math.max(Math.round(k / (issue.lot_kg_per_banh || 35)), 1) : null })()} onChange={(v) => setSb(v === null || v === undefined ? null : Number(v))} /></Col>
+            <Col span={16}><Text type="secondary">Đang ghi {fmtKg(issue.kg_out, 1)} kg{issue.kg_return !== null ? ` · đã trả ${fmtKg(issue.kg_return, 1)} kg (kg lấy mới không được nhỏ hơn)` : ''}. Chỉ sửa được trước bước QS ký.</Text></Col>
+          </Row>
         </Modal>
       </Space>
     </div>

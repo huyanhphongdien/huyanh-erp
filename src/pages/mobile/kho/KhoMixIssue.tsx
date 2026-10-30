@@ -51,6 +51,10 @@ export default function KhoMixIssue() {
   const [justDone, setJustDone] = useState<{ kgUsed: number; signed: boolean } | null>(null)
   const [editRet, setEditRet] = useState(false)
   const [cancelAsk, setCancelAsk] = useState(false)
+  // sửa cân lúc lấy (trước bước QS ký)
+  const [editLay, setEditLay] = useState(false)
+  const [lMode, setLMode] = useState<'pallet' | 'kg'>('pallet')
+  const [lGross, setLGross] = useState(''); const [lPallet, setLPallet] = useState('15'); const [lKg, setLKg] = useState(''); const [lBanh, setLBanh] = useState('')
   const [cancelReason, setCancelReason] = useState('')
   // C4: phiếu bàn giao chưa có ca → bắt chọn ca + tổ trước khi trả
   const user = useAuthStore((s) => s.user)
@@ -105,6 +109,17 @@ export default function KhoMixIssue() {
   const retSoBanhAuto = i && kgRetN !== null && Number.isFinite(kgRetN) && kgRetN >= 0 ? Math.round(kgRetN / (i.lot_kg_per_banh || 35)) : null
   const retSoBanhN = retSoBanh === '' ? retSoBanhAuto : Math.round(Number(retSoBanh))
   const chinhBanhTra = (d: number) => setRetSoBanh(String(Math.max((retSoBanhN ?? 0) + d, 0)))
+  const lGrossN = lGross === '' ? null : Number(lGross)
+  const lPalletN = lPallet === '' ? 0 : Number(lPallet)
+  const lKgN = lMode === 'pallet' ? (lGrossN !== null && Number.isFinite(lGrossN) ? Math.round((lGrossN - lPalletN) * 100) / 100 : null) : lKg === '' ? null : Number(lKg)
+  const lKgOk = lKgN !== null && Number.isFinite(lKgN) && lKgN > 0
+  const lBanhAuto = i && lKgOk ? Math.max(Math.round(lKgN! / (i.lot_kg_per_banh || 35)), 1) : null
+  const lBanhN = lBanh === '' ? lBanhAuto : Math.round(Number(lBanh))
+  const moSuaLay = () => {
+    if (!i) return
+    if (i.gross_kg !== null) { setLMode('pallet'); setLGross(String(i.gross_kg)); setLPallet(String(i.pallet_kg ?? 0)) } else { setLMode('kg'); setLKg(String(i.kg_out)) }
+    setLBanh(''); setEditLay(true)
+  }
   const kgRetOk = !!i && kgRetN !== null && Number.isFinite(kgRetN) && kgRetN >= 0 && kgRetN <= i.kg_out + 0.01
 
   async function traVaKy() {
@@ -127,6 +142,50 @@ export default function KhoMixIssue() {
     if (maList === null) {
       try { setMaList((await rawLotService.maDangChay(i.facility_id)).slice(0, 12)) } catch { setMaList([]) }
     }
+  }
+
+  async function luuSuaLay() {
+    if (!i || !lKgOk) return
+    const r = await run('sualay', () => mixService.suaLay(i.id, { kg: lMode === 'kg' ? lKgN : null, grossKg: lMode === 'pallet' ? lGrossN : null, palletKg: lMode === 'pallet' ? lPalletN : null, soBanh: lBanhN }), '')
+    if (r) { setMsg({ ok: true, text: `Đã sửa cân lấy: ${kgTxt(r.kg_truoc)} → ${kgTxt(r.kg_sau)} kg · ${r.so_banh} bành` }); setEditLay(false) }
+  }
+  // thẻ sửa cân lúc lấy: hiện khi phiếu chưa qua QS ký và người dùng được khai báo
+  const suaLayBox = () => {
+    if (!i || !['issued', 'returned'].includes(i.status) || !role.khaiBao) return null
+    if (!editLay) return <button type="button" className="kmx-btn ghost" style={{ color: '#1B4D3E', fontSize: 13 }} onClick={moSuaLay}>Gõ nhầm cân lúc lấy? Sửa cân lúc lấy</button>
+    return (
+      <section className="kmx-card" aria-label="Sửa cân lúc lấy" style={{ gap: 10, borderColor: '#1B4D3E' }}>
+        <div className="kmx-row">
+          <span className="kmx-strong" style={{ fontSize: 13 }}>Sửa cân lúc lấy · đang ghi {kgTxt(i.kg_out)} kg</span>
+          <button type="button" className="kmx-pill sm" onClick={() => setLMode(lMode === 'pallet' ? 'kg' : 'pallet')}>{lMode === 'pallet' ? 'Gõ thẳng kg' : 'Cân cả pallet'}</button>
+        </div>
+        {lMode === 'pallet' ? (
+          <>
+            <div className="kmx-grid2">
+              <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Hàng + pallet (kg)</span><input className="kmx-text kmx-mono" style={{ fontWeight: 700, fontSize: 17 }} type="number" inputMode="decimal" value={lGross} onChange={(e) => { setLGross(e.target.value); setLBanh('') }} aria-label="Hàng + pallet" /></label>
+              <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Bì pallet (kg)</span><input className="kmx-text" type="number" inputMode="decimal" value={lPallet} onChange={(e) => { setLPallet(e.target.value); setLBanh('') }} aria-label="Bì pallet" /></label>
+            </div>
+            <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>Hàng chèn = {lGross || '0'} − bì {lPallet || '0'}</span><span className="kmx-num sm">{lKgN === null ? '—' : `${kgTxt(lKgN)} kg`}</span></div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" type="number" inputMode="decimal" value={lKg} onChange={(e) => { setLKg(e.target.value); setLBanh('') }} aria-label="Kg lấy" /><span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span></div>
+        )}
+        <div className="kmx-row" style={{ alignItems: 'center' }}>
+          <span className="kmx-col"><span className="kmx-lbl">Số bành</span><span className="kmx-sm">tự tính {i.lot_kg_per_banh} kg/bành</span></span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type="button" className="kmx-pill sm" style={{ width: 44, padding: 0, fontSize: 20 }} aria-label="Bớt 1 bành" disabled={lBanhN === null || lBanhN <= 0} onClick={() => setLBanh(String(Math.max((lBanhN ?? 0) - 1, 0)))}>−</button>
+            <span className="kmx-num md" style={{ minWidth: 40, textAlign: 'center' }}>{lBanhN ?? '—'}</span>
+            <button type="button" className="kmx-pill sm" style={{ width: 44, padding: 0, fontSize: 20 }} aria-label="Thêm 1 bành" disabled={lBanhN === null} onClick={() => setLBanh(String((lBanhN ?? 0) + 1))}>+</button>
+          </div>
+        </div>
+        {i.kg_return !== null && lKgOk && lKgN! < i.kg_return && <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Kg lấy mới nhỏ hơn kg đã trả ({kgTxt(i.kg_return)}), sửa kg trả trước.</span>}
+        <div className="kmx-grid2">
+          <button type="button" className="kmx-btn sec" style={{ background: '#1B4D3E', color: '#fff' }} disabled={!lKgOk || busy === 'sualay'} onClick={luuSuaLay}>{busy === 'sualay' ? 'Đang lưu…' : 'Lưu cân mới'}</button>
+          <button type="button" className="kmx-btn sec" onClick={() => setEditLay(false)}>Thôi</button>
+        </div>
+        <span className="kmx-sm">Máy ghi lại ai sửa, lúc nào và số trước khi sửa. Tồn ở dây chuyền và tiêu hao tính lại theo số mới.</span>
+      </section>
+    )
   }
 
   async function ky(buoc: 'submit' | 'qc_confirm' | 'receive') {
@@ -193,6 +252,7 @@ export default function KhoMixIssue() {
             <span className="kmx-col"><span className="kmx-lbl">Đã lấy đầu ca</span><span className="kmx-md">{hm(i.out_at)} · lô {i.lot_so_lo || i.lot_code}{i.vi_tri ? ` · ${MIX_VI_TRI_LABELS[i.vi_tri].toLowerCase()}` : ''}{i.so_banh !== null ? ` · ${i.so_banh} bành` : ''}{i.ma_goc_all ? ` · vào mã ${i.ma_goc_all}` : ''} · {pOut.length} ảnh</span></span>
             <span className="kmx-num md" style={{ whiteSpace: 'nowrap' }}>{fmtKg(i.kg_out)} <span className="kmx-sm">kg</span></span>
           </div>
+          {suaLayBox()}
           {missOut.length > 0 && (
             <section className="kmx-card" style={{ borderColor: '#FECACA' }}>
               <div className="kmx-note red" style={{ padding: 0, background: 'transparent' }}>{I.info}<span>Lúc lấy còn thiếu {missOut.length} ảnh bắt buộc. Chụp bổ sung ở đây rồi mới ký được.</span></div>
@@ -323,8 +383,10 @@ export default function KhoMixIssue() {
               <button type="button" className="kmx-btn sec" style={{ background: '#1B4D3E', color: '#fff' }} disabled={busy === 'ma'} onClick={async () => { await run('ma', () => mixService.doiMaGoc(i.id, maChon, viTriChon), maChon.length ? 'Đã đổi mã gốc' : 'Đã bỏ mã gốc, máy sẽ lấy theo phiếu ca'); setDoiMa(false) }}>Lưu</button>
             </div>
           )}
+          {i.out_edit_at && <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Đã sửa cân lúc lấy: {kgTxt(i.out_kg_truoc)} → {kgTxt(i.kg_out)} kg · {i.out_edit_name || ''} · {fmtDt(i.out_edit_at)}</span>}
           {i.note && <span className="kmx-sm">Ghi chú: {i.note}</span>}
         </section>
+        {suaLayBox()}
 
         <section className="kmx-card" aria-label="Dòng thời gian" style={{ gap: 0 }}>
           <div className="kmx-tl"><span className="kmx-tl-dot done">{I.checkSm}</span><div className="kmx-tl-body">

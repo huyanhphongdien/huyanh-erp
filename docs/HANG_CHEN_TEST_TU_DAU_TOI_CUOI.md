@@ -250,6 +250,16 @@ Quy trình chốt 30/10: **Bước 1 QS khai báo** (nhập lô chèn, lấy đ�
 | 18.3 | Mở phiếu | tiêu đề "Trả lần 2" / "Lần 2 · PC-… · ca" |
 | 18.4 | Kho chèn trên trang chính | mỗi lô hiện số lô to, mã CH nhỏ, "kg · N b" |
 
+## 19. Sửa cân lúc lấy (sau SQL `wms_mix_p8_sua_can_lay.sql`, chạy SAU p7, 30/10)
+
+| # | Việc | Kỳ vọng |
+|---|---|---|
+| 19.1 | Chạy SQL → kiểm chứng | `f_sua_lay` khác null, `cot_moi_phai_la_3` = 3 |
+| 19.2 | Mở phiếu đang ở dây chuyền (hoặc đã trả, chưa ký) → nút "Gõ nhầm cân lúc lấy? Sửa cân lúc lấy" | thẻ sửa: hàng + pallet, bì (hoặc gõ thẳng kg), số bành tự tính với − +; Lưu → thông báo "Đã sửa cân lấy: 114 → 176,5 kg · 5 bành"; trang chính dòng L? đổi số; kho chèn "ở dây chuyền" đổi theo |
+| 19.3 | Phiếu đã trả 50 kg, sửa kg lấy xuống 40 | báo "Kg lấy mới nhỏ hơn kg đã trả", nút mờ; DB cũng chặn (TRA_QUA_LAY) |
+| 19.4 | Phiếu đã QS ký | không còn nút sửa; DB báo SAI_TRANG_THAI nếu gọi tay |
+| 19.5 | Sau khi sửa | phần Số liệu có dòng cam "Đã sửa cân lúc lấy: cũ → mới · ai · lúc nào"; máy tính Descriptions cũng hiện |
+
 ## Lỗi hay gặp
 
 | Màn hình báo | Nguyên nhân | Làm gì |

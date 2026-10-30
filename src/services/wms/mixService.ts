@@ -102,6 +102,10 @@ export interface MixIssue {
   so_banh_tra: number | null
   return_gross_kg: number | null
   return_pallet_kg: number | null
+  out_edit_at: string | null
+  out_edit_by: string | null
+  out_edit_name: string | null
+  out_kg_truoc: number | null
   production_order_id: string | null
   production_code: string | null
   output_batch_id: string | null
@@ -188,7 +192,7 @@ const normIssue = (r: any): MixIssue => ({
   kg_out: num(r.kg_out), kg_return: numOrNull(r.kg_return), kg_used: numOrNull(r.kg_used), handover_to_next: !!r.handover_to_next,
   so_anh_lay: num(r.so_anh_lay), so_anh_tra: num(r.so_anh_tra), lot_kg_per_banh: num(r.lot_kg_per_banh) || 35,
   so_banh: numOrNull(r.so_banh), gross_kg: numOrNull(r.gross_kg), pallet_kg: numOrNull(r.pallet_kg),
-  so_banh_tra: numOrNull(r.so_banh_tra), return_gross_kg: numOrNull(r.return_gross_kg), return_pallet_kg: numOrNull(r.return_pallet_kg),
+  so_banh_tra: numOrNull(r.so_banh_tra), return_gross_kg: numOrNull(r.return_gross_kg), return_pallet_kg: numOrNull(r.return_pallet_kg), out_kg_truoc: numOrNull(r.out_kg_truoc),
   raw_lot_ids: Array.isArray(r.raw_lot_ids) ? r.raw_lot_ids : null, ma_goc: r.ma_goc ?? null, ma_goc_all: r.ma_goc_all ?? null,
 })
 
@@ -296,6 +300,14 @@ export const mixService = {
     })
     if (error) throw new Error(dichLoiNhapKho(error))
     return { kg_used: num((data as any)?.kg_used) }
+  },
+
+  /** Sửa cân lúc lấy (bì, hàng + pallet hoặc kg, số bành) khi phiếu chưa qua bước QS ký; máy tính lại kg lấy, dây chuyền, tiêu hao */
+  async suaLay(issueId: string, input: { kg?: number | null; grossKg?: number | null; palletKg?: number | null; soBanh?: number | null; note?: string | null }): Promise<{ code: string; kg_truoc: number; kg_sau: number; so_banh: number }> {
+    const { data, error } = await supabase.rpc('fn_mix_sua_lay', { p_issue_id: issueId, p_kg: input.kg ?? null, p_gross_kg: input.grossKg ?? null, p_pallet_kg: input.palletKg ?? null, p_so_banh: input.soBanh ?? null, p_note: input.note ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    const d: any = data ?? {}
+    return { code: String(d.code ?? ''), kg_truoc: num(d.kg_truoc), kg_sau: num(d.kg_sau), so_banh: num(d.so_banh) }
   },
 
   /** Đổi mã nguyên liệu gốc của phiếu chèn (một hay nhiều mã; rỗng = bỏ, máy lấy theo phiếu ca) — trước khi thủ kho nhận */

@@ -9,6 +9,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../../stores/authStore'
 import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot } from '../../../services/wms/mixService'
 import { useMixRole } from '../../../hooks/useMixRole'
+import { rawLotService, type RawLotChen } from '../../../services/wms/rawLotService'
 import { firstName } from '../opsUtil'
 import { FacilitySelect, fmtD, fmtKg, todayLocal, useKhoFacility } from './khoCommon'
 import { I } from './khoMixUtil'
@@ -33,6 +34,7 @@ export default function KhoMix() {
   const [today, setToday] = useState<MixIssue[]>([])
   const [done, setDone] = useState<MixIssue[]>([])
   const [lots, setLots] = useState<MixLot[]>([])
+  const [chenMa, setChenMa] = useState<Map<string, RawLotChen>>(new Map())   // tổng chèn đã nhận theo mã gốc
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const now = useMemo(() => new Date(), [])
@@ -41,14 +43,15 @@ export default function KhoMix() {
     if (!facilityId) return
     setLoading(true); setErr(null)
     try {
-      const [b, o, t, d, l] = await Promise.all([
+      const [b, o, t, d, l, c] = await Promise.all([
         mixService.balance(facilityId),
         mixService.listIssues({ facilityId, status: ['issued', 'returned', 'submitted', 'qc_confirmed'] }),
         mixService.listIssues({ facilityId, date: todayLocal(), limit: 100 }),
         mixService.listIssues({ facilityId, status: ['received'], limit: 3 }),
         mixService.listLots(facilityId),
+        rawLotService.chen(facilityId).catch(() => [] as RawLotChen[]),
       ])
-      setBal(b); setOpen(o); setToday(t.filter((x) => x.status !== 'cancelled')); setDone(d); setLots(l)
+      setBal(b); setOpen(o); setToday(t.filter((x) => x.status !== 'cancelled')); setDone(d); setLots(l); setChenMa(new Map(c.map((x) => [x.ma, x])))
     } catch (e: any) { setErr(e?.message || 'Không tải được hàng chèn') }
     finally { setLoading(false) }
   }, [facilityId])
@@ -83,6 +86,19 @@ export default function KhoMix() {
     dayChuyen: curIssued.reduce((s, i) => s + i.kg_out, 0),
   } : null
   const lanKe = (cur?.items.length ?? 0) + 1
+  // gom các lần của ca theo MÃ GỐC đang chạy (số L vẫn đếm theo ca)
+  const nhomMa = useMemo(() => {
+    if (!cur) return []
+    const m = new Map<string, { ma: string; idx: number[]; kg: number; banh: number; dayChuyen: number }>()
+    cur.items.forEach((i, k) => {
+      const key = i.ma_goc_all || ''
+      const g = m.get(key) ?? { ma: key, idx: [], kg: 0, banh: 0, dayChuyen: 0 }
+      g.idx.push(k); g.kg += i.kg_out; g.banh += i.so_banh ?? 0; if (i.status === 'issued') g.dayChuyen += i.kg_out
+      m.set(key, g)
+    })
+    return [...m.values()]
+  }, [cur])
+  const tongMa = (ma: string) => ma.split(' + ').map((x) => chenMa.get(x.trim())).filter(Boolean) as RawLotChen[]
   const btnLay = (cls: string) => (
     <Link to="/m/kho/chen/lay" className={cls} aria-disabled={!canTake || !lotsCoHang.length} onClick={(e) => { if (!canTake || !lotsCoHang.length) e.preventDefault() }} style={!canTake || !lotsCoHang.length ? { opacity: 0.45 } : undefined}>{I.plus}Lấy lần {lanKe}</Link>
   )
@@ -113,24 +129,39 @@ export default function KhoMix() {
                 <div className="kmx-stat" style={tong.dayChuyen > 0 ? { background: '#FEF3C7' } : undefined}><span className="kmx-lbl" style={{ fontSize: 10 }}>Dây chuyền</span><span className="kmx-num md" style={tong.dayChuyen > 0 ? { color: '#B45309' } : undefined}>{fmtKg(tong.dayChuyen)}</span><span className="kmx-sm">kg chưa trả</span></div>
                 <div className="kmx-stat ok"><span className="kmx-lbl ok" style={{ fontSize: 10 }}>Tiêu hao</span><span className="kmx-num md ok">{fmtKg(tong.tieuHao)}</span><span className="kmx-sm">kg đã trả</span></div>
               </div>
-              <div className="kmx-list">
-                {cur.items.map((i, k) => {
-                  const chip = CHIP[i.status]
-                  return (
-                    <div key={i.id} className="kmx-li" style={{ alignItems: 'stretch', gap: 10 }}>
-                      <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-col" style={{ flex: 1, textDecoration: 'none', color: 'inherit', gap: 3 }}>
-                        <span className="kmx-row" style={{ justifyContent: 'flex-start', gap: 8 }}>
-                          <span className="kmx-mono" style={{ fontSize: 14, fontWeight: 800, color: '#0D2E25', background: '#E8F5F0', borderRadius: 8, padding: '2px 7px' }}>L{k + 1}</span>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: '#0D2E25' }}>{i.so_banh !== null ? `${i.so_banh} b · ` : ''}{i.lot_so_lo || i.lot_code}</span>
-                          <span className={`kmx-chip ${chip.cls}`} style={{ marginLeft: 'auto' }}>{chip.text}</span>
-                        </span>
-                        <span className="kmx-sm">{i.vi_tri ? `${MIX_VI_TRI_LABELS[i.vi_tri]} · ` : ''}{i.gross_kg !== null ? `cả pallet ${kg1(i.gross_kg)} − bì ${kg1(i.pallet_kg ?? 0)} = ` : ''}<b className="kmx-mono" style={{ color: '#0D2E25' }}>{kg1(i.kg_out)} kg</b>{i.kg_return !== null ? ` · trả ${kg1(i.kg_return)} · tiêu hao ${kg1(i.kg_used)}` : ''} · {hm(i.out_at)}{i.out_by && i.out_by !== me && i.out_name ? ` · ${firstName(i.out_name)}` : ''}{i.ma_goc_all ? ` · mã ${i.ma_goc_all}` : ''}</span>
-                      </Link>
-                      {i.status === 'issued' && <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-pill" style={{ flex: '0 0 auto', alignSelf: 'center', background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', padding: '0 14px' }}>Trả L{k + 1}</Link>}
+              {nhomMa.map((g) => {
+                const tm = tongMa(g.ma)
+                return (
+                  <div key={g.ma || '__none'} className="kmx-col" style={{ gap: 6 }}>
+                    <div className="kmx-row" style={{ padding: '4px 2px 0', alignItems: 'flex-start', gap: 8 }}>
+                      <span className="kmx-col" style={{ gap: 1 }}>
+                        <span className="kmx-strong" style={{ fontSize: 13 }}>{g.ma ? <>Chèn vào mã <span className="kmx-mono" style={{ color: '#0D2E25' }}>{g.ma}</span></> : 'Chưa gắn mã gốc'}</span>
+                        <span className="kmx-sm">{g.ma ? (tm.length ? tm.map((x) => `${x.ma}: đã nhận ${fmtKg(x.chen_kg)} kg${x.ty_le_chen_pct !== null ? ` (${x.ty_le_chen_pct} % hàng vào máy)` : ''}`).join(' · ') : 'mã chưa có phiếu nào được thủ kho nhận') : 'máy gắn theo phiếu ca lúc thủ kho nhận, hoặc mở phiếu bấm Đổi mã'}</span>
+                      </span>
+                      <span className="kmx-chip blue" style={{ flex: '0 0 auto' }}>{g.idx.length} lần · {kg1(g.kg)} kg{g.banh ? ` · ${g.banh} b` : ''}</span>
                     </div>
-                  )
-                })}
-              </div>
+                    <div className="kmx-list">
+                      {g.idx.map((k) => {
+                        const i = cur.items[k]
+                        const chip = CHIP[i.status]
+                        return (
+                          <div key={i.id} className="kmx-li" style={{ alignItems: 'stretch', gap: 10 }}>
+                            <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-col" style={{ flex: 1, textDecoration: 'none', color: 'inherit', gap: 3 }}>
+                              <span className="kmx-row" style={{ justifyContent: 'flex-start', gap: 8 }}>
+                                <span className="kmx-mono" style={{ fontSize: 14, fontWeight: 800, color: '#0D2E25', background: '#E8F5F0', borderRadius: 8, padding: '2px 7px' }}>L{k + 1}</span>
+                                <span style={{ fontSize: 14, fontWeight: 700, color: '#0D2E25' }}>{i.so_banh !== null ? `${i.so_banh} b · ` : ''}{i.lot_so_lo || i.lot_code}</span>
+                                <span className={`kmx-chip ${chip.cls}`} style={{ marginLeft: 'auto' }}>{chip.text}</span>
+                              </span>
+                              <span className="kmx-sm">{i.vi_tri ? `${MIX_VI_TRI_LABELS[i.vi_tri]} · ` : ''}{i.gross_kg !== null ? `cả pallet ${kg1(i.gross_kg)} − bì ${kg1(i.pallet_kg ?? 0)} = ` : ''}<b className="kmx-mono" style={{ color: '#0D2E25' }}>{kg1(i.kg_out)} kg</b>{i.kg_return !== null ? ` · trả ${kg1(i.kg_return)} · tiêu hao ${kg1(i.kg_used)}` : ''} · {hm(i.out_at)}{i.out_by && i.out_by !== me && i.out_name ? ` · ${firstName(i.out_name)}` : ''}</span>
+                            </Link>
+                            {i.status === 'issued' && <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-pill" style={{ flex: '0 0 auto', alignSelf: 'center', background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', padding: '0 14px' }}>Trả L{k + 1}</Link>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
               {btnLay('kmx-btn')}
               <span className="kmx-sm kmx-center">Mỗi lần lấy = một pallet: chọn lô, cân cả pallet, máy trừ bì và tính bành. Lần nào dùng hết thì Trả · 0 kg, không cần ảnh.</span>
             </section>

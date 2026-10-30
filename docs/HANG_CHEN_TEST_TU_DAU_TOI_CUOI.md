@@ -249,6 +249,7 @@ Quy trình chốt 30/10: **Bước 1 QS khai báo** (nhập lô chèn, lấy đ�
 | 18.2 | Lấy đầu ca | tiêu đề "Lấy lần 3 · ca · tổ"; màn chọn lô có thẻ xám liệt kê L1, L2 đã lấy (kg, cả pallet − bì) để đối chiếu sổ; màn xong "Đã ghi lần 3", nút "Lấy lần 4" |
 | 18.3 | Mở phiếu | tiêu đề "Trả lần 2" / "Lần 2 · PC-… · ca" |
 | 18.4 | Kho chèn trên trang chính | mỗi lô hiện số lô to, mã CH nhỏ, "kg · N b" |
+| 18.5 | Ca có phiếu chèn vào 2 mã khác nhau | trong thẻ ca, các dòng L gom thành 2 nhóm "Chèn vào mã KHMN-15" / "Chèn vào mã KHMN-17", mỗi nhóm chip "n lần · kg · bành" và dòng "đã nhận X kg (y % hàng vào máy)" lấy từ gom theo mã; số L vẫn đếm liên tục theo ca; phiếu chưa gắn mã nằm nhóm "Chưa gắn mã gốc" |
 
 ## 19. Sửa cân lúc lấy (sau SQL `wms_mix_p8_sua_can_lay.sql`, chạy SAU p7, 30/10)
 

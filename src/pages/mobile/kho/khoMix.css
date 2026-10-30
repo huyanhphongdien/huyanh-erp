@@ -1,0 +1,159 @@
+/* ==========================================================================
+   Kho NVL mobile — hệ màu ERP (xanh đậm #0D2E25 / #1B4D3E + vàng #E8A838) theo mockup
+   "Hàng chèn mobile" 30/10/2026. Prefix .kmx- cho màn hàng chèn; .kho-root đổi biến
+   của opsTheme sang bảng màu ERP để các tab Lô NVL / Nhập cùng tông.
+   ========================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+
+.ops-root.kho-root {
+  --g: #1B4D3E; --g-d: #0D2E25; --g-dd: #0D2E25; --lime: #E8A838; --lime-d: #92400E;
+  --ink: #1F2937; --ink-2: #4B5563; --ink-3: #6B7280;
+  --bg: #F4F6F4; --surf: #FFFFFF; --surf-2: #F4F6F4; --line: #E5E7EB;
+  --red: #B91C1C; --red-bg: #FEE2E2; --amber: #B45309; --amber-bg: #FEF3C7; --ok: #15803D; --ok-bg: #DCFCE7;
+  --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  --sans: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif;
+}
+.kho-root .ops-appbar { background: var(--g-d); }
+.kho-root .ops-botnav .it.on .ico { background: #E8F5F0; }
+.kho-root .ops-fab { background: var(--g); color: #fff; }
+.kho-root .ops-card.tint { background: #E8F5F0; }
+.kho-root .ops-chip.lime { background: #FEF3C7; color: #92400E; }
+.kho-root .ops-btn.l { background: #E8A838; color: #0D2E25; }
+.kho-root.kho-deep .ops-botnav, .kho-root.kho-deep .ops-fab { display: none; }
+
+/* ---- khung màn hàng chèn ---- */
+.kmx { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #F4F6F4; color: #1F2937; font-family: var(--sans); font-size: 15px; line-height: 1.45; }
+.kmx-hd { background: #0D2E25; color: #fff; padding: calc(10px + env(safe-area-inset-top)) 16px 14px; display: flex; align-items: center; gap: 12px; flex: 0 0 auto; box-shadow: var(--el1); }
+.kmx-back { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.14); color: #fff; display: flex; align-items: center; justify-content: center; border: 0; flex: 0 0 40px; cursor: pointer; text-decoration: none; }
+.kmx-hd-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.kmx-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #E8A838; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kmx-title { font-size: 20px; font-weight: 800; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kmx-hd-right { margin-left: auto; font-size: 12px; color: #D1E3DC; text-align: right; line-height: 1.35; flex: 0 0 auto; }
+.kmx-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 16px 0; flex: 0 0 auto; }
+.kmx-step { display: flex; flex-direction: column; gap: 5px; font-size: 11px; font-weight: 600; color: #6B7280; }
+.kmx-step b { height: 5px; border-radius: 3px; background: #D1D5DB; display: block; }
+.kmx-step.done { color: #15803D; } .kmx-step.done b { background: #2D8B6E; }
+.kmx-step.now { color: #0D2E25; font-weight: 700; } .kmx-step.now b { background: #E8A838; }
+.kmx-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 16px calc(96px + max(env(safe-area-inset-bottom), 16px)); display: flex; flex-direction: column; gap: 10px; }
+.kho-deep .kmx-body { padding-bottom: 16px; }
+.kmx-inner { width: 100%; max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.kmx-foot { flex: 0 0 auto; padding: 10px 16px calc(12px + max(env(safe-area-inset-bottom), 12px)); background: #F4F6F4; border-top: 1px solid #E5E7EB; display: flex; flex-direction: column; gap: 8px; }
+.kmx-foot > * { max-width: 560px; width: 100%; margin: 0 auto; }
+
+/* ---- thẻ, chữ ---- */
+.kmx-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; }
+.kmx-card.hero { border: 2px solid #2D8B6E; }
+.kmx-card.muted { background: #F9FAFB; border-style: dashed; border-color: #D1D5DB; color: #6B7280; }
+.kmx-card.press { cursor: pointer; text-decoration: none; color: #1F2937; -webkit-tap-highlight-color: transparent; }
+.kmx-lbl { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B7280; }
+.kmx-lbl.ok { color: #15803D; }
+.kmx-h2 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #6B7280; }
+.kmx-mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.kmx-num { font-family: var(--mono); font-weight: 700; color: #0D2E25; line-height: 1; font-variant-numeric: tabular-nums; }
+.kmx-num.xxl { font-size: 56px; } .kmx-num.xl { font-size: 44px; } .kmx-num.lg { font-size: 28px; } .kmx-num.md { font-size: 20px; } .kmx-num.sm { font-size: 16px; }
+.kmx-num.ok { color: #15803D; } .kmx-num.mut { color: #9CA3AF; }
+.kmx-unit { font-size: 16px; font-weight: 600; color: #6B7280; }
+.kmx-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.kmx-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kmx-sm { font-size: 12px; color: #6B7280; }
+.kmx-md { font-size: 13px; color: #4B5563; }
+.kmx-strong { font-size: 14px; font-weight: 700; color: #0D2E25; }
+.kmx-center { text-align: center; }
+.kmx-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.kmx-chip.ok { color: #15803D; background: #DCFCE7; } .kmx-chip.amb { color: #B45309; background: #FEF3C7; } .kmx-chip.red { color: #B91C1C; background: #FEE2E2; }
+.kmx-chip.blue { color: #1D4ED8; background: #DBEAFE; } .kmx-chip.mut { color: #4B5563; background: #F3F4F6; } .kmx-chip.gold { color: #0D2E25; background: #E8A838; }
+.kmx-badge { min-width: 28px; height: 28px; border-radius: 14px; background: #E8A838; color: #0D2E25; font-size: 13px; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 8px; }
+
+/* ---- nút ---- */
+.kmx-btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 58px; border-radius: 14px; border: 0; background: #1B4D3E; color: #fff; font: inherit; font-size: 18px; font-weight: 700; text-decoration: none; cursor: pointer; width: 100%; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+.kmx-btn:disabled { opacity: .45; cursor: default; }
+.kmx-btn.sec { min-height: 48px; background: #fff; color: #1B4D3E; border: 1px solid #E5E7EB; font-size: 14px; font-weight: 600; }
+.kmx-btn.ghost { min-height: 44px; background: transparent; color: #4B5563; font-size: 14px; font-weight: 600; }
+.kmx-btn.danger { min-height: 48px; background: #fff; color: #B91C1C; border: 1px solid #FECACA; font-size: 14px; font-weight: 600; }
+.kmx-btn.red { background: #B91C1C; color: #fff; min-height: 48px; font-size: 15px; }
+.kmx-btn.white { background: #fff; color: #0D2E25; }
+.kmx-btn.outline-w { min-height: 48px; background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.3); font-size: 15px; font-weight: 600; }
+.kmx-btn.md { min-height: 54px; font-size: 17px; }
+.kmx-pill { height: 40px; padding: 0 14px; border: 1px solid #E5E7EB; border-radius: 999px; background: #fff; font: inherit; font-size: 13px; font-weight: 600; color: #1B4D3E; cursor: pointer; flex: 1; }
+.kmx-pill.sm { height: 36px; flex: 0 0 auto; }
+.kmx-seg { display: flex; gap: 8px; flex-wrap: wrap; }
+.kmx-seg button { flex: 1 1 auto; min-width: 88px; height: 44px; padding: 0 12px; border: 1px solid #E5E7EB; border-radius: 12px; background: #fff; color: #1F2937; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.kmx-seg button.on { background: #1B4D3E; color: #fff; border-color: #1B4D3E; font-weight: 700; }
+.kmx-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.kmx-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.kmx-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+
+/* ---- ô nhập ---- */
+.kmx-input { flex: 1; min-width: 0; height: 68px; padding: 0 16px; border: 2px solid #1B4D3E; border-radius: 14px; font: inherit; font-family: var(--mono); font-size: 38px; font-weight: 700; color: #0D2E25; text-align: right; box-sizing: border-box; background: #fff; outline: none; width: 100%; }
+.kmx-input.red { border-color: #B91C1C; }
+.kmx-input::placeholder { color: #D1D5DB; }
+.kmx-text { height: 48px; padding: 0 14px; border: 1px solid #E5E7EB; border-radius: 12px; font: inherit; font-size: 15px; color: #1F2937; box-sizing: border-box; width: 100%; background: #fff; outline: none; }
+.kmx-tint { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 8px 12px; background: #E8F5F0; border-radius: 10px; font-size: 13px; color: #1B4D3E; }
+.kmx-tint.col { flex-direction: column; align-items: stretch; gap: 6px; }
+.kmx-bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #D1E3DC; }
+.kmx-bar span { background: #1B4D3E; display: block; }
+.kmx-note { display: flex; gap: 10px; align-items: flex-start; border-radius: 14px; padding: 12px 14px; font-size: 13px; line-height: 1.4; }
+.kmx-note svg { flex: 0 0 20px; margin-top: 1px; }
+.kmx-note.amb { background: #FEF3C7; color: #92400E; } .kmx-note.info { background: #fff; border: 1px solid #E5E7EB; color: #4B5563; }
+.kmx-note.ok { background: #DCFCE7; color: #15803D; } .kmx-note.red { background: #FEE2E2; color: #B91C1C; } .kmx-note.gold { background: #E8A838; color: #0D2E25; }
+.kmx-list { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; padding: 4px 14px; }
+.kmx-li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid #F3F4F6; }
+.kmx-li:last-child { border-bottom: 0; }
+.kmx-link { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; padding: 12px 14px; text-decoration: none; color: #1F2937; -webkit-tap-highlight-color: transparent; }
+.kmx-ico { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex: 0 0 40px; }
+.kmx-ico.amb { background: #FEF3C7; color: #B45309; } .kmx-ico.ok { background: #DCFCE7; color: #15803D; } .kmx-ico.blue { background: #DBEAFE; color: #1D4ED8; }
+.kmx-divider { display: flex; align-items: center; gap: 10px; padding: 0 2px; font-size: 12px; font-weight: 600; color: #6B7280; }
+.kmx-divider::before, .kmx-divider::after { content: ''; flex: 1; height: 1px; background: #E5E7EB; }
+.kmx-check-row { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #1F2937; padding: 2px 0; }
+.kmx-check-row input { width: 22px; height: 22px; margin: 0; accent-color: #1B4D3E; flex: 0 0 22px; }
+.kmx-stat { background: #F9FAFB; border-radius: 10px; padding: 8px 4px; display: flex; flex-direction: column; gap: 1px; text-align: center; }
+.kmx-stat.ok { background: #E8F5F0; }
+.kmx-kv { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #F3F4F6; font-size: 14px; }
+.kmx-kv:last-child { border-bottom: 0; }
+.kmx-kv .k { font-size: 13px; color: #6B7280; } .kmx-kv .v { font-weight: 600; text-align: right; }
+.kmx-skel { height: 90px; border-radius: 16px; background: linear-gradient(90deg, #fff 25%, #EEF1EC 50%, #fff 75%); background-size: 200% 100%; animation: kmx-sh 1.3s infinite; }
+@keyframes kmx-sh { to { background-position: -200% 0; } }
+.kmx-msg { border-radius: 14px; padding: 12px 14px; font-size: 13.5px; font-weight: 700; }
+.kmx-msg.ok { background: #DCFCE7; color: #15803D; } .kmx-msg.err { background: #FEE2E2; color: #B91C1C; }
+
+/* ---- màn "xong" nền xanh đậm ---- */
+.kmx-done { flex: 1; min-height: 0; overflow-y: auto; background: #0D2E25; color: #fff; padding: calc(48px + env(safe-area-inset-top)) 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+.kmx-check { width: 96px; height: 96px; border-radius: 50%; background: #2D8B6E; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 12px rgba(45,139,110,.25); flex: 0 0 96px; }
+.kmx-check.sm { width: 72px; height: 72px; flex-basis: 72px; box-shadow: 0 0 0 10px rgba(45,139,110,.25); }
+.kmx-done h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.01em; }
+.kmx-done-card { width: 100%; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px; text-align: left; box-sizing: border-box; color: #D1E3DC; font-size: 14px; }
+.kmx-done-card .kmx-num { color: #fff; }
+.kmx-done-foot { flex: 0 0 auto; padding: 10px 16px calc(16px + max(env(safe-area-inset-bottom), 12px)); background: #0D2E25; display: flex; flex-direction: column; gap: 8px; }
+.kmx-done-foot > * { max-width: 560px; width: 100%; margin: 0 auto; }
+
+/* ---- dòng thời gian ---- */
+.kmx-tl { display: flex; gap: 12px; padding: 4px 0 12px 20px; border-left: 2px solid #2D8B6E; margin-left: 13px; position: relative; }
+.kmx-tl.todo { border-left-style: dashed; border-left-color: #D1D5DB; }
+.kmx-tl.last { border-left-color: transparent; padding-bottom: 4px; }
+.kmx-tl-dot { position: absolute; left: -15px; top: 4px; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+.kmx-tl-dot.done { background: #2D8B6E; color: #fff; } .kmx-tl-dot.now { background: #FEF3C7; color: #B45309; } .kmx-tl-dot.todo { background: #F3F4F6; color: #6B7280; } .kmx-tl-dot.red { background: #FEE2E2; color: #B91C1C; }
+.kmx-tl-body { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.kmx-thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+.kmx-thumb { width: 56px; height: 44px; border-radius: 8px; object-fit: cover; background: #D1E3DC; border: 0; padding: 0; cursor: pointer; display: block; overflow: hidden; }
+.kmx-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kmx-thumb.lg { width: 100%; height: 68px; }
+.kmx-thumb.empty { display: flex; align-items: center; justify-content: center; font-size: 9px; color: #6B7280; background: #F3F4F6; }
+
+/* ---- ô ảnh ---- */
+.kmx-ph { border-radius: 12px; background: #fff; border: 2px dashed #9CA3AF; padding: 0; display: flex; flex-direction: column; overflow: hidden; font: inherit; color: #1F2937; text-align: left; cursor: pointer; position: relative; }
+.kmx-ph.done { border: 2px solid #2D8B6E; background: #E8F5F0; }
+.kmx-ph.miss { border-color: #B91C1C; }
+.kmx-ph:disabled { cursor: default; }
+.kmx-ph .img { height: 96px; display: flex; align-items: center; justify-content: center; background: #F9FAFB; overflow: hidden; }
+.kmx-ph.miss .img { background: #FFF5F5; }
+.kmx-ph .img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kmx-ph .cap { padding: 7px 10px; display: flex; flex-direction: column; gap: 1px; font-size: 12px; font-weight: 700; }
+.kmx-ph .cap small { font-size: 11px; font-weight: 600; color: #6B7280; }
+.kmx-ph.done .cap small { color: #15803D; } .kmx-ph.miss .cap small { color: #B91C1C; font-weight: 700; }
+.kmx-ph .busy { position: absolute; inset: 0; background: rgba(255,255,255,.75); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #0D2E25; }
+.kmx-ph-add { height: 40px; border: 1px dashed #9CA3AF; border-radius: 10px; background: #fff; font: inherit; font-size: 13px; font-weight: 600; color: #4B5563; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; width: 100%; }
+.kmx-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 60; display: flex; align-items: center; justify-content: center; border: 0; padding: 0; cursor: zoom-out; width: 100%; }
+.kmx-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.kmx-lightbox span { position: absolute; left: 0; right: 0; bottom: calc(16px + env(safe-area-inset-bottom)); color: #fff; font-size: 13px; text-align: center; }
+
+@media (prefers-reduced-motion: reduce) { .kmx-skel { animation: none; } }

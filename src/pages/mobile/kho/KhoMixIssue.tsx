@@ -1,18 +1,25 @@
 // ============================================================================
-// KhoMixIssue — phiếu chèn trên điện thoại: ảnh lúc lấy, TRẢ CUỐI CA (kg + ảnh), ký 3 bước
+// KhoMixIssue — phiếu chèn trên điện thoại theo mockup 30/10:
+//   · đang ở dây chuyền (issued): màn TRẢ CUỐI CA — cân phần còn lại, 2 ảnh, một chạm = ghi trả + ký bên giao
+//   · sau đó: màn "đã trả" rồi DÒNG THỜI GIAN phiếu (ảnh gắn từng mốc) + nút ký của QS / thủ kho, sửa, hủy
 // File: src/pages/mobile/kho/KhoMixIssue.tsx · Route: /m/kho/chen/phieu/:id
 // ============================================================================
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import RawPhotoTiles from '../../../components/wms/RawPhotoTiles'
-import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, type MixIssue } from '../../../services/wms/mixService'
+import { mixService, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, type MixIssue } from '../../../services/wms/mixService'
 import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
-import { KhoAppBar, Msg, fmtDt, fmtKg, inp, inpBig, lbl } from './khoCommon'
+import { fmtD, fmtDt, fmtKg } from './khoCommon'
+import { I, KmxPhotoTiles, Lightbox } from './khoMixUtil'
+import './khoMix.css'
 
-const STEPS: [MixIssue['status'], string][] = [['issued', 'Lấy'], ['returned', 'Trả'], ['submitted', 'Giao ký'], ['qc_confirmed', 'QS'], ['received', 'Kho nhận']]
+const hm = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '')
+const STATUS_CHIP: Record<MixIssue['status'], { cls: string; text: string }> = {
+  issued: { cls: 'ok', text: 'Ở dây chuyền' }, returned: { cls: 'amb', text: 'Chờ bên giao ký' }, submitted: { cls: 'gold', text: 'Chờ QS' },
+  qc_confirmed: { cls: 'blue', text: 'Chờ thủ kho' }, received: { cls: 'ok', text: 'Đã nhận' }, cancelled: { cls: 'red', text: 'Đã hủy' },
+}
 
 export default function KhoMixIssue() {
   const { id } = useParams<{ id: string }>()
@@ -27,8 +34,11 @@ export default function KhoMixIssue() {
   const [handover, setHandover] = useState(false)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  const [justDone, setJustDone] = useState<{ kgUsed: number; signed: boolean } | null>(null)
+  const [editRet, setEditRet] = useState(false)
   const [cancelAsk, setCancelAsk] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  const [big, setBig] = useState<{ src: string; cap: string } | null>(null)
   const role = useRawRole(i?.facility_id ?? null)
 
   const load = useCallback(async () => {
@@ -44,117 +54,245 @@ export default function KhoMixIssue() {
   useEffect(() => { load() }, [load])
 
   const required = settings.anh_bat_buoc?.length ? settings.anh_bat_buoc : ['toan_canh', 'man_hinh_can']
-  const editable = !!i && ['issued', 'returned'].includes(i.status)
   const missOut = rawPhotoService.missing(pOut, required)
   const missRet = rawPhotoService.missing(pRet, required)
-  const stepIdx = i ? Math.max(0, STEPS.findIndex(([s]) => s === i.status)) : 0
+  const editable = !!i && ['issued', 'returned'].includes(i.status)
 
   async function run(key: string, fn: () => Promise<any>, ok: string) {
     setBusy(key); setMsg(null)
     try { const r = await fn(); setMsg({ ok: true, text: ok }); await load(); return r }
-    catch (e: any) { setMsg({ ok: false, text: e?.message || 'Thao tác thất bại' }) }
+    catch (e: any) { setMsg({ ok: false, text: e?.message || 'Thao tác thất bại' }); return undefined }
     finally { setBusy(null) }
   }
 
-  async function tra() {
-    if (!i) return
-    const n = kgRet === '' ? null : Number(kgRet)
-    if (n === null || !Number.isFinite(n) || n < 0) { setMsg({ ok: false, text: 'Nhập kg trả (0 nếu dùng hết)' }); return }
-    if (n > i.kg_out + 0.01) { setMsg({ ok: false, text: `Trả nhiều hơn lấy (${fmtKg(i.kg_out)} kg)` }); return }
-    await run('tra', () => mixService.tra(i.id, n, handover, note.trim() || null), `✅ Trả ${fmtKg(n)} kg · tiêu hao ${fmtKg(i.kg_out - n)} kg — chụp 2 ảnh rồi ký`)
+  const kgRetN = kgRet === '' ? null : Number(kgRet)
+  const kgRetOk = !!i && kgRetN !== null && Number.isFinite(kgRetN) && kgRetN >= 0 && kgRetN <= i.kg_out + 0.01
+
+  async function traVaKy() {
+    if (!i || !kgRetOk) return
+    setBusy('tra'); setMsg(null)
+    try {
+      const r = await mixService.tra(i.id, kgRetN!, handover, note.trim() || null)
+      let signed = false
+      try { await mixService.ky(i.id, 'submit'); signed = true }
+      catch (e: any) { setMsg({ ok: false, text: `Đã ghi trả nhưng chưa ký được: ${e?.message || ''}` }) }
+      setJustDone({ kgUsed: r.kg_used, signed }); await load()
+    } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không ghi được' }) }
+    finally { setBusy(null) }
   }
 
   async function ky(buoc: 'submit' | 'qc_confirm' | 'receive') {
     if (!i) return
-    const r = await run(buoc, () => mixService.ky(i.id, buoc), buoc === 'receive' ? '✅ Thủ kho đã nhận — kho chèn & sổ ca đã cập nhật' : '✅ Đã ký')
+    const r = await run(buoc, () => mixService.ky(i.id, buoc), buoc === 'receive' ? 'Thủ kho đã nhận, kho chèn và sổ ca đã cập nhật' : 'Đã ký')
     if (buoc === 'receive' && r?.next_issue_id) nav(`/m/kho/chen/phieu/${r.next_issue_id}`, { replace: true })
   }
 
-  async function huy() {
-    if (!i) return
-    setCancelAsk(false)
-    await run('cancel', () => mixService.ky(i.id, 'cancel', cancelReason.trim() || null), 'Đã hủy phiếu, kg trả về tồn kho chèn')
-  }
-
-  if (err) return <><KhoAppBar title="Phiếu chèn" back="/m/kho/chen" /><div className="ops-body"><div className="ops-card" style={{ color: 'var(--red)', fontWeight: 700 }}>{err}</div></div></>
-  if (!i) return <><KhoAppBar title="Phiếu chèn" back="/m/kho/chen" /><div className="ops-body"><div className="ops-skel" /><div className="ops-skel" /></div></>
+  if (err) return <div className="kmx"><header className="kmx-hd"><button type="button" className="kmx-back" aria-label="Quay lại" onClick={() => nav('/m/kho/chen')}>{I.back}</button><div className="kmx-hd-txt"><span className="kmx-title">Phiếu chèn</span></div></header><div className="kmx-body"><div className="kmx-msg err">{err}</div></div></div>
+  if (!i) return <div className="kmx"><header className="kmx-hd"><button type="button" className="kmx-back" aria-label="Quay lại" onClick={() => nav('/m/kho/chen')}>{I.back}</button><div className="kmx-hd-txt"><span className="kmx-title">Phiếu chèn</span></div></header><div className="kmx-body"><div className="kmx-skel" /><div className="kmx-skel" /></div></div>
 
   const st = i.status
-  const canSubmit = st === 'returned' && (role.perms.submit || role.isBGD)
-  const canQc = st === 'submitted' && (role.isQC || role.isBGD)
-  const canReceive = st === 'qc_confirmed' && (role.isKeeper || role.isBGD)
-  const thieuAnhText = i.thieu_anh ? i.thieu_anh.replace('mix_issue_out:', 'lúc lấy: ').replace('mix_issue_return:', 'lúc trả: ').replace('toan_canh', 'toàn cảnh').replace('man_hinh_can', 'màn hình cân') : ''
+  const caTo = `${i.shift_name || fmtD(i.shift_date)}${i.team ? ` · Tổ ${i.team}` : ''}`
+  const canSubmit = role.perms.submit || role.isBGD
+  const canQc = role.isQC || role.isBGD
+  const canReceive = role.isKeeper || role.isBGD
+  const pct = i.kg_used !== null && i.kg_out > 0 ? Math.round((100 * i.kg_used) / i.kg_out) : 0
 
-  return (
-    <>
-      <KhoAppBar title={i.code} sub={`${i.lot_code} · ${MIX_SOURCE_LABELS[i.source_type]}${i.lot_grade ? ' · ' + i.lot_grade : ''}`} back="/m/kho/chen" red={st === 'cancelled'} />
-      <div className="ops-body">
-        <div className="ops-inner">
-          <div className="ops-card" style={{ padding: '10px 12px' }}>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {STEPS.map(([s, t], k) => <span key={s} className={`ops-chip ${st === 'cancelled' ? 'red' : k < stepIdx || st === 'received' ? 'ok' : k === stepIdx ? 'lime' : 'mut'}`} style={{ flex: 1, textAlign: 'center' }}>{t}</span>)}
-            </div>
-            <div className="ops-sm" style={{ marginTop: 6 }}>{MIX_ISSUE_STATUS_LABELS[st]} · {new Date(i.shift_date).toLocaleDateString('vi-VN')}{i.shift_name ? ` · ${i.shift_name}` : ''}{i.team ? ` · ${i.team}` : ''} · {MIX_PURPOSE_LABELS[i.purpose]}{i.target_index ? ` ${i.target_index} → ${i.target_value ?? ''}` : ''}</div>
-          </div>
-          <Msg m={msg} />
-
-          <div className="ops-card tint">
-            <div className="ops-rw">
-              <div><div className="ops-lbl">Lấy đầu ca</div><div className="ops-big">{fmtKg(i.kg_out)}<span className="ops-sm"> kg</span></div><div className="ops-sm">{fmtDt(i.out_at)} · {i.out_name || ''}</div></div>
-              <div style={{ textAlign: 'right' }}><div className="ops-lbl">Trả · tiêu hao</div><div className="ops-mid ops-mono">{i.kg_return === null ? '—' : `${fmtKg(i.kg_return)} kg`}</div><div className="ops-mid ops-mono" style={{ color: 'var(--g)' }}>{i.kg_used === null ? '' : `${fmtKg(i.kg_used)} kg tiêu hao`}</div></div>
-            </div>
-          </div>
-
-          <div className="ops-card">
-            <div className="ops-rw" style={{ marginBottom: 8 }}><div className="ops-sh" style={{ margin: 0 }}>1 · Ảnh lúc lấy</div><span className={`ops-chip ${missOut.length ? 'red' : 'ok'}`}>{missOut.length ? `thiếu ${missOut.length}` : 'đủ'}</span></div>
-            <RawPhotoTiles refType="mix_issue_out" refId={i.id} photos={pOut} required={required} facilityCode={i.facility_code || undefined} disabled={!editable} onChange={load} size={100} />
-          </div>
-
-          <div className="ops-card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div className="ops-rw"><div className="ops-sh" style={{ margin: 0 }}>2 · Trả cuối ca</div>{i.kg_return !== null && <span className={`ops-chip ${missRet.length ? 'red' : 'ok'}`}>{missRet.length ? `thiếu ${missRet.length} ảnh` : 'đủ ảnh'}</span>}</div>
-            {st === 'issued' ? (
-              <>
-                <div><label style={lbl} htmlFor="mx-ret">Kg trả về kho (0 nếu dùng hết)</label><input id="mx-ret" style={inpBig} type="number" inputMode="decimal" placeholder="0" value={kgRet} onChange={(e) => setKgRet(e.target.value)} />
-                  {kgRet !== '' && <div className="ops-sm" style={{ textAlign: 'right' }}>tiêu hao sẽ ghi: <b>{fmtKg(i.kg_out - Number(kgRet))} kg</b></div>}</div>
-                {settings.chen_ban_giao_ca && <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13 }}><input type="checkbox" checked={handover} onChange={(e) => setHandover(e.target.checked)} style={{ width: 20, height: 20 }} /> Phần trả vẫn để ở dây chuyền, bàn giao ca sau (tự mở phiếu mới khi kho nhận)</label>}
-                <div><label style={lbl} htmlFor="mx-rnote">Ghi chú</label><input id="mx-rnote" style={inp} value={note} onChange={(e) => setNote(e.target.value)} /></div>
-                <button className="ops-btn g" disabled={busy === 'tra' || kgRet === ''} onClick={tra}>{busy === 'tra' ? 'Đang ghi…' : 'Ghi trả cuối ca'}</button>
-              </>
-            ) : (
-              <>
-                <div className="ops-sm">Trả <b>{fmtKg(i.kg_return)} kg</b> lúc {fmtDt(i.return_at)} · {i.return_name || ''}{i.handover_to_next ? ' · bàn giao ca sau' : ''}</div>
-                {st === 'returned' && (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input style={{ ...inp, flex: 1 }} type="number" inputMode="decimal" placeholder={`sửa kg trả (${fmtKg(i.kg_return)})`} value={kgRet} onChange={(e) => setKgRet(e.target.value)} aria-label="Sửa kg trả" />
-                    <button className="ops-btn o" style={{ width: 'auto', padding: '0 14px' }} disabled={busy === 'sua' || kgRet === ''} onClick={() => run('sua', () => mixService.tra(i.id, Number(kgRet), handover || i.handover_to_next, note.trim() || null), 'Đã sửa kg trả')}>Sửa</button>
-                  </div>
-                )}
-                <RawPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={required} facilityCode={i.facility_code || undefined} disabled={!editable} onChange={load} size={100} />
-              </>
-            )}
-          </div>
-
-          {st !== 'received' && st !== 'cancelled' && (
-            <div className="ops-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div className="ops-sh" style={{ margin: 0 }}>3 · Ký phiếu</div>
-              {i.thieu_anh && st === 'returned' && <div className="ops-sm" style={{ color: 'var(--red)', fontWeight: 700 }}>Chưa ký được: thiếu ảnh {thieuAnhText}</div>}
-              {st === 'returned' && <button className="ops-btn g" disabled={!canSubmit || !!i.thieu_anh || busy === 'submit'} onClick={() => ky('submit')}>✍️ Bên giao ký</button>}
-              {st === 'submitted' && <button className="ops-btn g" disabled={!canQc || busy === 'qc_confirm'} onClick={() => ky('qc_confirm')}>✍️ QS xác nhận</button>}
-              {st === 'qc_confirmed' && <button className="ops-btn g" disabled={!canReceive || busy === 'receive'} onClick={() => ky('receive')}>📥 Thủ kho nhận · trừ kho chèn</button>}
-              {st === 'issued' && <div className="ops-sm">Ghi trả cuối ca trước đã.</div>}
-              {st === 'submitted' && !canQc && <div className="ops-sm">Chờ QS (HAP-QC hoặc người được chỉ định).</div>}
-              {st === 'qc_confirmed' && !canReceive && <div className="ops-sm">Chờ thủ kho NVL nhận.</div>}
-              {!cancelAsk ? <button className="ops-btn o" disabled={busy === 'cancel'} onClick={() => setCancelAsk(true)}>Hủy phiếu</button> : (
-                <>
-                  <input style={inp} placeholder="Lý do hủy" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} aria-label="Lý do hủy" />
-                  <div style={{ display: 'flex', gap: 6 }}><button className="ops-btn r" onClick={huy}>Xác nhận hủy</button><button className="ops-btn o" onClick={() => setCancelAsk(false)}>Không</button></div>
-                </>
-              )}
-            </div>
-          )}
-          <div className="ops-sm" style={{ textAlign: 'center' }}>{i.submitted_name ? `Giao: ${i.submitted_name} ${fmtDt(i.submitted_at)}` : ''}{i.qc_confirmed_name ? ` · QS: ${i.qc_confirmed_name} ${fmtDt(i.qc_confirmed_at)}` : ''}{i.received_name ? ` · Kho: ${i.received_name} ${fmtDt(i.received_at)}` : ''}</div>
+  // ── màn "đã trả" ngay sau một chạm ──
+  if (justDone) {
+    return (
+      <div className="kmx">
+        <header className="kmx-hd" style={{ flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12, padding: 'calc(28px + env(safe-area-inset-top)) 24px 22px' }}>
+          <span className="kmx-check sm"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span>
+          <div className="kmx-col" style={{ alignItems: 'center', gap: 4 }}><span style={{ fontSize: 24, fontWeight: 800 }}>{justDone.signed ? 'Đã trả, bạn đã ký' : 'Đã trả, chưa ký'}</span><span style={{ fontSize: 13, color: '#D1E3DC' }}>{i.code} · {caTo} · {hm(i.return_at)}</span></div>
+        </header>
+        <div className="kmx-body"><div className="kmx-inner">
+          {msg && !msg.ok && <div className="kmx-msg err">{msg.text}</div>}
+          <section className="kmx-card kmx-grid3" aria-label="Kết quả ca" style={{ display: 'grid' }}>
+            <div className="kmx-col kmx-center"><span className="kmx-lbl">Lấy</span><span className="kmx-num md">{fmtKg(i.kg_out)}</span></div>
+            <div className="kmx-col kmx-center"><span className="kmx-lbl">Trả</span><span className="kmx-num md">{fmtKg(i.kg_return)}</span></div>
+            <div className="kmx-col kmx-center kmx-stat ok"><span className="kmx-lbl ok">Tiêu hao</span><span className="kmx-num md ok">{fmtKg(i.kg_used)}</span></div>
+          </section>
+          <section className="kmx-card" aria-label="Tiến độ ký" style={{ gap: 0 }}>
+            <h2 className="kmx-h2" style={{ marginBottom: 10 }}>{justDone.signed ? 'Còn 2 chữ ký nữa' : 'Còn 3 chữ ký'}</h2>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className={`kmx-tl-dot ${justDone.signed ? 'done' : 'now'}`} style={{ position: 'static' }}>{justDone.signed ? I.checkSm : '1'}</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong">{justDone.signed ? 'Bên giao đã ký' : 'Bên giao ký · chưa'}</span><span className="kmx-sm">{i.submitted_name || i.return_name || ''}{i.team ? ` · Tổ ${i.team}` : ''}{i.submitted_at ? ` · ${hm(i.submitted_at)}` : ''}</span></span></div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className={`kmx-tl-dot ${justDone.signed ? 'now' : 'todo'}`} style={{ position: 'static' }}>2</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong" style={{ color: justDone.signed ? '#B45309' : '#6B7280' }}>QS xác nhận · đang chờ</span><span className="kmx-sm">Phòng QC thấy phiếu trong mục Chờ ký</span></span></div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' }}><span className="kmx-tl-dot todo" style={{ position: 'static' }}>3</span><span className="kmx-col" style={{ paddingTop: 3 }}><span className="kmx-strong" style={{ color: '#6B7280' }}>Thủ kho nhận</span><span className="kmx-sm">Lúc này kho chèn mới trừ {fmtKg(i.kg_used)} kg, sổ ca tự điền dòng CHÈN</span></span></div>
+          </section>
+          <div className="kmx-note info">{I.info}<span>{justDone.signed ? 'Bạn không cần làm gì thêm. Có gì sai thì mở phiếu để sửa kg trả trước khi QS ký.' : 'Mở phiếu để chụp ảnh còn thiếu rồi bấm Ký bên giao.'}</span></div>
+        </div></div>
+        <div className="kmx-foot">
+          <button type="button" className="kmx-btn" onClick={() => nav('/m/kho/chen')}>Về trang chính</button>
+          <button type="button" className="kmx-btn ghost" onClick={() => setJustDone(null)}>Xem phiếu</button>
         </div>
       </div>
-    </>
+    )
+  }
+
+  // ── màn TRẢ CUỐI CA (đang ở dây chuyền) ──
+  if (st === 'issued') {
+    const tieuHao = kgRetN !== null && Number.isFinite(kgRetN) ? Math.max(i.kg_out - kgRetN, 0) : null
+    const p = tieuHao !== null && i.kg_out > 0 ? Math.round((100 * tieuHao) / i.kg_out) : 0
+    const ready = kgRetOk && missRet.length === 0 && missOut.length === 0
+    return (
+      <div className="kmx">
+        <header className="kmx-hd">
+          <button type="button" className="kmx-back" aria-label="Về trang chính" onClick={() => nav('/m/kho/chen')}>{I.back}</button>
+          <div className="kmx-hd-txt"><span className="kmx-eyebrow">{i.code} · {caTo}</span><span className="kmx-title">Trả cuối ca</span></div>
+        </header>
+        <div className="kmx-body"><div className="kmx-inner">
+          {msg && <div className={`kmx-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>}
+          <div className="kmx-card" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}>
+            <span className="kmx-col"><span className="kmx-lbl">Đã lấy đầu ca</span><span className="kmx-md">{hm(i.out_at)} · lô {i.lot_code} · {pOut.length} ảnh</span></span>
+            <span className="kmx-num md" style={{ whiteSpace: 'nowrap' }}>{fmtKg(i.kg_out)} <span className="kmx-sm">kg</span></span>
+          </div>
+          {missOut.length > 0 && (
+            <section className="kmx-card" style={{ borderColor: '#FECACA' }}>
+              <div className="kmx-note red" style={{ padding: 0, background: 'transparent' }}>{I.info}<span>Lúc lấy còn thiếu {missOut.length} ảnh bắt buộc. Chụp bổ sung ở đây rồi mới ký được.</span></div>
+              <KmxPhotoTiles refType="mix_issue_out" refId={i.id} photos={pOut} required={required} facilityCode={i.facility_code || undefined} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />
+            </section>
+          )}
+          <section className="kmx-card" aria-label="Cân phần còn lại" style={{ gap: 10 }}>
+            <label htmlFor="kmx-ret" className="kmx-strong" style={{ fontSize: 13 }}>Cân phần còn lại, đọc số trên cân</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input id="kmx-ret" className={`kmx-input${kgRet !== '' && !kgRetOk ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={kgRet} onChange={(e) => setKgRet(e.target.value)} />
+              <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="kmx-pill" onClick={() => setKgRet('0')}>Dùng hết · 0 kg</button>
+              <button type="button" className="kmx-pill" onClick={() => setKgRet(String(i.kg_out))}>Chưa dùng · {fmtKg(i.kg_out)} kg</button>
+            </div>
+            {tieuHao !== null && (
+              <div className="kmx-tint col">
+                <div className="kmx-row"><span style={{ fontWeight: 600 }}>Tiêu hao ca này</span><span className="kmx-num md">{fmtKg(tieuHao)} kg</span></div>
+                <div className="kmx-bar"><span style={{ width: `${Math.min(p, 100)}%` }} /></div>
+                <div className="kmx-row" style={{ fontSize: 11, fontWeight: 600, color: '#4B5563' }}><span>Đã dùng {fmtKg(tieuHao)} kg ({p} %)</span><span>Trả {fmtKg(kgRetN)} kg</span></div>
+              </div>
+            )}
+            {kgRet !== '' && !kgRetOk && <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Số trả phải từ 0 đến {fmtKg(i.kg_out)} kg</span>}
+            {settings.chen_ban_giao_ca && (
+              <label className="kmx-check-row" htmlFor="kmx-handover">
+                <input id="kmx-handover" type="checkbox" checked={handover} onChange={(e) => setHandover(e.target.checked)} />
+                <span>Để <b>{kgRetN !== null && kgRetN > 0 ? `${fmtKg(kgRetN)} kg` : 'phần còn lại'}</b> lại dây chuyền cho ca sau<br /><span className="kmx-sm">Không cân về kho; máy tự mở phiếu cho ca kế khi thủ kho nhận.</span></span>
+              </label>
+            )}
+          </section>
+          <section className="kmx-card" aria-label="Chụp ảnh lúc trả">
+            <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Chụp 2 ảnh phần trả</span><span className={`kmx-chip ${missRet.length ? 'red' : 'ok'}`}>{required.length - missRet.length}/{required.length}{missRet.length ? ` · thiếu ${missRet.length}` : ' đã chụp'}</span></div>
+            <KmxPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={required} facilityCode={i.facility_code || undefined} labels={{ toan_canh: 'Toàn cảnh phần trả', man_hinh_can: 'Màn hình cân' }} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />
+            <span className="kmx-sm">Đủ 2 ảnh thì nút dưới mới sáng. Ảnh bổ sung không bắt buộc.</span>
+          </section>
+          <div className="kmx-col" style={{ gap: 6 }}>
+            <label htmlFor="kmx-rnote" className="kmx-sm" style={{ fontWeight: 600 }}>Ghi chú (không bắt buộc)</label>
+            <input id="kmx-rnote" className="kmx-text" value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+        </div></div>
+        <div className="kmx-foot">
+          <button type="button" className="kmx-btn" disabled={!ready || busy === 'tra'} onClick={traVaKy}>{I.pen}{busy === 'tra' ? 'Đang ghi…' : 'Ghi trả và ký bên giao'}</button>
+          <span className="kmx-sm kmx-center">Một chạm = ghi {kgRetN !== null && kgRetOk ? `${fmtKg(kgRetN)} kg trả` : 'kg trả'} + chữ ký 1/3 của bạn</span>
+        </div>
+      </div>
+    )
+  }
+
+  // ── DÒNG THỜI GIAN phiếu ──
+  const thumbs = (list: RawPhoto[]) => list.filter((p) => p.public_url).map((p) => (
+    <button key={p.id} type="button" className="kmx-thumb" aria-label={`Xem ảnh ${p.kind}`} onClick={() => setBig({ src: p.public_url!, cap: `${p.kind === 'toan_canh' ? 'Toàn cảnh' : p.kind === 'man_hinh_can' ? 'Màn hình cân' : 'Bổ sung'} · ${fmtDt(p.taken_at)}` })}><img src={p.public_url!} alt="" /></button>
+  ))
+  const chip = STATUS_CHIP[st]
+  const qsDot = st === 'cancelled' ? 'red' : i.qc_confirmed_at ? 'done' : st === 'submitted' ? 'now' : 'todo'
+  const khoDot = st === 'cancelled' ? 'red' : i.received_at ? 'done' : st === 'qc_confirmed' ? 'now' : 'todo'
+
+  return (
+    <div className="kmx">
+      <header className="kmx-hd">
+        <button type="button" className="kmx-back" aria-label="Về trang chính" onClick={() => nav('/m/kho/chen')}>{I.back}</button>
+        <div className="kmx-hd-txt"><span className="kmx-eyebrow">Phiếu chèn · {caTo}</span><span className="kmx-title kmx-mono" style={{ fontSize: 19 }}>{i.code}</span></div>
+        <span className={`kmx-chip ${chip.cls}`} style={{ flex: '0 0 auto' }}>{chip.text}</span>
+      </header>
+      <div className="kmx-body"><div className="kmx-inner">
+        {msg && <div className={`kmx-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>}
+        <section className="kmx-card" aria-label="Số liệu" style={{ gap: 10 }}>
+          <div className="kmx-grid3">
+            <div className="kmx-col kmx-center"><span className="kmx-lbl">Lấy</span><span className="kmx-num md">{fmtKg(i.kg_out)}</span></div>
+            <div className="kmx-col kmx-center"><span className="kmx-lbl">Trả</span><span className="kmx-num md">{i.kg_return === null ? '—' : fmtKg(i.kg_return)}</span></div>
+            <div className="kmx-col kmx-center kmx-stat ok"><span className="kmx-lbl ok">Tiêu hao</span><span className="kmx-num md ok">{i.kg_used === null ? '—' : fmtKg(i.kg_used)}</span></div>
+          </div>
+          {i.kg_used !== null && <div className="kmx-bar" style={{ height: 10 }}><span style={{ width: `${Math.min(pct, 100)}%` }} /></div>}
+          <span className="kmx-md">Lô <span className="kmx-mono" style={{ fontWeight: 600, color: '#0D2E25' }}>{i.lot_code}</span> · {MIX_SOURCE_LABELS[i.source_type].toLowerCase()}{i.lot_grade ? ` · ${i.lot_grade}` : ''}{i.po !== null ? ` · Po ${i.po}` : ''} · {MIX_PURPOSE_LABELS[i.purpose].toLowerCase()}{i.target_index ? ` ${i.target_index}${i.target_value !== null ? ' → ' + i.target_value : ''}` : ''}</span>
+          {i.note && <span className="kmx-sm">Ghi chú: {i.note}</span>}
+        </section>
+
+        <section className="kmx-card" aria-label="Dòng thời gian" style={{ gap: 0 }}>
+          <div className="kmx-tl"><span className="kmx-tl-dot done">{I.checkSm}</span><div className="kmx-tl-body">
+            <span className="kmx-row"><span className="kmx-strong">Lấy đầu ca · {fmtKg(i.kg_out)} kg</span><span className="kmx-sm">{hm(i.out_at)}</span></span>
+            <span className="kmx-sm">{i.out_name || ''}{i.team ? ` · Tổ ${i.team}` : ''}{missOut.length ? ` · thiếu ${missOut.length} ảnh` : ''}</span>
+            {pOut.length > 0 && <div className="kmx-thumbs">{thumbs(pOut)}</div>}
+          </div></div>
+          <div className={`kmx-tl${i.return_at ? '' : ' todo'}`}><span className={`kmx-tl-dot ${i.return_at ? 'done' : 'todo'}`}>{i.return_at ? I.checkSm : '·'}</span><div className="kmx-tl-body">
+            <span className="kmx-row"><span className="kmx-strong" style={i.return_at ? undefined : { color: '#6B7280' }}>Trả cuối ca{i.return_at ? ` · ${fmtKg(i.kg_return)} kg` : ''}</span><span className="kmx-sm">{hm(i.return_at)}</span></span>
+            {i.return_at && <span className="kmx-sm">{i.return_name || ''} · {i.handover_to_next ? 'để lại dây chuyền, bàn giao ca sau' : 'về kho, không bàn giao'}{missRet.length ? ` · thiếu ${missRet.length} ảnh` : ''}</span>}
+            {pRet.length > 0 && <div className="kmx-thumbs">{thumbs(pRet)}</div>}
+          </div></div>
+          <div className={`kmx-tl${i.submitted_at ? '' : ' todo'}`}><span className={`kmx-tl-dot ${i.submitted_at ? 'done' : st === 'returned' ? 'now' : 'todo'}`}>{i.submitted_at ? I.checkSm : '1'}</span><div className="kmx-tl-body">
+            <span className="kmx-row"><span className="kmx-strong" style={i.submitted_at ? undefined : { color: st === 'returned' ? '#B45309' : '#6B7280' }}>Bên giao ký{!i.submitted_at && st === 'returned' ? ' · đang chờ' : ''}</span><span className="kmx-sm">{hm(i.submitted_at)}</span></span>
+            <span className="kmx-sm">{i.submitted_name || (st === 'returned' ? 'Tổ sản xuất hoặc thủ kho' : '')}</span>
+          </div></div>
+          <div className={`kmx-tl${i.qc_confirmed_at ? '' : ' todo'}`}><span className={`kmx-tl-dot ${qsDot}`}>{i.qc_confirmed_at ? I.checkSm : '2'}</span><div className="kmx-tl-body">
+            <span className="kmx-row"><span className="kmx-strong" style={i.qc_confirmed_at ? undefined : { color: st === 'submitted' ? '#B45309' : '#6B7280' }}>QS xác nhận{st === 'submitted' ? ' · đang chờ' : ''}</span><span className="kmx-sm">{hm(i.qc_confirmed_at)}</span></span>
+            <span className="kmx-sm">{i.qc_confirmed_name || 'Phòng QC'}</span>
+          </div></div>
+          <div className="kmx-tl last todo"><span className={`kmx-tl-dot ${khoDot}`}>{i.received_at ? I.checkSm : '3'}</span><div className="kmx-tl-body">
+            <span className="kmx-row"><span className="kmx-strong" style={i.received_at ? undefined : { color: st === 'qc_confirmed' ? '#B45309' : '#6B7280' }}>Thủ kho nhận · trừ kho chèn{st === 'qc_confirmed' ? ' · đang chờ' : ''}</span><span className="kmx-sm">{hm(i.received_at)}</span></span>
+            <span className="kmx-sm">{i.received_name || (st === 'received' ? '' : 'Chưa đến lượt')}</span>
+          </div></div>
+          {st === 'cancelled' && <div className="kmx-note red" style={{ marginTop: 8 }}>{I.info}<span>Đã hủy{i.cancel_reason ? `: ${i.cancel_reason}` : ''}. Kg lấy đã trả về tồn kho chèn.</span></div>}
+        </section>
+
+        {st === 'returned' && (
+          <section className="kmx-card" aria-label="Ký bên giao" style={{ gap: 10 }}>
+            <h2 className="kmx-h2">Bước 1/3 · bên giao ký</h2>
+            {(missOut.length > 0 || missRet.length > 0) && <div className="kmx-note red" style={{ padding: '8px 10px' }}>{I.info}<span>Thiếu ảnh bắt buộc{missOut.length ? ` lúc lấy (${missOut.length})` : ''}{missRet.length ? ` lúc trả (${missRet.length})` : ''}. Chụp đủ rồi mới ký được.</span></div>}
+            {missOut.length > 0 && <KmxPhotoTiles refType="mix_issue_out" refId={i.id} photos={pOut} required={required} facilityCode={i.facility_code || undefined} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />}
+            {missRet.length > 0 && <KmxPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={required} facilityCode={i.facility_code || undefined} labels={{ toan_canh: 'Toàn cảnh phần trả', man_hinh_can: 'Màn hình cân' }} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />}
+            <button type="button" className="kmx-btn md" disabled={!canSubmit || missOut.length > 0 || missRet.length > 0 || busy === 'submit'} onClick={() => ky('submit')}>{I.pen}Ký bên giao</button>
+            {!editRet ? <button type="button" className="kmx-btn sec" onClick={() => { setKgRet(String(i.kg_return ?? '')); setHandover(i.handover_to_next); setEditRet(true) }}>Sửa kg trả</button> : (
+              <div className="kmx-col" style={{ gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" type="number" inputMode="decimal" value={kgRet} onChange={(e) => setKgRet(e.target.value)} aria-label="Kg trả" /><span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span></div>
+                {settings.chen_ban_giao_ca && <label className="kmx-check-row" htmlFor="kmx-handover2"><input id="kmx-handover2" type="checkbox" checked={handover} onChange={(e) => setHandover(e.target.checked)} /><span>Để lại dây chuyền cho ca sau</span></label>}
+                <div className="kmx-grid2">
+                  <button type="button" className="kmx-btn sec" style={{ background: '#1B4D3E', color: '#fff' }} disabled={!kgRetOk || busy === 'sua'} onClick={async () => { await run('sua', () => mixService.tra(i.id, kgRetN!, handover, null), 'Đã sửa kg trả'); setEditRet(false) }}>Lưu</button>
+                  <button type="button" className="kmx-btn sec" onClick={() => setEditRet(false)}>Thôi</button>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+        {st === 'submitted' && (
+          <section className="kmx-card" aria-label="QS xác nhận" style={{ gap: 8 }}>
+            <h2 className="kmx-h2">Bước 2/3 · QS xác nhận</h2>
+            {canQc ? <button type="button" className="kmx-btn md" disabled={busy === 'qc_confirm'} onClick={() => ky('qc_confirm')}>{I.check}Xác nhận QS</button> : <span className="kmx-md">Chờ phòng QC (hoặc người được chỉ định) xác nhận.</span>}
+          </section>
+        )}
+        {st === 'qc_confirmed' && (
+          <section className="kmx-card" aria-label="Thủ kho nhận" style={{ gap: 8 }}>
+            <h2 className="kmx-h2">Bước 3/3 · thủ kho nhận</h2>
+            {canReceive ? <button type="button" className="kmx-btn md" disabled={busy === 'receive'} onClick={() => ky('receive')}>{I.intake}Nhận · trừ kho chèn {fmtKg(i.kg_used)} kg</button> : <span className="kmx-md">Chờ thủ kho NVL nhận. Sau bước này kho chèn mới trừ và sổ ca tự điền dòng CHÈN.</span>}
+          </section>
+        )}
+
+        {st !== 'received' && st !== 'cancelled' && (
+          <div className="kmx-col" style={{ gap: 8 }}>
+            {!cancelAsk ? <button type="button" className="kmx-btn danger" onClick={() => setCancelAsk(true)}>Hủy phiếu</button> : (
+              <div className="kmx-card" style={{ borderColor: '#FECACA' }}>
+                <input className="kmx-text" placeholder="Lý do hủy" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} aria-label="Lý do hủy" />
+                <div className="kmx-grid2"><button type="button" className="kmx-btn red" disabled={busy === 'cancel'} onClick={() => run('cancel', () => mixService.ky(i.id, 'cancel', cancelReason.trim() || null), 'Đã hủy phiếu, kg trả về tồn kho chèn')}>Xác nhận hủy</button><button type="button" className="kmx-btn sec" onClick={() => setCancelAsk(false)}>Không</button></div>
+              </div>
+            )}
+            <span className="kmx-sm kmx-center">Hủy thì {fmtKg(i.kg_out)} kg trả về tồn kho chèn. Sửa kg trả chỉ được trước khi QS ký.</span>
+          </div>
+        )}
+      </div></div>
+      {big && <Lightbox src={big.src} caption={big.cap} onClose={() => setBig(null)} />}
+    </div>
   )
 }

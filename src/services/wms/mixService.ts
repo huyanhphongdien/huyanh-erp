@@ -77,6 +77,7 @@ export interface MixIssue {
   target_value: number | null
   kg_out: number
   out_at: string
+  out_by: string | null
   out_name: string | null
   kg_return: number | null
   return_at: string | null
@@ -200,14 +201,28 @@ export const mixService = {
     return data ? normIssue(data) : null
   },
 
-  async lay(input: { lotId: string; kg: number; shiftDate?: string | null; shiftId?: string | null; team?: string | null; purpose: MixPurpose; targetIndex?: string | null; targetValue?: number | null; productionOrderId?: string | null; note?: string | null }): Promise<string> {
+  async lay(input: { id?: string | null; lotId: string; kg: number; shiftDate?: string | null; shiftId?: string | null; team?: string | null; purpose: MixPurpose; targetIndex?: string | null; targetValue?: number | null; productionOrderId?: string | null; note?: string | null }): Promise<string> {
     const { data, error } = await supabase.rpc('fn_mix_lay', {
       p_lot_id: input.lotId, p_kg: input.kg, p_shift_date: input.shiftDate ?? null, p_shift_id: input.shiftId ?? null, p_team: input.team ?? null,
       p_purpose: input.purpose, p_target_index: input.targetIndex ?? null, p_target_value: input.targetValue ?? null,
-      p_production_order_id: input.productionOrderId ?? null, p_note: input.note ?? null,
+      p_production_order_id: input.productionOrderId ?? null, p_note: input.note ?? null, p_id: input.id ?? null,
     })
     if (error) throw new Error(dichLoiNhapKho(error))
     return String(data)
+  },
+
+  /** Tên tổ đã dùng gần đây (sổ ca ép bành + phiếu chèn) để hiện thành nút bấm */
+  async listTeams(facilityId: string): Promise<string[]> {
+    const from = new Date(); from.setDate(from.getDate() - 90)
+    const d = from.toISOString().slice(0, 10)
+    const [a, b] = await Promise.all([
+      supabase.from('shift_production_reports').select('team').eq('facility_id', facilityId).gte('report_date', d).not('team', 'is', null).limit(300),
+      supabase.from('mix_issues').select('team').eq('facility_id', facilityId).gte('shift_date', d).not('team', 'is', null).limit(300),
+    ])
+    const names = [...((a.data ?? []) as any[]), ...((b.data ?? []) as any[])].map((r) => String(r.team ?? '').trim()).filter(Boolean)
+    const count = new Map<string, number>()
+    for (const n of names) count.set(n, (count.get(n) ?? 0) + 1)
+    return [...count.entries()].sort((x, y) => y[1] - x[1]).map(([n]) => n).slice(0, 6)
   },
 
   async tra(issueId: string, kgReturn: number, handover: boolean, note?: string | null, outputBatchId?: string | null): Promise<{ kg_used: number }> {

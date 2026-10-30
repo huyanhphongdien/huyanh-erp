@@ -98,6 +98,7 @@ const KhoIntake = lazy(() => import('./pages/mobile/kho/KhoIntake'));
 const KhoMix = lazy(() => import('./pages/mobile/kho/KhoMix'));
 const KhoMixOut = lazy(() => import('./pages/mobile/kho/KhoMixOut'));
 const KhoMixIssue = lazy(() => import('./pages/mobile/kho/KhoMixIssue'));
+const KhoMixSign = lazy(() => import('./pages/mobile/kho/KhoMixSign'));
 
 // ===== CHẤM CÔNG V2: Ca, Phân ca, Tăng ca =====
 const ShiftListPage = lazy(() => import('./features/shifts').then(m => ({ default: m.ShiftListPage })));
@@ -463,6 +464,7 @@ function App() {
               <Route path="chen" element={<Suspense fallback={<LoadingSpinner />}><KhoMix /></Suspense>} />
               <Route path="chen/lay" element={<Suspense fallback={<LoadingSpinner />}><KhoMixOut /></Suspense>} />
               <Route path="chen/phieu/:id" element={<Suspense fallback={<LoadingSpinner />}><KhoMixIssue /></Suspense>} />
+              <Route path="chen/ky" element={<Suspense fallback={<LoadingSpinner />}><KhoMixSign /></Suspense>} />
             </Route>
 
             {/* ============================================================ */}

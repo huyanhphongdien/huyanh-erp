@@ -10,6 +10,7 @@ import { rawStockService } from '../../../services/wms/rawStockService'
 import { mixService } from '../../../services/wms/mixService'
 import { parseKhoScan } from './khoCommon'
 import '../opsTheme.css'
+import './khoMix.css'
 
 const I = {
   lots: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22"><path d="M3 9l9-5 9 5v10l-9 5-9-5z" /><path d="M3 9l9 5 9-5M12 14v10" /></svg>,
@@ -28,6 +29,8 @@ export default function KhoShell() {
   const [scan, setScan] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const showFab = loc.pathname === '/m/kho' || loc.pathname === '/m/kho/chen'
+  // Màn sâu của hàng chèn (lấy / phiếu / ký) chạy toàn màn hình, không có thanh tab dưới (theo mockup 30/10)
+  const deep = /^\/m\/kho\/chen\/.+/.test(loc.pathname)
 
   async function onDetect(raw: string) {
     setScan(false)
@@ -46,16 +49,16 @@ export default function KhoShell() {
   }
 
   return (
-    <div className="ops-root">
+    <div className={`ops-root kho-root${deep ? ' kho-deep' : ''}`}>
       <Outlet />
       {note && <div className="ops-card" role="status" style={{ position: 'absolute', left: 12, right: 12, bottom: 'calc(90px + env(safe-area-inset-bottom))', background: 'var(--red-bg)', color: 'var(--red)', fontWeight: 700, zIndex: 22 }}>{note}</div>}
-      {showFab && <button className="ops-fab" onClick={() => setScan(true)} aria-label="Quẹt QR lô">📷</button>}
-      <nav className="ops-botnav">
+      {showFab && !deep && <button className="ops-fab" onClick={() => setScan(true)} aria-label="Quẹt QR lô">📷</button>}
+      {!deep && <nav className="ops-botnav">
         {TABS.map((t) => {
           const on = t.exact ? loc.pathname === t.to || loc.pathname === t.to + '/' || t.also.some((a) => loc.pathname.startsWith(a)) : loc.pathname.startsWith(t.to)
           return <button key={t.to} className={`it${on ? ' on' : ''}`} onClick={() => nav(t.to)}><span className="ico">{t.ico}</span>{t.label}</button>
         })}
-      </nav>
+      </nav>}
       {scan && <OpsQrScanner onClose={() => setScan(false)} onDetect={onDetect} />}
     </div>
   )

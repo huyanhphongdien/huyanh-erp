@@ -98,11 +98,13 @@ export default function KhoMixOut() {
     let alive = true
     const fallback = () => {
       if (!alive) return
+      const gl = lenhs.find((g) => g.id === sp.get('lenh'))
+      if (gl) { setMaChon(gl.raw_lot_ids); setMaNguon('lenh'); return }   // lệnh chọn từ thẻ lệnh ở trang chính
       if (lenhs.length === 1) { setMaChon(lenhs[0].raw_lot_ids); setMaNguon('lenh'); return }   // đúng một lệnh → mã của lệnh (gộp)
       const dc = maList.filter((x) => x.trang_thai === 'dang_chay')
       if (dc.length === 1) { setMaChon([dc[0].raw_lot_id]); setMaNguon('dang_chay') } else if (maNguon !== null) { setMaChon([]); setMaNguon(null) }
     }
-    if (!shift?.id) { fallback(); return () => { alive = false } }
+    if (!shift?.id || lenhs.some((g) => g.id === sp.get('lenh'))) { fallback(); return () => { alive = false } }
     shiftBookService.findReport(facilityId, todayLocal(), shift.id)
       .then((r) => {
         if (!alive) return
@@ -134,7 +136,8 @@ export default function KhoMixOut() {
   const doiMode = (m: 'pallet' | 'kg') => { setMode(m); try { localStorage.setItem('kmx_can_mode', m) } catch { /* bỏ qua */ } }
   const doiViTri = (v: MixViTri) => { setViTri(v); try { localStorage.setItem('kmx_vi_tri', v) } catch { /* bỏ qua */ } }
   const kgOk = kgN !== null && Number.isFinite(kgN) && kgN > 0
-  const thieuLenh = lenhs.length > 1 && maChon.length === 0   // ≥ 2 lệnh song song: phải chạm lệnh pallet này chèn vào
+  const lenhChon = lenhs.find((g) => g.id === sp.get('lenh')) ?? null   // bấm 'Lấy lần n' trong thẻ lệnh → lệnh đã chọn, không hỏi lại
+  const thieuLenh = !lenhChon && lenhs.length > 1 && maChon.length === 0   // không qua thẻ lệnh mà có ≥ 2 lệnh: phải chạm lệnh
   // phương án B: chỉ chặn vượt tồn với hàng lấy từ lô TP (tồn thật); SBR / số lô gõ tay lấy quá tồn → máy ghi nhập thêm, chỉ báo
   const fgCua = lot?.source_ref_type === 'fg_lot' ? fgLots.find((g) => g.id === lot.source_ref_id) ?? null : null
   const fgConKg = fgCua ? Math.max(fgCua.ton_banh, 0) * (fgCua.kg_per_banh || 35) : 0
@@ -210,7 +213,7 @@ export default function KhoMixOut() {
   )
   const caTo = `${shift?.name || 'Ca ?'}${teamFinal ? ` · Ca ${teamFinal}` : ''}`
   // các lần đã chèn của ca này (theo ca tự nhận) → lần kế tiếp = n + 1
-  const prevLan = caIssues.filter((x) => (shift ? x.shift_id === shift.id : true)).sort((a, b) => a.out_at.localeCompare(b.out_at))
+  const prevLan = caIssues.filter((x) => (shift ? x.shift_id === shift.id : true) && (!lenhChon || x.lenh_id === lenhChon.id || (!x.lenh_id && x.ma_goc_all === lenhChon.ma_gop))).sort((a, b) => a.out_at.localeCompare(b.out_at))   // số lần đếm theo lệnh
   const lan = prevLan.length + 1
 
   // ── màn 4: đã ghi ──
@@ -416,7 +419,9 @@ export default function KhoMixOut() {
             </div>
           </section>
 
-          {lenhs.length > 1 ? (
+          {lenhChon ? (
+            <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>Chèn vào lệnh</span><span className="kmx-mono" style={{ fontWeight: 800 }}>{lenhChon.ma_gop}</span></div>
+          ) : lenhs.length > 1 ? (
             <section className="kmx-card" aria-label="Chèn vào lệnh nào" style={{ gap: 8 }}>
               <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Đang chạy {lenhs.length} lệnh song song — pallet này chèn vào lệnh nào?</span>{maNguon === 'lenh' && <span className="kmx-chip ok">theo lệnh</span>}</div>
               <div className="kmx-seg">

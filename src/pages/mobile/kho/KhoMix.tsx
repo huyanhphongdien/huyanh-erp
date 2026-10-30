@@ -123,30 +123,35 @@ export default function KhoMix() {
     catch { q += '&mail=err' }
     nav(`/m/kho/chen/lenh/${g.id}/tong-ket?${q}`)
   }
-  // phiếu lấy trước khi khai lệnh (nhóm "chưa gắn mã") → gắn cả nhóm vào một lệnh đang chạy
-  async function ganLenh(idx: number[], g: LenhChay) {
-    if (!cur) return
-    setBusyMa('gan'); setMsgMa(null)
-    try {
-      let n = 0
-      for (const k of idx) { const i = cur.items[k]; if (!i || i.status === 'received' || i.status === 'cancelled') continue; await mixService.doiMaGoc(i.id, g.raw_lot_ids); n++ }
-      setMsgMa(`Đã gắn ${n} lần chèn vào ${g.ma_gop}`); await load()
-    } catch (e: any) { setMsgMa(e?.message || 'Không gắn được (cần SQL p18)') }
-    finally { setBusyMa(null) }
-  }
-  // gom các lần của ca theo MÃ GỐC đang chạy (số L vẫn đếm theo ca)
-  const nhomMa = useMemo(() => {
-    if (!cur) return []
-    const m = new Map<string, { ma: string; idx: number[]; kg: number; banh: number; dayChuyen: number }>()
-    cur.items.forEach((i, k) => {
-      const key = i.ma_goc_all || ''
-      const g = m.get(key) ?? { ma: key, idx: [], kg: 0, banh: 0, dayChuyen: 0 }
-      g.idx.push(k); g.kg += i.kg_out; g.banh += i.so_banh ?? 0; if (i.status === 'issued') g.dayChuyen += i.kg_out
-      m.set(key, g)
-    })
-    return [...m.values()]
-  }, [cur])
   const tongMa = (ma: string) => ma.split(' + ').map((x) => chenMa.get(x.trim())).filter(Boolean) as RawLotChen[]
+  // các lần chèn của ca hiện tại chia theo LỆNH (lệnh tạo trước lên đầu, 31/10 chủ DN); phiếu không thuộc lệnh nào → "chưa gắn lệnh"
+  const lenhsAsc = [...lenhs].sort((a, b) => a.started_at.localeCompare(b.started_at))
+  const thuocLenh = (i: MixIssue, g: LenhChay) => i.lenh_id === g.id || (!i.lenh_id && !!i.ma_goc_all && i.ma_goc_all === g.ma_gop)
+  const itemsCuaLenh = (g: LenhChay) => (cur ? cur.items.filter((i) => thuocLenh(i, g)) : [])
+  const itemsChuaLenh = cur ? cur.items.filter((i) => !lenhsAsc.some((g) => thuocLenh(i, g))) : []
+  const tongCua = (items: MixIssue[]) => ({
+    lay: items.reduce((s, i) => s + i.kg_out, 0), banh: items.reduce((s, i) => s + (i.so_banh ?? 0), 0), tieuHao: items.reduce((s, i) => s + (i.kg_used ?? 0), 0),
+    dayChuyen: items.filter((i) => i.status === 'issued').reduce((s, i) => s + i.kg_out, 0), issued: items.filter((i) => i.status === 'issued').length,
+  })
+  const nhanCa = cur ? (fmtD(cur.shift_date) === fmtD(now.toISOString()) ? 'Ca này' : `Ca ${fmtD(cur.shift_date)}`) : 'Ca này'
+  const dongLan = (i: MixIssue, n: number) => {
+    const chip = CHIP[i.status]
+    return (
+                          <div key={i.id} className="kmx-li" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+                            <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-col" style={{ textDecoration: 'none', color: 'inherit', gap: 3, minWidth: 0 }}>
+                              <span className="kmx-row" style={{ gap: 8, alignItems: 'center' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                  <span className="kmx-mono" style={{ fontSize: 14, fontWeight: 800, color: '#0D2E25', background: '#E8F5F0', borderRadius: 8, padding: '2px 7px', flex: '0 0 auto' }}>L{n}</span>
+                                  <span style={{ fontSize: 14, fontWeight: 700, color: '#0D2E25', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.so_banh !== null ? `${i.so_banh} b · ` : ''}{i.lot_so_lo || i.lot_code}</span>
+                                </span>
+                                <span className={`kmx-chip ${chip.cls}`} style={{ flex: '0 0 auto' }}>{chip.text}</span>
+                              </span>
+                              <span className="kmx-sm">{i.vi_tri ? `${MIX_VI_TRI_LABELS[i.vi_tri]} · ` : ''}{i.gross_kg !== null ? (i.pallet_kg !== null ? `cả pallet ${kg1(i.gross_kg)} − bì ${kg1(i.pallet_kg)} = ` : 'cả pallet ') : ''}<b className="kmx-mono" style={{ color: '#0D2E25' }}>{kg1(i.kg_out)} kg</b>{i.gross_kg !== null && i.pallet_kg === null ? ' (bì trừ lúc trả)' : ''}{i.kg_return !== null ? ` · trả ${kg1(i.kg_return)} · tiêu hao ${kg1(i.kg_used)}` : ''} · {hm(i.out_at)}{i.out_by && i.out_by !== me && i.out_name ? ` · ${firstName(i.out_name)}` : ''}</span>
+                            </Link>
+                            {i.status === 'issued' && <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-btn sec" style={{ minHeight: 42, fontSize: 14, textDecoration: 'none' }}>{I.lines}Trả L{n} · cân cuối ca</Link>}
+                          </div>
+    )
+  }
   const btnLay = (cls: string) => (
     <Link to="/m/kho/chen/lay" className={cls} aria-disabled={!canTake} onClick={(e) => { if (!canTake) e.preventDefault() }} style={!canTake ? { opacity: 0.45 } : undefined}>{I.plus}Lấy lần {lanKe}</Link>   // phương án B: không cần kho chèn có lô
   )
@@ -172,26 +177,7 @@ export default function KhoMix() {
               {canTake && <button type="button" className="kmx-pill sm" onClick={() => { setChonMa((v) => !v); setChonIds([]); setHoiThay(null) }}>{chonMa ? 'Đóng' : 'Bắt đầu lệnh…'}</button>}
             </div>
             {msgMa && <span className="kmx-sm" style={{ color: '#1B4D3E', fontWeight: 600 }}>{msgMa}</span>}
-            {hoiKetThuc && (
-              <div className="kmx-tint col" style={{ alignItems: 'stretch', gap: 6 }}>
-                <span className="kmx-sm" style={{ color: '#0D2E25' }}>Kết thúc lệnh <b>{hoiKetThuc.ma_gop}</b> ({hoiKetThuc.code})? Phiếu ca, phiếu chèn, lô TP sẽ không tự gắn lệnh này nữa. Máy tự tổng kết và gửi mail báo cáo (kèm ảnh từng lần chèn) cho Ban Giám đốc.</span>
-                <div className="kmx-row" style={{ gap: 6 }}>
-                  <button type="button" className="kmx-pill sm" style={{ background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', flex: 1 }} disabled={busyMa === hoiKetThuc.id} onClick={() => ketThucLenh(hoiKetThuc)}>{busyMa === hoiKetThuc.id ? 'Đang kết thúc, gửi mail…' : 'Kết thúc và gửi mail BGĐ'}</button>
-                  <button type="button" className="kmx-pill sm" onClick={() => setHoiKetThuc(null)}>Hủy</button>
-                </div>
-              </div>
-            )}
-            {lenhs.length ? lenhs.map((g) => (
-              <div key={g.id} className="kmx-row" style={{ alignItems: 'center' }}>
-                <span className="kmx-col" style={{ gap: 1 }}>
-                  <span className="kmx-mono" style={{ fontSize: 16, fontWeight: 800, color: '#0D2E25' }}>{g.ma_gop}</span>
-                  <span className="kmx-sm">{g.code} · từ {fmtDt(g.started_at)}{g.started_name ? ` · ${firstName(g.started_name)}` : ''}{g.chen_kg > 0 ? ` · chèn ${fmtKg(g.chen_kg)} kg` : ''}{g.phieu_mo ? ` · ${g.phieu_mo} phiếu mở` : ''}</span>
-                </span>
-                <span className="kmx-row" style={{ gap: 6 }}>
-                  {canTake && <button type="button" className="kmx-pill sm" disabled={busyMa === g.id} onClick={() => setHoiKetThuc(g)}>{busyMa === g.id ? 'Đang gửi…' : 'Kết thúc'}</button>}
-                </span>
-              </div>
-            )) : <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Chưa khai lệnh đang chạy. Khai một lần (một hay nhiều mã gộp, ví dụ KHMN-15 + 17), mọi ca sau tự theo lệnh này (phiếu ca, phiếu chèn, lô thành phẩm).</span>}
+            {!lenhs.length && <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Chưa khai lệnh đang chạy. Khai một lần (một hay nhiều mã gộp, ví dụ KHMN-15 + 17); mỗi lệnh là một thẻ bên dưới với các lần chèn và nút Lấy riêng.</span>}
             {chonMa && (
               <div className="kmx-col" style={{ gap: 6 }}>
                 <span className="kmx-sm">Chạm một hay nhiều mã chạy chung một lệnh, rồi bấm Bắt đầu.</span>
@@ -212,66 +198,60 @@ export default function KhoMix() {
             )}
           </section>
 
-          {cur && tong ? (
-            <section className="kmx-card hero" aria-label="Các lần chèn của ca" style={{ gap: 10 }}>
-              <div className="kmx-row">
-                <span className="kmx-lbl ok">{fmtD(cur.shift_date) === fmtD(now.toISOString()) ? 'Ca này' : `Ca ${fmtD(cur.shift_date)}`} · đã chèn {cur.items.length} lần</span>
-                <span className={`kmx-chip ${curIssued.length ? 'amb' : 'ok'}`}>{curIssued.length ? `${curIssued.length} lần đang ở dây chuyền` : 'đã trả hết'}</span>
+          {lenhsAsc.map((g, gi) => {
+            const items = itemsCuaLenh(g); const tg = tongCua(items); const tm = tongMa(g.ma_gop)
+            return (
+              <section key={g.id} className="kmx-card hero" aria-label={`Lệnh ${g.ma_gop}`} style={{ gap: 10 }}>
+                <div className="kmx-row" style={{ alignItems: 'flex-start' }}>
+                  <span className="kmx-col" style={{ gap: 1, minWidth: 0 }}>
+                    <span className="kmx-lbl ok">Lệnh {gi + 1}{lenhsAsc.length > 1 ? ` / ${lenhsAsc.length}` : ''} · {g.code}</span>
+                    <span className="kmx-mono" style={{ fontSize: 20, fontWeight: 800, color: '#0D2E25' }}>{g.ma_gop}</span>
+                    <span className="kmx-sm">từ {fmtDt(g.started_at)}{g.started_name ? ` · ${firstName(g.started_name)}` : ''}{tm.length ? ` · đã nhận ${fmtKg(tm.reduce((s2, x) => s2 + x.chen_kg, 0))} kg` : ''}</span>
+                  </span>
+                  {canTake && <button type="button" className="kmx-pill sm" disabled={busyMa === g.id} onClick={() => setHoiKetThuc(g)}>{busyMa === g.id ? 'Đang gửi…' : 'Kết thúc'}</button>}
+                </div>
+                {hoiKetThuc?.id === g.id && (
+              <div className="kmx-tint col" style={{ alignItems: 'stretch', gap: 6 }}>
+                <span className="kmx-sm" style={{ color: '#0D2E25' }}>Kết thúc lệnh <b>{hoiKetThuc.ma_gop}</b> ({hoiKetThuc.code})? Phiếu ca, phiếu chèn, lô TP sẽ không tự gắn lệnh này nữa. Máy tự tổng kết và gửi mail báo cáo (kèm ảnh từng lần chèn) cho Ban Giám đốc.</span>
+                <div className="kmx-row" style={{ gap: 6 }}>
+                  <button type="button" className="kmx-pill sm" style={{ background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E', flex: 1 }} disabled={busyMa === hoiKetThuc.id} onClick={() => ketThucLenh(hoiKetThuc)}>{busyMa === hoiKetThuc.id ? 'Đang kết thúc, gửi mail…' : 'Kết thúc và gửi mail BGĐ'}</button>
+                  <button type="button" className="kmx-pill sm" onClick={() => setHoiKetThuc(null)}>Hủy</button>
+                </div>
               </div>
-              <div className="kmx-grid3">
-                <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Đã lấy</span><span className="kmx-num md">{fmtKg(tong.lay)}</span><span className="kmx-sm">{tong.banh ? `${tong.banh} bành` : 'kg'}</span></div>
-                <div className="kmx-stat" style={tong.dayChuyen > 0 ? { background: '#FEF3C7' } : undefined}><span className="kmx-lbl" style={{ fontSize: 10 }}>Dây chuyền</span><span className="kmx-num md" style={tong.dayChuyen > 0 ? { color: '#B45309' } : undefined}>{fmtKg(tong.dayChuyen)}</span><span className="kmx-sm">kg chưa trả</span></div>
-                <div className="kmx-stat ok"><span className="kmx-lbl ok" style={{ fontSize: 10 }}>Tiêu hao</span><span className="kmx-num md ok">{fmtKg(tong.tieuHao)}</span><span className="kmx-sm">kg đã trả</span></div>
-              </div>
-              {nhomMa.map((g) => {
-                const tm = tongMa(g.ma)
-                return (
-                  <div key={g.ma || '__none'} className="kmx-col" style={{ gap: 6 }}>
-                    <div className="kmx-row" style={{ padding: '4px 2px 0', alignItems: 'flex-start', gap: 8 }}>
-                      <span className="kmx-col" style={{ gap: 1 }}>
-                        <span className="kmx-strong" style={{ fontSize: 13 }}>{g.ma ? <>Chèn vào mã <span className="kmx-mono" style={{ color: '#0D2E25' }}>{g.ma}</span></> : 'Chưa gắn mã gốc'}</span>
-                        <span className="kmx-sm">{g.ma ? (tm.length ? tm.map((x) => `${x.ma}: đã nhận ${fmtKg(x.chen_kg)} kg${x.ty_le_chen_pct !== null ? ` (${x.ty_le_chen_pct} %)` : ''}`).join(' · ') : 'chưa có phiếu nào được nhận') : 'tự gắn khi thủ kho nhận · hoặc mở phiếu → Đổi mã'}</span>
-                      </span>
-                      <span className="kmx-chip blue" style={{ flex: '0 0 auto' }}>{g.idx.length} lần · {kg1(g.kg)} kg{g.banh ? ` · ${g.banh} b` : ''}</span>
-                    </div>
-                    {!g.ma && canTake && lenhs.length > 0 && <div className="kmx-row" style={{ gap: 6, flexWrap: 'wrap' }}>{lenhs.map((l) => <button key={l.id} type="button" className="kmx-pill sm" disabled={busyMa === 'gan'} onClick={() => ganLenh(g.idx, l)}>{busyMa === 'gan' ? '…' : `Gắn ${g.idx.length} lần vào ${l.ma_gop}`}</button>)}</div>}
-                    <div className="kmx-list">
-                      {g.idx.map((k) => {
-                        const i = cur.items[k]
-                        const chip = CHIP[i.status]
-                        return (
-                          <div key={i.id} className="kmx-li" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
-                            <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-col" style={{ textDecoration: 'none', color: 'inherit', gap: 3, minWidth: 0 }}>
-                              <span className="kmx-row" style={{ gap: 8, alignItems: 'center' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                                  <span className="kmx-mono" style={{ fontSize: 14, fontWeight: 800, color: '#0D2E25', background: '#E8F5F0', borderRadius: 8, padding: '2px 7px', flex: '0 0 auto' }}>L{k + 1}</span>
-                                  <span style={{ fontSize: 14, fontWeight: 700, color: '#0D2E25', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.so_banh !== null ? `${i.so_banh} b · ` : ''}{i.lot_so_lo || i.lot_code}</span>
-                                </span>
-                                <span className={`kmx-chip ${chip.cls}`} style={{ flex: '0 0 auto' }}>{chip.text}</span>
-                              </span>
-                              <span className="kmx-sm">{i.vi_tri ? `${MIX_VI_TRI_LABELS[i.vi_tri]} · ` : ''}{i.gross_kg !== null ? (i.pallet_kg !== null ? `cả pallet ${kg1(i.gross_kg)} − bì ${kg1(i.pallet_kg)} = ` : 'cả pallet ') : ''}<b className="kmx-mono" style={{ color: '#0D2E25' }}>{kg1(i.kg_out)} kg</b>{i.gross_kg !== null && i.pallet_kg === null ? ' (bì trừ lúc trả)' : ''}{i.kg_return !== null ? ` · trả ${kg1(i.kg_return)} · tiêu hao ${kg1(i.kg_used)}` : ''} · {hm(i.out_at)}{i.out_by && i.out_by !== me && i.out_name ? ` · ${firstName(i.out_name)}` : ''}</span>
-                            </Link>
-                            {i.status === 'issued' && <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-btn sec" style={{ minHeight: 42, fontSize: 14, textDecoration: 'none' }}>{I.lines}Trả L{k + 1} · cân cuối ca</Link>}
-                          </div>
-                        )
-                      })}
-                    </div>
+            )}
+                <div className="kmx-row">
+                  <span className="kmx-lbl">{nhanCa} · đã chèn {items.length} lần</span>
+                  <span className={`kmx-chip ${tg.issued ? 'amb' : items.length ? 'ok' : 'mut'}`}>{tg.issued ? `${tg.issued} lần đang ở dây chuyền` : items.length ? 'đã trả hết' : 'chưa chèn lần nào'}</span>
+                </div>
+                {items.length > 0 && (
+                  <div className="kmx-grid3">
+                    <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Đã lấy</span><span className="kmx-num md">{fmtKg(tg.lay)}</span><span className="kmx-sm">{tg.banh ? `${tg.banh} bành` : 'kg'}</span></div>
+                    <div className="kmx-stat" style={tg.dayChuyen > 0 ? { background: '#FEF3C7' } : undefined}><span className="kmx-lbl" style={{ fontSize: 10 }}>Dây chuyền</span><span className="kmx-num md" style={tg.dayChuyen > 0 ? { color: '#B45309' } : undefined}>{fmtKg(tg.dayChuyen)}</span><span className="kmx-sm">kg chưa trả</span></div>
+                    <div className="kmx-stat ok"><span className="kmx-lbl ok" style={{ fontSize: 10 }}>Tiêu hao</span><span className="kmx-num md ok">{fmtKg(tg.tieuHao)}</span><span className="kmx-sm">kg đã trả</span></div>
                   </div>
-                )
-              })}
-              {btnLay('kmx-btn')}
-              <span className="kmx-sm kmx-center">Mỗi lần lấy = một pallet: chạm nguồn + số lô, cân cả pallet (băng tải: số bành), bì khai lúc trả. Cuối ca: 3 lần cân, chụp 2 ảnh. "Kết thúc" đóng lệnh và tự gửi mail báo cáo cho BGĐ (QS được phân công, thủ kho NVL, BGĐ).</span>
+                )}
+                {items.length > 0 && <div className="kmx-list">{items.map((i, k) => dongLan(i, k + 1))}</div>}
+                <Link to={`/m/kho/chen/lay?lenh=${g.id}`} className="kmx-btn" aria-disabled={!canTake} onClick={(e) => { if (!canTake) e.preventDefault() }} style={!canTake ? { opacity: 0.45 } : undefined}>{I.plus}Lấy lần {items.length + 1}{lenhsAsc.length > 1 ? ` · ${g.ma_gop}` : ''}</Link>
+              </section>
+            )
+          })}
+          {itemsChuaLenh.length > 0 && (
+            <section className="kmx-card" aria-label="Chưa gắn lệnh" style={{ gap: 8, borderColor: '#FDE68A' }}>
+              <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Chưa gắn lệnh · {itemsChuaLenh.length} lần</span><span className="kmx-chip amb">{kg1(tongCua(itemsChuaLenh).lay)} kg</span></div>
+              <span className="kmx-sm">Lấy trước khi khai lệnh. Khai lệnh duy nhất thì máy tự gắn; còn lại mở phiếu → Đổi mã.</span>
+              <div className="kmx-list">{itemsChuaLenh.map((i, k) => dongLan(i, k + 1))}</div>
             </section>
-          ) : (
+          )}
+          {!lenhsAsc.length && (
             <section className="kmx-card hero" aria-label="Việc tiếp theo">
               <span className="kmx-lbl ok">Đầu ca</span>
-              <span className="kmx-strong" style={{ fontSize: 18 }}>Chưa chèn lần nào ca này</span>
-              <span className="kmx-md">Chạm nguồn (chuẩn / lỗi / DKL / SBR) + số lô trên bao, cân cả pallet, chụp 2 ảnh. Không cần nhập kho chèn trước. Các lần sau hiện thành dòng L1, L2… như sổ tay.</span>
+              <span className="kmx-strong" style={{ fontSize: 18 }}>Chưa khai lệnh đang chạy</span>
+              <span className="kmx-md">Bấm "Bắt đầu lệnh…" ở trên, chạm mã chạy (một hay nhiều mã), rồi lấy hàng chèn trong thẻ của lệnh. Lấy trước vẫn được nhưng phiếu nằm ở "chưa gắn lệnh".</span>
               {btnLay('kmx-btn')}
-              {!canTake && !loading && <span className="kmx-sm kmx-center">Chưa được phân công khai báo (QS) — xem Hàng chèn → Phân công.</span>}
               {!canTake && !role.loading && <span className="kmx-sm kmx-center">Tài khoản này chưa được phân công khai báo hàng chèn (QS). BGĐ phân công ở máy tính: Hàng chèn → Phân công.</span>}
             </section>
           )}
+          <span className="kmx-sm kmx-center">Mỗi lần lấy = một pallet: chạm nguồn + số lô, cân cả pallet (băng tải: số bành), bì khai lúc trả. Cuối ca: 3 lần cân, chụp 2 ảnh. "Kết thúc" đóng lệnh và tự gửi mail báo cáo cho BGĐ.</span>
 
           {otherIssued.length > 0 && (
             <section aria-label="Đang ở dây chuyền ca khác" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

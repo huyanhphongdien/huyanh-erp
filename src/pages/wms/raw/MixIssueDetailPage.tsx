@@ -172,7 +172,7 @@ export default function MixIssueDetailPage() {
                   {!issue.shift_id && (
                     <Row gutter={12}>
                       <Col span={12}><Text>Ca (phiếu bàn giao chưa có ca) *</Text><Select style={{ width: '100%' }} value={retShiftId} onChange={setRetShiftId} options={shifts.map((s) => ({ value: s.id, label: s.name || s.code }))} placeholder="Chọn ca" /></Col>
-                      <Col span={12}><Text>Tổ trưởng</Text><Input value={retTeam} onChange={(e) => setRetTeam(e.target.value)} placeholder="Vang / Hiền" /></Col>
+                      <Col span={12}><Text>Tổ trưởng</Text><Select style={{ width: '100%' }} allowClear value={retTeam || undefined} onChange={(v) => setRetTeam(v ?? '')} options={[{ value: 'Vang', label: 'Ca Vang' }, { value: 'Hiền', label: 'Ca Hiền' }]} placeholder="Ca Vang / Ca Hiền" /></Col>
                     </Row>
                   )}
                   <Row gutter={12}>

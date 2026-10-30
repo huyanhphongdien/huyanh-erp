@@ -9,7 +9,6 @@ import { useAuthStore } from '../../../stores/authStore'
 import { fgLotService, goiYSoLoKeTiep, FG_QC_CHIP, FG_QC_LABELS, type FgLot, type FgStockByMaterial } from '../../../services/wms/fgLotService'
 import { rawLotService, type RawLotBalance } from '../../../services/wms/rawLotService'
 import { shiftBookService, type ShiftMaterial } from '../../../services/wms/shiftBookService'
-import { mixService } from '../../../services/wms/mixService'
 import type { OpsShiftOption } from '../../../services/opsService'
 import { useRawRole } from '../../../hooks/useRawRole'
 import { FacilitySelect, KhoAppBar, Msg, fmtD, fmtKg, inp, inpBig, lbl, todayLocal, useKhoFacility } from './khoCommon'
@@ -33,7 +32,7 @@ export default function KhoFgLots() {
   const [shift, setShift] = useState<ShiftPick | null>(null)
   const [shifts, setShifts] = useState<OpsShiftOption[]>([])
   const [pickShift, setPickShift] = useState(false)
-  const [teams, setTeams] = useState<string[]>(['Vang', 'Hiền'])
+  const teams = ['Vang', 'Hiền']
   const [team, setTeam] = useState('')
   const [materialId, setMaterialId] = useState('')
   const [soLo, setSoLo] = useState('')
@@ -58,8 +57,8 @@ export default function KhoFgLots() {
     if (!facilityId) return
     setAdding(true); setMsg(null)
     try {
-      const [m, r, d, t] = await Promise.all([shiftBookService.listMaterials(), rawLotService.list(facilityId, { onlyWithStock: false }), detectShift(user?.employee_id || null), mixService.listTeams(facilityId)])
-      setMaterials(m.filter((x) => x.weightPerUnit && !['CHEN'].includes(x.code))); setRawLots(r.filter((x) => x.trang_thai === 'dang_chay' || x.trang_thai === 'san_sang' || x.trang_thai === 'da_chay_xong').slice(0, 20)); setShifts(d.shifts); setShift(d.pick); setTeams([...new Set([...t, 'Đen', 'Vàng'])])
+      const [m, r, d] = await Promise.all([shiftBookService.listMaterials(), rawLotService.list(facilityId, { onlyWithStock: false }), detectShift(user?.employee_id || null)])
+      setMaterials(m.filter((x) => x.weightPerUnit && !['CHEN'].includes(x.code))); setRawLots(r.filter((x) => x.trang_thai === 'dang_chay' || x.trang_thai === 'san_sang' || x.trang_thai === 'da_chay_xong').slice(0, 20)); setShifts(d.shifts); setShift(d.pick)
       const dc = r.find((x) => x.trang_thai === 'dang_chay'); if (dc) setRawLotId(dc.raw_lot_id)
     } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không tải được danh mục' }) }
   }

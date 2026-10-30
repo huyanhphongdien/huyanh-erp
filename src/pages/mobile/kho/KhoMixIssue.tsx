@@ -62,7 +62,7 @@ export default function KhoMixIssue() {
   const [shifts, setShifts] = useState<OpsShiftOption[]>([])
   const [pickShift, setPickShift] = useState(false)
   const [team, setTeam] = useState('')
-  const [teams, setTeams] = useState<string[]>(['Vang', 'Hiền'])
+  const teams = ['Vang', 'Hiền']
   const [big, setBig] = useState<{ src: string; cap: string } | null>(null)
   const role = useMixRole(i?.facility_id ?? null)
 
@@ -84,7 +84,6 @@ export default function KhoMixIssue() {
     if (!i || i.shift_id || i.status !== 'issued') return
     let alive = true
     detectShift(user?.employee_id || null).then((d) => { if (alive) { setShifts(d.shifts); setShift((cur) => cur ?? d.pick) } }).catch(() => { /* bỏ qua */ })
-    mixService.listTeams(i.facility_id).then((t) => { if (alive) setTeams([...new Set(['Vang', 'Hiền', ...t])]) }).catch(() => { /* bỏ qua */ })
     return () => { alive = false }
   }, [i?.id, i?.shift_id, i?.status]) // eslint-disable-line react-hooks/exhaustive-deps
 

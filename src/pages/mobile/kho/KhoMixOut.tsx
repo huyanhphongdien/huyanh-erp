@@ -48,9 +48,8 @@ export default function KhoMixOut() {
   const [shift, setShift] = useState<ShiftPick | null>(null)
   const [shifts, setShifts] = useState<OpsShiftOption[]>([])
   const [pickShift, setPickShift] = useState(false)
-  const [teams, setTeams] = useState<string[]>(DEFAULT_TEAMS)
+  const teams = DEFAULT_TEAMS
   const [team, setTeam] = useState('')
-  const [teamOther, setTeamOther] = useState(false)
   const [purpose, setPurpose] = useState<MixPurpose>('chay_lai')
   const [targetIndex, setTargetIndex] = useState('Po')
   const [targetValue, setTargetValue] = useState('')
@@ -67,12 +66,11 @@ export default function KhoMixOut() {
   useEffect(() => {
     if (!facilityId) return
     let alive = true
-    Promise.all([mixService.listLots(facilityId), rawSettingsService.getForFacility(facilityId), mixService.listTeams(facilityId), detectShift(user?.employee_id || null), rawLotService.maDangChay(facilityId).catch(() => [] as RawLotBalance[]), mixService.listIssues({ facilityId, date: todayLocal(), limit: 100 }).catch(() => [] as MixIssue[])])
-      .then(([l, s, t, d, m, ci]) => {
+    Promise.all([mixService.listLots(facilityId), rawSettingsService.getForFacility(facilityId), detectShift(user?.employee_id || null), rawLotService.maDangChay(facilityId).catch(() => [] as RawLotBalance[]), mixService.listIssues({ facilityId, date: todayLocal(), limit: 100 }).catch(() => [] as MixIssue[])])
+      .then(([l, s, d, m, ci]) => {
         if (!alive) return
         const ok = l.filter((x) => x.ton_kg > 0.005)
         setLots(ok); setSettings(s); setShifts(d.shifts); setShift(d.pick); setMaList(m); setCaIssues(ci.filter((x) => x.status !== 'cancelled'))
-        const tl = [...new Set([...DEFAULT_TEAMS, ...t])]; setTeams(tl)
         const pre = sp.get('lot'); const hit = pre ? ok.find((x) => x.id === pre) : null
         if (hit && !(hit.source_type === 'dkl' && !hit.metal_cleared)) { setLot(hit); setStep(2) }
       })
@@ -269,10 +267,8 @@ export default function KhoMixOut() {
             <div className="kmx-col" style={{ gap: 6 }}>
               <span className="kmx-lbl">Tổ trưởng · ca của ai</span>
               <div className="kmx-seg">
-                {teams.map((t) => <button key={t} type="button" className={!teamOther && team === t ? 'on' : ''} onClick={() => { setTeam(t); setTeamOther(false) }}>Ca {t}</button>)}
-                <button type="button" className={teamOther ? 'on' : ''} onClick={() => { setTeamOther(true); setTeam('') }}>Khác…</button>
+                {teams.map((t) => <button key={t} type="button" className={team === t ? 'on' : ''} onClick={() => setTeam(t)}>Ca {t}</button>)}
               </div>
-              {teamOther && <input className="kmx-text" placeholder="Tên tổ trưởng (vd Vang)" value={team} onChange={(e) => setTeam(e.target.value)} aria-label="Tên tổ" />}
             </div>
             <div className="kmx-col" style={{ gap: 6 }}>
               <span className="kmx-lbl">Dùng để</span>

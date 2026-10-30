@@ -314,9 +314,9 @@ export default function KhoMixIssue() {
             </div>
             {tieuHao !== null && (
               <div className="kmx-tint col">
-                <div className="kmx-row"><span style={{ fontWeight: 600 }}>Tiêu hao ca này</span><span className="kmx-num md">{fmtKg(tieuHao)} kg</span></div>
+                <div className="kmx-row"><span style={{ fontWeight: 600 }}>Tiêu hao ca này</span><span className="kmx-num md">{kgTxt(tieuHao)} kg</span></div>
                 <div className="kmx-bar"><span style={{ width: `${Math.min(p, 100)}%` }} /></div>
-                <div className="kmx-row" style={{ fontSize: 11, fontWeight: 600, color: '#4B5563' }}><span>Đã dùng {fmtKg(tieuHao)} kg ({p} %)</span><span>Trả {fmtKg(kgRetN)} kg</span></div>
+                <div className="kmx-row" style={{ fontSize: 11, fontWeight: 600, color: '#4B5563' }}><span>Đã dùng {kgTxt(tieuHao)} kg ({p} %)</span><span>Trả {kgTxt(kgRetN)} kg</span></div>
               </div>
             )}
             {kgRetN !== null && !kgRetOk && <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Số trả phải từ 0 đến {fmtKg(kgOutNew)} kg</span>}

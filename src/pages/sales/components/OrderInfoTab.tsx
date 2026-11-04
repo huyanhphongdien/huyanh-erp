@@ -32,7 +32,11 @@ export default function OrderInfoTab({ order }: { order: SalesOrder }) {
             <Descriptions.Item label="Trạng thái">
               <Tag color={ORDER_STATUS_COLORS[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="Grade"><Tag color="blue">{gradeLabel}</Tag></Descriptions.Item>
+            <Descriptions.Item label="Grade">
+              {/* Tên hỗn hợp dài (vd "MIXTURES OF NATURAL RUBBER SVR10 AND SBR1502 …") phải xuống dòng,
+                  không thì bảng rộng gấp rưỡi màn hình điện thoại. */}
+              <Tag color="blue" style={{ whiteSpace: 'normal', height: 'auto', lineHeight: 1.5, padding: '2px 8px', wordBreak: 'break-word' }}>{gradeLabel}</Tag>
+            </Descriptions.Item>
             <Descriptions.Item label="Khách hàng" span={2}>{cust?.name || '-'} {cust?.country ? `(${cust.country})` : ''}</Descriptions.Item>
             <Descriptions.Item label="Số lượng">{order.quantity_tons} tấn ({order.quantity_kg?.toLocaleString()} kg)</Descriptions.Item>
             <Descriptions.Item label="Đơn giá">{fmtMoney(order.unit_price, order.currency, { decimals: 0 })} / tấn</Descriptions.Item>

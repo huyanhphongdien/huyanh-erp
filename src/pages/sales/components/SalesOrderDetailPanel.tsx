@@ -105,6 +105,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     return () => window.removeEventListener('resize', onResize)
   }, [])
   const drawerWidth = vw < 768 ? '100%' : Math.min(1200, Math.round(vw * 0.78))
+  // Điện thoại: hàng nút đầu panel chỉ giữ icon (chữ nằm trong tooltip) cho khỏi tràn ngang.
+  const phone = vw < 640
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(false)
@@ -824,31 +826,31 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
                 {order.customer.name}
               </span>
             )}
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {/* Mở rộng → trang chi tiết đầy đủ */}
               <Tooltip title="Mở trang chi tiết đầy đủ">
                 <Button size="small" icon={<ExpandAltOutlined />}
                         onClick={() => { onClose?.(); navigate(`/sales/orders/${order.id}`) }}>
-                  Mở rộng
+                  {!phone && 'Mở rộng'}
                 </Button>
               </Tooltip>
               {/* Copy link — chuẩn hoá với inline mode */}
               <Tooltip title="Copy URL đơn vào clipboard">
                 <Button size="small" icon={<ShareAltOutlined />} onClick={handleCopyLink}>
-                  Copy link
+                  {!phone && 'Copy link'}
                 </Button>
               </Tooltip>
               {/* Xuất PDF */}
               <Tooltip title="In hoặc Save as PDF">
                 <Button size="small" icon={<PrinterOutlined />} onClick={handlePrintPDF}>
-                  Xuất PDF
+                  {!phone && 'Xuất PDF'}
                 </Button>
               </Tooltip>
               {/* Hành động dropdown */}
               <Dropdown menu={{ items: actionMenuItems }} trigger={['click']} placement="bottomRight">
                 <Button size="small" type="primary" icon={<ThunderboltOutlined />}
                         style={{ background: '#1B4D3E' }}>
-                  Hành động <DownOutlined style={{ fontSize: 10 }} />
+                  {!phone && 'Hành động '}<DownOutlined style={{ fontSize: 10 }} />
                 </Button>
               </Dropdown>
               {/* Khóa HĐ — chỉ legacy orders */}

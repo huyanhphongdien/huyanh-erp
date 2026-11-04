@@ -74,6 +74,8 @@ import SalesOrderDetailPanel from './components/SalesOrderDetailPanel'
 import SalesOrderSplitView from './components/SalesOrderSplitView'
 import SalesCommandPalette from './components/SalesCommandPalette'
 import { useOpenTab } from '../../hooks/useOpenTab'
+import { useIsPhone } from '../../hooks/useIsPhone'
+import SalesOrderPhoneList from './components/SalesOrderPhoneList'
 import { userSavedViewsService, type SavedView } from '../../services/userSavedViewsService'
 
 const { Title, Text } = Typography
@@ -249,6 +251,18 @@ const SalesOrderListPage = () => {
       path: `/sales/orders/${record.id}`,
     })
   }
+
+  // ĐIỆN THOẠI (≤ 640px): bảng 20 cột không dùng được → vẽ thẻ (SalesOrderPhoneList),
+  // giấu Views/độ dày/Split/ẩn cột/Excel/chọn nhiều dòng. Dữ liệu + bộ lọc dùng chung.
+  const isPhone = useIsPhone()
+  const [phoneFiltersOpen, setPhoneFiltersOpen] = useState(false)
+  const openCreateTab = () => openTab({
+    key: 'sales-order-create',
+    title: 'Tạo đơn hàng',
+    componentId: 'sales-order-create',
+    props: {},
+    path: '/sales/orders/new',
+  })
 
   // State
   const [orders, setOrders] = useState<SalesOrder[]>([])
@@ -1433,8 +1447,43 @@ const SalesOrderListPage = () => {
   // RENDER
   // ============================================
 
+  // Khối "không có đơn" — dùng chung cho bảng (máy tính) và danh sách thẻ (điện thoại).
+  const emptyState = (
+    // M4-D: Empty state đẹp
+    <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+      <div style={{ fontSize: 64, marginBottom: 12, opacity: 0.6 }}>📦</div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: '#1B4D3E', marginBottom: 6 }}>
+        Không tìm thấy đơn hàng nào
+      </div>
+      <div style={{ fontSize: 13, color: '#6c6a64', marginBottom: 20 }}>
+        {activeFilters.length > 0
+          ? `Bộ lọc hiện tại không có đơn nào khớp (${activeFilters.length} filter đang active).`
+          : 'Chưa có đơn hàng nào trong tháng — bắt đầu tạo đơn đầu tiên.'}
+      </div>
+      <Space>
+        {activeFilters.length > 0 && (
+          <Button onClick={clearAllFilters}>Xóa filter</Button>
+        )}
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => openTab({
+            key: 'sales-order-create',
+            title: 'Tạo đơn hàng',
+            componentId: 'sales-order-create',
+            props: {},
+            path: '/sales/orders/new',
+          })}
+          style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
+        >
+          Tạo đơn mới
+        </Button>
+      </Space>
+    </div>
+  )
+
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: isPhone ? 12 : 24 }}>
       <style>{`
         .inline-edit-cell:hover {
           background: #e6f4ff !important;
@@ -1442,13 +1491,23 @@ const SalesOrderListPage = () => {
         }
       `}</style>
       {/* Header */}
-      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
+      <Row justify="space-between" align="middle" style={{ marginBottom: isPhone ? 12 : 24 }}>
         <Col>
-          <Title level={3} style={{ margin: 0 }}>
+          <Title level={isPhone ? 4 : 3} style={{ margin: 0 }}>
             Đơn hàng bán
           </Title>
         </Col>
         <Col>
+          {isPhone ? (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={openCreateTab}
+              style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E', height: 40, borderRadius: 10, fontWeight: 600 }}
+            >
+              Tạo đơn
+            </Button>
+          ) : (
           <Space>
             {/* M4-B: Saved Views dropdown */}
             <Dropdown
@@ -1568,6 +1627,7 @@ const SalesOrderListPage = () => {
               Tạo đơn hàng
             </Button>
           </Space>
+          )}
         </Col>
       </Row>
 
@@ -1657,6 +1717,7 @@ const SalesOrderListPage = () => {
             🚨 Quá ETD ({stats.overdue_etd})
           </Button>
         )}
+        {!isPhone && (<>
         {/* M1: Tùy chỉnh cột — dropdown checkbox */}
         <Dropdown
           trigger={['click']}
@@ -1696,6 +1757,7 @@ const SalesOrderListPage = () => {
         >
           Xuất Excel (theo bộ lọc)
         </Button>
+        </>)}
       </div>
 
       {/* Q2: Banner "đang lọc Quá ETD" + "Đang sắp xếp" — đã bỏ.
@@ -1716,6 +1778,19 @@ const SalesOrderListPage = () => {
               prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
             />
           </Col>
+          {isPhone && (
+            <Col xs={24} style={{ paddingTop: 0 }}>
+              <Button
+                type="link"
+                size="small"
+                style={{ padding: 0, height: 'auto', fontWeight: 600 }}
+                onClick={() => setPhoneFiltersOpen((v) => !v)}
+              >
+                {phoneFiltersOpen || customerFilter || gradeFilter || dateRange ? '▴ Thu gọn bộ lọc' : '▾ Bộ lọc thêm (khách, grade, ngày)'}
+              </Button>
+            </Col>
+          )}
+          {(!isPhone || phoneFiltersOpen || !!customerFilter || !!gradeFilter || !!dateRange) && (<>
           <Col xs={12} sm={5} md={5}>
             <Select
               value={customerFilter}
@@ -1763,6 +1838,7 @@ const SalesOrderListPage = () => {
               allowClear
             />
           </Col>
+          </>)}
         </Row>
       </Card>
 
@@ -1770,7 +1846,7 @@ const SalesOrderListPage = () => {
           User hover row sẽ thấy tooltip giải thích — không cần legend chip riêng. */}
 
       {/* Bulk action bar — hiện khi có row được chọn */}
-      {selectedRowKeys.length > 0 && (
+      {!isPhone && selectedRowKeys.length > 0 && (
         <div style={{
           padding: '8px 14px',
           background: '#e6f4ff',
@@ -1840,8 +1916,23 @@ const SalesOrderListPage = () => {
         </div>
       )}
 
-      {/* Body: Split view HOẶC Table view tuỳ viewMode */}
-      {viewMode === 'split' ? (
+      {/* Body: điện thoại → thẻ · máy tính → Split view HOẶC Table view tuỳ viewMode */}
+      {isPhone ? (
+        <SalesOrderPhoneList
+          orders={orders}
+          loading={loading}
+          lotProgress={lotProgress}
+          lotPay={lotPay}
+          page={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total,
+            onChange: (page) => setPagination((prev) => ({ ...prev, current: page })),
+          }}
+          onOpen={(o) => { setPanelOrderId(o.id); setPanelOpen(true) }}
+          empty={emptyState}
+        />
+      ) : viewMode === 'split' ? (
         <SalesOrderSplitView
           orders={orders}
           loading={loading}
@@ -1912,41 +2003,7 @@ const SalesOrderListPage = () => {
           onChange={handleTableChange}
           scroll={{ x: 1850 }}
           size={densityConfig.size}
-          locale={{
-            emptyText: (
-              // M4-D: Empty state đẹp
-              <div style={{ padding: '48px 24px', textAlign: 'center' }}>
-                <div style={{ fontSize: 64, marginBottom: 12, opacity: 0.6 }}>📦</div>
-                <div style={{ fontSize: 16, fontWeight: 600, color: '#1B4D3E', marginBottom: 6 }}>
-                  Không tìm thấy đơn hàng nào
-                </div>
-                <div style={{ fontSize: 13, color: '#6c6a64', marginBottom: 20 }}>
-                  {activeFilters.length > 0
-                    ? `Bộ lọc hiện tại không có đơn nào khớp (${activeFilters.length} filter đang active).`
-                    : 'Chưa có đơn hàng nào trong tháng — bắt đầu tạo đơn đầu tiên.'}
-                </div>
-                <Space>
-                  {activeFilters.length > 0 && (
-                    <Button onClick={clearAllFilters}>Xóa filter</Button>
-                  )}
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={() => openTab({
-                      key: 'sales-order-create',
-                      title: 'Tạo đơn hàng',
-                      componentId: 'sales-order-create',
-                      props: {},
-                      path: '/sales/orders/new',
-                    })}
-                    style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
-                  >
-                    Tạo đơn mới
-                  </Button>
-                </Space>
-              </div>
-            ),
-          }}
+          locale={{ emptyText: emptyState }}
           onRow={(record) => ({
             onClick: () => {
               setPanelOrderId(record.id)

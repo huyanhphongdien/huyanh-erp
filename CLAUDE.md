@@ -38,6 +38,11 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
 - Tailwind utility classes preferred over inline styles (except legacy pages)
 - TanStack Query keys: `['entity-name', ...params]`; `staleTime: 5 * 60 * 1000` for heavy queries
 - Supabase joins: use `!fk_name` syntax for explicit FK references
+- **Điện thoại (≤ 640px)**: hook `src/hooks/useIsPhone.ts`. Sổ đơn hàng bán (`SalesOrderListPage`) trên điện thoại vẽ THẺ
+  (`components/SalesOrderPhoneList.tsx`) thay cho bảng 20 cột và giấu Views/độ dày/Split/ẩn cột/Excel/chọn nhiều dòng
+  (04/11/2026, đo bằng Chrome DevTools MCP). Thêm cột mới cho Sổ đơn → cân nhắc thêm vào thẻ; chi tiết đơn mở bằng
+  `SalesOrderDetailPanel` (drawer 100% trên điện thoại). Kiểm tra UI điện thoại: MCP `chrome-devtools` đã cài (user scope),
+  `emulate viewport 390x844x3,mobile,touch` rồi `evaluate_script` đo `scrollWidth` + phần tử rộng hơn `innerWidth`.
 
 ## Deploy Targets (CRITICAL)
 - **huyanhrubber.vn** = ERP (this project) → Vercel, auto-deploy from GitHub `main`

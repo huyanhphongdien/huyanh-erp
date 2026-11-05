@@ -101,9 +101,9 @@ export default function KhoMixStock() {
                 <span className="kmx-col" style={{ alignItems: 'flex-end' }}><span className={`kmx-num lg${khoa || l.ton_kg <= 0.005 ? ' mut' : ''}`}>{fmtKg(l.ton_kg)}</span><span className="kmx-sm" style={{ fontWeight: 600 }}>kg · {l.ton_banh} bành</span></span>
               </div>
               <div className="kmx-grid3" style={{ gap: 6 }}>
-                <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Nhập{l.so_banh_in !== null ? ` · ${l.so_banh_in} bành` : ''}</span><span className="kmx-num sm">{fmtKg(l.kg_in)}</span></div>
-                <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Tiêu hao</span><span className="kmx-num sm">{fmtKg(l.kg_used)}</span></div>
-                <div className="kmx-stat" style={l.kg_at_line > 0 ? { background: '#FEF3C7' } : undefined}><span className="kmx-lbl" style={{ fontSize: 10 }}>Dây chuyền</span><span className="kmx-num sm" style={l.kg_at_line > 0 ? { color: '#B45309' } : undefined}>{fmtKg(l.kg_at_line)}</span></div>
+                <div className="kmx-stat"><span className="kmx-lbl">Nhập</span><span className="kmx-num sm">{fmtKg(l.kg_in)}</span>{l.so_banh_in !== null && <span className="kmx-sm">{l.so_banh_in} bành</span>}</div>
+                <div className="kmx-stat"><span className="kmx-lbl">Tiêu hao</span><span className="kmx-num sm">{fmtKg(l.kg_used)}</span></div>
+                <div className="kmx-stat" style={l.kg_at_line > 0 ? { background: '#FEF3C7' } : undefined}><span className="kmx-lbl">Dây chuyền</span><span className="kmx-num sm" style={l.kg_at_line > 0 ? { color: '#B45309' } : undefined}>{fmtKg(l.kg_at_line)}</span></div>
               </div>
               {khoa && (
                 <div className="kmx-col" style={{ gap: 6 }}>
@@ -149,15 +149,22 @@ export default function KhoMixStock() {
         {!moves.length && !loading && <div className="kmx-card muted kmx-center" style={{ fontSize: 13 }}>Chưa có chuyển động</div>}
         {moves.length > 0 && (
           <div className="kmx-list">
-            {moves.map((m, k) => (
-              <div key={`${m.loai}-${m.lot_id}-${m.issue_id ?? ''}-${m.thoi_diem}-${k}`} className="kmx-li">
+            {moves.map((m, k) => {
+              // Dòng có phiếu: CẢ DÒNG là link mở phiếu. Trước đây chỉ mã PC-… (cao 17px) bấm được — quá nhỏ cho ngón tay.
+              const key = `${m.loai}-${m.lot_id}-${m.issue_id ?? ''}-${m.thoi_diem}-${k}`
+              const body = (
+                <>
                 <span className="kmx-col">
-                  <span style={{ fontSize: 13, fontWeight: 600 }}><span className={`kmx-chip ${m.loai === 'nhap_lo' ? 'ok' : m.loai === 'lay' ? 'blue' : m.loai === 'dieu_chinh' ? 'red' : 'amb'}`} style={{ marginRight: 6 }}>{m.loai === 'nhap_lo' ? 'Nhập lô' : m.loai === 'lay' ? 'Lấy' : m.loai === 'dieu_chinh' ? 'Kiểm kê' : 'Trả'}</span>{m.issue_code ? <Link to={`/m/kho/chen/phieu/${m.issue_id}`} className="kmx-mono" style={{ color: '#1B4D3E' }}>{m.issue_code}</Link> : <span className="kmx-mono">{m.lot_code}</span>}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}><span className={`kmx-chip ${m.loai === 'nhap_lo' ? 'ok' : m.loai === 'lay' ? 'blue' : m.loai === 'dieu_chinh' ? 'red' : 'amb'}`} style={{ marginRight: 6 }}>{m.loai === 'nhap_lo' ? 'Nhập lô' : m.loai === 'lay' ? 'Lấy' : m.loai === 'dieu_chinh' ? 'Kiểm kê' : 'Trả'}</span><span className="kmx-mono" style={m.issue_code ? { color: '#1B4D3E' } : undefined}>{m.issue_code || m.lot_code}</span></span>
                   <span className="kmx-sm">{fmtDt(m.thoi_diem)} · {m.mo_ta || ''}{m.nguoi ? ` · ${m.nguoi}` : ''}</span>
                 </span>
                 <span className="kmx-num sm" style={{ color: m.kg < 0 ? '#B91C1C' : '#15803D', whiteSpace: 'nowrap' }}>{m.kg > 0 ? '+' : ''}{fmtKg(m.kg)}</span>
-              </div>
-            ))}
+                </>
+              )
+              return m.issue_code && m.issue_id
+                ? <Link key={key} to={`/m/kho/chen/phieu/${m.issue_id}`} className="kmx-li" style={{ textDecoration: 'none', color: 'inherit' }}>{body}</Link>
+                : <div key={key} className="kmx-li">{body}</div>
+            })}
           </div>
         )}
       </div></div>

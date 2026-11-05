@@ -51,7 +51,7 @@ export function KhoAppBar({ title, sub, back, right, red }: { title: string; sub
 export function FacilitySelect({ value, onChange, facilities }: { value: string | null; onChange: (id: string) => void; facilities: { id: string; code: string; name?: string }[] }) {
   if (facilities.length <= 1) return null
   return (
-    <select value={value ?? ''} onChange={(e) => onChange(e.target.value)} aria-label="Nhà máy" style={{ background: 'rgba(255,255,255,.16)', color: '#fff', border: 0, borderRadius: 10, padding: '6px 8px', fontSize: 13, fontWeight: 700 }}>
+    <select value={value ?? ''} onChange={(e) => onChange(e.target.value)} aria-label="Nhà máy" style={{ background: 'rgba(255,255,255,.16)', color: '#fff', border: 0, borderRadius: 10, padding: '0 8px', minHeight: 40, fontSize: 13, fontWeight: 700 }}>
       {facilities.map((f) => <option key={f.id} value={f.id} style={{ color: '#000' }}>{f.code}</option>)}
     </select>
   )

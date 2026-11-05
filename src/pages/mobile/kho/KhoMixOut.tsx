@@ -269,8 +269,8 @@ export default function KhoMixOut() {
             <div className="kmx-seg">{NGUON.map((n) => <button key={n.k} type="button" className={nguon === n.k ? 'on' : ''} onClick={() => chonNguon(n.k)}>{n.t}</button>)}</div>
             <span className="kmx-sm">{NGUON.find((n) => n.k === nguon)?.s ?? 'Chạm nguồn, rồi chạm lô TP hoặc gõ số lô trên bao. Máy tự ghi vào kho chèn, không cần nhập lô trước.'}</span>
             {nguon === 'dkl' && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: raKimLoai ? '#15803D' : '#B91C1C' }}>
-                <input type="checkbox" checked={raKimLoai} onChange={(e) => setRaKimLoai(e.target.checked)} style={{ width: 20, height: 20 }} /> Đã rà kim loại pallet này (bắt buộc với DKL)
+              <label className="kmx-check-row" style={{ alignItems: 'center', fontSize: 14, fontWeight: 600, color: raKimLoai ? '#15803D' : '#B91C1C' }}>
+                <input type="checkbox" checked={raKimLoai} onChange={(e) => setRaKimLoai(e.target.checked)} /><span>Đã rà kim loại pallet này (bắt buộc với DKL)</span>
               </label>
             )}
           </section>

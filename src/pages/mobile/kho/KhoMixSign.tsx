@@ -127,9 +127,9 @@ export default function KhoMixSign() {
               <div className="kmx-row"><span className="kmx-mono" style={{ fontSize: 15, fontWeight: 700, color: '#0D2E25' }}>{i.code}</span><span className={`kmx-chip ${step.cls}`}>Bước {step.n} · {step.who}</span></div>
               <span className="kmx-md">{fmtD(i.shift_date)} · {i.shift_name || 'ca ?'}{i.team ? ` · Ca ${i.team}` : ''} · lô {i.lot_so_lo || i.lot_code} {MIX_SOURCE_LABELS[i.source_type].toLowerCase()}{i.vi_tri ? ` · chèn ${MIX_VI_TRI_LABELS[i.vi_tri].toLowerCase()}` : ''}{i.ma_goc_all ? ` · vào mã ${i.ma_goc_all}` : ''} · {MIX_PURPOSE_LABELS[i.purpose].toLowerCase()}</span>
               <div className="kmx-grid3">
-                <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Lấy {hm(i.out_at)}{i.so_banh !== null ? ` · ${i.so_banh} b` : ''}</span><span className="kmx-num md">{fmtKg(i.kg_out)}</span></div>
-                <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Trả {hm(i.return_at)}</span><span className="kmx-num md">{fmtKg(i.kg_return)}</span></div>
-                <div className="kmx-stat ok"><span className="kmx-lbl ok" style={{ fontSize: 10 }}>Tiêu hao</span><span className="kmx-num md ok">{fmtKg(i.kg_used)}</span></div>
+                <div className="kmx-stat"><span className="kmx-lbl">Lấy {hm(i.out_at)}</span><span className="kmx-num md">{fmtKg(i.kg_out)}</span>{i.so_banh !== null && <span className="kmx-sm">{i.so_banh} bành</span>}</div>
+                <div className="kmx-stat"><span className="kmx-lbl">Trả {hm(i.return_at)}</span><span className="kmx-num md">{fmtKg(i.kg_return)}</span></div>
+                <div className="kmx-stat ok"><span className="kmx-lbl ok">Tiêu hao</span><span className="kmx-num md ok">{fmtKg(i.kg_used)}</span></div>
               </div>
               <div className="kmx-col" style={{ gap: 6 }}>
                 <span className="kmx-lbl">{outs.length + rets.length} ảnh{i.dung_het ? ` · dùng hết, bì ${i.return_pallet_kg ?? '?'} kg` : ''} · chạm để xem to</span>

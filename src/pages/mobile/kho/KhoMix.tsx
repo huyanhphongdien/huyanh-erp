@@ -225,9 +225,9 @@ export default function KhoMix() {
                 </div>
                 {items.length > 0 && (
                   <div className="kmx-grid3">
-                    <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Đã lấy</span><span className="kmx-num md">{fmtKg(tg.lay)}</span><span className="kmx-sm">{tg.banh ? `${tg.banh} bành` : 'kg'}</span></div>
-                    <div className="kmx-stat" style={tg.dayChuyen > 0 ? { background: '#FEF3C7' } : undefined}><span className="kmx-lbl" style={{ fontSize: 10 }}>Dây chuyền</span><span className="kmx-num md" style={tg.dayChuyen > 0 ? { color: '#B45309' } : undefined}>{fmtKg(tg.dayChuyen)}</span><span className="kmx-sm">kg chưa trả</span></div>
-                    <div className="kmx-stat ok"><span className="kmx-lbl ok" style={{ fontSize: 10 }}>Tiêu hao</span><span className="kmx-num md ok">{fmtKg(tg.tieuHao)}</span><span className="kmx-sm">kg đã trả</span></div>
+                    <div className="kmx-stat"><span className="kmx-lbl">Đã lấy</span><span className="kmx-num md">{fmtKg(tg.lay)}</span><span className="kmx-sm">{tg.banh ? `${tg.banh} bành` : 'kg'}</span></div>
+                    <div className="kmx-stat" style={tg.dayChuyen > 0 ? { background: '#FEF3C7' } : undefined}><span className="kmx-lbl">Dây chuyền</span><span className="kmx-num md" style={tg.dayChuyen > 0 ? { color: '#B45309' } : undefined}>{fmtKg(tg.dayChuyen)}</span><span className="kmx-sm">kg chưa trả</span></div>
+                    <div className="kmx-stat ok"><span className="kmx-lbl ok">Tiêu hao</span><span className="kmx-num md ok">{fmtKg(tg.tieuHao)}</span><span className="kmx-sm">kg đã trả</span></div>
                   </div>
                 )}
                 {items.length > 0 && <div className="kmx-list">{items.map((i, k) => dongLan(i, k + 1))}</div>}
@@ -291,10 +291,11 @@ export default function KhoMix() {
           </section>
 
           <section aria-label="Kho chèn" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className="kmx-col" style={{ padding: '0 2px', gap: 2 }}>
-              <Link to="/m/kho/chen/kho" className="kmx-h2" style={{ display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', color: '#1B4D3E' }}>Kho chèn{I.chev}</Link>
+            {/* Cả khối tiêu đề + dòng tồn là MỘT vùng chạm ≥ 44px (trước chỉ chữ "Kho chèn" cao 19px bấm được) */}
+            <Link to="/m/kho/chen/kho" className="kmx-hlink">
+              <span className="kmx-h2" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1B4D3E' }}>Kho chèn{I.chev}</span>
               <span className="kmx-sm">Tại kho <b className="kmx-mono" style={{ color: '#0D2E25' }}>{fmtKg(bal?.tai_kho_kg)} kg</b> · {bal?.so_lo ?? 0} lô{(bal?.o_day_chuyen_kg ?? 0) > 0 ? ` · đang ở dây chuyền ${fmtKg(bal?.o_day_chuyen_kg)} kg` : ''}</span>
-            </div>
+            </Link>
             {lots.length > 0 ? (
               <div className="kmx-list">
                 {lots.map((l) => {
@@ -302,12 +303,15 @@ export default function KhoMix() {
                   return (
                     <div key={l.id} className="kmx-li">
                       <span className="kmx-col" style={{ minWidth: 0, flex: 1 }}>
-                        <span className="kmx-mono" style={{ fontSize: 15, fontWeight: 800, color: khoa ? '#6B7280' : l.so_lo ? '#0D2E25' : '#B91C1C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.so_lo || 'Chưa có số lô'} <span className="kmx-sm kmx-mono" style={{ fontWeight: 500 }}>{l.code}</span></span>
-                        <span className="kmx-sm" style={{ ...(khoa ? { color: '#B91C1C', fontWeight: 500 } : {}), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{khoa ? 'Dính kim loại · chưa xử lý, chưa lấy được' : (l.source_desc || `${MIX_SOURCE_LABELS[l.source_type]}${l.grade ? ` · ${l.grade}` : ''}`)}</span>
+                        {/* Số lô và mã CH từng chung 1 dòng nowrap → mã CH bị cắt "CH-PD-261031-…". Giờ: số lô (≤ 3 dòng, đủ cho pallet ghép 5 số lô) · dòng dưới mở đầu bằng mã CH, xuống được 2 dòng. */}
+                        <span className="kmx-mono kmx-clamp3" style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.25, color: khoa ? '#6B7280' : l.so_lo ? '#0D2E25' : '#B91C1C' }}>{l.so_lo || 'Chưa có số lô'}</span>
+                        <span className="kmx-sm kmx-clamp2"><span className="kmx-mono">{l.code}</span>{khoa ? '' : ` · ${l.source_desc || `${MIX_SOURCE_LABELS[l.source_type]}${l.grade ? ` · ${l.grade}` : ''}`}`}</span>
+                        {khoa && <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Dính kim loại · chưa xử lý, chưa lấy được</span>}
                       </span>
                       <span className="kmx-col" style={{ alignItems: 'flex-end', flex: '0 0 auto', gap: 0 }}>
                         <span className={`kmx-num sm${khoa ? ' mut' : ''}`} style={{ whiteSpace: 'nowrap' }}>{fmtKg(l.ton_kg)} <span className="kmx-sm">kg</span></span>
-                        <span className="kmx-sm" style={{ whiteSpace: 'nowrap' }}>{l.ton_banh} bành{l.kg_at_line > 0 ? ` · ${fmtKg(l.kg_at_line)} ở dây chuyền` : ''}</span>
+                        <span className="kmx-sm" style={{ whiteSpace: 'nowrap' }}>{l.ton_banh} bành</span>
+                        {l.kg_at_line > 0 && <span className="kmx-sm" style={{ whiteSpace: 'nowrap', color: '#B45309', fontWeight: 600 }}>dây chuyền {fmtKg(l.kg_at_line)}</span>}
                       </span>
                     </div>
                   )
@@ -318,7 +322,7 @@ export default function KhoMix() {
 
           {done.length > 0 && (
             <section aria-label="Đã nhận gần đây" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Link to="/m/kho/chen/phieu" className="kmx-h2" style={{ display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', color: '#1B4D3E' }}>Đã nhận gần đây · xem tất cả{I.chev}</Link>
+              <Link to="/m/kho/chen/phieu" className="kmx-hlink"><span className="kmx-h2" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1B4D3E' }}>Đã nhận gần đây · xem tất cả{I.chev}</span></Link>
               <div className="kmx-list">
                 {done.map((i) => (
                   <Link key={i.id} to={`/m/kho/chen/phieu/${i.id}`} className="kmx-li" style={{ textDecoration: 'none', color: 'inherit' }}>

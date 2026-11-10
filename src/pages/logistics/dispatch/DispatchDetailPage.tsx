@@ -20,6 +20,7 @@ import {
   type DispatchOrder, type DispatchLine, type DispatchStatus,
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
+import DispatchCostSection from './DispatchCostSection'
 
 const { Title, Text } = Typography
 
@@ -254,6 +255,9 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
           scroll={{ x: isPort ? 900 : 600 }}
           locale={{ emptyText: isPort ? 'Chưa có container' : 'Chuyến không có hàng (vd: đón khách) — bỏ trống là bình thường' }} />
       </Card>
+
+      {/* Chi phí đội xe (Đợt 1, 10/11/2026): ngày về, km, hành trình, khoản chi + chứng từ, tạm ứng gắn chuyến, duyệt & khoá */}
+      {order.status !== 'cancelled' && <DispatchCostSection order={order} />}
     </div>
   )
 }

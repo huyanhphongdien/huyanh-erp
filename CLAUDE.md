@@ -208,6 +208,25 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
 - **Treo (owner chưa chốt):** nhập kho WMS nào sau cân; ai chịu chênh lệch cân vs khai báo / ngưỡng báo NCC. Chưa nối
   Đề nghị thanh toán theo từng mã.
 
+## Chi phí đội xe qua Lệnh điều động (Đợt 1, 10/11/2026)
+- Số hoá `docs/Form theo dõi chi phí tài xế.xlsx`: **1 chuyến = 1 `dispatch_orders`**, HC-TH nhập sau khi xe về (tài xế chưa có
+  tài khoản). Mục tiêu đợt này là **quản lý chi phí**; KHÔNG tính lương chuyến (đơn giá, hỗ trợ vượt ngày, dầu/km, tấn) và chưa
+  tính giá vốn vận chuyển theo đơn hàng — đừng tự thêm.
+- Bảng: `fleet_routes` (hành trình, km ước, số ngày chuẩn), cột mới trên `dispatch_orders` (`return_date`, `odometer_start/end_km`,
+  `route_id/route_name`, `standard_days`, `cost_status` open|reviewed), `dispatch_expenses` (1 khoản chi: `kind`, `amount`,
+  `currency` VND|LAK, `fx_rate_vnd`, `amount_vnd` generated, `counted` = công ty chịu), `dispatch_expense_files` (ảnh hoá đơn,
+  bucket **`invoice-images`** thư mục `fleet-receipts/` — bucket riêng không tạo policy được qua agent_sql), `driver_advances`
+  (mã `TU-YYMM-seq`, tạm ứng, gắn lệnh tuỳ chọn). Migration `docs/migrations/fleet_costs_p1.sql` (đã áp 10/11/2026).
+- **Một nguồn số**: view `v_fleet_cost_trips` (1 dòng = 1 lệnh: km = đồng hồ về − đi, ngày = về − đi + 1, vượt = ngày − chuẩn,
+  tổng chi theo đồng tiền GỐC + `*_vnd_equiv` quy đổi) và `v_fleet_cost_month` (tài xế × tháng × đồng tiền: tạm ứng − chi được
+  tính = còn lại). Trang và Excel chỉ đọc view, không tự viết công thức.
+- ⚠ **Cước thuê xe ngoài** (`dispatch_orders.hire_cost`) KHÔNG chép thành dòng `dispatch_expenses` — view cộng thẳng vào
+  `counted_vnd`; UI hiện dòng chỉ-đọc. Nhập hai nơi là đếm đôi.
+- Duyệt: `cost_status='reviewed'` → trigger `fn_dispatch_expense_guard` / `fn_dispatch_expense_file_guard` chặn mọi
+  insert/update/delete khoản chi và chứng từ (mở lại mới sửa). Chứng từ không bắt buộc; sổ đánh dấu `n_missing_receipt`.
+- Service `src/services/logistics/fleetCostService.ts`, Excel `fleetCostExcel.ts` (đúng 26 cột của form, cột lương U–Y để trống),
+  khối `DispatchCostSection.tsx` trong chi tiết lệnh, trang `/logistics/costs` (`FleetCostPage.tsx`), menu VẬN TẢI → Sổ chi phí đội xe.
+
 ## Chấm công — GPS (owner chốt 16/09/2026)
 - **Điện thoại / tablet: BẮT BUỘC toạ độ và phải nằm trong bán kính nhà máy (3 km). Máy tính (PC/laptop): bỏ qua GPS.**
 - Cấu hình ở `attendance_settings` (`setting_key='gps_config'`: `enabled`, `locations[{name,latitude,longitude,radius_meters}]`).

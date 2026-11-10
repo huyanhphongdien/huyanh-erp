@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mock — Chi phí đội xe qua Lệnh điều động</title>
+<style>
+  :root{--green:#1B4D3E;--green2:#2E7D5B;--line:#E5E7EB;--ink:#1F2937;--mut:#6B7280;--bg:#F3F4F6;--soft:#F0F9F4;
+        --gold:#E8A838;--gold-bg:#FFFBEB;--amber:#B45309;--red:#B91C1C;--red-bg:#FEF2F2;--blue:#1d4ed8;--blue-bg:#EFF6FF;--ok:#15803D;--ok-bg:#DCFCE7;
+        --mono:'JetBrains Mono',Consolas,ui-monospace,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Be Vietnam Pro','Segoe UI',Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:14.5px;line-height:1.55}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 16px 72px}
+  .hero{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;padding:30px 28px;border-radius:0 0 16px 16px;margin-bottom:8px}
+  .hero h1{margin:0 0 6px;font-size:24px;font-weight:800}
+  .hero .sub{opacity:.92;font-size:14px;max-width:900px}
+  .hero .pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .hero .pill{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:600}
+  h2{font-size:19px;color:var(--green);border-left:5px solid var(--green);padding:3px 0 3px 12px;margin:36px 0 10px}
+  h2 small{font-weight:500;color:var(--mut);font-size:13px;margin-left:8px}
+  h3{font-size:14.5px;margin:16px 0 8px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .card.new{border:2px dashed var(--green2);background:#FBFDFC;position:relative}
+  .card.new::before{content:'MỚI';position:absolute;top:-10px;left:14px;background:var(--green2);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.08em;padding:1px 8px;border-radius:999px}
+  .muted{color:var(--mut)}.sm{font-size:12.5px}.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .right{text-align:right}.center{text-align:center}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--ink);cursor:default}
+  .btn.p{background:var(--green);color:#fff;border-color:var(--green)}
+  .btn.g{background:var(--gold);color:#0D2E25;border-color:var(--gold)}
+  .btn.dis{opacity:.5}
+  .tag{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600;border:1px solid transparent}
+  .tag.ok{background:var(--ok-bg);color:var(--ok)}.tag.amb{background:#FEF3C7;color:var(--amber)}.tag.red{background:#FEE2E2;color:var(--red)}
+  .tag.blue{background:var(--blue-bg);color:var(--blue)}.tag.mut{background:#F3F4F6;color:#4B5563}.tag.gold{background:var(--gold);color:#0D2E25}
+  .infogrid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:6px}
+  .field{background:#fafafa;border:1px solid var(--line);border-radius:8px;padding:8px 11px;min-width:0}
+  .field .l{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}
+  .field .v{font-size:14px;font-weight:600;margin-top:2px}
+  .field .v.big{font-size:17px;color:var(--green)}
+  .field.amb{background:var(--gold-bg);border-color:#FDE68A}.field.amb .v{color:var(--amber)}
+  .field.in{background:#fff;border:1.5px solid var(--green2)}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13px}
+  th{background:#F9FAFB;color:#374151;font-weight:700;text-align:left;padding:8px 8px;border-bottom:2px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap}
+  td{padding:8px 8px;border-bottom:1px solid #F1F5F9;vertical-align:top}
+  td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  tr.total td{font-weight:800;background:#F9FAFB;border-top:2px solid var(--line)}
+  tr.sub td{font-weight:700;background:var(--soft)}
+  .kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin:10px 0}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .kpi .l{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}
+  .kpi .v{font-size:19px;font-weight:800;font-family:var(--mono);color:var(--green);margin-top:2px}
+  .kpi .v.amb{color:var(--amber)}.kpi .v.red{color:var(--red)}.kpi .v.ok{color:var(--ok)}
+  .kpi .s{font-size:11.5px;color:var(--mut)}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:10px}
+  .sel{border:1px solid #D1D5DB;border-radius:8px;padding:5px 10px;font-size:13px;background:#fff;min-width:120px}
+  .sel b{color:var(--green)}
+  .tabs{display:flex;gap:2px;border-bottom:2px solid var(--line);margin:14px 0 0}
+  .tabs .t{padding:8px 14px;font-size:13.5px;font-weight:600;color:#4b5563;border-bottom:3px solid transparent;margin-bottom:-2px}
+  .tabs .t.on{color:var(--green);border-bottom-color:var(--green)}
+  .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}
+  .step{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;position:relative}
+  .step .n{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;font-weight:800;align-items:center;justify-content:center;margin-bottom:4px}
+  .step.have{border-color:#CBD5E1;background:#F8FAFC}.step.have .n{background:#64748B}
+  .step b{display:block;font-size:13.5px}.step span{font-size:12px;color:var(--mut)}
+  .modal{max-width:560px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 12px 36px rgba(0,0,0,.14);overflow:hidden}
+  .modal .hd{background:#F9FAFB;border-bottom:1px solid var(--line);padding:10px 16px;font-weight:700}
+  .modal .bd{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+  .modal .bd .full{grid-column:1/-1}
+  .inp{border:1px solid #D1D5DB;border-radius:8px;padding:6px 10px;font-size:13.5px;background:#fff;min-height:34px;display:flex;align-items:center;justify-content:space-between}
+  .inp.ph{color:#9CA3AF}
+  .lbl{font-size:11.5px;color:var(--mut);margin-bottom:3px;display:block}
+  .modal .ft{padding:10px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+  .switch{display:inline-block;width:38px;height:20px;border-radius:999px;background:var(--green);position:relative;vertical-align:middle}
+  .switch::after{content:'';position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff}
+  .switch.off{background:#D1D5DB}.switch.off::after{right:auto;left:2px}
+  .note{background:var(--gold-bg);border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;font-size:13.5px;margin:10px 0}
+  .note.red{background:var(--red-bg);border-color:#FECACA}
+  .cols2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .thumb{display:inline-block;width:34px;height:26px;border-radius:4px;background:#D1E3DC;border:1px solid #9CC3B5;vertical-align:middle}
+  .thumb.none{background:#F3F4F6;border:1px dashed #D1D5DB}
+  code{font-family:var(--mono);font-size:12.5px;background:#F3F4F6;padding:1px 5px;border-radius:4px}
+  ul.tight{margin:6px 0 0 18px;padding:0}ul.tight li{margin:3px 0}
+  @media (max-width:900px){.infogrid{grid-template-columns:repeat(2,1fr)}.kpis{grid-template-columns:repeat(3,1fr)}.flow{grid-template-columns:1fr}.cols2{grid-template-columns:1fr}.modal .bd{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>Chi phí đội xe quản lý qua Lệnh điều động</h1>
+    <div class="sub">Mock Đợt 1 (10/11/2026): số hoá <b>Form theo dõi chi phí tài xế.xlsx</b>. Mỗi chuyến = một lệnh điều động đã có sẵn; hành chính nhập thêm ngày về, km, các khoản chi và tạm ứng. Cuối tháng ERP tự ra sổ theo tài xế đúng bố cục form, cộng thêm góc nhìn theo xe và theo loại chi.</div>
+    <div class="pills">
+      <span class="pill">Người nhập: HC-TH (bước đầu)</span>
+      <span class="pill">Kế toán duyệt "được tính"</span>
+      <span class="pill">Chưa tính lương chuyến</span>
+      <span class="pill">LAK giữ cột riêng + quy đổi tham khảo</span>
+      <span class="pill">Xe thuê ngoài: cước thuê = 1 dòng chi</span>
+    </div>
+  </div>
+
+  <h2>0 · Luồng việc</h2>
+  <div class="flow">
+    <div class="step have"><span class="n">1</span><b>Lệnh điều động</b><span>đã có: ngày đi, xe, moóc, tài xế, điểm đến, tấn đã cân</span></div>
+    <div class="step"><span class="n">2</span><b>Xe về · HC-TH nhập</b><span>ngày về, km đồng hồ, hành trình, từng khoản chi theo phiếu + hoá đơn tài xế nộp</span></div>
+    <div class="step"><span class="n">3</span><b>Kế toán duyệt</b><span>bật/tắt "được tính" từng khoản, khoá chuyến</span></div>
+    <div class="step"><span class="n">4</span><b>Sổ tháng</b><span>theo tài xế (= form Excel), theo xe, theo loại chi · xuất .xlsx</span></div>
+    <div class="step"><span class="n">5</span><b>Đối soát tạm ứng</b><span>tạm ứng − chi được tính = còn lại, hoàn quỹ hay chi thêm</span></div>
+  </div>
+
+  <h2>1 · Chi tiết lệnh điều động <small>/logistics/dispatch/:id — thêm một khối dưới bảng container</small></h2>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div><b style="font-size:16px" class="mono">LDD-2611-007</b> &nbsp;<span class="tag blue">Xuất hàng đi cảng</span> &nbsp;<span class="tag ok">Đã điều động</span></div>
+      <div class="muted sm">03/11/2026 · 75H-042.82 / 75RM-00150 · Bùi Văn Nghĩa · QINGDAO, CHINA · 2 cont · 40.320 kg</div>
+    </div>
+    <div class="muted sm" style="margin-top:4px">… (phần đầu trang và bảng container giữ nguyên như hiện nay) …</div>
+  </div>
+
+  <div class="card new">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">🧾 Hành trình &amp; chi phí chuyến</h3>
+      <div class="row"><span class="tag amb">Chờ kế toán duyệt</span><span class="btn">✎ Sửa hành trình</span><span class="btn p">＋ Thêm khoản chi</span></div>
+    </div>
+    <div class="infogrid">
+      <div class="field"><div class="l">Ngày đi</div><div class="v">03/11/2026</div></div>
+      <div class="field in"><div class="l">Ngày về</div><div class="v">04/11/2026</div></div>
+      <div class="field"><div class="l">Tổng ngày đi và về</div><div class="v big">2</div></div>
+      <div class="field in"><div class="l">Hành trình</div><div class="v">Phong Điền → Cảng Tiên Sa, Đà Nẵng</div></div>
+      <div class="field"><div class="l">Tấn (theo cân)</div><div class="v mono">40,32</div></div>
+      <div class="field in"><div class="l">Km đồng hồ lúc đi</div><div class="v mono">125.430</div></div>
+      <div class="field in"><div class="l">Km đồng hồ lúc về</div><div class="v mono">125.740</div></div>
+      <div class="field"><div class="l">Km chuyến</div><div class="v big mono">310</div></div>
+      <div class="field"><div class="l">Số ngày chuẩn (theo hành trình)</div><div class="v">1 ngày</div></div>
+      <div class="field amb"><div class="l">Vượt thời gian</div><div class="v">+1 ngày</div></div>
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Loại chi</th><th>Nội dung</th><th class="num">Số tiền</th><th>Đ.tiền</th><th class="num">≈ VNĐ</th><th class="center">Được tính</th><th>Chứng từ</th><th>Người nhập</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><span class="tag mut">Dầu</span></td><td>Petrolimex Phong Điền · 95 lít</td><td class="num">2.450.000</td><td>VNĐ</td><td class="num">2.450.000</td><td class="center">☑</td><td><span class="thumb"></span></td><td class="sm">Lý Phương · 04/11 15:20</td></tr>
+        <tr><td>2</td><td><span class="tag mut">Phí đường / BOT</span></td><td>Trạm Phú Bài + Bắc Hải Vân, 2 lượt</td><td class="num">640.000</td><td>VNĐ</td><td class="num">640.000</td><td class="center">☑</td><td><span class="thumb"></span></td><td class="sm">Lý Phương</td></tr>
+        <tr><td>3</td><td><span class="tag mut">Cầu cảng / nâng hạ</span></td><td>Cảng Tiên Sa, 2 cont</td><td class="num">1.200.000</td><td>VNĐ</td><td class="num">1.200.000</td><td class="center">☑</td><td><span class="thumb"></span></td><td class="sm">Lý Phương</td></tr>
+        <tr><td>4</td><td><span class="tag mut">Ăn ở</span></td><td>2 ngày × 150.000</td><td class="num">300.000</td><td>VNĐ</td><td class="num">300.000</td><td class="center">☑</td><td><span class="thumb none"></span></td><td class="sm">Lý Phương</td></tr>
+        <tr style="background:var(--red-bg)"><td>5</td><td><span class="tag mut">Sửa chữa / lốp</span></td><td>Vá lốp moóc tại Lăng Cô <span class="sm muted">· lốp này vừa thay 10/2026, tài xế chịu</span></td><td class="num">350.000</td><td>VNĐ</td><td class="num">350.000</td><td class="center"><span class="tag red">☐ không</span></td><td><span class="thumb"></span></td><td class="sm">Lý Phương</td></tr>
+      </tbody>
+      <tfoot>
+        <tr class="total"><td colspan="3">Chi được tính</td><td class="num">4.590.000</td><td>VNĐ</td><td class="num">4.590.000</td><td colspan="3"></td></tr>
+        <tr><td colspan="3" class="muted">Không được tính (tài xế chịu)</td><td class="num muted">350.000</td><td class="muted">VNĐ</td><td class="num muted">350.000</td><td colspan="3"></td></tr>
+      </tfoot>
+    </table>
+    <div class="row" style="justify-content:space-between;margin-top:6px">
+      <div class="sm">Tạm ứng cho chuyến này: <b class="mono">TU-2611-012</b> · 02/11 · <b class="mono">5.000.000 ₫</b> · Lý Phương chi &nbsp;→&nbsp; còn lại sau chuyến <b class="mono" style="color:var(--ok)">+410.000 ₫</b> (tài xế hoàn quỹ, hoặc để cấn vào chuyến sau)</div>
+      <div class="row"><span class="btn">Gắn tạm ứng</span><span class="btn g">✓ Kế toán duyệt &amp; khoá</span></div>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div>
+      <h3>Hộp "Thêm khoản chi"</h3>
+      <div class="modal">
+        <div class="hd">Thêm khoản chi · LDD-2611-007 · Bùi Văn Nghĩa</div>
+        <div class="bd">
+          <div><span class="lbl">Loại chi *</span><div class="inp">Dầu <span>▾</span></div></div>
+          <div><span class="lbl">Ngày chi</span><div class="inp">03/11/2026</div></div>
+          <div class="full"><span class="lbl">Nội dung</span><div class="inp ph">VD: Petrolimex Phong Điền · 95 lít</div></div>
+          <div><span class="lbl">Số tiền *</span><div class="inp mono">2.450.000</div></div>
+          <div><span class="lbl">Đồng tiền</span><div class="inp"><b style="color:var(--green)">VNĐ</b> · LAK</div></div>
+          <div><span class="lbl">Tỷ giá LAK → VNĐ <span class="muted">(chỉ hiện khi chọn LAK)</span></span><div class="inp ph mono">1 LAK = 1,18 ₫ · tỷ giá tháng</div></div>
+          <div><span class="lbl">Được tính vào chi phí công ty</span><div class="inp"><span>Có</span><span class="switch"></span></div></div>
+          <div class="full"><span class="lbl">Ảnh hoá đơn / phiếu</span><div class="inp ph">📷 Chụp hoặc chọn ảnh (nhiều ảnh được)</div></div>
+          <div class="full"><span class="lbl">Ghi chú</span><div class="inp ph">tuỳ chọn</div></div>
+        </div>
+        <div class="ft"><span class="btn">Huỷ</span><span class="btn">Lưu &amp; thêm tiếp</span><span class="btn p">Lưu</span></div>
+      </div>
+      <div class="sm muted" style="margin-top:8px">Loại chi là danh mục cố định: Dầu · Phí đường / BOT · Cầu cảng / nâng hạ · Bốc xếp · Ăn ở · Sửa chữa / lốp · Phí biên giới, hải quan · Gửi xe, rửa xe · Cước thuê xe ngoài · Khác. HC-TH gõ "Khác" nhiều thì thêm loại.</div>
+    </div>
+    <div>
+      <h3>Nhập nhanh cả chuyến từ phiếu tài xế</h3>
+      <div class="card" style="margin-top:0">
+        <div class="sm muted">Tài xế nộp một tờ phiếu giấy cuối chuyến (như hiện nay). HC-TH mở lệnh, bấm <b>Nhập nhanh</b>: gõ một lưới nhiều dòng rồi lưu một lần, đỡ mở hộp từng khoản.</div>
+        <table>
+          <thead><tr><th>Loại chi</th><th>Nội dung</th><th class="num">Số tiền</th><th>Đ.tiền</th><th class="center">Tính</th></tr></thead>
+          <tbody>
+            <tr><td>Dầu</td><td>Petrolimex PĐ</td><td class="num">2.450.000</td><td>VNĐ</td><td class="center">☑</td></tr>
+            <tr><td>Phí đường / BOT</td><td>Phú Bài + Hải Vân</td><td class="num">640.000</td><td>VNĐ</td><td class="center">☑</td></tr>
+            <tr><td>Cầu cảng / nâng hạ</td><td>Tiên Sa 2 cont</td><td class="num">1.200.000</td><td>VNĐ</td><td class="center">☑</td></tr>
+            <tr><td class="muted">＋ dòng mới…</td><td></td><td></td><td></td><td></td></tr>
+          </tbody>
+        </table>
+        <div class="row" style="justify-content:flex-end"><span class="btn p">Lưu 3 khoản</span></div>
+      </div>
+      <div class="note"><b>Chuyến chưa có lệnh điều động</b> (xe đi việc vặt, không in lệnh): HC-TH vẫn tạo một lệnh loại <i>Nội bộ</i> hoặc <i>Khác</i> rồi nhập chi phí vào đó. Nguyên tắc: <b>không có chi phí nào nằm ngoài lệnh</b>, nhờ vậy sổ tháng mới đủ.</div>
+    </div>
+  </div>
+
+  <h2>2 · Sổ chi phí đội xe <small>/logistics/costs — trang mới trong menu VẬN TẢI</small></h2>
+  <div class="toolbar">
+    <span class="sel">Tháng <b>11/2026</b> ▾</span>
+    <span class="sel">Tài xế <b>Bùi Văn Nghĩa</b> ▾</span>
+    <span class="sel">Xe <b>Tất cả</b> ▾</span>
+    <span class="sel">Trạng thái <b>Tất cả</b> ▾</span>
+    <span style="flex:1"></span>
+    <span class="btn">🖨 In</span>
+    <span class="btn g">⬇ Xuất Excel (đúng mẫu form)</span>
+  </div>
+  <div class="tabs"><span class="t on">Theo tài xế</span><span class="t">Theo xe</span><span class="t">Theo loại chi</span><span class="t">Tạm ứng</span><span class="t">Chờ duyệt <span class="tag amb" style="margin-left:4px">2</span></span></div>
+  <div class="kpis">
+    <div class="kpi"><div class="l">Chuyến</div><div class="v">9</div><div class="s">2 chuyến Lào</div></div>
+    <div class="kpi"><div class="l">Km</div><div class="v">2.790</div><div class="s">theo đồng hồ</div></div>
+    <div class="kpi"><div class="l">Chi được tính</div><div class="v">38.420.000</div><div class="s">₫ · + 1.950.000 LAK</div></div>
+    <div class="kpi"><div class="l">Không được tính</div><div class="v amb">1.150.000</div><div class="s">₫ · tài xế chịu</div></div>
+    <div class="kpi"><div class="l">Tạm ứng</div><div class="v">42.000.000</div><div class="s">₫ · + 2.000.000 LAK</div></div>
+    <div class="kpi"><div class="l">Còn lại</div><div class="v ok">3.580.000</div><div class="s">₫ hoàn quỹ · + 50.000 LAK</div></div>
+    <div class="kpi"><div class="l">₫ / km</div><div class="v">13.770</div><div class="s">chi được tính ÷ km</div></div>
+  </div>
+
+  <div class="card" style="overflow-x:auto">
+    <div class="row" style="justify-content:space-between"><b>THEO DÕI CHI PHÍ ĐỘI XE CONTAINER THÁNG 11/2026 · Lái xe: BÙI VĂN NGHĨA</b><span class="sm muted">bố cục = form Excel, một dòng = một lệnh</span></div>
+    <table style="min-width:1500px">
+      <thead>
+        <tr>
+          <th rowspan="2">#</th><th rowspan="2">Lệnh</th><th rowspan="2">Ngày đi</th><th rowspan="2">Ngày về</th><th rowspan="2" class="num">Ngày</th><th rowspan="2">BS xe / moóc</th>
+          <th rowspan="2" class="num">Km đi</th><th rowspan="2" class="num">Km về</th><th rowspan="2" class="num">Km</th><th rowspan="2">Hành trình</th><th rowspan="2" class="num">Ngày chuẩn</th><th rowspan="2" class="num">Vượt</th>
+          <th rowspan="2">Nội dung công việc</th><th rowspan="2">Nội dung chi phí</th>
+          <th colspan="2" class="center">Tạm ứng</th><th colspan="2" class="center" style="background:var(--soft)">Chi được tính</th><th colspan="2" class="center" style="background:var(--red-bg)">Không được tính</th><th rowspan="2">Ghi chú</th>
+        </tr>
+        <tr><th class="num">LAK</th><th class="num">VNĐ</th><th class="num" style="background:var(--soft)">LAK</th><th class="num" style="background:var(--soft)">VNĐ</th><th class="num" style="background:var(--red-bg)">LAK</th><th class="num" style="background:var(--red-bg)">VNĐ</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td class="mono">LDD-2611-001</td><td>01/11</td><td>02/11</td><td class="num">2</td><td class="mono sm">75H-042.82 / RM-007.56</td><td class="num">124.810</td><td class="num">125.120</td><td class="num">310</td><td>PĐ → Cảng Tiên Sa</td><td class="num">1</td><td class="num" style="color:var(--amber)">1</td><td>Xuất 2 cont QINGDAO</td><td class="sm">Dầu, BOT, cầu cảng, ăn ở</td><td class="num"></td><td class="num">5.000.000</td><td class="num"></td><td class="num">4.690.000</td><td class="num"></td><td class="num"></td><td class="sm">kẹt cảng chờ 1 ngày</td></tr>
+        <tr><td>2</td><td class="mono">LDD-2611-006</td><td>03/11</td><td>03/11</td><td class="num">1</td><td class="mono sm">75H-042.82 / RM-007.56</td><td class="num">125.120</td><td class="num">125.430</td><td class="num">310</td><td>PĐ → Cảng Tiên Sa</td><td class="num">1</td><td class="num"></td><td>Xuất 2 cont</td><td class="sm">Dầu, BOT, cầu cảng</td><td class="num"></td><td class="num">4.500.000</td><td class="num"></td><td class="num">4.290.000</td><td class="num"></td><td class="num"></td><td></td></tr>
+        <tr><td>3</td><td class="mono">LDD-2611-007</td><td>03/11</td><td>04/11</td><td class="num">2</td><td class="mono sm">75H-042.82 / RM-00150</td><td class="num">125.430</td><td class="num">125.740</td><td class="num">310</td><td>PĐ → Cảng Tiên Sa</td><td class="num">1</td><td class="num" style="color:var(--amber)">1</td><td>Xuất 2 cont QINGDAO</td><td class="sm">Dầu, BOT, cầu cảng, ăn ở, vá lốp</td><td class="num"></td><td class="num">5.000.000</td><td class="num"></td><td class="num">4.590.000</td><td class="num"></td><td class="num">350.000</td><td class="sm">vá lốp: tài xế chịu</td></tr>
+        <tr style="background:#FBFDFC"><td>4</td><td class="mono">LDD-2611-009</td><td>05/11</td><td>08/11</td><td class="num">4</td><td class="mono sm">75H-042.82 / RM-00150</td><td class="num">125.740</td><td class="num">126.660</td><td class="num">920</td><td>PĐ → Savannakhet (Lào) → PĐ</td><td class="num">4</td><td class="num"></td><td>Lấy mủ NM Lào</td><td class="sm">Dầu Lào, phí biên giới, ăn ở, BOT VN</td><td class="num">2.000.000</td><td class="num">3.000.000</td><td class="num">1.950.000</td><td class="num">1.860.000</td><td class="num"></td><td class="num"></td><td class="sm">LAK quy đổi 1,18 ₫</td></tr>
+        <tr><td>5</td><td class="mono">LDD-2611-012</td><td>09/11</td><td>09/11</td><td class="num">1</td><td class="mono sm">75H-042.82 / RM-007.56</td><td class="num">126.660</td><td class="num">126.720</td><td class="num">60</td><td>PĐ → Tân Lâm</td><td class="num">1</td><td class="num"></td><td>Chuyển pallet nội bộ</td><td class="sm">Dầu</td><td class="num"></td><td class="num">1.000.000</td><td class="num"></td><td class="num">780.000</td><td class="num"></td><td class="num"></td><td></td></tr>
+        <tr><td colspan="21" class="muted center sm">… 4 chuyến nữa …</td></tr>
+      </tbody>
+      <tfoot>
+        <tr class="total"><td colspan="4">TỔNG</td><td class="num">17</td><td></td><td></td><td></td><td class="num">2.790</td><td colspan="5"></td><td class="num">2.000.000</td><td class="num">42.000.000</td><td class="num">1.950.000</td><td class="num">38.420.000</td><td class="num"></td><td class="num">1.150.000</td><td></td></tr>
+        <tr class="sub"><td colspan="14">TẠM ỨNG</td><td class="num">2.000.000</td><td class="num">42.000.000</td><td colspan="5"></td></tr>
+        <tr class="sub"><td colspan="14">TỔNG CHI (được tính)</td><td class="num">1.950.000</td><td class="num">38.420.000</td><td colspan="5"></td></tr>
+        <tr class="sub"><td colspan="14">CÒN LẠI (tài xế hoàn)</td><td class="num" style="color:var(--ok)">50.000</td><td class="num" style="color:var(--ok)">3.580.000</td><td colspan="5"></td></tr>
+      </tfoot>
+    </table>
+    <div class="sm muted">Số ngày chuẩn và hành trình lấy từ <b>danh mục hành trình</b> (HC-TH khai một lần: tên, km ước, số ngày chuẩn). Chuyến lạ thì gõ tay. Cột "Vượt" = tổng ngày − ngày chuẩn, tô cam khi &gt; 0; đợt này chỉ để theo dõi, chưa tính tiền hỗ trợ.</div>
+  </div>
+
+  <div class="cols2">
+    <div class="card">
+      <h3 style="margin-top:0">Tab "Theo xe" · 11/2026</h3>
+      <table>
+        <thead><tr><th>Đầu kéo</th><th class="num">Chuyến</th><th class="num">Km</th><th class="num">Dầu</th><th class="num">BOT</th><th class="num">Cảng</th><th class="num">Sửa</th><th class="num">Khác</th><th class="num">Tổng ₫</th><th class="num">₫/km</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">75H-042.82</td><td class="num">9</td><td class="num">2.790</td><td class="num">21,4 tr</td><td class="num">5,1 tr</td><td class="num">8,4 tr</td><td class="num">0</td><td class="num">3,5 tr</td><td class="num">38,4 tr</td><td class="num">13.770</td></tr>
+          <tr><td class="mono">75H-038.46</td><td class="num">8</td><td class="num">2.480</td><td class="num">19,8 tr</td><td class="num">4,8 tr</td><td class="num">7,2 tr</td><td class="num">2,6 tr</td><td class="num">2,9 tr</td><td class="num">37,3 tr</td><td class="num" style="color:var(--amber)">15.040</td></tr>
+          <tr><td class="mono">75H-041.10</td><td class="num">6</td><td class="num">1.860</td><td class="num">14,9 tr</td><td class="num">3,6 tr</td><td class="num">6,0 tr</td><td class="num">0</td><td class="num">1,8 tr</td><td class="num">26,3 tr</td><td class="num">14.140</td></tr>
+          <tr><td class="mono">Thuê ngoài</td><td class="num">5</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">42,5 tr</td><td class="num">42,5 tr</td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+      <div class="sm muted">Xe thuê ngoài: cước thuê (đã có <code>hire_cost</code> trên lệnh) tự thành một dòng chi loại "Cước thuê xe ngoài", để tổng tháng là <b>toàn bộ</b> tiền xe.</div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Tab "Tạm ứng" · sổ tạm ứng tài xế</h3>
+      <div class="row" style="justify-content:flex-end;margin-bottom:6px"><span class="btn p">＋ Chi tạm ứng</span></div>
+      <table>
+        <thead><tr><th>Phiếu</th><th>Ngày</th><th>Tài xế</th><th class="num">Số tiền</th><th>Đ.tiền</th><th>Chuyến</th><th>Người chi</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">TU-2611-012</td><td>02/11</td><td>Bùi Văn Nghĩa</td><td class="num">5.000.000</td><td>VNĐ</td><td class="mono sm">LDD-2611-007</td><td>Lý Phương</td></tr>
+          <tr><td class="mono">TU-2611-013</td><td>04/11</td><td>Bùi Văn Nghĩa</td><td class="num">2.000.000</td><td>LAK</td><td class="mono sm">LDD-2611-009</td><td>Lý Phương</td></tr>
+          <tr><td class="mono">TU-2611-013</td><td>04/11</td><td>Bùi Văn Nghĩa</td><td class="num">3.000.000</td><td>VNĐ</td><td class="mono sm">LDD-2611-009</td><td>Lý Phương</td></tr>
+          <tr><td class="mono">TU-2611-015</td><td>05/11</td><td>Nguyễn Đăng Thiện</td><td class="num">4.500.000</td><td>VNĐ</td><td class="muted sm">chưa gắn</td><td>Lý Phương</td></tr>
+        </tbody>
+      </table>
+      <table style="margin-top:10px">
+        <thead><tr><th>Số dư tạm ứng theo tài xế</th><th class="num">Tạm ứng</th><th class="num">Chi đã duyệt</th><th class="num">Còn lại</th></tr></thead>
+        <tbody>
+          <tr><td>Bùi Văn Nghĩa</td><td class="num">42.000.000 ₫ · 2.000.000 LAK</td><td class="num">38.420.000 ₫ · 1.950.000 LAK</td><td class="num" style="color:var(--ok)">3.580.000 ₫ · 50.000 LAK</td></tr>
+          <tr><td>Nguyễn Đăng Thiện</td><td class="num">31.500.000 ₫</td><td class="num">33.100.000 ₫</td><td class="num" style="color:var(--red)">−1.600.000 ₫ (chi thêm)</td></tr>
+        </tbody>
+      </table>
+      <div class="sm muted">Tạm ứng gắn chuyến là tuỳ chọn; đối soát làm <b>theo tháng, theo tài xế</b> như form, không ép từng chuyến phải khớp.</div>
+    </div>
+  </div>
+
+  <h2>3 · Cho người code <small>bảng, quyền, xuất Excel</small></h2>
+  <div class="card">
+    <ul class="tight">
+      <li><b>Thêm cột vào <code>dispatch_orders</code></b>: <code>return_date</code>, <code>odometer_start_km</code>, <code>odometer_end_km</code>, <code>route_id</code> (danh mục hành trình) hoặc <code>route_name</code>, <code>standard_days</code>, <code>cost_status</code> (open | reviewed), <code>cost_reviewed_by/at</code>. Km chuyến và số ngày là cột tính.</li>
+      <li><b>Bảng mới <code>dispatch_expenses</code></b>: 1 dòng = 1 khoản chi. <code>dispatch_order_id</code>, <code>driver_id</code> (snapshot từ lệnh), <code>expense_date</code>, <code>kind</code> (danh mục cố định), <code>description</code>, <code>amount</code>, <code>currency</code> VND | LAK, <code>fx_rate_vnd</code> (chỉ LAK), <code>amount_vnd</code> (tính), <code>counted</code> bool mặc định true, ảnh chứng từ (dùng lại kho file hiện có), <code>created_by</code>, <code>reviewed_by/at</code>. Khoá sửa khi lệnh <code>cost_status = reviewed</code>.</li>
+      <li><b>Bảng mới <code>driver_advances</code></b>: mã <code>TU-YYMM-seq</code>, <code>driver_id</code>, <code>advance_date</code>, <code>amount</code>, <code>currency</code>, <code>dispatch_order_id</code> (tuỳ chọn), <code>paid_by</code>, ghi chú. Đợt 1 là sổ riêng, <b>chưa</b> nối quỹ 112 của module Tài chính; nối sau nếu kế toán muốn tiền tạm ứng trừ thẳng vào quỹ.</li>
+      <li><b>Danh mục hành trình <code>fleet_routes</code></b>: tên, điểm đi/đến, km ước, số ngày chuẩn. HC-TH khai một lần, chọn khi nhập chuyến; chuyến lạ gõ tay.</li>
+      <li><b>Xe thuê ngoài</b>: khi lệnh có <code>hire_cost</code> → tự sinh (hoặc gợi ý) một dòng chi loại "Cước thuê xe ngoài", không nhập hai lần.</li>
+      <li><b>View <code>v_fleet_cost_month</code></b>: tài xế × tháng × đồng tiền: Σ tạm ứng, Σ chi được tính, Σ không được tính, còn lại. Sổ và xuất Excel đều đọc view này, trang không tự cộng.</li>
+      <li><b>Xuất .xlsx</b>: đúng bố cục file mẫu (tiêu đề tháng, tên lái xe, 26 cột, 3 dòng tổng cuối sheet), một sheet mỗi tài xế, dùng thư viện xlsx sẵn có trong ERP.</li>
+      <li><b>Quyền</b>: nhập = HC-TH, kế toán, BGĐ; duyệt/khoá = kế toán, BGĐ; tài xế chưa có tài khoản nên đợt này chưa có màn điện thoại cho tài xế.</li>
+      <li><b>Chưa làm đợt này</b>: lương chuyến (đơn giá, hỗ trợ vượt ngày, dầu/km, tấn) và giá vốn vận chuyển theo đơn hàng bán. Cột "Vượt" chỉ hiển thị.</li>
+    </ul>
+  </div>
+  <div class="note"><b>Hai điểm nhỏ cần anh gật:</b> (1) số ngày chuẩn lấy từ danh mục hành trình như trên, hay HC-TH gõ tay mỗi chuyến; (2) tỷ giá LAK dùng một tỷ giá tháng do kế toán nhập, hay nhập theo từng phiếu.</div>
+</div>
+</body>
+</html>

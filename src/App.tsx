@@ -220,6 +220,7 @@ const DispatchCreatePage = lazy(() => import('./pages/logistics/dispatch/Dispatc
 const DispatchDetailPage = lazy(() => import('./pages/logistics/dispatch/DispatchDetailPage'));
 const DispatchPrintPage = lazy(() => import('./pages/logistics/dispatch/DispatchPrintPage'));
 const FetchReportPage = lazy(() => import('./pages/logistics/dispatch/FetchReportPage'));
+const FleetCostPage = lazy(() => import('./pages/logistics/costs/FleetCostPage'));
 const FinanceLoanDashboard = lazy(() => import('./pages/finance/FinanceLoanDashboard'));
 const FinanceLoanListPage = lazy(() => import('./pages/finance/FinanceLoanListPage'));
 const FinanceDepositListPage = lazy(() => import('./pages/finance/FinanceDepositListPage'));
@@ -717,6 +718,7 @@ function App() {
                 <Route path="dispatch/:id/print" element={<DispatchPrintPage />} />
                 <Route path="fleet/vehicles" element={<FleetVehicleListPage />} />
                 <Route path="fleet/drivers" element={<FleetDriverListPage />} />
+                <Route path="costs" element={<FleetCostPage />} />
               </Route>
 
               {/* ===== VỐN VAY NGÂN HÀNG (Admin only) ===== */}

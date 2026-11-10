@@ -23,6 +23,7 @@ import {
 import { EditOutlined, SaveOutlined, CloseOutlined, LockOutlined, PlusOutlined, DeleteOutlined, FileWordOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
+import { balesFromTons, containersFromBales } from '../../../services/sales/baleMath'
 import { supabase } from '../../../lib/supabase'
 import type { SalesOrder, SalesOrderItem } from '../../../services/sales/salesTypes'
 import { isVnd, fmtMoney, priceUnitLabel, orderTotalInCurrency, toUsdEquivalent, vndInputProps } from '../../../services/sales/salesMoney'
@@ -278,7 +279,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       const itemRows = validItems.map((it, idx) => {
         const qtyKg = it.quantity_tons * 1000
         const bw = it.bale_weight_kg || 33.33
-        const bales = Math.round(qtyKg / bw)
+        const bales = balesFromTons(it.quantity_tons, bw)
         const bpc = it.bales_per_container || 576
         return {
           sales_order_id: order.id,
@@ -293,7 +294,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
           bale_weight_kg: bw,
           total_bales: bales,
           bales_per_container: bpc,
-          container_count: Math.ceil(bales / bpc),
+          container_count: containersFromBales(bales, bpc),
           packing_type: it.packing_type || 'loose_bale',
           sort_order: idx,
         }

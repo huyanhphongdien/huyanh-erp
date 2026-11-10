@@ -22,6 +22,7 @@ import { supabase } from '../../lib/supabase'
 import type { ContractFormData } from './contractGeneratorService'
 import { formatContractDate } from './contractGeneratorService'
 import { computeContractRisk } from './contractRisk'
+import { balesFromTons, containersFromBales } from './baleMath'
 import {
   amountToWords,
   formatGradeForContract,
@@ -754,9 +755,9 @@ export const salesContractWorkflowService = {
     const price = o.unit_price || 0
     const amount = o.total_value_usd || qty * price
     const baleWeight = o.bale_weight_kg || 35
-    const totalBales = o.total_bales || (qty > 0 ? Math.round((qty * 1000) / baleWeight) : 0)
+    const totalBales = o.total_bales || balesFromTons(qty, baleWeight)
     const balesPerCont = o.bales_per_container || 576
-    const containers = o.container_count || (totalBales > 0 ? Math.ceil(totalBales / balesPerCont) : 0)
+    const containers = o.container_count || containersFromBales(totalBales, balesPerCont)
     const contType = o.container_type === '40ft' ? "40'" : "20'"
 
     // Format contract_date: YYYY-MM-DD → DD MMM YYYY (vd "22 May 2026")

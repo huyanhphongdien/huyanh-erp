@@ -17,6 +17,7 @@ import { Button, Tag, Spin, Modal, message } from 'antd'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
 import { fmtMoney, priceUnitLabel, orderTotalInCurrency } from '../../../services/sales/salesMoney'
+import { balesFromTons } from '../../../services/sales/baleMath'
 import {
   salesContractWorkflowService,
   type SalesOrderContract,
@@ -79,7 +80,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
     }
     const isFOB = ['FOB', 'EXW'].includes((o.incoterm || 'FOB').toUpperCase())
     const totalUSD = o.total_value_usd || (o.quantity_tons || 0) * (o.unit_price || 0)
-    const bales = o.bale_weight_kg ? Math.round((o.quantity_tons || 0) * 1000 / o.bale_weight_kg) : 0
+    const bales = balesFromTons(o.quantity_tons, o.bale_weight_kg)
     return {
       contract_no: o.contract_no || o.code || '',
       contract_date: o.contract_date ? new Date(o.contract_date).toLocaleDateString('en-GB', {
@@ -354,9 +355,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
               <tbody>
                 {orderItems.map((item, idx) => {
                   const total = (item.quantity_tons || 0) * (item.unit_price || 0)
-                  const bales = item.bale_weight_kg
-                    ? Math.round((item.quantity_tons || 0) * 1000 / item.bale_weight_kg)
-                    : 0
+                  const bales = balesFromTons(item.quantity_tons, item.bale_weight_kg)
                   return (
                     <tr key={idx} style={{ borderTop: '1px solid #f5f5f5' }}>
                       <td style={{ ...td, paddingLeft: 16 }}><strong>{item.grade || '—'}</strong></td>

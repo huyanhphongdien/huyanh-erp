@@ -48,6 +48,7 @@ import {
 import { salesContractWorkflowService } from '../../services/sales/salesContractWorkflowService'
 import { salesCustomerService } from '../../services/sales/salesCustomerService'
 import { salesOrderService, type CreateSalesOrderData } from '../../services/sales/salesOrderService'
+import { balesFromTons, containersFromBales } from '../../services/sales/baleMath'
 import { rubberGradeService } from '../../services/wms/rubberGradeService'
 import type { SalesCustomer } from '../../services/sales/salesTypes'
 import { SALES_CURRENCY_OPTIONS, isVnd, priceUnitLabel, fmtMoney, vndInputProps } from '../../services/sales/salesMoney'
@@ -124,15 +125,9 @@ function SalesOrderCreatePage() {
   const hasFlexibleBaleWeight = orderItems.some(
     (i) => (i.bale_weights_kg && i.bale_weights_kg.length > 1),
   )
-  const itemsTotalBales = orderItems.reduce((s, i) => {
-    const bw = i.bale_weight_kg || 35
-    return s + Math.round((i.quantity_tons * 1000) / bw)
-  }, 0)
-  const itemsTotalContainers = orderItems.reduce((s, i) => {
-    const bw = i.bale_weight_kg || 35
-    const bales = Math.round((i.quantity_tons * 1000) / bw)
-    return s + (i.bales_per_container > 0 ? Math.ceil(bales / i.bales_per_container) : 0)
-  }, 0)
+  // Bành / cont tính qua baleMath (33,33 kg = 30 bành/tấn → 210 t = 6.300 bành = 10 cont, không phải 6.301 / 11)
+  const itemsTotalBales = orderItems.reduce((s, i) => s + balesFromTons(i.quantity_tons, i.bale_weight_kg || 35), 0)
+  const itemsTotalContainers = orderItems.reduce((s, i) => s + containersFromBales(balesFromTons(i.quantity_tons, i.bale_weight_kg || 35), i.bales_per_container), 0)
 
   // ── Load customers & grade standards ──
   useEffect(() => {
@@ -183,9 +178,9 @@ function SalesOrderCreatePage() {
   const watchFreightMark = Form.useWatch('contract_freight_mark', form) || ''
   const watchExtraTerms  = Form.useWatch('contract_extra_terms', form) || ''
 
-  const totalBales = baleWeight > 0 ? Math.round((quantityTons * 1000) / baleWeight) : 0
+  const totalBales = balesFromTons(quantityTons, baleWeight)
   const balesPerContainer = containerType === '40ft' ? balesPerContInput * 2 : balesPerContInput
-  const containerCount = balesPerContainer > 0 ? Math.ceil(totalBales / balesPerContainer) : 0
+  const containerCount = containersFromBales(totalBales, balesPerContainer)
   const totalValueUSD = quantityTons * unitPrice
   // Ưu tiên USD/MT nếu có; nếu không thì dùng %
   const commissionAmt = commissionUsdPerMt > 0
@@ -762,8 +757,8 @@ function SalesOrderCreatePage() {
                     </span>
                   ) : (
                     <>
-                      {Math.round(item.quantity_tons * 1000 / (item.bale_weight_kg || 35)).toLocaleString()} bành |
-                      {' '}{Math.ceil(Math.round(item.quantity_tons * 1000 / (item.bale_weight_kg || 35)) / (item.bales_per_container || 576))} cont
+                      {balesFromTons(item.quantity_tons, item.bale_weight_kg || 35).toLocaleString()} bành |
+                      {' '}{containersFromBales(balesFromTons(item.quantity_tons, item.bale_weight_kg || 35), item.bales_per_container || 576)} cont
                     </>
                   )}
                   {' | '}${(item.quantity_tons * item.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

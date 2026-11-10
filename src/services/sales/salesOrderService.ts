@@ -7,6 +7,7 @@
 
 import { supabase } from '../../lib/supabase'
 import { isVnd, orderTotals, toUsdEquivalent } from './salesMoney'
+import { balesFromTons, containersFromBales, defaultBalesPerContainer } from './baleMath'
 import type {
   SalesOrder,
   SalesOrderStatus,
@@ -383,8 +384,8 @@ export const salesOrderService = {
    *
    * Auto-calculate:
    * - quantity_kg = quantity_tons × 1000
-   * - total_bales = Math.ceil(quantity_kg / bale_weight_kg)
-   * - container_count = Math.ceil(quantity_tons / (20ft→20 | 40ft→25))
+   * - total_bales = balesFromTons(quantity_tons, bale_weight_kg)  (baleMath.ts — 33,33 kg = 30 bành/tấn)
+   * - container_count = ceil(total_bales / bành_mỗi_cont)  (20ft: 630 bành 33,33 kg | 600 bành 35 kg; 40ft gấp đôi)
    * - total_value_usd = quantity_tons × unit_price
    * - total_value_vnd = total_value_usd × exchange_rate
    * - Chỉ tiêu kỹ thuật tự điền từ rubber_grade_standards nếu chưa nhập
@@ -410,12 +411,11 @@ export const salesOrderService = {
     // Tính toán các trường tự động
     const baleWeight = input.bale_weight_kg || 33.33
     const quantityKg = input.quantity_tons * 1000
-    const totalBales = Math.round(quantityKg / baleWeight)
+    const totalBales = balesFromTons(input.quantity_tons, baleWeight)
     const containerType = input.container_type || '20ft'
     // Container 20ft: 600 bành (35kg) hoặc 630 bành (33.33kg) | 40ft: gấp đôi
-    const balesPerContainer20ft = baleWeight >= 35 ? 600 : 630
-    const balesPerContainer = containerType === '40ft' ? balesPerContainer20ft * 2 : balesPerContainer20ft
-    const containerCount = Math.ceil(totalBales / balesPerContainer)
+    const balesPerContainer = input.bales_per_container || defaultBalesPerContainer(baleWeight, containerType)
+    const containerCount = containersFromBales(totalBales, balesPerContainer)
     // Đồng tiền của đơn: USD (xuất khẩu) hoặc VND (nội địa) — xem salesMoney.ts.
     // Đơn VND phải có tỷ giá để có số USD quy đổi cho công nợ/báo cáo.
     const currency = (input.currency || 'USD').toUpperCase()
@@ -539,7 +539,7 @@ export const salesOrderService = {
         const baleWeights = item.bale_weights_kg && item.bale_weights_kg.length > 0
           ? item.bale_weights_kg
           : [bw]
-        const totalBales = Math.round(qtyKg / bw)
+        const totalBales = balesFromTons(item.quantity_tons, bw)
         const bpc = item.bales_per_container || 576
         return {
           sales_order_id: data.id,
@@ -555,7 +555,7 @@ export const salesOrderService = {
           bale_weights_kg: baleWeights,
           total_bales: totalBales,
           bales_per_container: bpc,
-          container_count: Math.ceil(totalBales / bpc),
+          container_count: containersFromBales(totalBales, bpc),
           packing_type: item.packing_type || 'loose_bale',
           packing_note: item.packing_note || null,
           drc_min: item.drc_min ?? null,
@@ -626,15 +626,18 @@ export const salesOrderService = {
     if (
       input.quantity_tons !== undefined ||
       input.bale_weight_kg !== undefined ||
+      input.bales_per_container !== undefined ||
       input.container_type !== undefined ||
       input.unit_price !== undefined ||
       input.exchange_rate !== undefined ||
       input.currency !== undefined
     ) {
       const quantityKg = quantityTons * 1000
-      const totalBales = Math.round(quantityKg / baleWeight)
-      const maxTonsPerContainer = containerType === '20ft' ? 20 : 25
-      const containerCount = Math.ceil(quantityTons / maxTonsPerContainer)
+      const totalBales = balesFromTons(quantityTons, baleWeight)
+      // Cùng luật với lúc tạo: bành ÷ bành/cont. Bản cũ chia tấn cho 20 → 210 t ra 11 cont
+      // dù 630 bành × 33,33 kg = 21 t/cont, tức 10 cont.
+      const balesPerContainer = (input.bales_per_container ?? existing.bales_per_container) || defaultBalesPerContainer(baleWeight, containerType)
+      const containerCount = containersFromBales(totalBales, balesPerContainer)
       const totals = orderTotals(currency, quantityTons, unitPrice, exchangeRate)
 
       recalculated.quantity_kg = quantityKg

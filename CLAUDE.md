@@ -110,6 +110,13 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
 - Chưa phủ: sinh hợp đồng/Invoice .docx (mẫu xuất khẩu, chữ USD), hoa hồng & tab Tài chính vẫn tính bằng USD quy đổi,
   trang Công nợ khách hiện USD quy đổi cho đơn VND.
 
+## Bành & container của đơn bán (10/11/2026)
+- **Mọi chỗ tính số bành / số container đi qua `src/services/sales/baleMath.ts`** (`balesFromTons`, `containersFromBales`,
+  `defaultBalesPerContainer`). ⚠ Đừng viết lại `round(kg / bale_weight_kg)`: 33,33 kg là cách ghi tròn của 100/3 kg
+  (30 bành/tấn) → 210 t từng ra 6.301 bành và `ceil(6301/630)` = 11 cont thay vì 6.300 / 10 (8 đơn bị sai, sửa data
+  bằng `docs/migrations/sales_fix_bales_3333_rounding.sql`). Container 20ft = 21 t (630 bành 33,33 kg | 600 bành 35 kg),
+  40ft gấp đôi; `update()` cũng chia bành ÷ bành/cont, không chia tấn cho 20 nữa.
+
 ## Công nợ phải thu (A/R)
 - **Mẫu số phải thu = `sales_orders.total_value_usd`** (trị giá hợp đồng). Trị giá lô chỉ
   dùng để PHÂN BỔ tiền vào lô, **không bao giờ** làm mẫu số công nợ.

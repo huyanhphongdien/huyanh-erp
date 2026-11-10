@@ -1,9 +1,20 @@
-# BÀN GIAO TRẠNG THÁI ĐANG LÀM (WIP) — cập nhật 2026-08-11
+# BÀN GIAO TRẠNG THÁI ĐANG LÀM (WIP) — cập nhật 2026-11-10
 
 > File này git-đồng bộ → mở trên máy khác bằng `git pull` rồi đọc. Ghi lại **việc đang dở + quyết định còn treo + quy tắc nghiệp vụ đã chốt** trong phiên làm việc.
 > Bản memory local (máy này): `C:\Users\Admin\.claude\projects\d--Projects-huyanh-erp-9\memory\` — muốn mang memory sang máy khác thì copy nguyên thư mục đó.
 
 Nhánh: `main` (mọi commit dưới đây ĐÃ push → Vercel auto-deploy `huyanhrubber.vn`).
+
+---
+
+## 0. CẬP NHẬT 10/11/2026 — Chi phí đội xe qua Lệnh điều động (Đợt 1 ĐÃ DEPLOY, f1439dca)
+- Số hoá `docs/Form theo dõi chi phí tài xế.xlsx`: 1 chuyến = 1 lệnh điều động; HC-TH nhập ngày về, km đồng hồ, hành trình,
+  khoản chi (VND | LAK, cờ "được tính", ảnh hoá đơn), tạm ứng; kế toán "Duyệt & khoá" (trigger DB chặn sửa).
+- Trang mới **/logistics/costs** (Sổ chi phí đội xe: theo tài xế = form Excel, theo xe ₫/km, theo loại chi, tạm ứng, chờ duyệt,
+  xuất .xlsx đúng 26 cột). Khối "Hành trình & chi phí" dưới chi tiết lệnh. Luật + bảng: CLAUDE.md mục "Chi phí đội xe".
+- Migration `docs/migrations/fleet_costs_p1.sql` đã áp prod. Ảnh lưu bucket `invoice-images/fleet-receipts/`.
+- **Treo:** lương chuyến (đơn giá/hỗ trợ vượt ngày/dầu-km/tấn) + giá vốn vận chuyển theo đơn — chờ owner đưa bảng đơn giá.
+  Quyền duyệt chưa siết theo phòng. Tạm ứng chưa nối quỹ 112.
 
 ---
 

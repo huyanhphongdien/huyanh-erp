@@ -139,7 +139,7 @@ export default function FleetPaymentRequestDetailPage() {
             {editable && <Button icon={<EditOutlined />} onClick={openInfo}>Sửa thông tin</Button>}
             {req.status === 'draft' && (
               <Popconfirm title="Gửi duyệt phiếu này?" onConfirm={() => act(() => fleetPaymentRequestService.submit(req.id), 'Đã gửi duyệt')} okText="Gửi" cancelText="Huỷ" disabled={!lines.length}>
-                <Button type="primary" icon={<SendOutlined />} loading={acting} disabled={!lines.length} style={{ background: '#E8A838', borderColor: '#E8A838', color: '#0D2E25', fontWeight: 600 }}>Gửi duyệt</Button>
+                <Button type="primary" icon={<SendOutlined />} loading={acting} disabled={!lines.length} style={lines.length ? { background: '#E8A838', borderColor: '#E8A838', color: '#0D2E25', fontWeight: 600 } : undefined}>Gửi duyệt</Button>
               </Popconfirm>
             )}
             {req.status === 'submitted' && (

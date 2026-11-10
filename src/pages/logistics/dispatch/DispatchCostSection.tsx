@@ -376,7 +376,7 @@ export default function DispatchCostSection({ order }: Props) {
           : inPr
             ? <Text type="secondary" style={{ fontSize: 12 }}>Chuyến đang nằm trong đề nghị thanh toán — duyệt ở phiếu đó.</Text>
             : <Popconfirm title={`Duyệt ${expenses.length} khoản chi và khoá chuyến này?`} description="Sau khi khoá không sửa/xoá khoản chi và chứng từ được nữa." onConfirm={() => setReviewed(true)} okText="Duyệt & khoá" cancelText="Huỷ" disabled={!expenses.length && !(order.is_hired && order.hire_cost)}>
-              <Button type="primary" icon={<CheckCircleOutlined />} style={{ background: GOLD, borderColor: GOLD, color: '#0D2E25', fontWeight: 600 }} disabled={!expenses.length && !(order.is_hired && order.hire_cost)}>Kế toán duyệt &amp; khoá</Button>
+              <Button type="primary" icon={<CheckCircleOutlined />} style={expenses.length || (order.is_hired && order.hire_cost) ? { background: GOLD, borderColor: GOLD, color: '#0D2E25', fontWeight: 600 } : undefined} disabled={!expenses.length && !(order.is_hired && order.hire_cost)}>Kế toán duyệt &amp; khoá</Button>
             </Popconfirm>)}
       </div>
 

@@ -313,7 +313,7 @@ export default function FleetCostPage() {
             <Tooltip title="Tải lại"><Button icon={<ReloadOutlined />} onClick={load} loading={loading} /></Tooltip>
             <Button icon={<FileExcelOutlined />} onClick={doExport} loading={exporting} disabled={!trips.length}>Xuất Excel</Button>
             <Tooltip title={driverId ? 'Gom chuyến có chi phí + tạm ứng của tài xế này thành phiếu đề nghị thanh toán' : 'Chọn một tài xế trước'}>
-              <Button type="primary" icon={<FileTextOutlined />} onClick={openPr} disabled={!driverId} style={{ background: GOLD, borderColor: GOLD, color: '#0D2E25', fontWeight: 600 }}>Lập đề nghị thanh toán</Button>
+              <Button type="primary" icon={<FileTextOutlined />} onClick={openPr} disabled={!driverId} style={driverId ? { background: GOLD, borderColor: GOLD, color: '#0D2E25', fontWeight: 600 } : undefined}>Lập đề nghị thanh toán</Button>
             </Tooltip>
           </Space>
         )}

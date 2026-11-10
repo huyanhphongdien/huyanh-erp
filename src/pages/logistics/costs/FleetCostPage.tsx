@@ -232,7 +232,12 @@ export default function FleetCostPage() {
     { title: 'Hành trình', width: 190, render: (_: unknown, t: TripCostRow) => t.route_name || [t.pickup_location, t.destination].filter(Boolean).join(' → ') || <Text type="secondary">–</Text> },
     { title: 'Chuẩn', dataIndex: 'standard_days', width: 60, align: 'right' as const, render: (v: number | null) => v ?? '–' },
     { title: 'Vượt', dataIndex: 'over_days', width: 56, align: 'right' as const, render: (v: number | null) => v ? <b style={{ color: '#b45309' }}>+{v}</b> : (v === 0 ? <span style={{ color: '#15803d' }}>0</span> : '–') },
-    { title: 'Nội dung công việc', width: 190, render: (_: unknown, t: TripCostRow) => <span style={{ fontSize: 12 }}>{TRIP_TYPE_LABELS[t.trip_type as TripType] || t.trip_type}{t.customer_name ? ` · ${t.customer_name}` : ''}{t.reason ? ` · ${t.reason}` : ''}</span> },
+    { title: 'Nội dung công việc', width: 190, render: (_: unknown, t: TripCostRow) => {
+      // "Lý do" của lệnh thường chính là tên loại chuyến ("Xuất hàng đi cảng") → không lặp lại
+      const typeLabel = TRIP_TYPE_LABELS[t.trip_type as TripType] || t.trip_type
+      const reason = t.reason && t.reason.trim().toLowerCase() !== typeLabel.toLowerCase() ? t.reason.trim() : ''
+      return <span style={{ fontSize: 12 }}>{[typeLabel, t.customer_name, reason].filter(Boolean).join(' · ')}</span>
+    } },
     { title: 'Nội dung chi', width: 180, render: (_: unknown, t: TripCostRow) => <span style={{ fontSize: 12 }}>{[(t.kinds || '').split(',').filter(Boolean).map((k) => EXPENSE_KIND_LABELS[k as ExpenseKind] || k).join(', '), t.is_hired && t.hire_cost ? HIRE_KIND_LABEL : ''].filter(Boolean).join(', ') || '–'}</span> },
     { title: 'Tạm ứng', width: 120, align: 'right' as const, render: (_: unknown, t: TripCostRow) => <Pair vnd={t.adv_vnd} lak={t.adv_lak} /> },
     { title: 'Chi được tính', width: 130, align: 'right' as const, onCell: () => ({ style: { background: '#F0F9F4' } }), render: (_: unknown, t: TripCostRow) => <Pair vnd={t.counted_vnd} lak={t.counted_lak} tone="#1B4D3E" /> },

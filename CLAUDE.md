@@ -226,6 +226,14 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
   insert/update/delete khoản chi và chứng từ (mở lại mới sửa). Chứng từ không bắt buộc; sổ đánh dấu `n_missing_receipt`.
 - Service `src/services/logistics/fleetCostService.ts`, Excel `fleetCostExcel.ts` (đúng 26 cột của form, cột lương U–Y để trống),
   khối `DispatchCostSection.tsx` trong chi tiết lệnh, trang `/logistics/costs` (`FleetCostPage.tsx`), menu VẬN TẢI → Sổ chi phí đội xe.
+- **Đợt 2 — Đề nghị thanh toán chi phí xe (10/11/2026)**, áp mẫu thanh toán mủ: `fleet_payment_requests` (mã `TTDX-YYMM-seq`,
+  1 phiếu = 1 tài xế × 1 kỳ, trạng thái draft→submitted→approved→paid/cancelled) + `fleet_payment_request_lines` (dòng chuyến
+  = `counted_driver_vnd_equiv` KHÔNG gồm cước thuê; dòng tạm ứng = số ÂM khấu trừ; `net_amount` = thực chi). Gom chuyến/tạm ứng
+  ghi `fleet_payment_request_id` lên `dispatch_orders`/`driver_advances` (chặn gom 2 lần; huỷ/xoá nháp thì nhả). Duyệt phiếu →
+  khoá chi phí các chuyến; trigger `fn_dispatch_expense_guard` cũng chặn sửa khoản chi khi chuyến đang trong phiếu còn hiệu lực.
+  Duyệt/Chi chỉ `isFinanceUser` (kế toán, BGĐ, admin). Service `fleetPaymentRequestService.ts`; trang chi tiết + in A4
+  `FleetPaymentRequestDetailPage/PrintPage.tsx` (cùng mẫu in với `PaymentRequestPrintPage` mủ; hàm đọc số dùng chung
+  `src/utils/readVietnameseNumber.ts`). Migration `fleet_costs_p2_payment_requests.sql` (đã áp). Mảnh UI chung: `fleetCostUi.tsx`.
 
 ## Chấm công — GPS (owner chốt 16/09/2026)
 - **Điện thoại / tablet: BẮT BUỘC toạ độ và phải nằm trong bán kính nhà máy (3 km). Máy tính (PC/laptop): bỏ qua GPS.**

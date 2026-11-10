@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer } from 'lucide-react'
 import logoImg from '../../../assets/logo.png'
+import { readVietnameseNumber } from '../../../utils/readVietnameseNumber'
 import { useAuthStore } from '../../../stores/authStore'
 import {
   paymentRequestService,
@@ -27,40 +28,6 @@ const fmtKg = (n: number | null | undefined) =>
   n != null ? n.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'
 // Làm tròn đến NGHÌN: phần lẻ ≥ 500 → lên 1.000, < 500 → về 000.
 const roundThousand = (n: number | null | undefined) => Math.round((n || 0) / 1000) * 1000
-
-// ── Đọc số tiền bằng chữ (tiếng Việt) ──────────────────────────────────────
-function readVietnameseNumber(num: number): string {
-  if (!num || num <= 0) return 'Không'
-  const ds = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín']
-  const readTriple = (n: number, full: boolean): string => {
-    const tr = Math.floor(n / 100)
-    const ch = Math.floor((n % 100) / 10)
-    const dv = n % 10
-    let s = ''
-    if (full || tr > 0) s += ds[tr] + ' trăm'
-    if (ch === 0) {
-      if (dv > 0) s += (s ? ' lẻ ' : '') + ds[dv]
-    } else {
-      s += (s ? ' ' : '') + (ch === 1 ? 'mười' : ds[ch] + ' mươi')
-      if (dv === 1 && ch > 1) s += ' mốt'
-      else if (dv === 5 && ch > 0) s += ' lăm'
-      else if (dv > 0) s += ' ' + ds[dv]
-    }
-    return s.trim()
-  }
-  const units = ['', ' nghìn', ' triệu', ' tỷ']
-  const groups: number[] = []
-  let n = Math.round(num)
-  while (n > 0) { groups.push(n % 1000); n = Math.floor(n / 1000) }
-  let out = ''
-  for (let i = groups.length - 1; i >= 0; i--) {
-    if (groups[i] === 0) continue   // bỏ nhóm 0 (gồm nhóm đơn vị cuối → hết "không trăm" thừa)
-    // Thêm khoảng trắng giữa các nhóm (trước đây dính chữ: "triệubảy", "nghìnkhông")
-    out += (out ? ' ' : '') + readTriple(groups[i], i < groups.length - 1) + units[i]
-  }
-  out = out.trim().replace(/\s+/g, ' ')
-  return out.charAt(0).toUpperCase() + out.slice(1)
-}
 
 export default function PaymentRequestPrintPage() {
   const { id } = useParams<{ id: string }>()

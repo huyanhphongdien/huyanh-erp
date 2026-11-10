@@ -27,14 +27,11 @@ import {
   type CostCurrency, type DispatchExpense, type DispatchExpenseFile, type DriverAdvance, type ExpenseInput, type ExpenseKind,
   type FleetRoute, type TripCostRow,
 } from '../../../services/logistics/fleetCostService'
+import { FLEET_PR_STATUS_LABELS, type FleetPrStatus } from '../../../services/logistics/fleetPaymentRequestService'
+import { useNavigate } from 'react-router-dom'
+import { AMBER, GOLD, INK_2, Kpi, MONO, OK, thousands } from '../costs/fleetCostUi'
 
 const { Text } = Typography
-
-const MONO: React.CSSProperties = { fontFamily: "'JetBrains Mono', Consolas, monospace", fontVariantNumeric: 'tabular-nums' }
-const thousands = {
-  formatter: (v: string | number | undefined) => (v === undefined || v === null || v === '' ? '' : `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')),
-  parser: (v: string | undefined) => (v ? v.replace(/\./g, '') : '') as unknown as number,
-}
 const toIso = (d?: Dayjs | null) => (d ? d.format('YYYY-MM-DD') : null)
 const fmtD = (iso?: string | null) => (iso ? dayjs(iso).format('DD/MM/YYYY') : '–')
 
@@ -56,6 +53,7 @@ type ExpenseFormValues = {
 
 export default function DispatchCostSection({ order }: Props) {
   const user = useAuthStore((s) => s.user)
+  const navigate = useNavigate()
   const [trip, setTrip] = useState<TripCostRow | null>(null)
   const [expenses, setExpenses] = useState<DispatchExpense[]>([])
   const [advances, setAdvances] = useState<DriverAdvance[]>([])
@@ -77,7 +75,10 @@ export default function DispatchCostSection({ order }: Props) {
   const [saving, setSaving] = useState(false)
   const [uploadingId, setUploadingId] = useState<string | null>(null)
 
-  const reviewed = trip?.cost_status === 'reviewed'
+  const inPr = !!trip?.fleet_payment_request_id && trip?.payment_request_status !== 'cancelled'
+  // Khoá sửa khi kế toán đã duyệt HOẶC chuyến đã gom vào đề nghị thanh toán (số tiền đã chép sang phiếu;
+  // muốn sửa thì bỏ chuyến khỏi phiếu nháp trước). DB cũng chặn ở trigger.
+  const reviewed = trip?.cost_status === 'reviewed' || inPr
   const canReview = true   // menu VẬN TẢI đã gate theo phòng; duyệt dành cho kế toán/BGĐ (chưa siết thêm ở Đợt 1)
 
   const load = useCallback(async () => {
@@ -312,9 +313,17 @@ export default function DispatchCostSection({ order }: Props) {
     <Card
       loading={loading && !trip}
       style={{ marginTop: 16 }}
-      title={<Space>🧾 Hành trình &amp; chi phí chuyến {reviewed
-        ? <Tag icon={<LockOutlined />} color="green">Đã duyệt{trip?.cost_reviewed_at ? ` · ${dayjs(trip.cost_reviewed_at).format('DD/MM HH:mm')}` : ''}</Tag>
-        : <Tag color="gold">{expenses.length ? 'Chờ kế toán duyệt' : 'Chưa nhập chi phí'}</Tag>}</Space>}
+      title={<Space wrap size={8}>
+        <span style={{ fontWeight: 700 }}>🧾 Hành trình &amp; chi phí chuyến</span>
+        {trip?.cost_status === 'reviewed'
+          ? <Tag icon={<LockOutlined />} color="green" style={{ margin: 0 }}>Đã duyệt{trip?.cost_reviewed_at ? ` · ${dayjs(trip.cost_reviewed_at).format('DD/MM HH:mm')}` : ''}</Tag>
+          : <Tag color={expenses.length ? 'gold' : 'default'} style={{ margin: 0 }}>{expenses.length ? 'Chờ kế toán duyệt' : 'Chưa nhập chi phí'}</Tag>}
+        {trip?.payment_request_code && (
+          <Tag color="geekblue" style={{ margin: 0, cursor: 'pointer', ...MONO }} onClick={() => navigate(`/logistics/costs/payment-requests/${trip.fleet_payment_request_id}`)}>
+            ĐNTT {trip.payment_request_code} · {FLEET_PR_STATUS_LABELS[trip.payment_request_status as FleetPrStatus] || trip.payment_request_status}
+          </Tag>
+        )}
+      </Space>}
       extra={<Space wrap>
         <Button icon={<EditOutlined />} onClick={openTrip} disabled={reviewed}>Sửa hành trình</Button>
         <Button icon={<TableOutlined />} onClick={openQuick} disabled={reviewed}>Nhập nhanh</Button>
@@ -330,27 +339,19 @@ export default function DispatchCostSection({ order }: Props) {
         <Descriptions.Item label="Km đồng hồ lúc về"><span style={MONO}>{trip?.odometer_end_km != null ? fmtAmt(trip.odometer_end_km) : '–'}</span></Descriptions.Item>
         <Descriptions.Item label="Km chuyến"><b style={MONO}>{trip?.trip_km != null ? fmtAmt(trip.trip_km) : '–'}</b></Descriptions.Item>
         <Descriptions.Item label="Số ngày chuẩn">{trip?.standard_days ?? '–'}</Descriptions.Item>
-        <Descriptions.Item label="Vượt thời gian">{overDays != null ? <b style={{ color: overDays > 0 ? '#b45309' : '#15803d' }}>{overDays > 0 ? `+${overDays} ngày` : 'không'}</b> : '–'}</Descriptions.Item>
+        <Descriptions.Item label="Vượt thời gian">{overDays != null ? <b style={{ color: overDays > 0 ? AMBER : OK }}>{overDays > 0 ? `+${overDays} ngày` : 'không'}</b> : '–'}</Descriptions.Item>
       </Descriptions>
 
       <Table rowKey="id" size="small" pagination={false} columns={columns as any} dataSource={rows} scroll={{ x: 960 }}
         locale={{ emptyText: 'Chưa có khoản chi. Bấm "Thêm khoản chi" hoặc "Nhập nhanh" từ phiếu tài xế nộp.' }}
-        summary={() => trip ? (
-          <Table.Summary fixed>
-            <Table.Summary.Row style={{ background: '#F9FAFB', fontWeight: 700 }}>
-              <Table.Summary.Cell index={0} colSpan={4}>Chi được tính (công ty chịu)</Table.Summary.Cell>
-              <Table.Summary.Cell index={1} align="right"><span style={MONO}>{fmtMoney(trip.counted_vnd)}{trip.counted_lak ? <><br />{fmtMoney(trip.counted_lak, 'LAK')}</> : null}</span></Table.Summary.Cell>
-              <Table.Summary.Cell index={2} colSpan={4}>
-                <Space size={12} wrap>
-                  {(trip.uncounted_vnd > 0 || trip.uncounted_lak > 0) && <Text type="secondary">Không được tính: <span style={MONO}>{[trip.uncounted_vnd ? fmtMoney(trip.uncounted_vnd) : '', trip.uncounted_lak ? fmtMoney(trip.uncounted_lak, 'LAK') : ''].filter(Boolean).join(' · ')}</span></Text>}
-                  {trip.n_missing_receipt > 0 && <Tag color="orange" style={{ margin: 0 }}>{trip.n_missing_receipt} khoản được tính thiếu chứng từ</Tag>}
-                  {trip.counted_lak > 0 && <Text type="secondary">Quy đổi tất cả ≈ <span style={MONO}>{fmtMoney(trip.counted_vnd_equiv)}</span></Text>}
-                </Space>
-              </Table.Summary.Cell>
-            </Table.Summary.Row>
-          </Table.Summary>
-        ) : null}
       />
+      {trip && (expenses.length > 0 || (order.is_hired && order.hire_cost)) && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+          <Kpi label="Chi được tính" value={`${fmtAmt(trip.counted_vnd)} ₫`} sub={trip.counted_lak ? `+ ${fmtAmt(trip.counted_lak)} LAK · quy đổi tất cả ${fmtAmt(trip.counted_vnd_equiv)} ₫` : 'công ty chịu'} />
+          <Kpi label="Không được tính" value={`${fmtAmt(trip.uncounted_vnd)} ₫`} sub={trip.uncounted_lak ? `+ ${fmtAmt(trip.uncounted_lak)} LAK` : 'tài xế chịu'} tone={trip.uncounted_vnd || trip.uncounted_lak ? AMBER : INK_2} />
+          <Kpi label="Chứng từ" value={trip.n_missing_receipt ? `thiếu ${trip.n_missing_receipt}` : 'đủ'} sub={`${expenses.filter((e) => e.files.length).length}/${expenses.length} khoản có ảnh`} tone={trip.n_missing_receipt ? AMBER : OK} />
+        </div>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
         <Space wrap size={6}>
@@ -363,17 +364,19 @@ export default function DispatchCostSection({ order }: Props) {
             </Tag>
           ))}
           {trip && (trip.adv_vnd > 0 || trip.adv_lak > 0) && (
-            <Text type="secondary">→ còn lại sau chuyến <b style={{ ...MONO, color: trip.adv_vnd - trip.counted_vnd >= 0 ? '#15803d' : '#b45309' }}>
+            <Text type="secondary">→ còn lại sau chuyến <b style={{ ...MONO, color: trip.adv_vnd - trip.counted_vnd >= 0 ? OK : AMBER }}>
               {fmtMoney(trip.adv_vnd - trip.counted_vnd)}{trip.adv_lak || trip.counted_lak ? ` · ${fmtMoney(trip.adv_lak - trip.counted_lak, 'LAK')}` : ''}</b> (đối soát chính thức theo tháng ở Sổ chi phí)</Text>
           )}
           {!reviewed && <Button size="small" icon={<PlusOutlined />} onClick={openAdvance} disabled={!order.driver_id}>Gắn tạm ứng</Button>}
         </Space>
-        {canReview && (reviewed
-          ? <Popconfirm title="Mở lại để sửa chi phí chuyến này?" onConfirm={() => setReviewed(false)} okText="Mở lại" cancelText="Huỷ">
+        {canReview && (trip?.cost_status === 'reviewed'
+          ? (inPr ? <Text type="secondary" style={{ fontSize: 12 }}>Đã duyệt qua đề nghị thanh toán.</Text> : <Popconfirm title="Mở lại để sửa chi phí chuyến này?" onConfirm={() => setReviewed(false)} okText="Mở lại" cancelText="Huỷ">
               <Button icon={<UnlockOutlined />}>Mở lại</Button>
-            </Popconfirm>
-          : <Popconfirm title={`Duyệt ${expenses.length} khoản chi và khoá chuyến này?`} description="Sau khi khoá không sửa/xoá khoản chi và chứng từ được nữa." onConfirm={() => setReviewed(true)} okText="Duyệt & khoá" cancelText="Huỷ" disabled={!expenses.length && !(order.is_hired && order.hire_cost)}>
-              <Button type="primary" icon={<CheckCircleOutlined />} style={{ background: '#E8A838', borderColor: '#E8A838', color: '#0D2E25' }} disabled={!expenses.length && !(order.is_hired && order.hire_cost)}>Kế toán duyệt &amp; khoá</Button>
+            </Popconfirm>)
+          : inPr
+            ? <Text type="secondary" style={{ fontSize: 12 }}>Chuyến đang nằm trong đề nghị thanh toán — duyệt ở phiếu đó.</Text>
+            : <Popconfirm title={`Duyệt ${expenses.length} khoản chi và khoá chuyến này?`} description="Sau khi khoá không sửa/xoá khoản chi và chứng từ được nữa." onConfirm={() => setReviewed(true)} okText="Duyệt & khoá" cancelText="Huỷ" disabled={!expenses.length && !(order.is_hired && order.hire_cost)}>
+              <Button type="primary" icon={<CheckCircleOutlined />} style={{ background: GOLD, borderColor: GOLD, color: '#0D2E25', fontWeight: 600 }} disabled={!expenses.length && !(order.is_hired && order.hire_cost)}>Kế toán duyệt &amp; khoá</Button>
             </Popconfirm>)}
       </div>
 

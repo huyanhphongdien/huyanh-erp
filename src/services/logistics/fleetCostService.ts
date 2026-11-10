@@ -102,6 +102,8 @@ export interface DriverAdvance {
   note: string | null
   created_by: string | null
   created_at: string
+  /** Đợt 2: tạm ứng đã khấu trừ ở đề nghị thanh toán nào (null = chưa đối soát) */
+  fleet_payment_request_id?: string | null
   driver?: { id: string; full_name: string } | null
   dispatch_order?: { id: string; code: string; dispatch_date: string } | null
 }
@@ -150,6 +152,12 @@ export interface TripCostRow {
   kinds: string | null
   adv_vnd: number
   adv_lak: number
+  /** Đợt 2: phần TÀI XẾ được thanh toán (quy đổi VNĐ, KHÔNG gồm cước thuê xe ngoài) */
+  counted_driver_vnd_equiv: number
+  /** Đợt 2: chuyến đã gom vào đề nghị thanh toán nào */
+  fleet_payment_request_id: string | null
+  payment_request_code: string | null
+  payment_request_status: string | null
 }
 
 /** 1 dòng của v_fleet_cost_month = tài xế × tháng × đồng tiền. driver_id null = xe thuê ngoài / lệnh không gắn tài xế. */
@@ -277,6 +285,10 @@ function normalizeTrip(row: any): TripCostRow {
     counted_vnd_equiv: n('counted_vnd_equiv'), uncounted_vnd_equiv: n('uncounted_vnd_equiv'),
     n_expenses: n('n_expenses'), n_missing_receipt: n('n_missing_receipt'),
     adv_vnd: n('adv_vnd'), adv_lak: n('adv_lak'),
+    counted_driver_vnd_equiv: n('counted_driver_vnd_equiv'),
+    fleet_payment_request_id: row.fleet_payment_request_id ?? null,
+    payment_request_code: row.payment_request_code ?? null,
+    payment_request_status: row.payment_request_status ?? null,
   }
 }
 

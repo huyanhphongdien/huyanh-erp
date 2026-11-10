@@ -221,6 +221,8 @@ const DispatchDetailPage = lazy(() => import('./pages/logistics/dispatch/Dispatc
 const DispatchPrintPage = lazy(() => import('./pages/logistics/dispatch/DispatchPrintPage'));
 const FetchReportPage = lazy(() => import('./pages/logistics/dispatch/FetchReportPage'));
 const FleetCostPage = lazy(() => import('./pages/logistics/costs/FleetCostPage'));
+const FleetPaymentRequestDetailPage = lazy(() => import('./pages/logistics/costs/FleetPaymentRequestDetailPage'));
+const FleetPaymentRequestPrintPage = lazy(() => import('./pages/logistics/costs/FleetPaymentRequestPrintPage'));
 const FinanceLoanDashboard = lazy(() => import('./pages/finance/FinanceLoanDashboard'));
 const FinanceLoanListPage = lazy(() => import('./pages/finance/FinanceLoanListPage'));
 const FinanceDepositListPage = lazy(() => import('./pages/finance/FinanceDepositListPage'));
@@ -719,6 +721,8 @@ function App() {
                 <Route path="fleet/vehicles" element={<FleetVehicleListPage />} />
                 <Route path="fleet/drivers" element={<FleetDriverListPage />} />
                 <Route path="costs" element={<FleetCostPage />} />
+                <Route path="costs/payment-requests/:id" element={<FleetPaymentRequestDetailPage />} />
+                <Route path="costs/payment-requests/:id/print" element={<FleetPaymentRequestPrintPage />} />
               </Route>
 
               {/* ===== VỐN VAY NGÂN HÀNG (Admin only) ===== */}

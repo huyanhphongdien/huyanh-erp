@@ -449,7 +449,8 @@ const getMenuGroups = (
       { path: '/logistics/dispatch', label: 'Lệnh điều động', icon: <ClipboardList size={18} />,
         tab: { key: 'dispatch-list', componentId: 'dispatch-list' },
         extraActivePaths: ['/logistics/dispatch/new'] },
-      { path: '/logistics/dispatch/fetch-report', label: 'Báo cáo đi lấy mủ', icon: <BarChart3 size={18} /> },
+      // Tạm ẩn theo yêu cầu owner 10/11/2026 (trang /logistics/dispatch/fetch-report vẫn còn, bật lại thì bỏ comment):
+      // { path: '/logistics/dispatch/fetch-report', label: 'Báo cáo đi lấy mủ', icon: <BarChart3 size={18} /> },
       { path: '/logistics/costs', label: 'Sổ chi phí đội xe', icon: <Wallet size={18} /> },
       { path: '/logistics/fleet/vehicles', label: 'Đội xe', icon: <Truck size={18} />,
         tab: { key: 'fleet-vehicle-list', componentId: 'fleet-vehicle-list' } },

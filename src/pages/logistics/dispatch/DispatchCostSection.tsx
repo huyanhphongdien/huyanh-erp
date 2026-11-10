@@ -342,7 +342,7 @@ export default function DispatchCostSection({ order }: Props) {
         <Descriptions.Item label="Vượt thời gian">{overDays != null ? <b style={{ color: overDays > 0 ? AMBER : OK }}>{overDays > 0 ? `+${overDays} ngày` : 'không'}</b> : '–'}</Descriptions.Item>
       </Descriptions>
 
-      <Table rowKey="id" size="small" pagination={false} columns={columns as any} dataSource={rows} scroll={{ x: 960 }}
+      <Table className="fleet-table" rowKey="id" size="small" pagination={false} columns={columns as any} dataSource={rows} scroll={{ x: 960 }}
         locale={{ emptyText: 'Chưa có khoản chi. Bấm "Thêm khoản chi" hoặc "Nhập nhanh" từ phiếu tài xế nộp.' }}
       />
       {trip && (expenses.length > 0 || (order.is_hired && order.hire_cost)) && (
@@ -451,7 +451,7 @@ export default function DispatchCostSection({ order }: Props) {
       {/* ── Modal: nhập nhanh ── */}
       <Modal title={`Nhập nhanh từ phiếu tài xế · ${order.code}`} open={quickOpen} onOk={saveQuick} confirmLoading={saving} onCancel={() => setQuickOpen(false)} okText={`Lưu ${quickRows.filter((r) => r.amount).length} khoản`} cancelText="Huỷ" width={820} destroyOnHidden>
         <Text type="secondary">Mỗi dòng một khoản. Ngày chi = ngày điều động; chứng từ tải thêm ở bảng sau khi lưu.</Text>
-        <Table size="small" pagination={false} rowKey="key" dataSource={quickRows} style={{ marginTop: 10 }}
+        <Table className="fleet-table" size="small" pagination={false} rowKey="key" dataSource={quickRows} style={{ marginTop: 10 }}
           columns={[
             { title: 'Loại chi', width: 170, render: (_: unknown, r, i) => <Select size="small" value={r.kind} style={{ width: '100%' }} options={EXPENSE_KINDS.map((k) => ({ value: k, label: EXPENSE_KIND_LABELS[k] }))} onChange={(v) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, kind: v } : x))} /> },
             { title: 'Nội dung', render: (_: unknown, r, i) => <Input size="small" value={r.description} onChange={(e) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} /> },

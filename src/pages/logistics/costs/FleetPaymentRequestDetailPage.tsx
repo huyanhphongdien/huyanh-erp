@@ -196,7 +196,7 @@ export default function FleetPaymentRequestDetailPage() {
       </Card>
 
       <Card title={`Các dòng (${lines.length})`} size="small" extra={editable && <Button size="small" icon={<PlusOutlined />} onClick={() => openLine()}>Thêm khoản tay</Button>}>
-        <Table rowKey="id" size="small" pagination={false} dataSource={lines} columns={columns as any} scroll={{ x: 900 }}
+        <Table className="fleet-table" rowKey="id" size="small" pagination={false} dataSource={lines} columns={columns as any} scroll={{ x: 900 }}
           locale={{ emptyText: 'Phiếu chưa có dòng nào' }}
           summary={() => (
             <Table.Summary fixed>

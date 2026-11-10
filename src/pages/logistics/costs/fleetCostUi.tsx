@@ -7,6 +7,7 @@
 
 import type { CSSProperties, ReactNode } from 'react'
 import { Tag, Typography } from 'antd'
+import './fleetCost.css'
 import { fmtAmt } from '../../../services/logistics/fleetCostService'
 import { FLEET_PR_STATUS_COLORS, FLEET_PR_STATUS_LABELS, type FleetPrStatus } from '../../../services/logistics/fleetPaymentRequestService'
 
@@ -69,6 +70,11 @@ export function PageHeader({ title, subtitle, extra }: { title: ReactNode; subti
 
 export function PrStatusTag({ status, style }: { status: FleetPrStatus; style?: CSSProperties }) {
   return <Tag color={FLEET_PR_STATUS_COLORS[status]} style={{ margin: 0, fontWeight: 600, ...style }}>{FLEET_PR_STATUS_LABELS[status]}</Tag>
+}
+
+/** Tên cột 2 tầng: tên chính + dòng phụ nhỏ (đơn vị / cách tính). Dùng với bảng class .fleet-table. */
+export function Th({ main, sub }: { main: ReactNode; sub?: ReactNode }) {
+  return <span>{main}{sub && <span className="fc-sub">{sub}</span>}</span>
 }
 
 /** Nhãn mục nhỏ in hoa dùng trên các thẻ. */

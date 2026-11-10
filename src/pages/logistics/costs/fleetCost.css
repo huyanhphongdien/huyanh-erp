@@ -1,0 +1,32 @@
+/* ============================================================================
+   Bảng của Sổ chi phí đội xe / Đề nghị thanh toán chi phí xe (class .fleet-table)
+   Vì sao: luật chung airtable-theme.css in HOA mọi tiêu đề cột + letter-spacing → tiếng Việt
+   có dấu in hoa khó đọc và gãy dòng xấu ("CHUẨ/N", "KHÔNG ĐƯỢC/TÍNH"). Ở đây: chữ thường,
+   không gãy dòng (cột đủ rộng), dòng phụ nhỏ cho đơn vị, nền xanh nhạt thương hiệu.
+   ========================================================================== */
+.fleet-table .ant-table-thead > tr > th,
+.fleet-table .ant-table-thead > tr > td {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: #1f2937 !important;
+  background: #f1f6f3 !important;
+  white-space: nowrap;
+  line-height: 1.3;
+  padding: 9px 10px !important;
+  vertical-align: middle;
+  border-bottom: 2px solid #cfe0d8 !important;
+}
+.fleet-table .ant-table-thead > tr > th::before { display: none; }   /* bỏ vạch chia cột mờ của AntD cho đầu bảng sạch */
+.fleet-table .ant-table-thead > tr > th.ant-table-cell-fix-left,
+.fleet-table .ant-table-thead > tr > th.ant-table-cell-fix-right { background: #f1f6f3 !important; }
+/* dòng phụ dưới tên cột: đơn vị / cách tính */
+.fleet-table .fc-sub { display: block; font-size: 11px; font-weight: 500; color: #6b7280; margin-top: 1px; }
+/* thân bảng: số đơn cách, dòng cao vừa, kẻ ngang nhạt */
+.fleet-table .ant-table-tbody > tr > td { padding: 8px 10px !important; border-bottom: 1px solid #eef2ef !important; }
+.fleet-table .ant-table-tbody > tr:hover > td { background: #f8fbf9 !important; }
+.fleet-table .ant-table-summary > tr > td { background: #f9fafb !important; border-top: 2px solid #cfe0d8 !important; padding: 8px 10px !important; }
+.fleet-table .ant-table-placeholder .ant-table-cell { color: #6b7280; }
+/* bảng chọn (rowSelection) trong hộp lập đề nghị */
+.fleet-table .ant-table-selection-column { padding-left: 8px !important; }

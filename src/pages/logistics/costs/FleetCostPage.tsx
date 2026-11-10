@@ -25,6 +25,7 @@ import { TRIP_TYPE_LABELS, type TripType } from '../../../services/logistics/dis
 import {
   fleetCostService, EXPENSE_KIND_LABELS, HIRE_KIND_LABEL, fmtAmt, fmtMoney,
   type DriverAdvance, type ExpenseKind, type MonthCostRow, type MonthExpenseRow, type TripCostRow,
+  COUNTED_SUB, UNCOUNTED_LABEL, UNCOUNTED_SUB,
 } from '../../../services/logistics/fleetCostService'
 import {
   fleetPaymentRequestService, FLEET_PR_METHOD_LABELS, FLEET_PR_STATUS_LABELS,
@@ -267,8 +268,8 @@ export default function FleetCostPage() {
     } },
     { title: 'Nội dung chi', width: 180, render: (_: unknown, t: TripCostRow) => <span style={{ fontSize: 12 }}>{[(t.kinds || '').split(',').filter(Boolean).map((k) => EXPENSE_KIND_LABELS[k as ExpenseKind] || k).join(', '), t.is_hired && t.hire_cost ? HIRE_KIND_LABEL : ''].filter(Boolean).join(', ') || '–'}</span> },
     { title: <Th main="Tạm ứng" sub="gắn chuyến" />, width: 130, align: 'right' as const, render: (_: unknown, t: TripCostRow) => <Pair vnd={t.adv_vnd} lak={t.adv_lak} /> },
-    { title: <Th main="Chi được tính" sub="công ty chịu" />, width: 150, align: 'right' as const, onCell: () => ({ style: { background: '#F0F9F4' } }), render: (_: unknown, t: TripCostRow) => <Pair vnd={t.counted_vnd} lak={t.counted_lak} tone={BRAND} bold /> },
-    { title: <Th main="Không được tính" sub="tài xế chịu" />, width: 160, align: 'right' as const, onCell: () => ({ style: { background: '#FEF2F2' } }), render: (_: unknown, t: TripCostRow) => <Pair vnd={t.uncounted_vnd} lak={t.uncounted_lak} tone={RED} /> },
+    { title: <Th main="Chi được tính" sub={COUNTED_SUB} />, width: 150, align: 'right' as const, onCell: () => ({ style: { background: '#F0F9F4' } }), render: (_: unknown, t: TripCostRow) => <Pair vnd={t.counted_vnd} lak={t.counted_lak} tone={BRAND} bold /> },
+    { title: <Th main={UNCOUNTED_LABEL} sub={UNCOUNTED_SUB} />, width: 170, align: 'right' as const, onCell: () => ({ style: { background: '#FFFBEB' } }), render: (_: unknown, t: TripCostRow) => <Pair vnd={t.uncounted_vnd} lak={t.uncounted_lak} tone={AMBER} /> },
     { title: 'Trạng thái', width: 150, render: (_: unknown, t: TripCostRow) => (
       <Space size={4} wrap>
         {t.cost_status === 'reviewed' ? <Tag icon={<LockOutlined />} color="green" style={{ margin: 0 }}>đã duyệt</Tag> : t.n_expenses > 0 ? <Tag color="gold" style={{ margin: 0 }}>chờ duyệt</Tag> : <Tag style={{ margin: 0 }}>chưa nhập</Tag>}
@@ -323,8 +324,8 @@ export default function FleetCostPage() {
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <Kpi label="Chuyến" value={kpi.n} sub={`${trips.filter((t) => t.is_hired).length} thuê ngoài · ${fmtAmt(kpi.km)} km`} icon={<CarOutlined />} />
-        <Kpi label="Chi được tính" value={`${fmtAmt(kpi.counted)} ₫`} sub={kpi.countedLak ? `+ ${fmtAmt(kpi.countedLak)} LAK · quy đổi ${fmtAmt(kpi.countedEq)} ₫` : 'công ty chịu'} icon={<DollarOutlined />} />
-        <Kpi label="Không được tính" value={`${fmtAmt(kpi.uncounted)} ₫`} sub={kpi.uncountedLak ? `+ ${fmtAmt(kpi.uncountedLak)} LAK` : 'tài xế chịu'} tone={AMBER} />
+        <Kpi label="Chi được tính" value={`${fmtAmt(kpi.counted)} ₫`} sub={kpi.countedLak ? `+ ${fmtAmt(kpi.countedLak)} LAK · quy đổi ${fmtAmt(kpi.countedEq)} ₫` : COUNTED_SUB} icon={<DollarOutlined />} />
+        <Kpi label={UNCOUNTED_LABEL} value={`${fmtAmt(kpi.uncounted)} ₫`} sub={kpi.uncountedLak ? `+ ${fmtAmt(kpi.uncountedLak)} LAK · ${UNCOUNTED_SUB}` : UNCOUNTED_SUB} tone={AMBER} />
         <Kpi label="Tạm ứng" value={`${fmtAmt(kpi.adv)} ₫`} sub={kpi.advLak ? `+ ${fmtAmt(kpi.advLak)} LAK` : 'trong tháng'} icon={<WalletOutlined />} />
         <Kpi label="Còn lại" value={`${fmtAmt(Math.abs(kpi.bal))} ₫`} sub={kpi.balLak ? `+ ${fmtAmt(kpi.balLak)} LAK` : (kpi.bal >= 0 ? 'tài xế hoàn / cấn kỳ sau' : 'chi thêm cho tài xế')} tone={kpi.bal >= 0 ? OK : RED} />
         <Kpi label="₫ / km" value={fmtAmt(kpi.perKm)} sub="chi được tính ÷ km đã ghi" />
@@ -344,7 +345,7 @@ export default function FleetCostPage() {
                     { title: 'Chuyến có chi', dataIndex: 'trips', width: 130, align: 'right' as const },
                     { title: 'Tạm ứng', width: 140, align: 'right' as const, render: (_: unknown, r: DriverRow) => <Pair vnd={r.advVnd} lak={r.advLak} /> },
                     { title: 'Chi được tính', width: 150, align: 'right' as const, render: (_: unknown, r: DriverRow) => <Pair vnd={r.cVnd} lak={r.cLak} tone={BRAND} bold /> },
-                    { title: 'Không được tính', width: 160, align: 'right' as const, render: (_: unknown, r: DriverRow) => <Pair vnd={r.uVnd} lak={r.uLak} tone={RED} /> },
+                    { title: <Th main={UNCOUNTED_LABEL} sub="chờ quyết định" />, width: 160, align: 'right' as const, render: (_: unknown, r: DriverRow) => <Pair vnd={r.uVnd} lak={r.uLak} tone={AMBER} /> },
                     { title: <Th main="Còn lại" sub="tạm ứng − chi được tính" />, width: 180, align: 'right' as const, render: (_: unknown, r: DriverRow) => <Pair vnd={r.balVnd} lak={r.balLak} tone={r.balVnd >= 0 ? OK : RED} bold /> },
                   ]}
                   locale={{ emptyText: 'Tháng này chưa có khoản chi hay tạm ứng nào' }} />
@@ -383,7 +384,7 @@ export default function FleetCostPage() {
                   { title: <Th main="Được tính" sub="LAK" />, dataIndex: 'lak', width: 140, align: 'right' as const, render: (v: number) => <span style={MONO}>{v ? fmtAmt(v) : ''}</span> },
                   { title: <Th main="Quy đổi" sub="₫" />, dataIndex: 'eq', width: 140, align: 'right' as const, render: (v: number) => <b style={MONO}>{fmtAmt(v)}</b> },
                   { title: 'Tỷ trọng', width: 100, align: 'right' as const, render: (_: unknown, r: { eq: number }) => kpi.countedEq ? `${(r.eq / kpi.countedEq * 100).toFixed(1)} %` : '' },
-                  { title: <Th main="Không tính" sub="₫ · tài xế chịu" />, dataIndex: 'uncounted', width: 150, align: 'right' as const, render: (v: number) => <span style={{ ...MONO, color: RED }}>{v ? fmtAmt(v) : ''}</span> },
+                  { title: <Th main={UNCOUNTED_LABEL} sub="₫ · chờ quyết định" />, dataIndex: 'uncounted', width: 160, align: 'right' as const, render: (v: number) => <span style={{ ...MONO, color: AMBER }}>{v ? fmtAmt(v) : ''}</span> },
                 ]}
                 locale={{ emptyText: 'Không có khoản chi' }} />
             ),

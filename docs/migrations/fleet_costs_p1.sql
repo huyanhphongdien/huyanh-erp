@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS public.dispatch_expenses (
   amount_vnd         numeric(16,2) GENERATED ALWAYS AS (
                        CASE WHEN currency = 'VND' THEN amount ELSE round(amount * coalesce(fx_rate_vnd, 0), 0) END
                      ) STORED,
-  counted            boolean NOT NULL DEFAULT true,     -- true = công ty chịu (được tính) · false = tài xế chịu
+  counted            boolean NOT NULL DEFAULT true,     -- true = theo quy định (được tính) · false = CHƯA THÔNG QUA, chờ quyết định (KHÔNG phải tài xế chịu)
   uncounted_reason   text,
   note               text,
   created_by         uuid,                               -- auth uid (như dispatch_orders.created_by)

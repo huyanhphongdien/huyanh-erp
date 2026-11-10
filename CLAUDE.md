@@ -214,7 +214,9 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
   tính giá vốn vận chuyển theo đơn hàng — đừng tự thêm.
 - Bảng: `fleet_routes` (hành trình, km ước, số ngày chuẩn), cột mới trên `dispatch_orders` (`return_date`, `odometer_start/end_km`,
   `route_id/route_name`, `standard_days`, `cost_status` open|reviewed), `dispatch_expenses` (1 khoản chi: `kind`, `amount`,
-  `currency` VND|LAK, `fx_rate_vnd`, `amount_vnd` generated, `counted` = công ty chịu), `dispatch_expense_files` (ảnh hoá đơn,
+  `currency` VND|LAK, `fx_rate_vnd`, `amount_vnd` generated, `counted` = theo quy định/được tính; **`false` = CHƯA THÔNG QUA** —
+  ngoài danh mục quy định hoặc chưa có quyết định, chờ BGĐ/kế toán, KHÔNG phải "tài xế chịu" (owner chỉnh 10/11/2026; nhãn
+  dùng `COUNTED_*`/`UNCOUNTED_*` trong `fleetCostService.ts`, đừng gõ lại)), `dispatch_expense_files` (ảnh hoá đơn,
   bucket **`invoice-images`** thư mục `fleet-receipts/` — bucket riêng không tạo policy được qua agent_sql), `driver_advances`
   (mã `TU-YYMM-seq`, tạm ứng, gắn lệnh tuỳ chọn). Migration `docs/migrations/fleet_costs_p1.sql` (đã áp 10/11/2026).
 - **Một nguồn số**: view `v_fleet_cost_trips` (1 dòng = 1 lệnh: km = đồng hồ về − đi, ngày = về − đi + 1, vượt = ngày − chuẩn,

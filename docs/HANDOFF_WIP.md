@@ -9,7 +9,7 @@ Nhánh: `main` (mọi commit dưới đây ĐÃ push → Vercel auto-deploy `huy
 
 ## 0. CẬP NHẬT 10/11/2026 — Chi phí đội xe qua Lệnh điều động (Đợt 1 ĐÃ DEPLOY, f1439dca)
 - Số hoá `docs/Form theo dõi chi phí tài xế.xlsx`: 1 chuyến = 1 lệnh điều động; HC-TH nhập ngày về, km đồng hồ, hành trình,
-  khoản chi (VND | LAK, cờ "được tính", ảnh hoá đơn), tạm ứng; kế toán "Duyệt & khoá" (trigger DB chặn sửa).
+  khoản chi (VND | LAK, cờ "được tính" — tắt = CHƯA THÔNG QUA/chờ quyết định, KHÔNG phải tài xế chịu; ảnh hoá đơn), tạm ứng; kế toán "Duyệt & khoá" (trigger DB chặn sửa).
 - Trang mới **/logistics/costs** (Sổ chi phí đội xe: theo tài xế = form Excel, theo xe ₫/km, theo loại chi, tạm ứng, chờ duyệt,
   xuất .xlsx đúng 26 cột). Khối "Hành trình & chi phí" dưới chi tiết lệnh. Luật + bảng: CLAUDE.md mục "Chi phí đội xe".
 - Migration `docs/migrations/fleet_costs_p1.sql` đã áp prod. Ảnh lưu bucket `invoice-images/fleet-receipts/`.

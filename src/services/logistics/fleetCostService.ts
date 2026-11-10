@@ -37,6 +37,14 @@ export const EXPENSE_KINDS = Object.keys(EXPENSE_KIND_LABELS) as ExpenseKind[]
 export const HIRE_KIND = 'hire' as const
 export const HIRE_KIND_LABEL = 'Cước thuê xe ngoài'
 export const COST_STATUS_LABELS: Record<CostStatus, string> = { open: 'Đang nhập', reviewed: 'Đã duyệt' }
+/** Cờ `counted` của khoản chi (owner chỉnh 10/11/2026):
+ *  true  = khoản chi TRONG danh mục chi phí công ty đã quy định → tính vào chuyến, vào đề nghị thanh toán.
+ *  false = CHƯA THÔNG QUA — ngoài quy định hoặc chưa có quyết định, chờ BGĐ / kế toán; KHÔNG có nghĩa tài xế chịu.
+ *  Đừng viết lại chữ "tài xế chịu" ở màn nào. */
+export const COUNTED_LABEL = 'Được tính'
+export const COUNTED_SUB = 'theo quy định'
+export const UNCOUNTED_LABEL = 'Chưa thông qua'
+export const UNCOUNTED_SUB = 'ngoài quy định · chờ quyết định'
 
 /** Thư mục trong bucket invoice-images (bucket đã có policy authenticated insert/delete, public read). */
 const RECEIPT_BUCKET = 'invoice-images'

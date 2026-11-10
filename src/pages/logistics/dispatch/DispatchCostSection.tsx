@@ -18,6 +18,7 @@ import type { UploadFile } from 'antd'
 import {
   CheckCircleOutlined, DeleteOutlined, EditOutlined, FilePdfOutlined, LockOutlined, PaperClipOutlined, PlusOutlined,
   TableOutlined, UnlockOutlined, UploadOutlined, WalletOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useAuthStore } from '../../../stores/authStore'
@@ -26,6 +27,7 @@ import {
   fleetCostService, EXPENSE_KINDS, EXPENSE_KIND_LABELS, HIRE_KIND_LABEL, RECEIPT_ACCEPT, RECEIPT_MAX_BYTES, fmtAmt, fmtMoney,
   type CostCurrency, type DispatchExpense, type DispatchExpenseFile, type DriverAdvance, type ExpenseInput, type ExpenseKind,
   type FleetRoute, type TripCostRow,
+  COUNTED_SUB, UNCOUNTED_LABEL, UNCOUNTED_SUB,
 } from '../../../services/logistics/fleetCostService'
 import { FLEET_PR_STATUS_LABELS, type FleetPrStatus } from '../../../services/logistics/fleetPaymentRequestService'
 import { useNavigate } from 'react-router-dom'
@@ -253,7 +255,7 @@ export default function DispatchCostSection({ order }: Props) {
       ? <span>{order.hire_company || 'Xe thuê ngoài'} <Text type="secondary" style={{ fontSize: 12 }}>· lấy từ lệnh (sửa ở Sửa lệnh)</Text></span>
       : <div>
           <div>{r.description || <Text type="secondary">–</Text>}</div>
-          {(r.note || (!r.counted && r.uncounted_reason)) && <div style={{ fontSize: 12, color: '#6b7280' }}>{!r.counted && r.uncounted_reason ? `Không tính: ${r.uncounted_reason}` : r.note}</div>}
+          {(r.note || (!r.counted && r.uncounted_reason)) && <div style={{ fontSize: 12, color: '#6b7280' }}>{!r.counted && r.uncounted_reason ? `Chưa thông qua: ${r.uncounted_reason}` : r.note}</div>}
         </div> },
     { title: 'Ngày', key: 'date', width: 96, render: (_: unknown, r: Row) => 'hire' in r ? fmtD(order.dispatch_date) : fmtD(r.expense_date) },
     { title: 'Số tiền', key: 'amount', width: 150, align: 'right' as const, render: (_: unknown, r: Row) => 'hire' in r
@@ -262,9 +264,10 @@ export default function DispatchCostSection({ order }: Props) {
           <b style={MONO}>{fmtMoney(r.amount, r.currency)}</b>
           {r.currency === 'LAK' && <div style={{ fontSize: 11, color: '#6b7280', ...MONO }}>≈ {fmtAmt(r.amount_vnd)} ₫ · {r.fx_rate_vnd}</div>}
         </div> },
-    { title: 'Được tính', key: 'counted', width: 100, align: 'center' as const, render: (_: unknown, r: Row) => 'hire' in r
+    { title: <Tooltip title="Bật: khoản chi theo quy định, tính vào chuyến và đề nghị thanh toán. Tắt: chưa thông qua — ngoài quy định hoặc chưa có quyết định, chờ BGĐ / kế toán (không phải tài xế chịu)."><span>Được tính <QuestionCircleOutlined style={{ color: '#9ca3af' }} /></span></Tooltip>,
+      key: 'counted', width: 110, align: 'center' as const, render: (_: unknown, r: Row) => 'hire' in r
       ? <Tag color="green">có</Tag>
-      : <Switch size="small" checked={r.counted} disabled={reviewed} checkedChildren="có" unCheckedChildren="không" onChange={(v) => toggleCounted(r, v)} /> },
+      : <Switch size="small" checked={r.counted} disabled={reviewed} checkedChildren="có" unCheckedChildren="chờ" onChange={(v) => toggleCounted(r, v)} /> },
     { title: 'Chứng từ', key: 'files', width: 210, render: (_: unknown, r: Row) => {
       if ('hire' in r) return <Text type="secondary">–</Text>
       const imgs = r.files.filter((f) => (f.mime || '').startsWith('image/'))
@@ -347,8 +350,8 @@ export default function DispatchCostSection({ order }: Props) {
       />
       {trip && (expenses.length > 0 || (order.is_hired && order.hire_cost)) && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
-          <Kpi label="Chi được tính" value={`${fmtAmt(trip.counted_vnd)} ₫`} sub={trip.counted_lak ? `+ ${fmtAmt(trip.counted_lak)} LAK · quy đổi tất cả ${fmtAmt(trip.counted_vnd_equiv)} ₫` : 'công ty chịu'} />
-          <Kpi label="Không được tính" value={`${fmtAmt(trip.uncounted_vnd)} ₫`} sub={trip.uncounted_lak ? `+ ${fmtAmt(trip.uncounted_lak)} LAK` : 'tài xế chịu'} tone={trip.uncounted_vnd || trip.uncounted_lak ? AMBER : INK_2} />
+          <Kpi label="Chi được tính" value={`${fmtAmt(trip.counted_vnd)} ₫`} sub={trip.counted_lak ? `+ ${fmtAmt(trip.counted_lak)} LAK · quy đổi tất cả ${fmtAmt(trip.counted_vnd_equiv)} ₫` : COUNTED_SUB} />
+          <Kpi label={UNCOUNTED_LABEL} value={`${fmtAmt(trip.uncounted_vnd)} ₫`} sub={trip.uncounted_lak ? `+ ${fmtAmt(trip.uncounted_lak)} LAK · ${UNCOUNTED_SUB}` : UNCOUNTED_SUB} tone={trip.uncounted_vnd || trip.uncounted_lak ? AMBER : INK_2} />
           <Kpi label="Chứng từ" value={trip.n_missing_receipt ? `thiếu ${trip.n_missing_receipt}` : 'đủ'} sub={`${expenses.filter((e) => e.files.length).length}/${expenses.length} khoản có ảnh`} tone={trip.n_missing_receipt ? AMBER : OK} />
         </div>
       )}
@@ -433,8 +436,8 @@ export default function DispatchCostSection({ order }: Props) {
             )}
           </Space>
           <Space size={12} style={{ display: 'flex' }} align="start">
-            <Form.Item name="counted" label="Được tính vào chi phí công ty" valuePropName="checked" style={{ width: 230 }}><Switch checkedChildren="có" unCheckedChildren="không" /></Form.Item>
-            {countedWatch === false && <Form.Item name="uncounted_reason" label="Lý do không tính (tài xế chịu)" rules={[{ required: true, message: 'Ghi lý do' }]} style={{ flex: 1 }}><Input maxLength={200} /></Form.Item>}
+            <Form.Item name="counted" label="Khoản chi theo quy định (được tính)" valuePropName="checked" style={{ width: 250 }} extra="tắt = chưa thông qua, chờ quyết định"><Switch checkedChildren="được tính" unCheckedChildren="chờ duyệt" /></Form.Item>
+            {countedWatch === false && <Form.Item name="uncounted_reason" label="Vì sao chưa thông qua" rules={[{ required: true, message: 'Ghi vì sao khoản này chưa thông qua' }]} style={{ flex: 1 }}><Input maxLength={200} placeholder="ngoài danh mục quy định / chờ BGĐ, kế toán quyết định" /></Form.Item>}
           </Space>
           <Form.Item label="Ảnh hoá đơn / phiếu (nhiều ảnh, PDF được)">
             <Upload.Dragger accept={RECEIPT_ACCEPT} multiple fileList={pendingFiles} listType="picture"
@@ -457,7 +460,7 @@ export default function DispatchCostSection({ order }: Props) {
             { title: 'Nội dung', render: (_: unknown, r, i) => <Input size="small" value={r.description} onChange={(e) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} /> },
             { title: 'Số tiền', width: 150, render: (_: unknown, r, i) => <InputNumber size="small" min={0} {...thousands} value={r.amount ?? undefined} style={{ width: '100%' }} onChange={(v) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, amount: v == null ? null : Number(v) } : x))} /> },
             { title: 'Đ.tiền', width: 110, render: (_: unknown, r, i) => <Segmented size="small" value={r.currency} options={['VND', 'LAK']} onChange={(v) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, currency: v as CostCurrency } : x))} /> },
-            { title: 'Tính', width: 70, align: 'center' as const, render: (_: unknown, r, i) => <Switch size="small" checked={r.counted} onChange={(v) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, counted: v } : x))} /> },
+            { title: <Tooltip title="Tắt = chưa thông qua, chờ quyết định (không phải tài xế chịu)"><span>Tính</span></Tooltip>, width: 70, align: 'center' as const, render: (_: unknown, r, i) => <Switch size="small" checked={r.counted} onChange={(v) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, counted: v } : x))} /> },
             { title: '', width: 40, render: (_: unknown, __, i) => <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => setQuickRows((rs) => rs.filter((_, j) => j !== i))} /> },
           ]} />
         <Space style={{ marginTop: 8 }} wrap>

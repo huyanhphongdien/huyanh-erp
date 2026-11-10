@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../../stores/authStore'
-import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot } from '../../../services/wms/mixService'
+import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPallet } from '../../../services/wms/mixService'
 import { useMixRole } from '../../../hooks/useMixRole'
 import { rawLotService, type LenhChay, type RawLotBalance, type RawLotChen } from '../../../services/wms/rawLotService'
 import { guiMailKetThuc } from '../../../services/wms/maTongKetMail'
@@ -35,6 +35,7 @@ export default function KhoMix() {
   const [today, setToday] = useState<MixIssue[]>([])
   const [done, setDone] = useState<MixIssue[]>([])
   const [lots, setLots] = useState<MixLot[]>([])
+  const [pallets, setPallets] = useState<MixPallet[]>([])   // Sổ pallet (p19): lưới HC trống / dây chuyền / chưa số kg
   const [chenMa, setChenMa] = useState<Map<string, RawLotChen>>(new Map())   // tổng chèn đã nhận theo mã gốc
   // sổ mã đang chạy (một mã chạy nhiều ca; khai một lần, kết thúc khi xong)
   const [lenhs, setLenhs] = useState<LenhChay[]>([])   // lệnh đang chạy (SQL p13): một lệnh = 1..n mã gộp
@@ -53,7 +54,7 @@ export default function KhoMix() {
     if (!facilityId) return
     setLoading(true); setErr(null)
     try {
-      const [b, o, t, d, l, c, r, m] = await Promise.all([
+      const [b, o, t, d, l, c, r, m, pl] = await Promise.all([
         mixService.balance(facilityId),
         mixService.listIssues({ facilityId, status: ['issued', 'returned', 'submitted', 'qc_confirmed'] }),
         mixService.listIssues({ facilityId, date: todayLocal(), limit: 100 }),
@@ -62,8 +63,9 @@ export default function KhoMix() {
         rawLotService.chen(facilityId).catch(() => [] as RawLotChen[]),
         rawLotService.lenhDangChay(facilityId).catch(() => [] as LenhChay[]),
         rawLotService.list(facilityId).catch(() => [] as RawLotBalance[]),
+        mixService.listPallets(facilityId).catch(() => [] as MixPallet[]),
       ])
-      setBal(b); setOpen(o); setToday(t.filter((x) => x.status !== 'cancelled')); setDone(d); setLots(l); setChenMa(new Map(c.map((x) => [x.ma, x]))); setLenhs(r); setMaMo(m)
+      setBal(b); setOpen(o); setToday(t.filter((x) => x.status !== 'cancelled')); setDone(d); setLots(l); setChenMa(new Map(c.map((x) => [x.ma, x]))); setLenhs(r); setMaMo(m); setPallets(pl)
     } catch (e: any) { setErr(e?.message || 'Không tải được hàng chèn') }
     finally { setLoading(false) }
   }, [facilityId])
@@ -98,6 +100,8 @@ export default function KhoMix() {
     dayChuyen: curIssued.reduce((s, i) => s + i.kg_out, 0),
   } : null
   const lanKe = (cur?.items.length ?? 0) + 1
+  const palDung = pallets.filter((p) => p.is_active)
+  const palDem = { trong: palDung.filter((p) => p.trang_thai === 'trong').length, dc: palDung.filter((p) => p.trang_thai === 'day_chuyen').length, chuaBi: palDung.filter((p) => p.trang_thai === 'chua_bi').length, tat: pallets.length - palDung.length }
   const maChuaChay = maMo.filter((x) => !lenhs.some((g) => g.raw_lot_ids.includes(x.raw_lot_id))).sort((a, b) => (b.ngay_cuoi ?? '').localeCompare(a.ngay_cuoi ?? '')).slice(0, 8)
   const maTen = (ids: string[]) => ids.map((id) => maMo.find((x) => x.raw_lot_id === id)?.ma ?? '?').join(' + ')
   // bắt đầu lệnh 1..n mã; đang có lệnh chạy → hỏi: thay thế (mặc định 30/10) / chạy song song / gộp vào lệnh đang chạy
@@ -142,13 +146,14 @@ export default function KhoMix() {
                               <span className="kmx-row" style={{ gap: 8, alignItems: 'center' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                                   <span className="kmx-mono" style={{ fontSize: 14, fontWeight: 800, color: '#0D2E25', background: '#E8F5F0', borderRadius: 8, padding: '2px 7px', flex: '0 0 auto' }}>L{n}</span>
+                                  {i.pallet_code && <span className="kmx-hc">{i.pallet_code}</span>}
                                   <span style={{ fontSize: 14, fontWeight: 700, color: '#0D2E25', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.so_banh !== null ? `${i.so_banh} b · ` : ''}{i.lot_so_lo || i.lot_code}</span>
                                 </span>
                                 <span className={`kmx-chip ${chip.cls}`} style={{ flex: '0 0 auto' }}>{chip.text}</span>
                               </span>
                               <span className="kmx-sm">{i.vi_tri ? `${MIX_VI_TRI_LABELS[i.vi_tri]} · ` : ''}{i.gross_kg !== null ? (i.pallet_kg !== null ? `cả pallet ${kg1(i.gross_kg)} − bì ${kg1(i.pallet_kg)} = ` : 'cả pallet ') : ''}<b className="kmx-mono" style={{ color: '#0D2E25' }}>{kg1(i.kg_out)} kg</b>{i.gross_kg !== null && i.pallet_kg === null ? ' (bì trừ lúc trả)' : ''}{i.kg_return !== null ? ` · trả ${kg1(i.kg_return)} · tiêu hao ${kg1(i.kg_used)}` : ''} · {hm(i.out_at)}{i.out_by && i.out_by !== me && i.out_name ? ` · ${firstName(i.out_name)}` : ''}</span>
                             </Link>
-                            {i.status === 'issued' && <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-btn sec" style={{ minHeight: 42, fontSize: 14, textDecoration: 'none' }}>{I.lines}Trả L{n} · cân cuối ca</Link>}
+                            {i.status === 'issued' && <Link to={`/m/kho/chen/phieu/${i.id}`} className="kmx-btn sec" style={{ minHeight: 42, fontSize: 14, textDecoration: 'none' }}>{I.lines}Trả L{n} · {i.pallet_code ? 'dùng hết hay còn dư' : 'cân cuối ca'}</Link>}
                           </div>
     )
   }
@@ -251,7 +256,14 @@ export default function KhoMix() {
               {!canTake && !role.loading && <span className="kmx-sm kmx-center">Tài khoản này chưa được phân công khai báo hàng chèn (QS). BGĐ phân công ở máy tính: Hàng chèn → Phân công.</span>}
             </section>
           )}
-          <span className="kmx-sm kmx-center" style={{ color: '#9CA3AF' }}>Mỗi lần lấy = một pallet · cuối ca trả 3 lần cân, 2 ảnh · Kết thúc = đóng lệnh + mail BGĐ</span>
+          {pallets.length > 0 && (
+            <Link to="/m/kho/chen/so-pallet" className="kmx-card press" aria-label="Sổ pallet" style={{ gap: 8 }}>
+              <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Sổ pallet · {palDung.length} pallet HC</span><span style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, fontWeight: 700, color: '#1B4D3E' }}>Xem{I.chev}</span></div>
+              <div className="kmx-pal mini">{palDung.map((p) => <span key={p.id} className={`cell${p.trang_thai === 'day_chuyen' ? ' line' : p.bi_kg === null ? ' nobi' : ''}`} title={`${p.code} · ${p.bi_kg === null ? 'chưa khai số kg' : `bì ${kg1(p.bi_kg)} kg`}`}>{p.code.replace(/^HC/, '')}</span>)}</div>
+              <span className="kmx-sm">{palDem.trong} trống · {palDem.dc} ở dây chuyền{palDem.chuaBi ? ` · ${palDem.chuaBi} chưa khai số kg` : ''}{palDem.tat ? ` · ${palDem.tat} tắt` : ''} · bì tạm 15 / 25 kg tới khi cân từng pallet</span>
+            </Link>
+          )}
+          <span className="kmx-sm kmx-center" style={{ color: '#9CA3AF' }}>Mỗi lần lấy = một pallet HC · cuối ca dùng hết 1 chạm, còn dư cân 1 lần · Kết thúc = đóng lệnh + mail BGĐ</span>
 
           {otherIssued.length > 0 && (
             <section aria-label="Đang ở dây chuyền ca khác" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

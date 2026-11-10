@@ -169,3 +169,20 @@
 .kmx-lightbox span { position: absolute; left: 0; right: 0; bottom: calc(16px + env(safe-area-inset-bottom)); color: #fff; font-size: 13px; text-align: center; }
 
 @media (prefers-reduced-motion: reduce) { .kmx-skel { animation: none; } }
+
+/* ---- Sổ pallet hàng chèn (p19): lưới HC1→HC30. Xanh nhạt = trống, vàng = ở dây chuyền, nét đứt = chưa khai số kg, gạch = tắt ---- */
+.kmx-pal { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.kmx-pal > button, .kmx-pal > .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 48px; border-radius: 10px; font: inherit; font-family: var(--mono); font-size: 13px; font-weight: 700; border: 1px solid #CDE9DD; background: #E8F5F0; color: #0D2E25; cursor: pointer; padding: 2px 3px; line-height: 1.1; min-width: 0; -webkit-tap-highlight-color: transparent; }
+.kmx-pal small { font-family: var(--sans); font-size: 9px; font-weight: 600; letter-spacing: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kmx-pal > .line { background: #FEF3C7; border-color: #FDE68A; color: #92400E; cursor: default; }
+.kmx-pal > .nobi { border: 1px dashed #D1D5DB; color: #9CA3AF; background: #F9FAFB; cursor: default; }
+.kmx-pal > .off { color: #C4C9CF; text-decoration: line-through; background: #F3F4F6; border-color: #E5E7EB; cursor: default; }
+.kmx-pal > .sel { background: #1B4D3E; color: #fff; border-color: #1B4D3E; box-shadow: 0 0 0 3px #E8A838; }
+.kmx-pal.mini { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+.kmx-pal.mini > .cell { min-height: 24px; font-size: 9.5px; border-radius: 5px; padding: 0; cursor: default; }
+.kmx-hc { display: inline-flex; align-items: center; font-family: var(--mono); font-size: 12px; font-weight: 800; color: #fff; background: #1B4D3E; border-radius: 7px; padding: 1px 7px; white-space: nowrap; flex: 0 0 auto; }
+.kmx-hc.amb { background: #B45309; }
+.kmx-big2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kmx-big2 > button { min-height: 64px; border-radius: 12px; border: 1px solid #E5E7EB; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; font-weight: 700; font-size: 14px; color: #1B4D3E; text-align: center; padding: 6px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.kmx-big2 > button.on { background: #1B4D3E; color: #fff; border-color: #1B4D3E; }
+.kmx-big2 > button small { font-size: 11px; font-weight: 500; opacity: .85; }

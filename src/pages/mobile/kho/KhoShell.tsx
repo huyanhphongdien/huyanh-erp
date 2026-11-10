@@ -44,6 +44,7 @@ export default function KhoShell() {
       if (p.kind === 'batch_id') { nav(`/m/kho/lo/${p.value}`); return }
       if (p.kind === 'mix_lot') { const l = await mixService.findLotByCode(p.value); if (l) { nav(`/m/kho/chen?lot=${l.id}`); return } }
       if (p.kind === 'mix_issue') { const i = await mixService.findIssueByCode(p.value); if (i) { nav(`/m/kho/chen/phieu/${i.id}`); return } }
+      if (p.kind === 'mix_pallet') { nav(`/m/kho/chen/so-pallet?hc=${encodeURIComponent(p.value)}`); return }   // tem pallet HC (Sổ pallet p19)
       const hits = await rawStockService.getBatches({ search: p.value, includeEmpty: true, limit: 5 })
       const exact = hits.find((h) => h.batch_no.toUpperCase() === p.value) ?? (hits.length === 1 ? hits[0] : null)
       if (exact) { nav(`/m/kho/lo/${exact.batch_id}`); return }

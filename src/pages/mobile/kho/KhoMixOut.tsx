@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import OpsQrScanner from '../OpsQrScanner'
 import { useAuthStore } from '../../../stores/authStore'
-import { mixService, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue, type MixLot, type MixPurpose, type MixSourceType, type MixViTri } from '../../../services/wms/mixService'
+import { mixService, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue, type MixLot, type MixPallet, type MixPurpose, type MixSourceType, type MixViTri } from '../../../services/wms/mixService'
 import { fgLotService, type FgLot } from '../../../services/wms/fgLotService'
 import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
@@ -40,6 +40,10 @@ export default function KhoMixOut() {
   // chèn vào đâu: bể slap hay máy mix (nhớ lần trước)
   const [viTri, setViTri] = useState<MixViTri | null>(() => { try { const v = localStorage.getItem('kmx_vi_tri'); return v === 'be_slap' || v === 'may_mix' || v === 'bang_tai' ? v : null } catch { return null } })
   const [gross, setGross] = useState('')
+  // p19 Sổ pallet: chạm pallet HC lúc lấy → bì từ sổ, kg lấy = cân cả pallet − bì chốt ngay (không còn "bì trừ lúc trả")
+  const [pallets, setPallets] = useState<MixPallet[]>([])
+  const [palletId, setPalletId] = useState<string | null>(null)
+  const [scanPallet, setScanPallet] = useState(false)
   // mã nguyên liệu gốc đang chạy mà ca này chèn vào (một hay nhiều)
   const [maList, setMaList] = useState<RawLotBalance[]>([])
   const [maChon, setMaChon] = useState<string[]>([])
@@ -73,11 +77,11 @@ export default function KhoMixOut() {
   useEffect(() => {
     if (!facilityId) return
     let alive = true
-    Promise.all([mixService.listLots(facilityId), rawSettingsService.getForFacility(facilityId), detectShift(user?.employee_id || null), rawLotService.maDangChay(facilityId).catch(() => [] as RawLotBalance[]), mixService.listIssues({ facilityId, date: todayLocal(), limit: 100 }).catch(() => [] as MixIssue[])])
-      .then(([l, s, d, m, ci]) => {
+    Promise.all([mixService.listLots(facilityId), rawSettingsService.getForFacility(facilityId), detectShift(user?.employee_id || null), rawLotService.maDangChay(facilityId).catch(() => [] as RawLotBalance[]), mixService.listIssues({ facilityId, date: todayLocal(), limit: 100 }).catch(() => [] as MixIssue[]), mixService.listPallets(facilityId, false).catch(() => [] as MixPallet[])])
+      .then(([l, s, d, m, ci, pl]) => {
         if (!alive) return
         const ok = l.filter((x) => x.ton_kg > 0.005)
-        setLots(ok); setSettings(s); setShifts(d.shifts); setShift(d.pick); setMaList(m); setCaIssues(ci.filter((x) => x.status !== 'cancelled'))
+        setLots(ok); setSettings(s); setShifts(d.shifts); setShift(d.pick); setMaList(m); setCaIssues(ci.filter((x) => x.status !== 'cancelled')); setPallets(pl)
         const pre = sp.get('lot'); const hit = pre ? ok.find((x) => x.id === pre) : null
         if (hit && !(hit.source_type === 'dkl' && !hit.metal_cleared)) { setLot(hit); setStep(2) }
       })
@@ -126,10 +130,18 @@ export default function KhoMixOut() {
   // băng tải: tính theo bành × kg/bành của lô, không pallet, không bì (gõ số bành hoặc kg)
   const bangTai = viTri === 'bang_tai'
   const kpb = lot?.kg_per_banh || 35
-  const kgN = bangTai ? (kg !== '' ? Number(kg) : soBanh !== '' ? Math.round(Number(soBanh) * kpb * 100) / 100 : null) : mode === 'pallet' ? (grossN !== null && Number.isFinite(grossN) ? grossN : null) : kg === '' ? null : Number(kg)
+  // p19: pallet HC từ Sổ pallet (chỉ pallet đang dùng). Nhà máy chưa có sổ → quay về đường cũ (cân tổng, bì trừ lúc trả)
+  const palletsDung = pallets.filter((p) => p.is_active)
+  const coSoPallet = palletsDung.some((p) => p.bi_kg !== null)
+  const pallet = palletsDung.find((p) => p.id === palletId) ?? null
+  const biN = pallet?.bi_kg ?? null
+  const dungPallet = mode === 'pallet' && !bangTai && coSoPallet
+  const kgN = bangTai ? (kg !== '' ? Number(kg) : soBanh !== '' ? Math.round(Number(soBanh) * kpb * 100) / 100 : null)
+    : dungPallet ? (grossN !== null && Number.isFinite(grossN) && biN !== null ? Math.round((grossN - biN) * 100) / 100 : null)
+    : mode === 'pallet' ? (grossN !== null && Number.isFinite(grossN) ? grossN : null) : kg === '' ? null : Number(kg)
   const kgTxt = (n: number | null) => (n === null ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }))
   // số bành tự tính theo cỡ bành của lô (35 kg); tổ chỉ chỉnh ± khi đếm khác
-  const soBanhAuto = kgN !== null && kgN > 0 && lot ? Math.max(Math.round(Math.max(kgN - (mode === 'pallet' && !bangTai ? 15 : 0), 0) / (lot.kg_per_banh || 35)), 1) : null   // cân tổng: ước bớt ~15 kg pallet
+  const soBanhAuto = kgN !== null && kgN > 0 && lot ? Math.max(Math.round(Math.max(kgN - (mode === 'pallet' && !bangTai && !dungPallet ? 15 : 0), 0) / (lot.kg_per_banh || 35)), 1) : null   // đường cũ cân tổng chưa bì: ước bớt ~15 kg pallet; pallet HC: kg hàng thật
   const soBanhN = soBanh === '' ? soBanhAuto : Math.round(Number(soBanh))
   const chinhBanh = (d: number) => { setSoBanh(String(Math.max((soBanhN ?? 0) + d, 0))); if (bangTai) setKg('') }
   const maLabel = maChon.map((id) => maList.find((x) => x.raw_lot_id === id)?.ma || '?').join(' + ')
@@ -180,11 +192,26 @@ export default function KhoMixOut() {
     } catch (e: any) { setMsg(e?.message || 'Không đọc được mã') }
   }
 
+  // chạm pallet HC: đang ở dây chuyền / chưa khai số kg thì báo, không chọn
+  function chonPallet(p: MixPallet) {
+    if (p.trang_thai === 'day_chuyen') { setMsg(`${p.code} đang ở dây chuyền (${p.issue_code ?? ''}${p.issue_lot_so_lo ? ` · lô ${p.issue_lot_so_lo}` : ''}). Trả phiếu đó trước hoặc chọn pallet khác.`); return }
+    if (p.bi_kg === null) { setMsg(`${p.code} chưa khai số kg trong Sổ pallet. Báo thủ kho khai rồi mới lấy được.`); return }
+    setPalletId(p.id); setMsg(null)
+  }
+  function onScanPallet(raw: string) {
+    setScanPallet(false)
+    const p = parseKhoScan(raw)
+    if (!p || p.kind !== 'mix_pallet') { setMsg(`"${raw}" không phải tem pallet HC`); return }
+    const hit = palletsDung.find((x) => x.code.toUpperCase() === p.value.toUpperCase())
+    if (!hit) { setMsg(`Không có pallet ${p.value} trong Sổ pallet của ${facility?.code || 'nhà máy này'}`); return }
+    chonPallet(hit)
+  }
+
   async function ghi() {
-    if (!lot || !kgOk || qua || !soLoOk) return
+    if (!lot || !kgOk || qua || !soLoOk || (dungPallet && !pallet)) return
     setBusy(true); setMsg(null)
     try {
-      await mixService.lay({ id: issueId, lotId: lot.id, kg: kgN!, shiftDate: todayLocal(), shiftId: shift?.id ?? null, team: teamFinal || null, purpose, targetIndex: purpose === 'nang_chi_so' ? targetIndex : null, targetValue: purpose === 'nang_chi_so' && targetValue !== '' ? Number(targetValue) : null, note: note.trim() || null, soLo: lot.so_lo ? null : soLo.trim().toUpperCase(), viTri, rawLotIds: maChon, soBanh: soBanh === '' ? null : soBanhN, grossKg: mode === 'pallet' && !bangTai ? grossN : null, palletKg: null })
+      await mixService.lay({ id: issueId, lotId: lot.id, kg: kgN!, shiftDate: todayLocal(), shiftId: shift?.id ?? null, team: teamFinal || null, purpose, targetIndex: purpose === 'nang_chi_so' ? targetIndex : null, targetValue: purpose === 'nang_chi_so' && targetValue !== '' ? Number(targetValue) : null, note: note.trim() || null, soLo: lot.so_lo ? null : soLo.trim().toUpperCase(), viTri, rawLotIds: maChon, soBanh: soBanh === '' ? null : soBanhN, grossKg: mode === 'pallet' && !bangTai ? grossN : null, palletKg: null, palletId: dungPallet ? palletId : null })
       const i = await mixService.getIssue(issueId)
       setCodeDone(i?.code || ''); setDoneAt(i?.out_at || new Date().toISOString()); setStep(4)
     } catch (e: any) { setMsg(e?.message || 'Không ghi được') }
@@ -198,7 +225,9 @@ export default function KhoMixOut() {
   }
 
   function layThem() {
-    setStep(1); setLot(null); setKg(''); setGross(''); setSoBanh(''); setNote('');
+    setStep(1); setLot(null); setKg(''); setGross(''); setSoBanh(''); setNote('')
+    setPalletId(null)
+    if (facilityId) mixService.listPallets(facilityId, false).then(setPallets).catch(() => { /* bỏ qua */ })
     if (facilityId) mixService.listIssues({ facilityId, date: todayLocal(), limit: 100 }).then((ci) => setCaIssues(ci.filter((x) => x.status !== 'cancelled'))).catch(() => { /* bỏ qua */ })
     setPhotos([]); setIssueId(newUuid()); setCodeDone(''); setMsg(null)
     setSoLoMoi(''); setRaKimLoai(false); setKhoCu(false); taiNguon()
@@ -229,11 +258,11 @@ export default function KhoMixOut() {
           <div className="kmx-done-card">
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}><span className="kmx-num xl">{kgTxt(kgN)}</span><span style={{ fontSize: 15, fontWeight: 600 }}>kg · {doneAt ? new Date(doneAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}</span></div>
             <span>Lô <span className="kmx-mono" style={{ fontWeight: 600, color: '#fff' }}>{lot?.so_lo || soLo.trim().toUpperCase() || lot?.code}</span> · {lot ? MIX_SOURCE_LABELS[lot.source_type].toLowerCase() : ''}{lot?.source_desc ? ` · ${lot.source_desc}` : ''}</span>
-            <span>{viTri ? `Chèn ${MIX_VI_TRI_LABELS[viTri]}` : ''}{soBanhN !== null ? ` · ${soBanhN} bành` : ''}</span>
+            <span>{viTri ? `Chèn ${MIX_VI_TRI_LABELS[viTri]}` : ''}{soBanhN !== null ? ` · ${soBanhN} bành` : ''}{pallet ? ` · pallet ${pallet.code} (bì ${kgTxt(biN)} kg)` : ''}</span>
             {maChon.length > 0 && <span>{maChon.length ? <>Chèn vào mã <b className="kmx-mono" style={{ color: '#fff' }}>{maLabel}</b></> : 'Mã gốc theo phiếu ca'}</span>}
             <span>{caTo} · {photos.length} ảnh · {firstName(user?.full_name) || ''}</span>
           </div>
-          <div className="kmx-note gold" style={{ width: '100%', boxSizing: 'border-box', textAlign: 'left' }}>{I.clock}<span><b>Việc tiếp theo, cuối ca:</b> mở trang chính, bấm <b>Trả cuối ca</b>, dùng hết thì cân pallet rỗng (bì chính xác), còn dư thì cân hàng + pallet, chụp 2 ảnh.</span></div>
+          <div className="kmx-note gold" style={{ width: '100%', boxSizing: 'border-box', textAlign: 'left' }}>{I.clock}<span><b>Việc tiếp theo, cuối ca:</b> mở trang chính, bấm <b>Trả</b>. {pallet ? `Dùng hết thì bấm Dùng hết (không cân, 1 ảnh pallet rỗng); còn dư thì cân cả pallet một lần, bì ${pallet.code} đã có trong Sổ pallet.` : 'Dùng hết thì cân pallet rỗng (bì chính xác), còn dư thì cân hàng + pallet, chụp 2 ảnh.'}</span></div>
         </div>
         <div className="kmx-done-foot">
           <button type="button" className="kmx-btn white" onClick={() => nav('/m/kho/chen')}>Về trang chính</button>
@@ -261,7 +290,7 @@ export default function KhoMixOut() {
           {prevLan.length > 0 && (
             <div className="kmx-card muted" style={{ gap: 3 }}>
               <span className="kmx-lbl">Ca này đã chèn {prevLan.length} lần · đang lấy lần {lan}</span>
-              {prevLan.map((p, k) => <span key={p.id} className="kmx-sm kmx-mono" style={{ color: '#1F2937' }}>L{k + 1} · {p.so_banh !== null ? `${p.so_banh} b ` : ''}{p.lot_so_lo || p.lot_code} · {kgTxt(p.kg_out)} kg{p.gross_kg !== null ? ` (cả pallet ${kgTxt(p.gross_kg)} − bì ${kgTxt(p.pallet_kg ?? 0)})` : ''}{p.status === 'issued' ? ' · đang ở dây chuyền' : ''}</span>)}
+              {prevLan.map((p, k) => <span key={p.id} className="kmx-sm kmx-mono" style={{ color: '#1F2937' }}>L{k + 1} · {p.so_banh !== null ? `${p.so_banh} b ` : ''}{p.lot_so_lo || p.lot_code}{p.pallet_code ? ` · ${p.pallet_code}` : ''} · {kgTxt(p.kg_out)} kg{p.gross_kg !== null ? ` (cả pallet ${kgTxt(p.gross_kg)} − bì ${kgTxt(p.pallet_kg ?? 0)})` : ''}{p.status === 'issued' ? ' · đang ở dây chuyền' : ''}</span>)}
             </div>
           )}
           <section className="kmx-card" aria-label="Nguồn hàng chèn" style={{ gap: 8 }}>
@@ -388,10 +417,30 @@ export default function KhoMixOut() {
             ) : (
               <>
             <div className="kmx-row">
-              <span className="kmx-strong" style={{ fontSize: 13 }}>{mode === 'pallet' ? 'Cân cả pallet (bì khai lúc trả)' : 'Đọc đúng số trên màn hình cân'}</span>
-              <button type="button" className="kmx-pill sm" onClick={() => doiMode(mode === 'pallet' ? 'kg' : 'pallet')}>{mode === 'pallet' ? 'Gõ thẳng kg' : 'Cân cả pallet'}</button>
+              <span className="kmx-strong" style={{ fontSize: 13 }}>{dungPallet ? 'Pallet HC và số đọc trên cân' : mode === 'pallet' ? 'Cân cả pallet (bì khai lúc trả)' : 'Đọc đúng số trên màn hình cân'}</span>
+              <button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto' }} onClick={() => doiMode(mode === 'pallet' ? 'kg' : 'pallet')}>{mode === 'pallet' ? 'Không pallet · gõ kg' : coSoPallet ? 'Dùng pallet HC' : 'Cân cả pallet'}</button>
             </div>
-            {mode === 'pallet' ? (
+            {dungPallet ? (
+              <>
+                <div className="kmx-row"><span className="kmx-lbl">Pallet nào? · chạm chữ viết tắt trên pallet</span><button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto', gap: 4 }} onClick={() => setScanPallet(true)}>Quét tem</button></div>
+                <div className="kmx-pal">
+                  {palletsDung.map((p) => {
+                    const cls = p.trang_thai === 'day_chuyen' ? 'line' : p.bi_kg === null ? 'nobi' : ''
+                    return <button key={p.id} type="button" className={`${cls}${palletId === p.id ? ' sel' : ''}`} onClick={() => chonPallet(p)} aria-label={`${p.code}${p.bi_kg !== null ? ` bì ${kgTxt(p.bi_kg)} kg` : ' chưa khai số kg'}`}>{p.code}<small>{p.trang_thai === 'day_chuyen' ? 'dây chuyền' : p.bi_kg === null ? 'kg?' : `bì ${kgTxt(p.bi_kg)}`}</small></button>
+                  })}
+                </div>
+                {pallet ? (
+                  <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span><b className="kmx-mono">{pallet.code}</b>{pallet.ten ? ` · ${pallet.ten}` : ''} · bì <b className="kmx-mono">{kgTxt(pallet.bi_kg)} kg</b>{pallet.note ? ` · ${pallet.note}` : pallet.bi_khai_at ? ` · khai ${new Date(pallet.bi_khai_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}` : ''}</span><span className="kmx-chip ok">trống</span></div>
+                ) : <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Chạm pallet đang chở hàng chèn này. Vàng = đang ở dây chuyền, nét đứt = chưa khai số kg (báo thủ kho).</span>}
+                <label htmlFor="kmx-kg" className="kmx-lbl">Số đọc trên cân · cả pallet, không trừ gì</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input id="kmx-kg" className={`kmx-input${qua || (kgN !== null && kgN <= 0) ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={gross} onChange={(e) => { setGross(e.target.value); setSoBanh('') }} />
+                  <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
+                </div>
+                <div className="kmx-tint" style={kgN !== null && kgN <= 0 ? { background: '#FEE2E2', color: '#B91C1C' } : { background: '#E8F5F0', color: '#0D2E25' }}><span>{grossN !== null && pallet ? `${kgTxt(grossN)} − bì ${pallet.code} ${kgTxt(biN)} =` : pallet ? `− bì ${pallet.code} ${kgTxt(biN)} kg` : 'chọn pallet để máy trừ bì'}</span><span className="kmx-num sm" style={kgN !== null && kgN <= 0 ? { color: '#B91C1C' } : undefined}>{kgN === null ? '—' : `${kgTxt(kgN)} kg`}</span></div>
+                {kgN !== null && kgN <= 0 && <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Số trên cân phải lớn hơn bì pallet.</span>}
+              </>
+            ) : mode === 'pallet' ? (
               <>
                 <label htmlFor="kmx-kg" className="kmx-lbl">Cân cả pallet · số trên cân (không trừ bì)</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -410,7 +459,7 @@ export default function KhoMixOut() {
             )}
             <div className="kmx-tint" style={qua ? { background: '#FEE2E2', color: '#B91C1C' } : undefined}><span>{qua ? `Lấy nhiều hơn tồn lô TP (${fgCua ? fgCua.ton_banh : 0} bành)` : nhapThem > 0 ? `Lô tồn ${kgTxt(lot.ton_kg)} kg → máy ghi nhập thêm ${kgTxt(nhapThem)} kg${fgCua ? ' từ lô TP' : ''}` : 'Lô còn lại sau khi lấy'}</span><span className="kmx-num sm" style={qua ? { color: '#B91C1C' } : undefined}>{conLai === null ? `${fmtKg(lot.ton_kg)} kg trong kho` : `${fmtKg(Math.max(conLai, 0))} kg`}</span></div>
             <div className="kmx-row" style={{ alignItems: 'center' }}>
-              <span className="kmx-col"><span className="kmx-lbl">Số bành</span><span className="kmx-sm">{bangTai ? `băng tải · ${kpb} kg/bành, không pallet` : `ước ${lot.kg_per_banh} kg/bành, máy tính lại lúc trả${soBanh !== '' ? ' · bạn đã chỉnh, giữ nguyên' : ''}`}</span></span>
+              <span className="kmx-col"><span className="kmx-lbl">Số bành</span><span className="kmx-sm">{bangTai ? `băng tải · ${kpb} kg/bành, không pallet` : dungPallet ? `ước ${kpb} kg/bành trên kg hàng đã trừ bì${soBanh !== '' ? ' · bạn đã chỉnh' : ''}` : `ước ${lot.kg_per_banh} kg/bành, máy tính lại lúc trả${soBanh !== '' ? ' · bạn đã chỉnh, giữ nguyên' : ''}`}</span></span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button type="button" className="kmx-pill sm" style={{ width: 44, padding: 0, fontSize: 20 }} aria-label="Bớt 1 bành" disabled={soBanhN === null || soBanhN <= 0} onClick={() => chinhBanh(-1)}>−</button>
                 <span className="kmx-num md" style={{ minWidth: 40, textAlign: 'center' }}>{soBanhN ?? '—'}</span>
@@ -441,8 +490,9 @@ export default function KhoMixOut() {
           </section>
         </div></div>
         <div className="kmx-foot">
-          <button type="button" className="kmx-btn" disabled={!kgOk || qua || missing.length > 0 || !viTri || !soLoOk || thieuLenh} onClick={() => { setMsg(null); setStep(3) }}>{!soLoOk ? 'Gõ số lô của lô chèn' : !viTri ? 'Chọn chèn bể Slap, máy Mix hay băng tải' : thieuLenh ? 'Chạm lệnh pallet này chèn vào' : 'Tiếp tục'}{I.next}</button>
+          <button type="button" className="kmx-btn" disabled={!kgOk || qua || missing.length > 0 || !viTri || !soLoOk || thieuLenh || (dungPallet && !pallet)} onClick={() => { setMsg(null); setStep(3) }}>{!soLoOk ? 'Gõ số lô của lô chèn' : !viTri ? 'Chọn chèn bể Slap, máy Mix hay băng tải' : dungPallet && !pallet ? 'Chạm pallet HC đang chở hàng' : thieuLenh ? 'Chạm lệnh pallet này chèn vào' : 'Tiếp tục'}{I.next}</button>
         </div>
+        {scanPallet && <OpsQrScanner onClose={() => setScanPallet(false)} onDetect={onScanPallet} />}
       </div>
     )
   }
@@ -461,7 +511,7 @@ export default function KhoMixOut() {
             <div style={{ borderTop: '1px solid #F3F4F6' }}>
               <div className="kmx-kv"><span className="k">Lô chèn</span><span className="v"><span className="kmx-mono" style={{ color: '#0D2E25', fontWeight: 700 }}>{lot.so_lo || soLo.trim().toUpperCase()}</span> <span className="kmx-sm kmx-mono">{lot.code}</span><br /><span className="kmx-sm" style={{ fontWeight: 500 }}>{MIX_SOURCE_LABELS[lot.source_type]}{lot.grade ? ` · ${lot.grade}` : ''}</span></span></div>
               <div className="kmx-kv"><span className="k">Chèn vào</span><span className="v">{viTri ? MIX_VI_TRI_LABELS[viTri] : '—'}</span></div>
-              <div className="kmx-kv"><span className="k">Cân</span><span className="v">{bangTai ? `băng tải · ${soBanhN ?? '—'} bành × ${kpb} = ${kgTxt(kgN)} kg · không pallet` : mode === 'pallet' ? `${soBanhN !== null ? `${soBanhN} bành${soBanh === '' ? ' (ước)' : ''} · ` : ''}cả pallet ${kgTxt(grossN)} kg · bì trừ lúc trả` : 'gõ thẳng kg hàng'}</span></div>
+              <div className="kmx-kv"><span className="k">Cân</span><span className="v">{bangTai ? `băng tải · ${soBanhN ?? '—'} bành × ${kpb} = ${kgTxt(kgN)} kg · không pallet` : dungPallet && pallet ? `${soBanhN !== null ? `${soBanhN} bành${soBanh === '' ? ' (ước)' : ''} · ` : ''}pallet ${pallet.code} · cả pallet ${kgTxt(grossN)} − bì ${kgTxt(biN)} = ${kgTxt(kgN)} kg` : mode === 'pallet' ? `${soBanhN !== null ? `${soBanhN} bành${soBanh === '' ? ' (ước)' : ''} · ` : ''}cả pallet ${kgTxt(grossN)} kg · bì trừ lúc trả` : 'gõ thẳng kg hàng'}</span></div>
               <div className="kmx-kv"><span className="k">Chèn vào mã</span><span className="v">{maChon.length ? <span className="kmx-mono" style={{ color: '#0D2E25' }}>{maLabel}</span> : <span style={{ color: '#B45309' }}>chưa chọn · lấy theo phiếu ca</span>}</span></div>
               <div className="kmx-kv"><span className="k">Ca · tổ</span><span className="v">{caTo}</span></div>
               <div className="kmx-kv" style={{ alignItems: 'center' }}><span className="k">Ảnh lúc lấy</span><span className="v" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{thumbs.map((p) => <span key={p.id} className="kmx-thumb" style={{ width: 46, height: 46 }}><img src={p.public_url || ''} alt="" /></span>)}<span style={{ fontSize: 12, fontWeight: 700, color: '#15803D' }}>{required.length - missing.length}/{required.length}</span></span></div>

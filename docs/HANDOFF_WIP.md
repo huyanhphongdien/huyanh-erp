@@ -18,6 +18,18 @@ Nhánh: `main` (mọi commit dưới đây ĐÃ push → Vercel auto-deploy `huy
 
 ---
 
+## 0b. 10/11/2026 — Hàng chèn theo SỔ PALLET HC (ĐÃ CODE + áp p19, dữ liệu thử đã xoá)
+- Owner: "khai báo sẵn pallet HC1→30, khai số kg sẵn" · "có Sổ pallet: Khai báo pallet, chữ viết tắt, số kg" · "xoá hết dữ liệu cũ hàng chèn;
+  chưa cân chi tiết: HC1→10 = 15 kg, HC11→20 = 25 kg". Luật đầy đủ: CLAUDE.md mục "Hàng chèn — Sổ pallet HC".
+- Đã làm: `wms_don_du_lieu_hang_chen_261110.sql` (xoá 10 phiếu + 10 lô + 38 ảnh, giữ lệnh / mã NVL / phân công) → `wms_mix_p19_so_pallet.sql`
+  (mix_pallets + logs, mix_issues.pallet_id, fn_mix_lay/tra/sua_lay/ky/thieu_anh, v_mix_pallets, seed PĐ) → màn Lấy chạm pallet, màn Trả
+  Dùng hết / Còn dư, trang chính viên HC + thẻ Sổ pallet, màn Sổ pallet điện thoại `/m/kho/chen/so-pallet`, PC `/wms/chen/pallet`.
+- Mock: `docs/MOCK_HANG_CHEN_PALLET_HC.html` · artifact https://claude.ai/artifact/MwGuWNXmve7hy8x3MPjnNA.
+- **Treo:** cân thật từng pallet (bì 15/25 là tạm, ghi chú trên pallet tự xoá khi cân lại); in tem QR HC1→HC20; cập nhật Hướng dẫn Hàng chèn
+  mục 4–5 + mục Sổ pallet (cần ảnh màn mới trên prod); HC21→30 đang tắt, bật khi có pallet thật; bước "Xếp pallet" (thủ kho cân sẵn hàng) nếu owner muốn.
+
+---
+
 ## 1. ĐÃ XONG + DEPLOY trong phiên này
 
 ### A. Đồng nhất 2 dạng xem Đơn hàng bán (full-page vs Bảng/Split)

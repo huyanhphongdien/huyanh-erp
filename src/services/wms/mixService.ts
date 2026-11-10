@@ -97,6 +97,10 @@ export interface MixIssue {
   lenh_id: string | null
   lenh_code: string | null
   lenh_ma_gop: string | null
+  /** Sổ pallet (p19): pallet HC của lần chèn; NULL = băng tải hoặc phiếu trước p19. pallet_kg = bì chốt lúc lấy */
+  pallet_id: string | null
+  pallet_code: string | null
+  pallet_ten: string | null
   ma_goc: string | null
   ma_goc_all: string | null
   so_banh: number | null
@@ -147,6 +151,28 @@ export interface MixQuyen { khai_bao: boolean; duyet_qc: boolean; nhan_kho: bool
 export const MIX_QUYEN_NONE: MixQuyen = { khai_bao: false, duyet_qc: false, nhan_kho: false, la_bgd: false, da_phan_cong: { khai_bao: 0, duyet_qc: 0, nhan_kho: 0 } }
 export interface MixSigner { id: string; employee_id: string; full_name: string; email: string | null; buoc: MixBuoc; facility_id: string | null; facility_code: string | null; is_active: boolean; granted_at: string; revoked_at: string | null; notes: string | null; granted_name: string | null }
 export interface NhanVienLite { id: string; full_name: string; email: string | null }
+
+/** Sổ pallet hàng chèn (p19, chủ DN 10/11/2026): khai báo pallet (ten) · chữ viết tắt (code: HC7) · số kg (bi_kg = BÌ pallet rỗng).
+ *  Lúc lấy chạm pallet → kg lấy = cân cả pallet − bì chốt ngay; lúc trả dùng hết = 0 không cân, còn dư cân 1 lần. */
+export type MixPalletTrangThai = 'trong' | 'day_chuyen' | 'chua_bi' | 'tat'
+export const MIX_PALLET_TRANG_THAI_LABELS: Record<MixPalletTrangThai, string> = { trong: 'Trống', day_chuyen: 'Ở dây chuyền', chua_bi: 'Chưa khai số kg', tat: 'Tắt' }
+export const MIX_PALLET_TRANG_THAI_COLORS: Record<MixPalletTrangThai, string> = { trong: 'green', day_chuyen: 'gold', chua_bi: 'red', tat: 'default' }
+/** bì khai quá số ngày này → nhắc "cân lại" (chữ vàng, không chặn) */
+export const MIX_PALLET_BI_CU_NGAY = 90
+export interface MixPallet {
+  id: string; facility_id: string; facility_code: string | null
+  code: string; so: number | null; ten: string | null
+  bi_kg: number | null; bi_khai_at: string | null; bi_khai_name: string | null
+  is_active: boolean; tat_ly_do: string | null; note: string | null
+  trang_thai: MixPalletTrangThai
+  issue_id: string | null; issue_code: string | null; issue_kg_out: number | null; issue_out_at: string | null; issue_status: string | null; issue_vi_tri: MixViTri | null
+  issue_lot_so_lo: string | null; issue_lot_code: string | null; issue_lenh_ma_gop: string | null
+  bi_cu_ngay: number | null; so_lan_can_lai: number
+  created_at: string; updated_at: string
+}
+export type MixPalletLogLoai = 'khai' | 'can_lai' | 'doi_ma' | 'sua_ten' | 'tat' | 'bat'
+export const MIX_PALLET_LOG_LABELS: Record<MixPalletLogLoai, string> = { khai: 'Khai số kg', can_lai: 'Cân lại', doi_ma: 'Đổi chữ viết tắt', sua_ten: 'Sửa tên', tat: 'Tắt', bat: 'Bật lại' }
+export interface MixPalletLog { id: string; pallet_id: string; pallet_code: string; facility_id: string; loai: MixPalletLogLoai; bi_cu: number | null; bi_moi: number | null; code_cu: string | null; code_moi: string | null; ly_do: string | null; at: string; by_name: string | null }
 
 export interface MixBalance {
   facility_id: string
@@ -200,6 +226,10 @@ const normIssue = (r: any): MixIssue => ({
   so_banh: numOrNull(r.so_banh), gross_kg: numOrNull(r.gross_kg), pallet_kg: numOrNull(r.pallet_kg),
   so_banh_tra: numOrNull(r.so_banh_tra), return_gross_kg: numOrNull(r.return_gross_kg), return_pallet_kg: numOrNull(r.return_pallet_kg), out_kg_truoc: numOrNull(r.out_kg_truoc), dung_het: !!r.dung_het,
   raw_lot_ids: Array.isArray(r.raw_lot_ids) ? r.raw_lot_ids : null, ma_goc: r.ma_goc ?? null, ma_goc_all: r.ma_goc_all ?? null,
+  pallet_id: r.pallet_id ?? null, pallet_code: r.pallet_code ?? null, pallet_ten: r.pallet_ten ?? null,
+})
+const normPallet = (r: any): MixPallet => ({
+  ...r, so: numOrNull(r.so), bi_kg: numOrNull(r.bi_kg), is_active: !!r.is_active, issue_kg_out: numOrNull(r.issue_kg_out), bi_cu_ngay: numOrNull(r.bi_cu_ngay), so_lan_can_lai: num(r.so_lan_can_lai),
 })
 
 export const mixService = {
@@ -283,12 +313,14 @@ export const mixService = {
     targetIndex?: string | null; targetValue?: number | null; productionOrderId?: string | null; note?: string | null
     rawLotIds?: string[] | null; soBanh?: number | null; grossKg?: number | null; palletKg?: number | null; viTri?: MixViTri | null
     /** lô cũ chưa có số lô: người lấy gõ, máy ghi vào lô */ soLo?: string | null
+    /** p19: pallet HC từ Sổ pallet → bì lấy từ sổ, kg = grossKg − bì (palletKg bị bỏ qua) */ palletId?: string | null
   }): Promise<string> {
     const { data, error } = await supabase.rpc('fn_mix_lay', {
       p_lot_id: input.lotId, p_kg: input.kg ?? null, p_shift_date: input.shiftDate ?? null, p_shift_id: input.shiftId ?? null, p_team: input.team ?? null,
       p_purpose: input.purpose, p_target_index: input.targetIndex ?? null, p_target_value: input.targetValue ?? null,
       p_production_order_id: input.productionOrderId ?? null, p_note: input.note ?? null, p_id: input.id ?? null,
       p_raw_lot_ids: input.rawLotIds?.length ? input.rawLotIds : null, p_so_banh: input.soBanh ?? null, p_gross_kg: input.grossKg ?? null, p_pallet_kg: input.palletKg ?? null, p_vi_tri: input.viTri ?? null, p_so_lo: input.soLo ?? null,
+      p_pallet_id: input.palletId ?? null,
     })
     if (error) throw new Error(dichLoiNhapKho(error))
     return String(data)
@@ -320,8 +352,8 @@ export const mixService = {
   },
 
   /** Sửa cân lúc lấy (bì, hàng + pallet hoặc kg, số bành) khi phiếu chưa qua bước QS ký; máy tính lại kg lấy, dây chuyền, tiêu hao */
-  async suaLay(issueId: string, input: { kg?: number | null; grossKg?: number | null; palletKg?: number | null; soBanh?: number | null; note?: string | null }): Promise<{ code: string; kg_truoc: number; kg_sau: number; so_banh: number }> {
-    const { data, error } = await supabase.rpc('fn_mix_sua_lay', { p_issue_id: issueId, p_kg: input.kg ?? null, p_gross_kg: input.grossKg ?? null, p_pallet_kg: input.palletKg ?? null, p_so_banh: input.soBanh ?? null, p_note: input.note ?? null })
+  async suaLay(issueId: string, input: { kg?: number | null; grossKg?: number | null; palletKg?: number | null; soBanh?: number | null; note?: string | null; /** p19: đổi pallet chạm nhầm (null = giữ pallet của phiếu) */ palletId?: string | null }): Promise<{ code: string; kg_truoc: number; kg_sau: number; so_banh: number }> {
+    const { data, error } = await supabase.rpc('fn_mix_sua_lay', { p_issue_id: issueId, p_kg: input.kg ?? null, p_gross_kg: input.grossKg ?? null, p_pallet_kg: input.palletKg ?? null, p_so_banh: input.soBanh ?? null, p_note: input.note ?? null, p_pallet_id: input.palletId ?? null })
     if (error) throw new Error(dichLoiNhapKho(error))
     const d: any = data ?? {}
     return { code: String(d.code ?? ''), kg_truoc: num(d.kg_truoc), kg_sau: num(d.kg_sau), so_banh: num(d.so_banh) }
@@ -334,6 +366,44 @@ export const mixService = {
   },
 
   /** Quyền của người đang đăng nhập trong quy trình hàng chèn (DB quyết, xem fn_mix_duoc_ky) */
+  // ── Sổ pallet hàng chèn (p19) ──
+  async listPallets(facilityId: string, includeInactive = true): Promise<MixPallet[]> {
+    let q = supabase.from('v_mix_pallets').select('*').eq('facility_id', facilityId).order('so', { ascending: true, nullsFirst: false }).order('code')
+    if (!includeInactive) q = q.eq('is_active', true)
+    const { data, error } = await q
+    if (error) throw error
+    return (data ?? []).map(normPallet)
+  },
+  async findPalletByCode(facilityId: string, code: string): Promise<MixPallet | null> {
+    const { data, error } = await supabase.from('v_mix_pallets').select('*').eq('facility_id', facilityId).ilike('code', code.trim()).maybeSingle()
+    if (error) throw error
+    return data ? normPallet(data) : null
+  },
+  /** Ghi Sổ pallet: tên · chữ viết tắt · số kg (bì). Thủ kho (bước 3) hoặc BGĐ. Mỗi lần đổi có log. */
+  async khaiPallet(id: string, input: { ten?: string | null; code?: string | null; biKg?: number | null; lyDo?: string | null }): Promise<{ id: string; code: string; ten: string | null; bi_kg: number | null }> {
+    const { data, error } = await supabase.rpc('fn_mix_pallet_khai', { p_id: id, p_ten: input.ten ?? null, p_code: input.code ?? null, p_bi_kg: input.biKg ?? null, p_ly_do: input.lyDo ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    const d: any = data ?? {}
+    return { id: String(d.id), code: String(d.code ?? ''), ten: d.ten ?? null, bi_kg: numOrNull(d.bi_kg) }
+  },
+  async tatPallet(id: string, tat: boolean, lyDo?: string | null): Promise<void> {
+    const { error } = await supabase.rpc('fn_mix_pallet_tat', { p_id: id, p_tat: tat, p_ly_do: lyDo ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
+  },
+  /** Tạo bộ pallet HC<tu>→HC<den> cho một nhà máy (bỏ qua mã đã có); trả về số dòng tạo mới */
+  async taoBoPallet(facilityId: string, tu: number, den: number, opts?: { prefix?: string; ten?: string | null; biKg?: number | null }): Promise<number> {
+    const { data, error } = await supabase.rpc('fn_mix_pallet_tao_bo', { p_facility_id: facilityId, p_tu: tu, p_den: den, p_prefix: opts?.prefix ?? 'HC', p_ten: opts?.ten ?? null, p_bi_kg: opts?.biKg ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    return num(data)
+  },
+  async palletLogs(facilityId: string, palletId?: string | null, limit = 100): Promise<MixPalletLog[]> {
+    let q = supabase.from('v_mix_pallet_logs').select('*').eq('facility_id', facilityId).order('at', { ascending: false }).limit(limit)
+    if (palletId) q = q.eq('pallet_id', palletId)
+    const { data, error } = await q
+    if (error) throw error
+    return (data ?? []).map((r: any) => ({ ...r, bi_cu: numOrNull(r.bi_cu), bi_moi: numOrNull(r.bi_moi) }))
+  },
+
   async quyen(facilityId?: string | null): Promise<MixQuyen> {
     const { data, error } = await supabase.rpc('fn_mix_quyen', { p_facility_id: facilityId ?? null })
     if (error) throw error

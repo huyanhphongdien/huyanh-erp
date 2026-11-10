@@ -63,7 +63,7 @@ export function Msg({ m }: { m: { ok: boolean; text: string } | null }) {
 }
 
 /** Đọc giá trị QR: tem lô (URL …/wms/batch/<uuid>), uuid trần, mã lô NVL, mã lô chèn CH-…, mã phiếu chèn PC-… */
-export function parseKhoScan(raw: string): { kind: 'batch_id' | 'mix_lot' | 'mix_issue' | 'batch_no'; value: string } | null {
+export function parseKhoScan(raw: string): { kind: 'batch_id' | 'mix_lot' | 'mix_issue' | 'mix_pallet' | 'batch_no'; value: string } | null {
   if (!raw) return null
   let v = raw.trim()
   try { if (/^https?:\/\//i.test(v)) { const u = new URL(v); const seg = u.pathname.split('/').filter(Boolean); v = seg[seg.length - 1] || '' } } catch { /* nguyên chuỗi */ }
@@ -72,5 +72,9 @@ export function parseKhoScan(raw: string): { kind: 'batch_id' | 'mix_lot' | 'mix
   const up = v.toUpperCase()
   if (/^CH-[A-Z0-9]+-\d{6}-\d+$/.test(up)) return { kind: 'mix_lot', value: up }
   if (/^PC-[A-Z0-9]+-\d{6}-\d+$/.test(up)) return { kind: 'mix_issue', value: up }
+  // tem pallet hàng chèn (Sổ pallet p19): "HC7" hoặc "HC-PD-7" → chữ viết tắt HC7 của nhà máy đang chọn
+  if (/^HC\d{1,3}$/.test(up)) return { kind: 'mix_pallet', value: up }
+  const hc = /^HC-[A-Z0-9]+-(\d{1,3})$/.exec(up)
+  if (hc) return { kind: 'mix_pallet', value: `HC${hc[1]}` }
   return up ? { kind: 'batch_no', value: up } : null
 }

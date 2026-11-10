@@ -237,6 +237,25 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
   `FleetPaymentRequestDetailPage/PrintPage.tsx` (cùng mẫu in với `PaymentRequestPrintPage` mủ; hàm đọc số dùng chung
   `src/utils/readVietnameseNumber.ts`). Migration `fleet_costs_p2_payment_requests.sql` (đã áp). Mảnh UI chung: `fleetCostUi.tsx`.
 
+## Hàng chèn — Sổ pallet HC (owner chốt 10/11/2026)
+- **Sổ pallet** = bảng `mix_pallets`, 3 cột như sổ giấy: `ten` (khai báo pallet) · `code` (chữ viết tắt HC1→HC30) · `bi_kg` (số kg =
+  BÌ pallet rỗng). Khai 1 lần; cân lại / đổi chữ viết tắt / tắt-bật đều ghi `mix_pallet_logs`. Quyền ghi sổ = bước 3 nhận kho (thủ kho)
+  hoặc BGĐ (`fn_mix_duoc_ky('nhan_kho')`). View `v_mix_pallets` (trạng thái trong | day_chuyen | chua_bi | tat + phiếu đang gắn) — UI chỉ đọc view.
+- PĐ seed HC1→HC20 với **bì TẠM theo nhóm** (HC1→10 = 15 kg, HC11→20 = 25 kg, note "chưa cân từng pallet"); HC21→30 tạo sẵn nhưng TẮT
+  ("chưa đưa vào dùng"). Cân thật từng pallet → Sổ pallet "Sửa · cân lại" (ghi chú bì tạm tự xoá). TL / Lào chưa có sổ → màn lấy tự quay về đường cũ.
+- **Lúc lấy** (bể Slap / máy Mix): chạm pallet HC (hoặc quét tem `HC7` / `HC-PD-7`, `parseKhoScan` kind `mix_pallet`) + gõ số trên cân →
+  `fn_mix_lay(p_pallet_id)`: `kg_out = gross − bì` CHỐT NGAY, `mix_issues.pallet_kg` = bì chép từ sổ (cân lại sau KHÔNG đổi phiếu đang mở).
+  Index partial `mix_issues_pallet_issued_uniq` + `fn_mix_pallet_phieu_dang_gan`: một pallet chỉ ở dây chuyền trong một phiếu (phiếu bàn giao
+  chưa nhận cũng tính). Băng tải không pallet (p17). Nút "Không pallet · gõ kg" giữ làm đường lùi. Số bành ước trên kg hàng thật, hết trừ 15 kg ước lệ.
+- **Lúc trả** (phiếu có `pallet_id`): **Dùng hết** = 0 kg, không cân, ảnh trả chỉ cần `toan_canh` (`fn_mix_thieu_anh`); **Còn dư** = cân 1 lần
+  (hàng + pallet) − bì. KHÔNG còn cân 3 pallet rỗng / ô gõ bì. Phiếu không pallet (băng tải, phiếu cũ) giữ đường v5 (bì khai lúc trả).
+  Bàn giao ca sau: `fn_mix_ky` chép pallet_id + bì + vị trí + mã + lệnh sang phiếu mới.
+- Dữ liệu thử hàng chèn (10 phiếu, 10 lô, 38 ảnh, 30/10–10/11) đã xoá 10/11/2026 bằng `wms_don_du_lieu_hang_chen_261110.sql` + Storage API
+  (giữ lệnh chạy, mã NVL, phân công). ⚠ `agent_sql` bắt `DELETE` phải có `WHERE` → viết `WHERE true`.
+- Màn: điện thoại `/m/kho/chen/so-pallet` (`KhoMixPallet.tsx`), máy tính `/wms/chen/pallet` (`MixPalletPage.tsx`), lưới pallet CSS `.kmx-pal`.
+  Migration `wms_mix_p19_so_pallet.sql` (đã áp 10/11/2026). Mock: `docs/MOCK_HANG_CHEN_PALLET_HC.html`. **Chưa làm:** in tem QR HC, cập nhật
+  Hướng dẫn Hàng chèn mục 4–5 (ảnh màn mới), bước "Xếp pallet" (thủ kho cân sẵn hàng) nếu owner muốn.
+
 ## Chấm công — GPS (owner chốt 16/09/2026)
 - **Điện thoại / tablet: BẮT BUỘC toạ độ và phải nằm trong bán kính nhà máy (3 km). Máy tính (PC/laptop): bỏ qua GPS.**
 - Cấu hình ở `attendance_settings` (`setting_key='gps_config'`: `enabled`, `locations[{name,latitude,longitude,radius_meters}]`).

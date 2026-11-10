@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Card, Checkbox, Col, Input, InputNumber, Modal, Radio, Row, Select, Space, Statistic, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { DatabaseOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, DatabaseOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import MaTongKetModal from '../../../components/wms/MaTongKetModal'
 import { xacNhanBatDauMa } from '../../../components/wms/xacNhanBatDauMa'
@@ -242,13 +242,14 @@ export default function MixShiftPage() {
           <Col>
             <div>
               <Title level={3} style={{ margin: 0 }}>Hàng chèn</Title>
-              <Text type="secondary">QS lấy đầu ca → trả cuối ca → QS ký → QC duyệt → thủ kho nhận · tiêu hao = lấy − trả · 2 ảnh lúc lấy và lúc trả · bì pallet khai ở lần trả (dùng hết = cân pallet rỗng) · dòng CHÈN sổ ca tự điền</Text>
+              <Text type="secondary">QS lấy đầu ca → trả cuối ca → QS ký → QC duyệt → thủ kho nhận · tiêu hao = lấy − trả · 2 ảnh lúc lấy · bì theo Sổ pallet HC (chạm pallet lúc lấy, kg lấy chốt ngay; dùng hết = không cân) · dòng CHÈN sổ ca tự điền</Text>
             </div>
           </Col>
           <Col>
             <Space wrap>
               <FacilityPicker value={facilityId} onChange={(id) => setFacilityId(id)} allowAll={false} style={{ minWidth: 180 }} />
               <Button icon={<DatabaseOutlined />} onClick={() => navigate('/wms/chen/ton')}>Kho chèn</Button>
+              <Button icon={<AppstoreOutlined />} onClick={() => navigate('/wms/chen/pallet')}>Sổ pallet</Button>
               <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>Làm mới</Button>
               <Button type="primary" icon={<PlusOutlined />} disabled={!canWrite || !lotsCoHang.length} onClick={() => setOpen(true)}>Lấy đầu ca</Button>
             </Space>

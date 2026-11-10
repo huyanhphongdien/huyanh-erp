@@ -104,6 +104,7 @@ const KhoMixStock = lazy(() => import('./pages/mobile/kho/KhoMixStock'));
 const KhoMixLotNew = lazy(() => import('./pages/mobile/kho/KhoMixLotNew'));
 const KhoMixList = lazy(() => import('./pages/mobile/kho/KhoMixList'));
 const KhoMixMaTongKet = lazy(() => import('./pages/mobile/kho/KhoMixMaTongKet'));
+const KhoMixPallet = lazy(() => import('./pages/mobile/kho/KhoMixPallet'));
 const KhoStocktake = lazy(() => import('./pages/mobile/kho/KhoStocktake'));
 const KhoRawIssue = lazy(() => import('./pages/mobile/kho/KhoRawIssue'));
 const KhoFgLots = lazy(() => import('./pages/mobile/kho/KhoFgLots'));
@@ -197,6 +198,7 @@ const MixShiftPage = lazy(() => import('./pages/wms/raw/MixShiftPage'));
 const MixIssueDetailPage = lazy(() => import('./pages/wms/raw/MixIssueDetailPage'));
 const MixStockPage = lazy(() => import('./pages/wms/raw/MixStockPage'));
 const MixSignersPage = lazy(() => import('./pages/wms/raw/MixSignersPage'));
+const MixPalletPage = lazy(() => import('./pages/wms/raw/MixPalletPage'));
 const RawReconcilePage = lazy(() => import('./pages/wms/raw/RawReconcilePage'));
 const WeighbridgeDetailPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeDetailPage'));
 
@@ -487,6 +489,7 @@ function App() {
               <Route path="chen/phieu" element={<Suspense fallback={<LoadingSpinner />}><KhoMixList /></Suspense>} />
               <Route path="chen/ma/:id/tong-ket" element={<Suspense fallback={<LoadingSpinner />}><KhoMixMaTongKet /></Suspense>} />
               <Route path="chen/lenh/:id/tong-ket" element={<Suspense fallback={<LoadingSpinner />}><KhoMixMaTongKet /></Suspense>} />
+              <Route path="chen/so-pallet" element={<Suspense fallback={<LoadingSpinner />}><KhoMixPallet /></Suspense>} />
             </Route>
 
             {/* ============================================================ */}
@@ -636,6 +639,7 @@ function App() {
                   <Route path="chen" element={<MixShiftPage />} />
                   <Route path="chen/ton" element={<MixStockPage />} />
                   <Route path="chen/phan-cong" element={<MixSignersPage />} />
+                  <Route path="chen/pallet" element={<MixPalletPage />} />
                   <Route path="chen/phieu/:id" element={<MixIssueDetailPage />} />
                 </Route>
                 {/* Trang cân chuyển sang can.huyanhrubber.vn — ERP chỉ giữ lịch sử + chi tiết */}

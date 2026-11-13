@@ -31,7 +31,7 @@ import {
 } from '../../../services/logistics/fleetCostService'
 import { FLEET_PR_STATUS_LABELS, type FleetPrStatus } from '../../../services/logistics/fleetPaymentRequestService'
 import { useNavigate } from 'react-router-dom'
-import { AMBER, GOLD, INK_2, Kpi, MONO, OK, thousands } from '../costs/fleetCostUi'
+import { AMBER, BRAND_DARK, GOLD, INK_2, Kpi, MONO, OK, thousands } from '../costs/fleetCostUi'
 
 const { Text } = Typography
 const toIso = (d?: Dayjs | null) => (d ? d.format('YYYY-MM-DD') : null)
@@ -39,6 +39,30 @@ const fmtD = (iso?: string | null) => (iso ? dayjs(iso).format('DD/MM/YYYY') : '
 
 interface Props {
   order: DispatchOrder
+}
+
+// ── Nhập nhanh: chép cả phiếu chi của tài xế thành nhiều khoản một lần ──────
+type QuickRow = { key: number; kind: ExpenseKind; description: string; amount: number | null; currency: CostCurrency; counted: boolean; reason: string }
+/** Gợi ý nội dung theo loại chi — bấm chọn hoặc gõ, rút ngắn thao tác khi chép phiếu. */
+const DESC_SUGGEST: Record<ExpenseKind, string[]> = {
+  fuel: ['Dầu Petrolimex', 'Dầu PVOil', 'Đổ dầu dọc đường'],
+  toll: ['Vé BOT', 'Phí cao tốc', 'Vé cầu đường'],
+  port: ['Nâng hạ container', 'Phí cầu cảng', 'Hạ container rỗng'],
+  loading: ['Bốc xếp hàng', 'Công bốc vác'],
+  meals: ['Ăn ở dọc đường', 'Cơm tài xế', 'Nghỉ đêm'],
+  repair: ['Vá lốp', 'Sửa xe dọc đường', 'Thay lốp'],
+  border: ['Phí biên giới', 'Thủ tục hải quan', 'Phí cửa khẩu'],
+  parking: ['Gửi xe qua đêm', 'Rửa xe', 'Bãi đỗ xe'],
+  other: [],
+}
+/** Dòng mồi khi mở Nhập nhanh: phủ loại chi thường gặp của một chuyến. */
+const QUICK_SEED: ExpenseKind[] = ['fuel', 'toll', 'meals', 'parking']
+let quickKeySeq = 1
+const emptyQuickRow = (kind: ExpenseKind = 'other'): QuickRow => ({ key: quickKeySeq++, kind, description: '', amount: null, currency: 'VND', counted: true, reason: '' })
+/** Luôn chừa đúng một dòng trống ở cuối để gõ tiếp như bảng tính (không phải bấm "Thêm dòng"). */
+const withTrailingBlank = (rows: QuickRow[]): QuickRow[] => {
+  const last = rows[rows.length - 1]
+  return !last || last.amount != null || last.description.trim() !== '' ? [...rows, emptyQuickRow()] : rows
 }
 
 type ExpenseFormValues = {
@@ -70,8 +94,10 @@ export default function DispatchCostSection({ order }: Props) {
   const [expForm] = Form.useForm<ExpenseFormValues>()
   const [pendingFiles, setPendingFiles] = useState<UploadFile[]>([])
   const [quickOpen, setQuickOpen] = useState(false)
-  const [quickRows, setQuickRows] = useState<{ key: number; kind: ExpenseKind; description: string; amount: number | null; currency: CostCurrency; counted: boolean }[]>([])
+  const [quickRows, setQuickRows] = useState<QuickRow[]>([])
   const [quickRate, setQuickRate] = useState<number | null>(null)
+  const [quickDate, setQuickDate] = useState<Dayjs | null>(null)
+  const [quickFormTotal, setQuickFormTotal] = useState<number | null>(null)
   const [advOpen, setAdvOpen] = useState(false)
   const [advForm] = Form.useForm()
   const [saving, setSaving] = useState(false)
@@ -185,9 +211,12 @@ export default function DispatchCostSection({ order }: Props) {
   }
 
   // ── Nhập nhanh ────────────────────────────────────────────────────────────
+  const editQuick = (i: number, patch: Partial<QuickRow>) => setQuickRows((rs) => withTrailingBlank(rs.map((x, j) => (j === i ? { ...x, ...patch } : x))))
   const openQuick = () => {
-    setQuickRows([1, 2, 3].map((k) => ({ key: k, kind: 'fuel', description: '', amount: null, currency: 'VND', counted: true })))
+    setQuickRows(withTrailingBlank(QUICK_SEED.map((k) => emptyQuickRow(k))))
     setQuickRate(lastLak)
+    setQuickDate(dayjs(trip?.return_date || order.dispatch_date))
+    setQuickFormTotal(null)
     setQuickOpen(true)
   }
   const saveQuick = async () => {
@@ -198,7 +227,8 @@ export default function DispatchCostSection({ order }: Props) {
     try {
       await fleetCostService.addExpenses(rows.map((r) => ({
         dispatch_order_id: order.id, kind: r.kind, description: r.description, amount: r.amount!, currency: r.currency,
-        fx_rate_vnd: r.currency === 'LAK' ? quickRate : null, counted: r.counted, expense_date: order.dispatch_date,
+        fx_rate_vnd: r.currency === 'LAK' ? quickRate : null, counted: r.counted, uncounted_reason: r.counted ? null : r.reason,
+        expense_date: toIso(quickDate) || order.dispatch_date,
       })))
       message.success(`Đã lưu ${rows.length} khoản chi`)
       setQuickOpen(false); load()
@@ -311,6 +341,12 @@ export default function DispatchCostSection({ order }: Props) {
   const countedWatch = Form.useWatch('counted', expForm)
   const advCurrencyWatch = Form.useWatch('currency', advForm)
   const hasLakQuick = quickRows.some((r) => r.currency === 'LAK' && r.amount)
+  // Tổng tiền đang nhập ở lưới Nhập nhanh — hiện sống để HC-TH đối chiếu với tổng trên phiếu giấy.
+  const quickVnd = quickRows.reduce((s, r) => s + (r.currency === 'VND' && r.amount ? r.amount : 0), 0)
+  const quickLak = quickRows.reduce((s, r) => s + (r.currency === 'LAK' && r.amount ? r.amount : 0), 0)
+  const quickCount = quickRows.filter((r) => r.amount && r.amount > 0).length
+  const quickEquiv = quickVnd + (quickRate && quickRate > 0 ? quickLak * quickRate : 0)
+  const quickDiff = quickFormTotal != null ? Math.round(quickEquiv - quickFormTotal) : null
 
   return (
     <Card
@@ -328,9 +364,12 @@ export default function DispatchCostSection({ order }: Props) {
         )}
       </Space>}
       extra={<Space wrap>
-        <Button icon={<EditOutlined />} onClick={openTrip} disabled={reviewed}>Sửa hành trình</Button>
-        <Button icon={<TableOutlined />} onClick={openQuick} disabled={reviewed}>Nhập nhanh</Button>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => openExpense()} disabled={reviewed}>Thêm khoản chi</Button>
+        <Button icon={<EditOutlined />} onClick={openTrip} disabled={reviewed}
+          style={!reviewed && !trip?.return_date ? { borderColor: GOLD, color: AMBER, fontWeight: 600 } : undefined}>
+          {trip?.return_date ? 'Sửa hành trình' : 'Nhập ngày về & km'}
+        </Button>
+        <Button icon={<PlusOutlined />} onClick={() => openExpense()} disabled={reviewed}>Thêm một khoản</Button>
+        <Button type="primary" icon={<TableOutlined />} onClick={openQuick} disabled={reviewed}>Nhập nhanh cả phiếu</Button>
       </Space>}
     >
       <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 5 }} style={{ marginBottom: 14 }} labelStyle={{ fontWeight: 600, fontSize: 12 }}>
@@ -346,10 +385,11 @@ export default function DispatchCostSection({ order }: Props) {
       </Descriptions>
 
       <Table className="fleet-table" rowKey="id" size="small" pagination={false} columns={columns as any} dataSource={rows} scroll={{ x: 960 }}
-        locale={{ emptyText: 'Chưa có khoản chi. Bấm "Thêm khoản chi" hoặc "Nhập nhanh" từ phiếu tài xế nộp.' }}
+        locale={{ emptyText: 'Chưa có khoản chi. Bấm "Nhập nhanh cả phiếu" để chép cả phiếu tài xế một lần, hoặc "Thêm một khoản" kèm ảnh hoá đơn.' }}
       />
       {trip && (expenses.length > 0 || (order.is_hired && order.hire_cost)) && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+          <Kpi label="Tổng chi chuyến" value={`${fmtAmt(trip.counted_vnd_equiv + trip.uncounted_vnd_equiv)} ₫`} sub={`${expenses.length} khoản${order.is_hired && order.hire_cost ? ' + cước thuê' : ''} · quy đổi VNĐ`} tone={BRAND_DARK} />
           <Kpi label="Chi được tính" value={`${fmtAmt(trip.counted_vnd)} ₫`} sub={trip.counted_lak ? `+ ${fmtAmt(trip.counted_lak)} LAK · quy đổi tất cả ${fmtAmt(trip.counted_vnd_equiv)} ₫` : COUNTED_SUB} />
           <Kpi label={UNCOUNTED_LABEL} value={`${fmtAmt(trip.uncounted_vnd)} ₫`} sub={trip.uncounted_lak ? `+ ${fmtAmt(trip.uncounted_lak)} LAK · ${UNCOUNTED_SUB}` : UNCOUNTED_SUB} tone={trip.uncounted_vnd || trip.uncounted_lak ? AMBER : INK_2} />
           <Kpi label="Chứng từ" value={trip.n_missing_receipt ? `thiếu ${trip.n_missing_receipt}` : 'đủ'} sub={`${expenses.filter((e) => e.files.length).length}/${expenses.length} khoản có ảnh`} tone={trip.n_missing_receipt ? AMBER : OK} />
@@ -452,21 +492,43 @@ export default function DispatchCostSection({ order }: Props) {
       </Modal>
 
       {/* ── Modal: nhập nhanh ── */}
-      <Modal title={`Nhập nhanh từ phiếu tài xế · ${order.code}`} open={quickOpen} onOk={saveQuick} confirmLoading={saving} onCancel={() => setQuickOpen(false)} okText={`Lưu ${quickRows.filter((r) => r.amount).length} khoản`} cancelText="Huỷ" width={820} destroyOnHidden>
-        <Text type="secondary">Mỗi dòng một khoản. Ngày chi = ngày điều động; chứng từ tải thêm ở bảng sau khi lưu.</Text>
-        <Table className="fleet-table" size="small" pagination={false} rowKey="key" dataSource={quickRows} style={{ marginTop: 10 }}
+      <Modal title={`Nhập nhanh từ phiếu tài xế · ${order.code}`} open={quickOpen} onOk={saveQuick} confirmLoading={saving} onCancel={() => setQuickOpen(false)}
+        okText={quickCount ? `Lưu ${quickCount} khoản · ${fmtAmt(quickEquiv)} ₫` : 'Lưu'} okButtonProps={{ disabled: !quickCount }} cancelText="Huỷ" width={880} destroyOnHidden>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <Text type="secondary">Mỗi dòng một khoản. Gõ xong một dòng, máy tự mở dòng trống kế tiếp. Chứng từ tải thêm ở bảng sau khi lưu.</Text>
+          <Space size={6}><Text style={{ fontSize: 13 }}>Ngày chi chung</Text><DatePicker size="small" format="DD/MM/YYYY" value={quickDate} allowClear={false} onChange={(d) => setQuickDate(d)} /></Space>
+        </div>
+        <Table className="fleet-table" size="small" pagination={false} rowKey="key" dataSource={quickRows}
           columns={[
-            { title: 'Loại chi', width: 170, render: (_: unknown, r, i) => <Select size="small" value={r.kind} style={{ width: '100%' }} options={EXPENSE_KINDS.map((k) => ({ value: k, label: EXPENSE_KIND_LABELS[k] }))} onChange={(v) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, kind: v } : x))} /> },
-            { title: 'Nội dung', render: (_: unknown, r, i) => <Input size="small" value={r.description} onChange={(e) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} /> },
-            { title: 'Số tiền', width: 150, render: (_: unknown, r, i) => <InputNumber size="small" min={0} {...thousands} value={r.amount ?? undefined} style={{ width: '100%' }} onChange={(v) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, amount: v == null ? null : Number(v) } : x))} /> },
-            { title: 'Đ.tiền', width: 110, render: (_: unknown, r, i) => <Segmented size="small" value={r.currency} options={['VND', 'LAK']} onChange={(v) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, currency: v as CostCurrency } : x))} /> },
-            { title: <Tooltip title="Tắt = chưa thông qua, chờ quyết định (không phải tài xế chịu)"><span>Tính</span></Tooltip>, width: 70, align: 'center' as const, render: (_: unknown, r, i) => <Switch size="small" checked={r.counted} onChange={(v) => setQuickRows((rs) => rs.map((x, j) => j === i ? { ...x, counted: v } : x))} /> },
-            { title: '', width: 40, render: (_: unknown, __, i) => <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => setQuickRows((rs) => rs.filter((_, j) => j !== i))} /> },
+            { title: 'Loại chi', width: 160, render: (_: unknown, r, i) => <Select size="small" value={r.kind} style={{ width: '100%' }} options={EXPENSE_KINDS.map((k) => ({ value: k, label: EXPENSE_KIND_LABELS[k] }))} onChange={(v) => editQuick(i, { kind: v })} /> },
+            { title: 'Nội dung', render: (_: unknown, r, i) => (
+              <div>
+                <AutoComplete size="small" style={{ width: '100%' }} value={r.description} options={DESC_SUGGEST[r.kind].map((v) => ({ value: v }))}
+                  filterOption={(input, opt) => String(opt?.value || '').toLowerCase().includes(input.toLowerCase())}
+                  onChange={(v) => editQuick(i, { description: v })} placeholder={EXPENSE_KIND_LABELS[r.kind]} />
+                {!r.counted && <Input size="small" style={{ marginTop: 4 }} value={r.reason} onChange={(e) => editQuick(i, { reason: e.target.value })} placeholder="Vì sao chưa thông qua (tuỳ chọn)" prefix={<Tag color="orange" style={{ margin: 0 }}>chờ</Tag>} />}
+              </div>
+            ) },
+            { title: 'Số tiền', width: 150, align: 'right' as const, render: (_: unknown, r, i) => <InputNumber size="small" min={0} {...thousands} value={r.amount ?? undefined} style={{ width: '100%' }} onChange={(v) => editQuick(i, { amount: v == null ? null : Number(v) })} onPressEnter={() => setQuickRows((rs) => withTrailingBlank(rs))} addonAfter={r.currency === 'LAK' ? 'K' : '₫'} /> },
+            { title: 'Đ.tiền', width: 104, render: (_: unknown, r, i) => <Segmented size="small" value={r.currency} options={['VND', 'LAK']} onChange={(v) => editQuick(i, { currency: v as CostCurrency })} /> },
+            { title: <Tooltip title="Bật = khoản chi theo quy định, tính vào chuyến. Tắt = chưa thông qua, chờ quyết định (không phải tài xế chịu)."><span>Tính <QuestionCircleOutlined style={{ color: '#9ca3af' }} /></span></Tooltip>, width: 72, align: 'center' as const, render: (_: unknown, r, i) => <Switch size="small" checked={r.counted} checkedChildren="có" unCheckedChildren="chờ" onChange={(v) => editQuick(i, { counted: v })} /> },
+            { title: '', width: 40, render: (_: unknown, __, i) => <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => setQuickRows((rs) => withTrailingBlank(rs.filter((_, j) => j !== i)))} /> },
           ]} />
-        <Space style={{ marginTop: 8 }} wrap>
-          <Button size="small" icon={<PlusOutlined />} onClick={() => setQuickRows((rs) => [...rs, { key: Date.now(), kind: 'other', description: '', amount: null, currency: 'VND', counted: true }])}>Thêm dòng</Button>
-          {hasLakQuick && <Space size={4}><Text>Tỷ giá 1 LAK = </Text><InputNumber size="small" min={0.0001} step={0.01} value={quickRate ?? undefined} onChange={(v) => setQuickRate(v == null ? null : Number(v))} /><Text>₫</Text></Space>}
-        </Space>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+          <Space wrap>
+            <Button size="small" icon={<PlusOutlined />} onClick={() => setQuickRows((rs) => [...rs, emptyQuickRow()])}>Thêm dòng</Button>
+            {hasLakQuick && <Space size={4}><Text>Tỷ giá 1 LAK = </Text><InputNumber size="small" min={0.0001} step={0.01} value={quickRate ?? undefined} onChange={(v) => setQuickRate(v == null ? null : Number(v))} /><Text>₫</Text></Space>}
+          </Space>
+          <div style={{ background: '#f8faf9', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 14px', display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+            <span><Text type="secondary" style={{ fontSize: 12 }}>Đang nhập </Text><b style={MONO}>{quickCount}</b><Text type="secondary" style={{ fontSize: 12 }}> khoản</Text></span>
+            <span><Text type="secondary" style={{ fontSize: 12 }}>Tổng </Text><b style={{ ...MONO, color: BRAND_DARK, fontSize: 15 }}>{fmtAmt(quickVnd)} ₫</b>{quickLak > 0 && <b style={{ ...MONO, color: INK_2 }}> + {fmtAmt(quickLak)} LAK</b>}</span>
+            <Space size={6}><Text style={{ fontSize: 12 }}>Tổng trên phiếu</Text><InputNumber size="small" min={0} {...thousands} value={quickFormTotal ?? undefined} onChange={(v) => setQuickFormTotal(v == null ? null : Number(v))} style={{ width: 130 }} placeholder="đối chiếu" />
+              {quickDiff != null && (Math.abs(quickDiff) < 1
+                ? <Tag color="green" style={{ margin: 0 }}><CheckCircleOutlined /> khớp</Tag>
+                : <Tag color="red" style={{ margin: 0, ...MONO }}>lệch {fmtAmt(Math.abs(quickDiff))} ₫ {quickDiff > 0 ? '(nhập dư)' : '(còn thiếu)'}</Tag>)}
+            </Space>
+          </div>
+        </div>
       </Modal>
 
       {/* ── Modal: tạm ứng ── */}

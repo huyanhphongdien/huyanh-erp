@@ -11,12 +11,14 @@ import {
   Card, Form, Select, Input, AutoComplete, DatePicker, Button, Space, Typography, Row, Col,
   Table, InputNumber, message, Breadcrumb, Divider, Tag, Modal, Empty, Segmented, Alert,
 } from 'antd'
-import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined, ImportOutlined, TruckOutlined, CarOutlined } from '@ant-design/icons'
+import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined, ImportOutlined, TruckOutlined, CarOutlined, CheckCircleFilled } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { fleetService, VEHICLE_KIND_LABELS, type FleetVehicle, type FleetDriver } from '../../../services/logistics/fleetService'
 import {
-  dispatchService, getGradeDangDung, TRIP_TYPE_LABELS, isContainerTrip,
-  type TripType, type DispatchLineInput, type SalesOrderOption,
+  dispatchService, getGradeDangDung, isContainerTrip,
+  TRIP_CARDS, TRIP_GROUP_META, tripCardFor,
+  type TripType, type CargoKind, type TripVehicleGroup, type TripCard,
+  type DispatchLineInput, type SalesOrderOption,
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
 import { useAuthStore } from '../../../stores/authStore'
@@ -141,6 +143,7 @@ export default function DispatchCreatePage() {
         form.setFieldsValue({
           dispatch_date: order.dispatch_date ? dayjs(order.dispatch_date) : dayjs(),
           trip_type: order.trip_type,
+          cargo_kind: order.cargo_kind ?? null,
           reason: order.reason,
           is_hired: order.is_hired || false,
           hire_company: order.hire_company,
@@ -319,6 +322,7 @@ export default function DispatchCreatePage() {
       const payload = {
         dispatch_date: dayjs(v.dispatch_date).format('YYYY-MM-DD'),
         trip_type: v.trip_type as TripType,
+        cargo_kind: (v.cargo_kind || null) as CargoKind | null,
         reason: v.reason || null,
         is_hired: hired,
         hire_company: hired ? (v.hire_company || null) : null,
@@ -381,6 +385,13 @@ export default function DispatchCreatePage() {
   const isTrading = watchedTripType === 'trading'
   const isFetchMu = watchedTripType === 'fetch_mu'           // đi lấy mủ TL→PĐ (Đợt 2)
   const isHired = Form.useWatch('is_hired', form) === true   // xe thuê ngoài
+
+  // Lưới thẻ "Loại chuyến" — chạm 1 thẻ set LUỒNG (trip_type) + LOẠI HÀNG (cargo_kind).
+  const watchedCargo = Form.useWatch('cargo_kind', form) as CargoKind | null | undefined
+  const activeCard = useMemo(() => tripCardFor(watchedTripType, watchedCargo), [watchedTripType, watchedCargo])
+  const selectCard = useCallback((c: TripCard) => {
+    form.setFieldsValue({ trip_type: c.trip_type, cargo_kind: c.cargo_kind })
+  }, [form])
 
   // Ô xe chính LỌC THEO LOẠI CHUYẾN (phiếu):
   //   • Xuất hàng đi cảng → chỉ Đầu kéo (kéo container).
@@ -458,23 +469,60 @@ export default function DispatchCreatePage() {
           </Space>
         </div>
 
-        <Form form={form} layout="vertical" size="large" initialValues={{ dispatch_date: dayjs(), trip_type: 'port', is_hired: false }}>
+        <Form form={form} layout="vertical" size="large" initialValues={{ dispatch_date: dayjs(), trip_type: 'port', cargo_kind: 'raw', is_hired: false }}>
+          {/* ── LOẠI CHUYẾN — lưới thẻ gom theo nhóm xe (chạm 1 thẻ = set LUỒNG + LOẠI HÀNG) ── */}
+          <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 600, fontSize: 15 }}>Loại chuyến <span style={{ color: '#dc2626' }}>*</span></span>
+            {activeCard && (
+              <span style={{ color: '#64748b', fontSize: 13 }}>
+                đang chọn:&nbsp;<b style={{ color: '#14532d' }}>{TRIP_GROUP_META[activeCard.group].icon} {activeCard.label}</b>
+                <span style={{ marginLeft: 6 }}>· xe tự nhận từ xe chọn bên dưới</span>
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
+            {(['cont', 'truck', 'car', 'other'] as TripVehicleGroup[]).map(g => {
+              const meta = TRIP_GROUP_META[g]
+              const cards = TRIP_CARDS.filter(c => c.group === g)
+              return (
+                <div key={g} style={{ flex: '1 1 240px', minWidth: 210, background: '#FAFAFA', border: '1px solid #EDEFF2', borderRadius: 12, padding: 10 }}>
+                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: 8, fontSize: 13 }}>{meta.icon} {meta.label}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {cards.map(c => {
+                      const on = c.key === activeCard?.key
+                      return (
+                        <button type="button" key={c.key} onClick={() => selectCard(c)}
+                          style={{
+                            textAlign: 'left', cursor: 'pointer', borderRadius: 10, padding: '8px 10px', width: '100%',
+                            border: on ? '2px solid #1B4D3E' : '1px solid #E2E8F0',
+                            background: on ? '#F0FDF4' : '#fff',
+                            boxShadow: on ? '0 1px 5px rgba(27,77,62,.18)' : 'none',
+                            transition: 'all .12s',
+                          }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                            <span style={{ fontWeight: 600, color: on ? '#14532d' : '#1f2937', fontSize: 14 }}>{c.label}</span>
+                            {on && <CheckCircleFilled style={{ color: '#1B4D3E' }} />}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{c.sub}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {/* trip_type + cargo_kind lưu ẩn — set bởi thẻ ở trên (không hiện dropdown nữa) */}
+          <Form.Item name="trip_type" hidden rules={[{ required: true, message: 'Chọn loại chuyến' }]}><Input /></Form.Item>
+          <Form.Item name="cargo_kind" hidden><Input /></Form.Item>
+
           <Row gutter={16}>
-            <Col xs={24} sm={8} md={5}>
+            <Col xs={24} sm={8} md={6}>
               <Form.Item name="dispatch_date" label="Ngày điều động" rules={[{ required: true }]}>
                 <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={8} md={6}>
-              <Form.Item
-                name="trip_type" label="Loại chuyến" rules={[{ required: true }]}
-                extra={isTrading ? 'Mua của nhà máy khác → xe bốc TẠI NHÀ MÁY ĐÓ' : undefined}
-              >
-                <Select options={(['port', 'trading', 'fetch_mu', 'lao', 'internal', 'other'] as TripType[])
-                  .map(t => ({ value: t, label: TRIP_TYPE_LABELS[t] }))} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8} md={13}>
+            <Col xs={24} sm={16} md={18}>
               {isPort ? (
                 <Form.Item label="Đơn hàng bán (gộp được nhiều đơn cho 1 xe)">
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>

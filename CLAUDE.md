@@ -237,6 +237,20 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
   `FleetPaymentRequestDetailPage/PrintPage.tsx` (cùng mẫu in với `PaymentRequestPrintPage` mủ; hàm đọc số dùng chung
   `src/utils/readVietnameseNumber.ts`). Migration `fleet_costs_p2_payment_requests.sql` (đã áp). Mảnh UI chung: `fleetCostUi.tsx`.
 
+## Phân loại Lệnh điều động — 2 trục Luồng × Chở gì (13/11/2026)
+- Owner muốn phân loại chuyến chi tiết theo **Loại XE × Loại HÀNG** (Xe cont chở mủ / cont thành phẩm / xe tải chở mủ / xe tải
+  hàng hoá / xe con chở CBNV…). Cách làm: giữ `dispatch_orders.trip_type` làm **LUỒNG** (port/trading/fetch_mu/lao/internal/other —
+  quyết định form: bảng container, pallet, điểm bốc) và **THÊM cột `cargo_kind`** = loại hàng (`raw`/`finished`/`goods`/`passenger`/
+  `supplies`/`other`, NULL = lệnh cũ chưa phân loại — cố ý không backfill). `(trip_type, cargo_kind)` cùng nhau tái lập đủ các "loại"
+  owner liệt kê; **Loại XE suy từ xe đã chọn + nhãn thẻ, KHÔNG lưu cột riêng** (tránh 2 nguồn sự thật).
+- **Một nguồn thẻ**: `TRIP_CARDS` + `TRIP_GROUP_META` + `tripCardFor()` + `dispatchCategoryLabel()` trong `dispatchService.ts`. Mọi màn
+  đọc nhãn/nhóm qua đó, ĐỪNG gõ lại map. Form tạo lệnh (`DispatchCreatePage`) bỏ dropdown "Loại chuyến", thay bằng **lưới thẻ gom theo
+  nhóm xe** (chạm 1 thẻ = set cả `trip_type` + `cargo_kind`, lưu qua 2 Form.Item ẩn). Sổ lệnh (`DispatchListPage`) cột "Loại chuyến" +
+  **lọc theo nhóm xe** (client-side). Detail/Print đọc `dispatchCategoryLabel` (Print bỏ emoji, ghi "Nhóm xe — Loại chở").
+- `create()` gửi `cargo_kind` theo **safe-key** (chỉ khi có giá trị → an toàn PGRST204 nếu lỡ deploy trước migration); `update()` thêm
+  `cargo_kind` vào mảng keys. Migration `docs/migrations/dispatch_cargo_kind.sql` — **CHẠY TRƯỚC khi deploy** (lệnh mới luôn kèm
+  `cargo_kind` lúc lưu). `trip_type` KHÔNG đổi giá trị nào (vẫn 6 luồng cũ) nên không đụng CHECK cũ.
+
 ## Hàng chèn — Sổ pallet HC (owner chốt 10/11/2026)
 - **Sổ pallet** = bảng `mix_pallets`, 3 cột như sổ giấy: `ten` (khai báo pallet) · `code` (chữ viết tắt HC1→HC30) · `bi_kg` (số kg =
   BÌ pallet rỗng). Khai 1 lần; cân lại / đổi chữ viết tắt / tắt-bật đều ghi `mix_pallet_logs`. Quyền ghi sổ = bước 3 nhận kho (thủ kho)

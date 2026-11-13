@@ -7,14 +7,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
-  Card, Table, Button, Space, Typography, Tag, Input, Segmented, message, Breadcrumb,
+  Card, Table, Button, Space, Typography, Tag, Input, Select, Segmented, message, Breadcrumb,
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, SendOutlined, TruckOutlined, CarOutlined, IdcardOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
-  dispatchService, DISPATCH_STATUS_LABELS, TRIP_TYPE_LABELS, isContainerTrip,
+  dispatchService, DISPATCH_STATUS_LABELS, isContainerTrip,
   FETCH_RUBBER_LABELS, palletOutKg,
-  type DispatchOrder, type DispatchStatus,
+  dispatchCategoryLabel, tripCardFor, TRIP_GROUP_META,
+  type DispatchOrder, type DispatchStatus, type TripVehicleGroup,
 } from '../../../services/logistics/dispatchService'
 
 const { Title } = Typography
@@ -29,6 +30,7 @@ export default function DispatchListPage() {
   const [rows, setRows] = useState<DispatchOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<DispatchStatus | 'all'>('all')
+  const [groupFilter, setGroupFilter] = useState<'all' | TripVehicleGroup>('all')
   const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
@@ -47,10 +49,15 @@ export default function DispatchListPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Lọc theo nhóm xe (client-side trên các dòng đã tải) — gom theo thẻ loại chuyến.
+  const shown = groupFilter === 'all'
+    ? rows
+    : rows.filter(r => tripCardFor(r.trip_type, r.cargo_kind)?.group === groupFilter)
+
   const columns = [
     { title: 'Mã lệnh', dataIndex: 'code', key: 'code', width: 140, render: (v: string) => <b>{v}</b> },
     { title: 'Ngày', dataIndex: 'dispatch_date', key: 'date', width: 110, render: (v: string) => dayjs(v).format('DD/MM/YYYY') },
-    { title: 'Loại', dataIndex: 'trip_type', key: 'trip', width: 150, render: (v: keyof typeof TRIP_TYPE_LABELS) => TRIP_TYPE_LABELS[v] || v },
+    { title: 'Loại chuyến', key: 'trip', width: 180, render: (_: any, r: DispatchOrder) => <span>{dispatchCategoryLabel(r.trip_type, r.cargo_kind)}</span> },
     {
       title: 'Xe / Tài xế', key: 'veh', render: (_: any, r: DispatchOrder) => (
         <Space size={4} wrap>
@@ -112,17 +119,27 @@ export default function DispatchListPage() {
           </Space>
         </div>
 
-        <Segmented
-          style={{ marginBottom: 12 }}
-          value={filter}
-          onChange={v => setFilter(v as any)}
-          options={[
-            { label: 'Tất cả', value: 'all' },
-            ...(['draft', 'dispatched', 'in_transit', 'completed', 'cancelled'] as DispatchStatus[]).map(s => ({ label: DISPATCH_STATUS_LABELS[s], value: s })),
-          ]}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <Segmented
+            value={filter}
+            onChange={v => setFilter(v as any)}
+            options={[
+              { label: 'Tất cả', value: 'all' },
+              ...(['draft', 'dispatched', 'in_transit', 'completed', 'cancelled'] as DispatchStatus[]).map(s => ({ label: DISPATCH_STATUS_LABELS[s], value: s })),
+            ]}
+          />
+          <Select
+            value={groupFilter} onChange={v => setGroupFilter(v)} style={{ width: 200 }}
+            options={[
+              { value: 'all', label: 'Mọi nhóm xe' },
+              ...(['cont', 'truck', 'car', 'other'] as TripVehicleGroup[]).map(g => ({
+                value: g, label: `${TRIP_GROUP_META[g].icon} ${TRIP_GROUP_META[g].label}`,
+              })),
+            ]}
+          />
+        </div>
 
-        <Table rowKey="id" size="middle" loading={loading} columns={columns as any} dataSource={rows}
+        <Table rowKey="id" size="middle" loading={loading} columns={columns as any} dataSource={shown}
           onRow={(r) => ({
             // Mở TAB chi tiết thay vì điều hướng — trang này giờ là 1 tab, navigate
             // sẽ đè mất tab đang mở (vd tab Đơn hàng bán bên cạnh).

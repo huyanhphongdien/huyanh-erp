@@ -56,11 +56,82 @@ export const CONTAINER_TRIP_TYPES: TripType[] = ['port', 'trading']
 export const isContainerTrip = (t?: TripType | string | null): boolean =>
   CONTAINER_TRIP_TYPES.includes((t ?? 'port') as TripType)
 
+// ============================================================================
+// PHÂN LOẠI CHUYẾN — trục "Chở gì" (cargo_kind) đi kèm trip_type (luồng)
+//   trip_type = LUỒNG xử lý (quyết định form). cargo_kind = loại HÀNG chở.
+//   (trip_type, cargo_kind) cùng nhau tái lập các "loại" owner liệt kê theo Loại xe × Loại hàng.
+//   Loại XE suy từ xe đã chọn + nhãn thẻ, KHÔNG lưu cột riêng (tránh 2 nguồn sự thật).
+//   Migration: docs/migrations/dispatch_cargo_kind.sql
+// ============================================================================
+export type CargoKind = 'raw' | 'finished' | 'goods' | 'passenger' | 'supplies' | 'other'
+export const CARGO_KIND_LABELS: Record<CargoKind, string> = {
+  raw: 'Mủ',
+  finished: 'Thành phẩm',
+  goods: 'Hàng hoá',
+  passenger: 'Cán bộ / khách',
+  supplies: 'Vật tư',
+  other: 'Khác',
+}
+
+/** Nhóm XE của thẻ loại chuyến (chỉ để trình bày + lọc — không lưu DB). */
+export type TripVehicleGroup = 'cont' | 'truck' | 'car' | 'other'
+export const TRIP_GROUP_META: Record<TripVehicleGroup, { label: string; icon: string }> = {
+  cont: { label: 'Xe cont (đầu kéo)', icon: '🚛' },
+  truck: { label: 'Xe tải', icon: '🚚' },
+  car: { label: 'Xe con', icon: '🚗' },
+  other: { label: 'Khác', icon: '🗂️' },
+}
+
+/** 1 thẻ = 1 "loại chuyến" chọn nhanh. Chạm 1 cái → set luôn trip_type + cargo_kind. */
+export interface TripCard {
+  key: string
+  group: TripVehicleGroup
+  label: string
+  sub: string
+  trip_type: TripType
+  cargo_kind: CargoKind | null
+}
+export const TRIP_CARDS: TripCard[] = [
+  // 🚛 Xe cont (đầu kéo + rơ-moóc) — chuyến chở container
+  { key: 'cont_mu_cang', group: 'cont', label: 'Chở mủ đi cảng', sub: 'Xuất khẩu · container', trip_type: 'port', cargo_kind: 'raw' },
+  { key: 'cont_tp_cang', group: 'cont', label: 'Chở thành phẩm', sub: 'Xuất khẩu · container', trip_type: 'port', cargo_kind: 'finished' },
+  { key: 'cont_tm', group: 'cont', label: 'Hàng thương mại', sub: 'Mua NM khác → giao khách', trip_type: 'trading', cargo_kind: 'goods' },
+  { key: 'cont_fetch', group: 'cont', label: 'Đi lấy mủ (NM khác)', sub: 'Cân 2 đầu ở Phong Điền', trip_type: 'fetch_mu', cargo_kind: 'raw' },
+  { key: 'cont_lao', group: 'cont', label: 'Đi Lào', sub: 'Chở hàng đi Lào', trip_type: 'lao', cargo_kind: 'goods' },
+  // 🚚 Xe tải — chở nội bộ, không container
+  { key: 'tai_mu', group: 'truck', label: 'Chở mủ', sub: 'Gom / chuyển mủ nội bộ', trip_type: 'internal', cargo_kind: 'raw' },
+  { key: 'tai_hang', group: 'truck', label: 'Chở hàng hoá', sub: 'Vật tư · hàng nội bộ', trip_type: 'internal', cargo_kind: 'goods' },
+  // 🚗 Xe con — chở người
+  { key: 'con_nguoi', group: 'car', label: 'Chở cán bộ NV', sub: 'Đón khách · công tác', trip_type: 'internal', cargo_kind: 'passenger' },
+  // 🗂️ Khác
+  { key: 'khac_noibo', group: 'other', label: 'Nội bộ / việc khác', sub: 'Không gắn đơn hàng', trip_type: 'internal', cargo_kind: 'other' },
+  { key: 'khac', group: 'other', label: 'Khác', sub: 'Loại chuyến khác', trip_type: 'other', cargo_kind: null },
+]
+
+/**
+ * Thẻ ứng với 1 lệnh. Khớp đúng (trip_type + cargo_kind); lệnh CŨ (cargo_kind NULL)
+ * lùi về thẻ ĐẦU của luồng đó để màn không trống (không tự ghi cargo lên DB).
+ */
+export function tripCardFor(trip?: TripType | string | null, cargo?: CargoKind | string | null): TripCard | undefined {
+  const t = (trip ?? 'port') as TripType
+  const c = (cargo ?? null) as CargoKind | null
+  return TRIP_CARDS.find(k => k.trip_type === t && (k.cargo_kind ?? null) === c)
+    || TRIP_CARDS.find(k => k.trip_type === t)
+}
+
+/** Nhãn phân loại gọn cho Sổ lệnh / in phiếu: "🚛 Chở mủ đi cảng". */
+export function dispatchCategoryLabel(trip?: TripType | string | null, cargo?: CargoKind | string | null): string {
+  const card = tripCardFor(trip, cargo)
+  if (!card) return TRIP_TYPE_LABELS[(trip ?? 'other') as TripType] || String(trip ?? '')
+  return `${TRIP_GROUP_META[card.group].icon} ${card.label}`
+}
+
 export interface DispatchOrder {
   id: string
   code: string
   dispatch_date: string
   trip_type: TripType
+  cargo_kind: CargoKind | null   // loại hàng chở (phân loại cùng trip_type) — NULL = lệnh cũ
   reason: string | null
   is_hired: boolean
   hire_company: string | null
@@ -149,6 +220,7 @@ export interface DispatchLineInput {
 export interface CreateDispatchInput {
   dispatch_date?: string
   trip_type?: TripType
+  cargo_kind?: CargoKind | null
   reason?: string | null
   // Thuê ngoài: is_hired=true → nhập tay biển số/tài xế (các trường *_plate / driver_*)
   is_hired?: boolean
@@ -310,6 +382,9 @@ async function create(input: CreateDispatchInput): Promise<DispatchOrder> {
       code,
       dispatch_date: input.dispatch_date || new Date().toISOString().slice(0, 10),
       trip_type: input.trip_type || 'port',
+      // cargo_kind: chỉ gửi khi CÓ giá trị (an toàn PGRST204 nếu code lỡ chạy trước
+      // migration dispatch_cargo_kind.sql → payload không mang key lạ).
+      ...(input.cargo_kind ? { cargo_kind: input.cargo_kind } : {}),
       reason: input.reason || null,
       is_hired: hired,
       hire_company: hired ? (input.hire_company || null) : null,
@@ -365,7 +440,7 @@ async function update(
 ): Promise<DispatchOrder> {
   const out: Record<string, any> = {}
   // update() an toàn sẵn: chỉ set key khi patch có mặt (!== undefined).
-  const keys = ['dispatch_date', 'trip_type', 'reason', 'contract_ref', 'customer_name', 'destination',
+  const keys = ['dispatch_date', 'trip_type', 'cargo_kind', 'reason', 'contract_ref', 'customer_name', 'destination',
     'pickup_location', 'pickup_contact', 'pallet_plastic_out', 'pallet_steel_out', 'pallet_kg_out',
     'fetch_rubber_type', 'fetch_lot_code',
     'recipient_name', 'recipient_phone', 'sales_order_id', 'note', 'is_hired', 'hire_company', 'hire_cost'] as const

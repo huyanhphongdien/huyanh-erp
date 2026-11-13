@@ -12,7 +12,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Printer } from 'lucide-react'
 import logoImg from '../../../assets/logo.png'
 import {
-  dispatchService, TRIP_TYPE_LABELS, isContainerTrip,
+  dispatchService, TRIP_TYPE_LABELS, tripCardFor, TRIP_GROUP_META, isContainerTrip,
   FETCH_RUBBER_LABELS, palletOutKg,
   type DispatchOrder, type DispatchLine,
 } from '../../../services/logistics/dispatchService'
@@ -134,6 +134,9 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
   const totalPkg = lines.reduce((s, l) => s + (l.package_count || 0), 0)
   // Đi cảng = mẫu container/seal đầy đủ. Chuyến nội bộ/thường = mẫu gọn có cột Hành trình.
   const isPort = isContainerTrip(order.trip_type)
+  // Nhãn loại chuyến trên GIẤY: bỏ emoji, ghi rõ "Nhóm xe — Loại chở" cho trang trọng.
+  const _tc = tripCardFor(order.trip_type, order.cargo_kind)
+  const tripLabel = _tc ? `${TRIP_GROUP_META[_tc.group].label} — ${_tc.label}` : (TRIP_TYPE_LABELS[order.trip_type] || order.trip_type)
   return (
     <div style={{ fontFamily: "'Be Vietnam Pro', 'Segoe UI', Tahoma, Arial, sans-serif", fontSize: 12.5, color: '#111' }}>
       <CompanyHeader />
@@ -145,7 +148,7 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
           <span style={{ color: '#D1D5DB' }}>│</span>
           <span>Ngày: <strong>{fmtDate(order.dispatch_date)}</strong></span>
           <span style={{ color: '#D1D5DB' }}>│</span>
-          <span>{TRIP_TYPE_LABELS[order.trip_type]}</span>
+          <span>{tripLabel}</span>
         </div>
       </div>
 

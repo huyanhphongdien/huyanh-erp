@@ -469,7 +469,7 @@ export default function DispatchCreatePage() {
           </Space>
         </div>
 
-        <Form form={form} layout="vertical" size="large" initialValues={{ dispatch_date: dayjs(), trip_type: 'port', cargo_kind: 'raw', is_hired: false }}>
+        <Form form={form} layout="vertical" size="large" initialValues={{ dispatch_date: dayjs(), trip_type: 'port', cargo_kind: 'finished', is_hired: false }}>
           {/* ── LOẠI CHUYẾN — lưới thẻ gom theo nhóm xe (chạm 1 thẻ = set LUỒNG + LOẠI HÀNG) ── */}
           <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 600, fontSize: 15 }}>Loại chuyến <span style={{ color: '#dc2626' }}>*</span></span>

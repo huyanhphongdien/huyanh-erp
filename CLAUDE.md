@@ -238,8 +238,10 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
   `src/utils/readVietnameseNumber.ts`). Migration `fleet_costs_p2_payment_requests.sql` (đã áp). Mảnh UI chung: `fleetCostUi.tsx`.
 
 ## Phân loại Lệnh điều động — 2 trục Luồng × Chở gì (13/11/2026)
-- Owner muốn phân loại chuyến chi tiết theo **Loại XE × Loại HÀNG** (Xe cont chở mủ / cont thành phẩm / xe tải chở mủ / xe tải
-  hàng hoá / xe con chở CBNV…). Cách làm: giữ `dispatch_orders.trip_type` làm **LUỒNG** (port/trading/fetch_mu/lao/internal/other —
+- Owner muốn phân loại chuyến chi tiết theo **Loại XE × Loại HÀNG**. Nhóm thẻ hiện có (owner chốt 13/11/2026): 🚛 Xe cont = Đi cảng
+  (thành phẩm, `port/finished`) · Hàng thương mại (mua NM khác, `trading/finished`) · Đi lấy mủ NM khác (`fetch_mu/raw`) · Đi Lào
+  (chở MỦ về từ Lào, `lao/raw`); 🚚 Xe tải = Chở mủ (`internal/raw`) · Chở hàng hoá (`internal/goods`); 🚗 Xe con = Chở CBNV
+  (`internal/passenger`); 🗂️ Khác = Nội bộ (`internal/other`) · Khác (`other`). Cách làm: giữ `dispatch_orders.trip_type` làm **LUỒNG** (port/trading/fetch_mu/lao/internal/other —
   quyết định form: bảng container, pallet, điểm bốc) và **THÊM cột `cargo_kind`** = loại hàng (`raw`/`finished`/`goods`/`passenger`/
   `supplies`/`other`, NULL = lệnh cũ chưa phân loại — cố ý không backfill). `(trip_type, cargo_kind)` cùng nhau tái lập đủ các "loại"
   owner liệt kê; **Loại XE suy từ xe đã chọn + nhãn thẻ, KHÔNG lưu cột riêng** (tránh 2 nguồn sự thật).

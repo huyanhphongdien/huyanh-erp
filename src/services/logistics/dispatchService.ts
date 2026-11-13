@@ -93,11 +93,12 @@ export interface TripCard {
 }
 export const TRIP_CARDS: TripCard[] = [
   // 🚛 Xe cont (đầu kéo + rơ-moóc) — chuyến chở container
-  { key: 'cont_mu_cang', group: 'cont', label: 'Chở mủ đi cảng', sub: 'Xuất khẩu · container', trip_type: 'port', cargo_kind: 'raw' },
-  { key: 'cont_tp_cang', group: 'cont', label: 'Chở thành phẩm', sub: 'Xuất khẩu · container', trip_type: 'port', cargo_kind: 'finished' },
-  { key: 'cont_tm', group: 'cont', label: 'Hàng thương mại', sub: 'Mua NM khác → giao khách', trip_type: 'trading', cargo_kind: 'goods' },
+  // "Đi cảng" = xuất THÀNH PHẨM ra cảng (không phải mủ). "Chở thành phẩm" (mua NM khác)
+  // gộp vào "Hàng thương mại". "Đi Lào" = chở MỦ về từ Lào. (owner chốt 13/11/2026)
+  { key: 'cont_cang', group: 'cont', label: 'Đi cảng', sub: 'Xuất khẩu thành phẩm · container', trip_type: 'port', cargo_kind: 'finished' },
+  { key: 'cont_tm', group: 'cont', label: 'Hàng thương mại', sub: 'Mua NM khác → giao khách (thành phẩm)', trip_type: 'trading', cargo_kind: 'finished' },
   { key: 'cont_fetch', group: 'cont', label: 'Đi lấy mủ (NM khác)', sub: 'Cân 2 đầu ở Phong Điền', trip_type: 'fetch_mu', cargo_kind: 'raw' },
-  { key: 'cont_lao', group: 'cont', label: 'Đi Lào', sub: 'Chở hàng đi Lào', trip_type: 'lao', cargo_kind: 'goods' },
+  { key: 'cont_lao', group: 'cont', label: 'Đi Lào', sub: 'Chở mủ về từ Lào', trip_type: 'lao', cargo_kind: 'raw' },
   // 🚚 Xe tải — chở nội bộ, không container
   { key: 'tai_mu', group: 'truck', label: 'Chở mủ', sub: 'Gom / chuyển mủ nội bộ', trip_type: 'internal', cargo_kind: 'raw' },
   { key: 'tai_hang', group: 'truck', label: 'Chở hàng hoá', sub: 'Vật tư · hàng nội bộ', trip_type: 'internal', cargo_kind: 'goods' },

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hướng dẫn Vận tải</title>
+<meta name="description" content="Hướng dẫn module Vận tải và Chi phí đội xe trên Huy Anh ERP: lệnh điều động, đội xe, tài xế, chi phí chuyến, sổ chi phí, đề nghị thanh toán. Ảnh chụp thật từ hệ thống 10/11/2026.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{--green:#1B4D3E;--green-d:#0D2E25;--green2:#2E7D5B;--lime:#E8A838;--line:#E5E7EB;--ink:#1F2937;--mut:#6B7280;
+        --bg:#F3F4F6;--soft:#F0F9F4;--gold-bg:#FFFBEB;--red:#B91C1C;--red-bg:#FEF2F2;--blue:#1d4ed8;--blue-bg:#EFF6FF;
+        --mono:'JetBrains Mono',Consolas,ui-monospace,monospace}
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:'Be Vietnam Pro','Segoe UI',Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:15px;line-height:1.6}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 18px 80px}
+  .hero{background:linear-gradient(135deg,var(--green-d),var(--green2));color:#fff;padding:34px 30px 28px;border-radius:0 0 18px 18px;margin-bottom:10px}
+  .hero .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--lime);font-weight:700}
+  .hero h1{margin:6px 0 8px;font-size:30px;font-weight:800;letter-spacing:-.01em}
+  .hero .sub{opacity:.92;font-size:15px;max-width:860px}
+  .hero .meta{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px}
+  .hero .pill{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:600}
+  nav.toc{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:14px 0 8px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px 24px}
+  nav.toc a{color:var(--green);text-decoration:none;font-weight:600;font-size:14px}
+  nav.toc a:hover{text-decoration:underline}
+  nav.toc .n{display:inline-block;width:26px;color:var(--mut);font-family:var(--mono);font-weight:500}
+  h2{font-size:21px;color:var(--green);border-left:5px solid var(--green);padding:3px 0 3px 12px;margin:38px 0 10px;scroll-margin-top:16px}
+  h2 small{font-weight:500;color:var(--mut);font-size:13px;margin-left:8px}
+  h3{font-size:16px;margin:22px 0 8px;color:var(--green-d)}
+  p{margin:8px 0}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .muted{color:var(--mut)}.sm{font-size:13px}.mono{font-family:var(--mono)}
+  .kbd{display:inline-block;background:#fff;border:1px solid #D1D5DB;border-bottom-width:2px;border-radius:6px;padding:1px 8px;font-size:13px;font-weight:700;color:var(--green);white-space:nowrap}
+  .btn{display:inline-block;background:var(--green);color:#fff;border-radius:7px;padding:1px 9px;font-size:13px;font-weight:700;white-space:nowrap}
+  .btn.gold{background:var(--lime);color:var(--green-d)}.btn.white{background:#fff;color:var(--green);border:1px solid var(--line)}.btn.red{background:var(--red-bg);color:var(--red);border:1px solid #FECACA}.btn.blue{background:#1677ff}.btn.ok{background:#15803d}
+  .tag{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600}
+  .tag.grey{background:#F3F4F6;color:#4B5563}.tag.blue{background:var(--blue-bg);color:var(--blue)}.tag.gold{background:#FEF3C7;color:#B45309}.tag.green{background:#DCFCE7;color:#15803D}.tag.red{background:#FEE2E2;color:var(--red)}.tag.geek{background:#EEF2FF;color:#3730A3}
+  .desk{background:#111827;border-radius:12px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.18);margin:12px 0}
+  .desk img{display:block;width:100%;height:auto;border-radius:6px}
+  .desk .cap{color:#D1D5DB;font-size:12.5px;padding:8px 6px 2px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  ol.steps{margin:6px 0 0;padding:0;list-style:none;counter-reset:s}
+  ol.steps li{position:relative;padding:8px 0 8px 44px;border-bottom:1px dashed #E5E7EB;counter-increment:s}
+  ol.steps li:last-child{border-bottom:0}
+  ol.steps li::before{content:counter(s);position:absolute;left:0;top:9px;width:30px;height:30px;border-radius:50%;background:var(--green);color:#fff;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center}
+  ol.steps li b{color:var(--green-d)}
+  ul.tight{margin:6px 0 0 18px;padding:0}ul.tight li{margin:4px 0}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px;background:#fff}
+  th{background:var(--soft);color:#1f2937;font-weight:700;text-align:left;padding:8px 10px;border-bottom:2px solid #cfe0d8}
+  td{padding:8px 10px;border-bottom:1px solid #F1F5F9;vertical-align:top}
+  .note{border-radius:10px;padding:10px 14px;font-size:14px;margin:10px 0;border:1px solid}
+  .note.warn{background:var(--gold-bg);border-color:#FDE68A}.note.red{background:var(--red-bg);border-color:#FECACA}.note.ok{background:var(--soft);border-color:#BBF7D0}.note.info{background:var(--blue-bg);border-color:#BFDBFE}
+  .flow{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin:12px 0}
+  .flow .st{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .flow .st .n{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;font-weight:800;align-items:center;justify-content:center;margin-bottom:4px}
+  .flow .st b{display:block;font-size:13.5px}.flow .st span{font-size:12px;color:var(--mut)}
+  .roles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .roles .r{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:13.5px}
+  .roles .r b{display:block;color:var(--green);margin-bottom:4px}
+  .status{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .status .arrow{color:#9CA3AF}
+  footer{margin-top:40px;padding-top:12px;border-top:1px solid var(--line);color:var(--mut);font-size:12.5px}
+  @media (max-width:900px){.two{grid-template-columns:1fr}.flow{grid-template-columns:repeat(2,1fr)}.roles{grid-template-columns:1fr 1fr}nav.toc{grid-template-columns:1fr}}
+  @media print{body{background:#fff}.hero{border-radius:0}h2{break-after:avoid}.desk{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="kicker">Huy Anh ERP · Vận tải</div>
+    <h1>Hướng dẫn module Vận tải và Chi phí đội xe</h1>
+    <div class="sub">Dành cho Hành chính tổng hợp (lập lệnh, nhập chi phí), trạm cân, kế toán (duyệt, chi) và Ban Giám đốc. Một chuyến xe đi từ <b>lệnh điều động</b> → in lệnh và biên bản bàn giao → trạm cân chọn lệnh khi cân xuất → xe về nhập <b>km và chi phí</b> → gom thành <b>đề nghị thanh toán</b> cho tài xế.</div>
+    <div class="meta">
+      <span class="pill">Máy tính: huyanhrubber.vn → menu VẬN TẢI</span>
+      <span class="pill">4 mục: Lệnh điều động · Sổ chi phí đội xe · Đội xe · Tài xế</span>
+      <span class="pill">Ảnh chụp từ hệ thống 10/11/2026</span>
+    </div>
+  </div>
+
+  <nav class="toc">
+    <a href="#s1"><span class="n">1</span>Tổng quan và ai làm gì</a>
+    <a href="#s2"><span class="n">2</span>Danh sách lệnh điều động</a>
+    <a href="#s3"><span class="n">3</span>Tạo lệnh điều động</a>
+    <a href="#s4"><span class="n">4</span>Chi tiết lệnh, đổi trạng thái, in</a>
+    <a href="#s5"><span class="n">5</span>Nối với trạm cân và đơn hàng bán</a>
+    <a href="#s6"><span class="n">6</span>Đội xe và tài xế</a>
+    <a href="#s7"><span class="n">7</span>Chi phí chuyến trên lệnh</a>
+    <a href="#s8"><span class="n">8</span>Sổ chi phí đội xe</a>
+    <a href="#s9"><span class="n">9</span>Tạm ứng tài xế</a>
+    <a href="#s10"><span class="n">10</span>Đề nghị thanh toán chi phí xe</a>
+    <a href="#s11"><span class="n">11</span>Quy ước nhanh và lỗi thường gặp</a>
+  </nav>
+
+  <h2 id="s1">1 · Tổng quan và ai làm gì</h2>
+  <div class="card">
+    <b>Một chuyến xe nhìn từ trên xuống</b>
+    <div class="flow">
+      <div class="st"><span class="n">1</span><b>Lập lệnh</b><span>từ đơn hàng bán hoặc tự nhập</span></div>
+      <div class="st"><span class="n">2</span><b>In</b><span>lệnh điều động, biên bản bàn giao</span></div>
+      <div class="st"><span class="n">3</span><b>Điều xe</b><span>đổi trạng thái Đã điều xe</span></div>
+      <div class="st"><span class="n">4</span><b>Trạm cân</b><span>cân xuất chọn lệnh, KL về lệnh</span></div>
+      <div class="st"><span class="n">5</span><b>Xe về</b><span>nhập ngày về, km, khoản chi</span></div>
+      <div class="st"><span class="n">6</span><b>Duyệt</b><span>kế toán khoá chi phí chuyến</span></div>
+      <div class="st"><span class="n">7</span><b>Thanh toán</b><span>đề nghị thanh toán cho tài xế</span></div>
+    </div>
+  </div>
+  <div class="roles">
+    <div class="r"><b>Hành chính tổng hợp</b>Lập lệnh, in, điều xe, cập nhật trạng thái. Khi xe về nhập hành trình, km, từng khoản chi kèm hoá đơn, ghi tạm ứng, lập đề nghị thanh toán.</div>
+    <div class="r"><b>Trạm cân</b>Khi cân xuất trên app cân chọn đúng lệnh điều động. Khối lượng thật tự ghi về lệnh và đơn hàng bán.</div>
+    <div class="r"><b>Kế toán</b>Soát khoản chi và chứng từ, bấm Duyệt và khoá, duyệt đề nghị thanh toán, đánh dấu đã chi.</div>
+    <div class="r"><b>Ban Giám đốc</b>Xem sổ chi phí theo tài xế, theo xe, theo loại chi; ký duyệt khi cần.</div>
+  </div>
+  <p class="sm muted">Vào được menu Vận tải: Ban Giám đốc, Hành chính tổng hợp, QC, Logistics và admin. Duyệt và chi trên đề nghị thanh toán chỉ kế toán, Ban Giám đốc, admin.</p>
+
+  <h2 id="s2">2 · Danh sách lệnh điều động</h2>
+  <div class="desk"><img src="van-tai/01-danh-sach-lenh.jpeg" alt="Danh sách lệnh điều động"><div class="cap">Vận tải → Lệnh điều động</div></div>
+  <ul class="tight">
+    <li>Ô tìm theo mã lệnh, biển số, tài xế, khách. Thanh chọn trạng thái để lọc.</li>
+    <li>Cột: Mã lệnh (LDD-năm tháng-số thứ tự), Ngày, Loại chuyến, Xe / Tài xế, Khách / Điểm đến, số Cont hay Pallet, KL kế hoạch, Trạng thái.</li>
+    <li>Chạm một dòng để mở chi tiết. Nút <span class="btn">Tạo lệnh điều động</span> ở góc phải.</li>
+  </ul>
+  <div class="card">
+    <b>Trạng thái lệnh</b>
+    <div class="status" style="margin-top:8px">
+      <span class="tag grey">Nháp</span><span class="arrow">→</span>
+      <span class="tag blue">Đã điều xe</span><span class="arrow">→</span>
+      <span class="tag gold">Đang đi</span><span class="arrow">→</span>
+      <span class="tag green">Hoàn tất</span>
+      <span class="muted sm" style="margin-left:8px">(<span class="tag red">Đã huỷ</span> ở bất kỳ bước nào; lệnh huỷ có thể trả về Nháp)</span>
+    </div>
+    <div class="note warn sm" style="margin-top:10px">Lệnh <b>Hoàn tất</b> hoặc <b>Đã huỷ</b> không còn hiện trên app cân. Nếu trạm cân báo "không thấy lệnh", kiểm tra trạng thái trước.</div>
+  </div>
+
+  <h2 id="s3">3 · Tạo lệnh điều động</h2>
+  <div class="desk"><img src="van-tai/02-tao-lenh.jpeg" alt="Form tạo lệnh điều động"><div class="cap">Lệnh điều động → Tạo lệnh điều động</div></div>
+  <div class="two">
+    <div>
+      <ol class="steps">
+        <li><b>Ngày điều động</b> và <b>Loại chuyến</b>: Xuất hàng đi cảng, Hàng thương mại, Đi lấy mủ, Đi Lào, Nội bộ, Khác. Loại chuyến quyết định bảng hàng bên dưới là container hay dòng tự do.</li>
+        <li><b>Phương tiện và tài xế</b>: chọn Đầu kéo, máy tự điền tài xế mặc định của xe đó. Chọn Rơ-moóc theo chuyến (moóc đổi liên tục nên không gắn cứng). Xe thuê ngoài thì bật thuê ngoài, gõ nhà xe, tên tài xế, số điện thoại, cước thuê.</li>
+        <li><b>Thông tin chuyến</b>: khách hàng, điểm giao hoặc cảng, điểm bốc hàng (bỏ trống là kho Huy Anh), liên hệ tại điểm bốc, căn cứ hợp đồng hoặc booking, người nhận, lý do, ghi chú.</li>
+        <li><b>Hàng trên xe</b>: bấm <span class="btn white">Tạo từ Đơn hàng bán</span> → chọn đơn → tick đúng container và seal đi chuyến này (có nút chọn cả lô). Một xe chở container của nhiều đơn, nhiều khách thì gắn thêm đơn, mỗi đơn là một thẻ. Chuyến không có container thì <span class="btn white">Thêm dòng container</span> và gõ tay.</li>
+        <li>Bấm <span class="btn">Lưu lệnh</span>. Lệnh mới ở trạng thái Nháp.</li>
+      </ol>
+    </div>
+    <div class="card" style="margin-top:0">
+      <b>Chuyến đi lấy mủ</b>
+      <p class="sm">Loại "Đi lấy mủ" có thêm ô loại mủ dự kiến, mã lô dự kiến, số pallet nhựa và sắt mang đi. App cân điền sẵn các số này khi chọn lệnh, và chi tiết lệnh hiện bảng đối chiếu bốn lần cân (hai ở Tân Lâm, hai ở Phong Điền).</p>
+      <b>Mẹo</b>
+      <ul class="tight sm">
+        <li>Đầu kéo gắn tài xế cố định ở danh mục Đội xe, nên chọn xe là xong phần tài xế.</li>
+        <li>Mỗi dòng là một container với seal riêng. Một xe hai container thì hai dòng.</li>
+        <li>Lệnh đã Hoàn tất không sửa được bảng hàng. Cần sửa thì đổi về Đã điều xe trước.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="s4">4 · Chi tiết lệnh, đổi trạng thái, in</h2>
+  <div class="desk"><img src="van-tai/03-chi-tiet-lenh.jpeg" alt="Chi tiết lệnh điều động"><div class="cap">Chi tiết lệnh LDD-2611-001: thông tin, container đã cân, khối Hành trình và chi phí chuyến</div></div>
+  <ul class="tight">
+    <li>Hàng nút trên cùng: <span class="btn white">In lệnh điều động</span>, <span class="btn white">In biên bản bàn giao</span>, <span class="btn white">Sửa</span>, <span class="btn">Đổi trạng thái</span>, thùng rác để xoá lệnh nháp. Lệnh đi cảng có thêm <span class="btn white">Đánh dấu đã cân</span> khi trạm cân không chọn lệnh được.</li>
+    <li>Bảng container: số container, seal, số kiện, KL net kế hoạch, GW, cột Cân hàng hiện "Đã cân" kèm số cân thật khi trạm cân đã cân.</li>
+    <li>Phía dưới là khối <b>Hành trình và chi phí chuyến</b> (mục 7).</li>
+  </ul>
+  <div class="desk"><img src="van-tai/07-in-lenh.jpeg" alt="Bản in lệnh điều động xe"><div class="cap">Bản in A4 Lệnh điều động xe: số lệnh, lái xe, biển số, khách, cảng, bảng container, ô bảo vệ ghi giờ và km, bốn chữ ký</div></div>
+  <p class="sm">Bản in Biên bản bàn giao vận chuyển dùng cùng số liệu, thêm cột khách hàng khi một xe chở hàng của hai khách trở lên. Bấm <span class="btn gold">In</span> ở góc phải, trình duyệt chỉ in tờ phiếu.</p>
+
+  <h2 id="s5">5 · Nối với trạm cân và đơn hàng bán</h2>
+  <div class="card">
+    <ol class="steps">
+      <li>Lập lệnh và đổi sang <b>Đã điều xe</b>. Lệnh xuất hiện trong ô "Lệnh điều động" của app cân Phong Điền khi cân xuất.</li>
+      <li>Trạm cân chọn lệnh, không chọn từng container. Một lệnh là một xe, cân xong lần hai thì khối lượng chia về các dòng theo kế hoạch, seal thật ghi về lệnh, phiếu cân gắn vào lệnh.</li>
+      <li>Đơn hàng bán tự cập nhật giao hàng theo container đã cân. Sổ lô và công nợ dùng ngày điều động làm mốc.</li>
+      <li>Xe giao xong, đổi lệnh sang <b>Hoàn tất</b>.</li>
+    </ol>
+    <div class="note info sm">Xe hai container mà trạm cân làm hai phiếu nối nhau thì chỉ gắn được một phiếu vào lệnh. Trường hợp này khối lượng từng dòng có thể lệch, cần đối chiếu tay. Việc sửa app cân để xử lý đúng hai phiếu đang để sau.</div>
+  </div>
+
+  <h2 id="s6">6 · Đội xe và tài xế</h2>
+  <div class="desk"><img src="van-tai/08-doi-xe.jpeg" alt="Danh mục đội xe"><div class="cap">Vận tải → Đội xe: đầu kéo, rơ-moóc, xe khác</div></div>
+  <ul class="tight">
+    <li>Mỗi xe có biển số, loại (đầu kéo, rơ-moóc, xe khác), mã nội bộ, nhãn hiệu, trọng tải, số khung, số máy, hạn đăng kiểm, hạn phù hiệu, cửa khẩu, tài xế mặc định.</li>
+    <li>Xe sắp hết hạn đăng kiểm hoặc phù hiệu được tô màu để nhắc gia hạn.</li>
+    <li><span class="btn">Thêm xe</span> để khai xe mới; sửa bằng cách chạm dòng.</li>
+  </ul>
+  <div class="desk"><img src="van-tai/09-tai-xe.jpeg" alt="Danh mục tài xế"><div class="cap">Vận tải → Tài xế</div></div>
+  <ul class="tight">
+    <li>Họ tên, số điện thoại, CCCD, số và hạng giấy phép lái xe, ngày sinh, địa chỉ, trạng thái đang làm việc. Các thông tin này in lên lệnh điều động.</li>
+    <li>Tài xế nghỉ thì tắt "Đang làm việc", không xoá, để lệnh cũ vẫn còn tên.</li>
+  </ul>
+
+  <h2 id="s7">7 · Chi phí chuyến trên lệnh <small>khối "Hành trình và chi phí chuyến" trong chi tiết lệnh</small></h2>
+  <p>Xe về, Hành chính tổng hợp mở lệnh rồi nhập ba thứ: hành trình và km, từng khoản chi theo phiếu tài xế nộp, tạm ứng đã đưa. Kế toán xem xong bấm duyệt và khoá.</p>
+  <div class="desk"><img src="van-tai/17-khoi-chi-phi.jpeg" alt="Khối Hành trình và chi phí chuyến với ba nút nhập"><div class="cap">Ba nút nhập: <b>Nhập ngày về &amp; km</b> (tô vàng khi chuyến chưa có ngày về), <b>Thêm một khoản</b> (một khoản kèm ảnh), <b>Nhập nhanh cả phiếu</b> (chép cả phiếu tài xế một lần — đường chính).</div></div>
+  <h3>Nhập ngày về và km</h3>
+  <div class="desk"><img src="van-tai/05-sua-hanh-trinh.jpeg" alt="Hộp Hành trình và km của chuyến"></div>
+  <ul class="tight">
+    <li>Khi chuyến chưa có ngày về, nút đổi thành <span class="btn gold">Nhập ngày về &amp; km</span> tô vàng để nhắc — thiếu nó thì không tính được km và số ngày. Nhập xong nút trở lại <b>Sửa hành trình</b>.</li>
+    <li>Chọn hành trình trong danh mục, máy tự điền số ngày chuẩn; chuyến lạ thì gõ tay.</li>
+    <li>Ngày về, km đồng hồ lúc đi, km đồng hồ lúc về. Máy tính tổng ngày = về − đi + 1, km chuyến = về − đi, vượt = tổng ngày − số ngày chuẩn.</li>
+  </ul>
+  <h3>Nhập nhanh cả phiếu <small>đường chính khi tài xế nộp một tờ phiếu chi</small></h3>
+  <div class="desk"><img src="van-tai/06-nhap-nhanh.jpeg" alt="Hộp Nhập nhanh cả phiếu với tổng tiền sống và ô đối chiếu"><div class="cap">Lưới Nhập nhanh: tổng tiền chạy theo từng dòng, ô "Tổng trên phiếu" báo khớp hay lệch.</div></div>
+  <ol class="steps">
+    <li>Lưới mở sẵn các loại chi thường gặp (dầu, phí đường, ăn ở, gửi xe). Gõ xong một dòng, máy tự mở dòng trống kế tiếp như bảng tính; thiếu loại nào bấm <span class="btn white">Thêm dòng</span>.</li>
+    <li><b>Nội dung</b> gõ tay hoặc bấm chọn trong gợi ý theo loại chi.</li>
+    <li><b>Ngày chi chung</b> ở trên áp cho cả phiếu, mặc định lấy ngày về; không phải gõ từng dòng.</li>
+    <li><b>Số tiền</b>, <b>đồng tiền</b> VND hoặc LAK mỗi dòng. Có dòng LAK thì nhập một tỷ giá chung.</li>
+    <li>Công tắc <b>Tính</b>: bật là được tính; tắt là chưa thông qua, dòng hiện thêm ô ghi vì sao.</li>
+    <li><b>Tổng tiền sống</b> dưới lưới cộng ngay khi gõ. Gõ <b>Tổng trên phiếu</b> (số cuối trên tờ phiếu tài xế) để đối chiếu: máy báo <span class="pill">khớp</span> hoặc lệch bao nhiêu, dư hay thiếu — bắt lỗi chép sai tại chỗ.</li>
+    <li>Nút lưu hiện luôn tổng: <span class="btn gold">Lưu 4 khoản · 3.540.000 ₫</span>. Chứng từ tải thêm ở bảng sau khi lưu.</li>
+  </ol>
+  <h3>Thêm một khoản <small>một khoản kèm ảnh hoá đơn</small></h3>
+  <div class="desk"><img src="van-tai/04-them-khoan-chi.jpeg" alt="Hộp Thêm một khoản"><div class="cap">Dùng khi chỉ có một khoản hoặc cần đính ảnh ngay. Công tắc đang tắt (chờ duyệt) nên hiện thêm ô "Vì sao chưa thông qua".</div></div>
+  <ol class="steps">
+    <li><b>Loại chi</b> và <b>Ngày chi</b> (mặc định ngày điều động). <b>Nội dung</b> ngắn gọn, ví dụ "Petrolimex Phong Điền 95 lít".</li>
+    <li><b>Số tiền</b> và <b>đồng tiền</b> VND hoặc LAK. Chọn LAK thì nhập tỷ giá 1 LAK bằng bao nhiêu đồng, máy điền sẵn tỷ giá gần nhất và tự quy đổi.</li>
+    <li><b>Khoản chi theo quy định (được tính)</b>: bật khi nằm trong danh mục chi phí công ty đã quy định, máy tính vào chuyến và vào đề nghị thanh toán. Tắt khi <b>chưa được thông qua</b> (ngoài quy định, chưa có quyết định): ghi vì sao, khoản nằm ở cột "Chưa thông qua" chờ Ban Giám đốc hoặc kế toán quyết, đồng ý thì bật lại. Tắt <b>không</b> có nghĩa là tài xế phải chịu.</li>
+    <li><b>Ảnh hoá đơn</b>: kéo thả hoặc chọn nhiều ảnh, nhận cả PDF, ảnh tự nén. Không bắt buộc nhưng sổ sẽ đếm khoản thiếu chứng từ.</li>
+    <li><span class="btn">Lưu</span> hoặc <span class="btn white">Lưu và thêm tiếp</span> để nhập khoản kế.</li>
+  </ol>
+  <h3>Bảng khoản chi, tạm ứng gắn chuyến, duyệt và khoá</h3>
+  <ul class="tight">
+    <li>Mỗi khoản một dòng: loại, nội dung, ngày, số tiền (LAK hiện kèm số quy đổi), công tắc Được tính (tắt là chưa thông qua, chờ quyết định), ảnh chứng từ (chạm xem to, nút tải thêm), người nhập. Khoản được tính mà chưa có ảnh gắn nhãn "thiếu CT".</li>
+    <li>Cước thuê xe ngoài đã khai trên lệnh hiện thành một dòng màu tím, không nhập lại.</li>
+    <li>Bốn ô tổng: <b>Tổng chi chuyến</b> (được tính + chưa thông qua, quy đổi VNĐ), Chi được tính, Chưa thông qua, Chứng từ đủ hay thiếu.</li>
+    <li><span class="btn white">Gắn tạm ứng</span>: ghi tạm ứng đã đưa cho tài xế trước chuyến. Dòng dưới hiện còn lại sau chuyến.</li>
+    <li><span class="btn gold">Kế toán duyệt và khoá</span>: sau khi khoá không sửa hay xoá khoản chi và chứng từ được nữa. Muốn sửa bấm <span class="btn white">Mở lại</span>.</li>
+  </ul>
+  <div class="note warn sm">Chuyến đã gom vào đề nghị thanh toán cũng bị khoá sửa khoản chi. Muốn sửa phải bỏ chuyến khỏi phiếu nháp trước.</div>
+  <h2 id="s8">8 · Sổ chi phí đội xe <small>Vận tải → Sổ chi phí đội xe</small></h2>
+  <div class="desk"><img src="van-tai/10-so-chi-phi-theo-tai-xe.jpeg" alt="Sổ chi phí đội xe, tab theo tài xế"><div class="cap">Lọc tháng 11/2026, tài xế Bùi Văn Nghĩa. Bảng trên là đối soát theo tài xế, bảng dưới mỗi dòng một chuyến theo đúng bố cục form theo dõi chi phí tài xế</div></div>
+  <ul class="tight">
+    <li><b>Bộ lọc</b>: tháng, tài xế, đầu kéo. Nút tải lại, <span class="btn white">Xuất Excel</span> ra file đúng 26 cột của form, một sheet mỗi tài xế. Nút <span class="btn gold">Lập đề nghị thanh toán</span> sáng khi đã chọn tài xế.</li>
+    <li><b>Bảy ô số</b>: chuyến, chi được tính, chưa thông qua, tạm ứng, còn lại, đồng trên km, chờ xử lý.</li>
+    <li><b>Theo tài xế</b>: bảng đối soát tạm ứng − chi được tính = còn lại (dương là tài xế hoàn, âm là chi thêm), chạm tên để lọc; bảng chuyến bên dưới có ngày đi về, xe, km, hành trình, ngày chuẩn, vượt, nội dung, tạm ứng, chi được tính, chưa thông qua, trạng thái và mã đề nghị thanh toán.</li>
+  </ul>
+  <div class="two">
+    <div class="desk"><img src="van-tai/11-theo-xe.jpeg" alt="Tab theo xe"><div class="cap">Theo xe: mỗi đầu kéo một dòng, chi theo từng loại, tổng quy đổi, đồng trên km</div></div>
+    <div class="desk"><img src="van-tai/15-theo-loai-chi.jpeg" alt="Tab theo loại chi"><div class="cap">Theo loại chi: số khoản, VND, LAK, quy đổi, tỷ trọng</div></div>
+  </div>
+  <div class="desk"><img src="van-tai/16-cho-duyet.jpeg" alt="Tab chờ duyệt"><div class="cap">Chờ duyệt: chuyến đã có khoản chi nhưng kế toán chưa khoá, nút Mở lệnh để duyệt</div></div>
+
+  <h2 id="s9">9 · Tạm ứng tài xế</h2>
+  <div class="desk"><img src="van-tai/12-chi-tam-ung.jpeg" alt="Hộp Chi tạm ứng cho tài xế"><div class="cap">Tab Tạm ứng → Chi tạm ứng</div></div>
+  <ul class="tight">
+    <li>Chọn tài xế, ngày chi, số tiền, VND hoặc LAK (LAK cần tỷ giá để sau này khấu trừ), gắn chuyến nếu biết, người chi tiền, ghi chú. Mã phiếu TU-năm tháng-số tự sinh.</li>
+    <li>Tab Tạm ứng liệt kê phiếu trong tháng, cột Đối soát cho biết phiếu đã vào đề nghị thanh toán chưa. Phiếu chưa đối soát mới xoá được.</li>
+    <li>Số dư từng tài xế xem ở tab Theo tài xế. Tạm ứng chưa đối soát được mang sang kỳ sau cho đến khi khấu trừ.</li>
+  </ul>
+
+  <h2 id="s10">10 · Đề nghị thanh toán chi phí xe</h2>
+  <p>Cùng mẫu và cùng luồng với đề nghị thanh toán mủ. Một phiếu là một tài xế trong một kỳ: các chuyến có chi phí thành dòng cộng, tạm ứng chưa đối soát thành dòng trừ, tổng là số thực chi cho tài xế.</p>
+  <div class="desk"><img src="van-tai/13-lap-de-nghi-thanh-toan.jpeg" alt="Hộp Lập đề nghị thanh toán"><div class="cap">Lập đề nghị thanh toán: tick chuyến và tạm ứng, ba ô số tính ngay chi được tính, trừ tạm ứng, thực chi</div></div>
+  <ol class="steps">
+    <li>Ở Sổ chi phí chọn tháng và tài xế → bấm <span class="btn gold">Lập đề nghị thanh toán</span>.</li>
+    <li>Tick các chuyến có chi phí chưa gom và các tạm ứng chưa đối soát (gồm cả phiếu kỳ trước). Bỏ tick phiếu tạm ứng nào muốn giữ sang kỳ sau. Chọn ngày phiếu, hình thức nhận tiền, tài khoản nếu chuyển khoản.</li>
+    <li>Bấm <span class="btn">Tạo phiếu nháp</span>. Máy sinh mã TTDX-năm tháng-số và mở trang chi tiết phiếu.</li>
+    <li>Ở trang phiếu: sửa thông tin, thêm khoản tay, bỏ dòng (chuyến hay tạm ứng được nhả ra), xem ba ô tổng. Xong bấm <span class="btn gold">Gửi duyệt</span>.</li>
+    <li>Kế toán hoặc Ban Giám đốc bấm <span class="btn blue">Duyệt</span>: chi phí các chuyến trong phiếu bị khoá. Chi tiền xong bấm <span class="btn ok">Đánh dấu đã chi</span>.</li>
+    <li>Cần sửa thì <span class="btn white">Trả về nháp</span>. Lập nhầm thì <span class="btn red">Huỷ</span>, chuyến và tạm ứng được nhả để gom phiếu khác.</li>
+    <li><span class="btn white">In phiếu</span>: tờ A4 "Đề nghị thanh toán" như bên mủ, có kính gửi, người đề nghị, lý do, ô tick hình thức nhận tiền, bảng STT, nội dung, ĐVT, SL, đơn giá, thành tiền, ghi chú, số tiền bằng chữ, ba chữ ký.</li>
+  </ol>
+  <div class="desk"><img src="van-tai/14-tab-de-nghi-thanh-toan.jpeg" alt="Tab Đề nghị thanh toán"><div class="cap">Tab Đề nghị thanh toán liệt kê phiếu trong kỳ: số phiếu, ngày, tài xế, chi được tính, trừ tạm ứng, thực chi, trạng thái</div></div>
+  <div class="card">
+    <b>Trạng thái phiếu</b>
+    <div class="status" style="margin-top:8px">
+      <span class="tag grey">Nháp</span><span class="arrow">→</span>
+      <span class="tag gold">Đã gửi</span><span class="arrow">→</span>
+      <span class="tag blue">Đã duyệt</span><span class="arrow">→</span>
+      <span class="tag green">Đã chi</span>
+      <span class="muted sm" style="margin-left:8px">(<span class="tag red">Đã huỷ</span> từ Nháp, Đã gửi hoặc Đã duyệt)</span>
+    </div>
+    <ul class="tight sm" style="margin-top:8px">
+      <li>Dòng chuyến là phần tài xế được thanh toán, quy đổi VND, <b>không gồm cước thuê xe ngoài</b> (tiền đó trả cho nhà xe).</li>
+      <li>Tạm ứng lớn hơn chi phí thì phiếu ghi "Tài xế nộp lại"; muốn giữ tạm ứng cho kỳ sau, bỏ bớt dòng tạm ứng.</li>
+      <li>Mỗi chuyến, mỗi tạm ứng chỉ nằm trong một phiếu còn hiệu lực.</li>
+    </ul>
+  </div>
+
+  <h2 id="s11">11 · Quy ước nhanh và lỗi thường gặp</h2>
+  <div class="card">
+    <ul class="tight">
+      <li>Một lệnh = một xe = một chuyến. Một xe chở container của nhiều đơn, nhiều khách vẫn một lệnh.</li>
+      <li>Km đi và km về là số đồng hồ. Tổng ngày = về − đi + 1. Vượt = tổng ngày − số ngày chuẩn, chỉ để theo dõi, chưa tính tiền.</li>
+      <li>LAK ghi theo đồng tiền gốc, mỗi khoản có tỷ giá riêng. Sổ tách cột LAK và VND như form, ô tổng có số quy đổi.</li>
+      <li>Chứng từ không bắt buộc nhưng sổ đếm khoản được tính thiếu chứng từ để kế toán soát.</li>
+      <li><b>Được tính</b> = khoản chi trong danh mục quy định. <b>Chưa thông qua</b> = ngoài quy định hoặc chưa có quyết định, chờ Ban Giám đốc hoặc kế toán; không vào đề nghị thanh toán cho tới khi bật lại. Không phải tài xế chịu.</li>
+      <li>Cước thuê xe ngoài khai một lần trên lệnh, không nhập vào khoản chi, không vào đề nghị thanh toán của tài xế.</li>
+      <li>Tạm ứng là sổ riêng, chưa nối quỹ tiền mặt. Lương chuyến chưa tính trong hệ thống.</li>
+    </ul>
+  </div>
+  <table>
+    <thead><tr><th style="width:38%">Tình huống</th><th>Làm gì</th></tr></thead>
+    <tbody>
+      <tr><td>App cân không thấy lệnh</td><td>Lệnh đang Hoàn tất, Đã huỷ hoặc còn Nháp. Đổi về Đã điều xe.</td></tr>
+      <tr><td>Nút "Lập đề nghị thanh toán" mờ</td><td>Chưa chọn tài xế ở bộ lọc. Chọn tài xế rồi bấm lại.</td></tr>
+      <tr><td>"Không có chuyến có chi phí hay tạm ứng nào chưa gom"</td><td>Chuyến trong kỳ chưa có khoản chi, hoặc đã nằm trong phiếu khác. Xem cột trạng thái ở tab Theo tài xế.</td></tr>
+      <tr><td>"Lệnh đã duyệt chi phí (khoá)"</td><td>Kế toán đã khoá. Bấm Mở lại trên lệnh, hoặc nếu chuyến đang trong đề nghị thanh toán thì bỏ chuyến khỏi phiếu nháp.</td></tr>
+      <tr><td>Tài xế có khoản chi lạ, chưa biết công ty có chấp nhận không</td><td>Vẫn nhập, tắt Được tính và ghi vì sao. Khoản hiện ở cột Chưa thông qua, không vào đề nghị thanh toán. Khi có quyết định đồng ý, bật lại Được tính.</td></tr>
+      <tr><td>"Khoản chi bằng LAK cần tỷ giá"</td><td>Nhập ô 1 LAK bằng bao nhiêu đồng. Tạm ứng LAK cũng cần tỷ giá mới khấu trừ được.</td></tr>
+      <tr><td>Nút Duyệt hoặc Đánh dấu đã chi mờ</td><td>Chỉ kế toán, Ban Giám đốc, admin bấm được.</td></tr>
+      <tr><td>Khoản chi thuộc chuyến xe thuê ngoài</td><td>Nhập như thường, nhưng tiền trả cho nhà xe đi luồng riêng, không lập đề nghị thanh toán tài xế.</td></tr>
+    </tbody>
+  </table>
+
+  <footer>Tài liệu nội bộ Cao su Huy Anh · Huy Anh ERP · Ảnh chụp từ hệ thống thật ngày 10/11/2026 (số liệu chi phí tháng 11 chưa nhập nên các ô số đang bằng 0).</footer>
+</div>
+</body>
+</html>

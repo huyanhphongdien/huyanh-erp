@@ -4,6 +4,7 @@
 // ============================================================================
 import { supabase } from '../../lib/supabase'
 import dayjs from 'dayjs'
+import { FIN_LIGHT } from './finLight'
 
 export type InterestFreq = 'monthly' | 'quarterly' | 'yearly' | 'end'
 export type PeriodStatus = 'pending' | 'paid'
@@ -41,7 +42,7 @@ export const IALERT_LABEL: Record<InterestAlert, string> = {
   overdue: 'QUÁ HẠN', due: 'Đến hạn', soon: 'Sắp đến', ok: 'Còn hạn', paid: 'Đã trả',
 }
 export const IALERT_COLOR: Record<InterestAlert, string> = {
-  overdue: '#dc2626', due: '#ea580c', soon: '#ca8a04', ok: '#16a34a', paid: '#9ca3af',
+  overdue: FIN_LIGHT.overdue, due: FIN_LIGHT.due, soon: FIN_LIGHT.soon, ok: FIN_LIGHT.ok, paid: FIN_LIGHT.closed,
 }
 
 const WARN_DUE = 7  // sắp đến hạn ≤7 ngày

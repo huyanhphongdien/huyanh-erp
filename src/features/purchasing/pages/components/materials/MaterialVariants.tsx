@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Package, AlertTriangle, Boxes, Loader2 } from 'lucide-react'
-import { 
-  materialVariantService, 
+import { App as AntdApp } from 'antd'
+import {
+  materialVariantService,
   variantAttributeService,
   MaterialVariant,
   VariantAttribute,
   VariantAttributeValue
 } from '../../../../../services/materialVariantService'
 import VariantForm from './VariantForm'
-
-// Helper function - format currency
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value)
-}
+import PageState from '../../../../../components/common/PageState'
+import { fmtVnd as formatCurrency, fmtDate, fmtNum } from '../../../../../utils/format'
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong'
+// formatCurrency = fmtVnd (utils/format) — bản Intl tự viết cũ đã xoá
 
 interface MaterialVariantsProps {
   materialId: string
@@ -29,9 +29,12 @@ const MaterialVariants: React.FC<MaterialVariantsProps> = ({
   canEdit = true,
   onVariantsChange
 }) => {
+  const { message, modal } = AntdApp.useApp()
   const [variants, setVariants] = useState<MaterialVariant[]>([])
   const [attributes, setAttributes] = useState<(VariantAttribute & { values: VariantAttributeValue[] })[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải — trước đây nuốt im rồi hiện "Chưa có biến thể nào" (trống GIẢ)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingVariant, setEditingVariant] = useState<MaterialVariant | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -43,6 +46,7 @@ const MaterialVariants: React.FC<MaterialVariantsProps> = ({
   const loadData = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const [variantsData, attributesData] = await Promise.all([
         materialVariantService.getByMaterial(materialId),
         variantAttributeService.getWithValues(true)
@@ -51,24 +55,33 @@ const MaterialVariants: React.FC<MaterialVariantsProps> = ({
       setAttributes(attributesData)
     } catch (error) {
       console.error('Error loading variants:', error)
+      setLoadError(error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Bạn có chắc muốn xóa biến thể này?')) return
-    try {
-      setDeletingId(id)
-      await materialVariantService.delete(id)
-      await loadData()
-      onVariantsChange?.()
-    } catch (error) {
-      console.error('Error deleting variant:', error)
-      alert('Không thể xóa biến thể')
-    } finally {
-      setDeletingId(null)
-    }
+  const handleDelete = (variant: MaterialVariant) => {
+    modal.confirm({
+      title: `Xóa biến thể "${variant.variant_name}"?`,
+      content: 'Biến thể sẽ chuyển sang "Ngừng kinh doanh" và không dùng được cho đơn mới.',
+      okText: 'Xóa biến thể',
+      okButtonProps: { danger: true },
+      cancelText: 'Không',
+      onOk: async () => {
+        try {
+          setDeletingId(variant.id)
+          await materialVariantService.delete(variant.id)
+          await loadData()
+          onVariantsChange?.()
+        } catch (error) {
+          console.error('Error deleting variant:', error)
+          message.error(dichLoiHeThong(error, 'Không thể xóa biến thể'))
+        } finally {
+          setDeletingId(null)
+        }
+      },
+    })
   }
 
   const handleFormSuccess = () => {
@@ -104,6 +117,11 @@ const MaterialVariants: React.FC<MaterialVariantsProps> = ({
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
       </div>
     )
+  }
+
+  // Lỗi tải xét TRƯỚC trống
+  if (loadError) {
+    return <PageState error={loadError} onRetry={loadData} />
   }
 
   return (
@@ -169,9 +187,9 @@ const MaterialVariants: React.FC<MaterialVariantsProps> = ({
                   <td className="px-4 py-3"><span className="text-sm text-gray-500 font-mono">{variant.sku || '-'}</span></td>
                   <td className="px-4 py-3 text-right">
                     <div className={`text-sm font-medium ${isLowStock(variant) ? 'text-red-600' : 'text-gray-900'}`}>
-                      {variant.stock_quantity.toLocaleString('vi-VN')} {unitSymbol}
+                      {fmtNum(variant.stock_quantity, 3)} {unitSymbol}
                     </div>
-                    <div className="text-xs text-gray-400">Tối thiểu: {variant.min_stock}</div>
+                    <div className="text-xs text-gray-400">Tối thiểu: {fmtNum(variant.min_stock, 3)}</div>
                   </td>
                   <td className="px-4 py-3 text-right">
                     {variant.reference_price ? <span className="text-sm text-gray-900">{formatCurrency(variant.reference_price)}</span> : <span className="text-sm text-gray-400">-</span>}
@@ -180,7 +198,7 @@ const MaterialVariants: React.FC<MaterialVariantsProps> = ({
                     {variant.last_purchase_price ? (
                       <div>
                         <span className="text-sm font-medium text-green-600">{formatCurrency(variant.last_purchase_price)}</span>
-                        {variant.last_purchase_date && <div className="text-xs text-gray-400">{new Date(variant.last_purchase_date).toLocaleDateString('vi-VN')}</div>}
+                        {variant.last_purchase_date && <div className="text-xs text-gray-400">{fmtDate(variant.last_purchase_date)}</div>}
                       </div>
                     ) : <span className="text-sm text-gray-400">-</span>}
                   </td>
@@ -191,7 +209,7 @@ const MaterialVariants: React.FC<MaterialVariantsProps> = ({
                         <button onClick={() => setEditingVariant(variant)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Sửa">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDelete(variant.id)} disabled={deletingId === variant.id} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50" title="Xóa">
+                        <button onClick={() => handleDelete(variant)} disabled={deletingId === variant.id} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50" title="Xóa">
                           {deletingId === variant.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                         </button>
                       </div>
@@ -205,7 +223,7 @@ const MaterialVariants: React.FC<MaterialVariantsProps> = ({
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-4">
-                <span className="text-gray-500">Tổng tồn kho: <span className="font-medium text-gray-900 ml-1">{variants.reduce((sum, v) => sum + v.stock_quantity, 0).toLocaleString('vi-VN')} {unitSymbol}</span></span>
+                <span className="text-gray-500">Tổng tồn kho: <span className="font-medium text-gray-900 ml-1">{fmtNum(variants.reduce((sum, v) => sum + v.stock_quantity, 0), 3)} {unitSymbol}</span></span>
                 {variants.some(isLowStock) && (
                   <span className="flex items-center gap-1 text-red-600">
                     <AlertTriangle className="w-4 h-4" />{variants.filter(isLowStock).length} biến thể tồn kho thấp

@@ -22,6 +22,7 @@ import dayjs from 'dayjs'
 import { shiftBookService, type ThuKho } from '../../services/wms/shiftBookService'
 import { employeeService } from '../../services/employeeService'
 import { useAuthStore } from '../../stores/authStore'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text } = Typography
 
@@ -51,7 +52,7 @@ export default function ChiDinhThuKhoModal({ open, onClose, facilityId, facility
     try {
       setDs(await shiftBookService.listThuKho(facilityId))
     } catch (e) {
-      message.error('Không đọc được danh sách thủ kho: ' + (e as Error).message)
+      message.error(dichLoiHeThong(e, 'Không đọc được danh sách thủ kho'))
     } finally {
       setLoading(false)
     }
@@ -82,10 +83,10 @@ export default function ChiDinhThuKhoModal({ open, onClose, facilityId, facility
       onChanged?.()
     } catch (e) {
       // RLS từ chối thì lỗi Postgres khá khó hiểu — dịch sang câu người đọc được.
-      const msg = (e as Error).message
+      const msg = (e as Error)?.message || ''
       message.error(/row-level security|permission/i.test(msg)
         ? 'Chỉ Ban Giám đốc mới chỉ định được thủ kho.'
-        : 'Không chỉ định được: ' + msg)
+        : dichLoiHeThong(e, 'Không chỉ định được'))
     } finally {
       setSaving(false)
     }
@@ -98,10 +99,10 @@ export default function ChiDinhThuKhoModal({ open, onClose, facilityId, facility
       await nap()
       onChanged?.()
     } catch (e) {
-      const msg = (e as Error).message
+      const msg = (e as Error)?.message || ''
       message.error(/row-level security|permission/i.test(msg)
         ? 'Chỉ Ban Giám đốc mới thu quyền được.'
-        : 'Không thu quyền được: ' + msg)
+        : dichLoiHeThong(e, 'Không thu quyền được'))
     }
   }
 

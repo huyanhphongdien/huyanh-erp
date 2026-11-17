@@ -6,12 +6,14 @@
 import { useState, useEffect } from 'react'
 import { Card, Table, Button, Form, Input, InputNumber, Modal, Select, Typography,
   Space, Tag, message, Alert, Popconfirm } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, DollarOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
+import { PlusOutlined, HistoryOutlined, DeleteOutlined, DollarOutlined } from '@ant-design/icons'
 import {
   listCurrentAll, listPriceHistory, setNewPrice, deletePrice,
   type DailyPrice,
 } from '../../../services/b2b/dailyPriceListService'
+import { fmtDateTime, vndInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
 
 const { Title, Text } = Typography
 
@@ -21,22 +23,30 @@ const RUBBER_TYPES = [
   { value: 'mu_cao_su', label: 'Mủ cao su' },
 ]
 
+/** Mã loại mủ → tên tiếng Việt (cột + tiêu đề modal từng in mã máy 'mu_tap') */
+const rubberLabel = (code: string) => RUBBER_TYPES.find(rt => rt.value === code)?.label || code
+
 export default function DailyPriceListPage() {
   const [current, setCurrent] = useState<DailyPrice[]>([])
   const [loading, setLoading] = useState(false)
+  // Lỗi tải ≠ bảng trống: trước đây lỗi chỉ toast rồi cảnh báo "Chưa có giá hôm nay" giả
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [historyModalOpen, setHistoryModalOpen] = useState(false)
   const [historyProduct, setHistoryProduct] = useState<string>('')
   const [history, setHistory] = useState<DailyPrice[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [form] = Form.useForm()
 
   const load = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const all = await listCurrentAll()
       setCurrent(all)
     } catch (e: any) {
-      message.error(e.message || 'Load failed')
+      setLoadError(e)
+      message.error(dichLoiHeThong(e, 'Không tải được bảng giá'))
     } finally {
       setLoading(false)
     }
@@ -57,29 +67,44 @@ export default function DailyPriceListPage() {
         base_price_per_kg: values.base_price_per_kg,
         notes: values.notes,
       })
-      message.success('Đã set giá mới (giá cũ tự close)')
+      message.success('Đã chốt giá mới — giá cũ tự hết hiệu lực')
       setModalOpen(false)
       load()
     } catch (e: any) {
-      message.error(e.message || 'Failed')
+      // Lỗi kiểm tra form → antd đã tô đỏ ô, không bắn thêm toast
+      if (e?.errorFields) return
+      message.error(dichLoiHeThong(e, 'Lưu giá thất bại'))
     }
   }
 
   const showHistory = async (productCode: string) => {
     setHistoryProduct(productCode)
+    setHistory([])
     setHistoryModalOpen(true)
-    const h = await listPriceHistory(productCode)
-    setHistory(h)
+    setHistoryLoading(true)
+    try {
+      const h = await listPriceHistory(productCode)
+      setHistory(h)
+    } catch (e) {
+      message.error(dichLoiHeThong(e, 'Không tải được lịch sử giá'))
+    } finally {
+      setHistoryLoading(false)
+    }
   }
 
+  // Bọc try/catch — trước đây xoá lỗi là im lặng (promise reject không ai bắt, không báo gì)
   const handleDelete = async (id: string) => {
-    await deletePrice(id)
-    message.success('Đã xoá')
-    load()
+    try {
+      await deletePrice(id)
+      message.success('Đã xoá')
+      load()
+    } catch (e) {
+      message.error(dichLoiHeThong(e, 'Xoá giá thất bại'))
+    }
   }
 
-  // Check products chưa có giá hôm nay
-  const productsNoPrice = RUBBER_TYPES.filter(
+  // Check products chưa có giá hôm nay (chỉ khi tải THÀNH CÔNG — lỗi tải không được báo "chưa có giá")
+  const productsNoPrice = loadError ? [] : RUBBER_TYPES.filter(
     rt => !current.find(c => c.product_code === rt.value)
   )
 
@@ -87,10 +112,10 @@ export default function DailyPriceListPage() {
     {
       title: 'Loại mủ',
       dataIndex: 'product_code',
-      render: (v: string) => <Tag color="blue">{v}</Tag>,
+      render: (v: string) => <Tag color="blue">{rubberLabel(v)}</Tag>,
     },
     {
-      title: 'Giá nền (VNĐ/kg)',
+      title: 'Giá nền (₫/kg)',
       dataIndex: 'base_price_per_kg',
       render: (v: number) => <strong>{v.toLocaleString('vi-VN')}</strong>,
       align: 'right' as const,
@@ -98,7 +123,7 @@ export default function DailyPriceListPage() {
     {
       title: 'Hiệu lực từ',
       dataIndex: 'effective_from',
-      render: (v: string) => dayjs(v).format('DD/MM/YYYY HH:mm'),
+      render: (v: string) => fmtDateTime(v),
     },
     {
       title: 'Ghi chú',
@@ -109,10 +134,17 @@ export default function DailyPriceListPage() {
       title: 'Thao tác',
       render: (_: any, row: DailyPrice) => (
         <Space>
-          <Button size="small" icon={<EditOutlined />} onClick={() => showHistory(row.product_code)}>
+          <Button size="small" icon={<HistoryOutlined />} onClick={() => showHistory(row.product_code)}>
             Lịch sử
           </Button>
-          <Popconfirm title="Xoá?" onConfirm={() => handleDelete(row.id)}>
+          <Popconfirm
+            title="Xoá giá này?"
+            description="Giá bị xoá sẽ không còn áp cho phiếu cân mới."
+            okText="Xoá"
+            cancelText="Không"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDelete(row.id)}
+          >
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -122,10 +154,9 @@ export default function DailyPriceListPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <Title level={3}><DollarOutlined /> Bảng giá ngày (Daily Price List)</Title>
+      <Title level={3}><DollarOutlined /> Bảng giá ngày</Title>
       <Text type="secondary">
-        Admin set giá ngày cho flow walk-in (hộ nông dân) + outright. Giá cũ tự close khi set mới.
-        tstzrange EXCLUDE chống overlap ở DB.
+        Giá áp cho phiếu cân mủ lẻ và mua đứt. Nhập giá mới thì giá cũ tự hết hiệu lực.
       </Text>
 
       {productsNoPrice.length > 0 && (
@@ -138,34 +169,36 @@ export default function DailyPriceListPage() {
         title="Giá hiện hành"
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={openModal}>
-            Set giá mới
+            Nhập giá mới
           </Button>
         }>
-        <Table
-          loading={loading}
-          dataSource={current}
-          columns={columns}
-          rowKey="id"
-          pagination={false}
-        />
+        <PageState error={!loading && loadError} onRetry={load}>
+          <Table
+            loading={loading}
+            dataSource={current}
+            columns={columns}
+            rowKey="id"
+            pagination={false}
+          />
+        </PageState>
       </Card>
 
       <Modal
         open={modalOpen}
-        title="Set giá mới (tự close giá cũ)"
+        title="Nhập giá mới (giá cũ tự hết hiệu lực)"
         onOk={handleSubmit}
         onCancel={() => setModalOpen(false)}
         okText="Lưu"
+        cancelText="Huỷ"
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="product_code" label="Loại sản phẩm" rules={[{ required: true }]}>
+          <Form.Item name="product_code" label="Loại sản phẩm" rules={[{ required: true, message: 'Chọn loại sản phẩm' }]}>
             <Select options={RUBBER_TYPES} placeholder="Chọn" />
           </Form.Item>
-          <Form.Item name="base_price_per_kg" label="Giá nền VNĐ/kg"
-            rules={[{ required: true, type: 'number', min: 1 }]}>
+          <Form.Item name="base_price_per_kg" label="Giá nền ₫/kg"
+            rules={[{ required: true, type: 'number', min: 1, message: 'Nhập giá nền lớn hơn 0' }]}>
             <InputNumber<number> min={0} step={1000}
-              formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={v => Number(String(v).replace(/\D/g, '')) || 0}
+              {...vndInputProps}
               style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="notes" label="Ghi chú">
@@ -176,17 +209,17 @@ export default function DailyPriceListPage() {
 
       <Modal
         open={historyModalOpen}
-        title={`Lịch sử giá — ${historyProduct}`}
+        title={`Lịch sử giá — ${rubberLabel(historyProduct)}`}
         onCancel={() => setHistoryModalOpen(false)}
         footer={null}
         width={700}
       >
-        <Table size="small" dataSource={history} rowKey="id" pagination={false}
+        <Table size="small" dataSource={history} rowKey="id" pagination={false} loading={historyLoading}
           columns={[
-            { title: 'Từ', dataIndex: 'effective_from', render: v => dayjs(v).format('DD/MM HH:mm') },
-            { title: 'Đến', dataIndex: 'effective_to', render: v => v ? dayjs(v).format('DD/MM HH:mm') : <Tag>Hiện hành</Tag> },
-            { title: 'Giá', dataIndex: 'base_price_per_kg', render: v => v.toLocaleString('vi-VN'), align: 'right' as const },
-            { title: 'Notes', dataIndex: 'notes', ellipsis: true },
+            { title: 'Từ', dataIndex: 'effective_from', render: v => fmtDateTime(v) },
+            { title: 'Đến', dataIndex: 'effective_to', render: v => v ? fmtDateTime(v) : <Tag>Hiện hành</Tag> },
+            { title: 'Giá (₫/kg)', dataIndex: 'base_price_per_kg', render: v => v.toLocaleString('vi-VN'), align: 'right' as const },
+            { title: 'Ghi chú', dataIndex: 'notes', ellipsis: true },
           ]} />
       </Modal>
     </div>

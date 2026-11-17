@@ -38,6 +38,14 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { supabase } from '../../../../../lib/supabase';
+import {
+  INVOICE_PAYMENT_STATUS_LABELS,
+  PAYMENT_METHOD_LABELS,
+  isInvoiceOverdue,
+  invoiceDaysOverdue,
+} from '../../../../../services/invoicePaymentService';
+import { fmtVnd as fmt, fmtDate } from '../../../../../utils/format';
+import PageState from '../../../../../components/common/PageState';
 
 // ============================================================================
 // TYPES
@@ -100,28 +108,12 @@ interface OrderInvoiceTabProps {
 // HELPERS
 // ============================================================================
 
-const fmt = (amount: number): string =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(amount);
+// fmt = fmtVnd · fmtDate: utils/format (bản tự viết cũ đã xoá)
 
-const fmtDate = (d: string): string => {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-};
+// Quá hạn theo NGÀY LỊCH — dùng chung invoicePaymentService (trước đây hạn hôm nay đã "Quá hạn 1d" từ 7h sáng)
+const isOverdue = (dueDate?: string, status?: string): boolean => isInvoiceOverdue(dueDate, status);
 
-const fmtDateTime = (d: string): string => {
-  if (!d) return '—';
-  return new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-};
-
-const isOverdue = (dueDate?: string, status?: string): boolean => {
-  if (!dueDate || status === 'paid') return false;
-  return new Date(dueDate) < new Date();
-};
-
-const getDaysOverdue = (dueDate: string): number => {
-  const diff = new Date().getTime() - new Date(dueDate).getTime();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-};
+const getDaysOverdue = (dueDate: string): number => invoiceDaysOverdue(dueDate);
 
 const pct = (paid: number, total: number): number =>
   total > 0 ? Math.round((paid / total) * 100) : 0;
@@ -130,10 +122,12 @@ const pct = (paid: number, total: number): number =>
 // STATUS CONFIG
 // ============================================================================
 
+// Nhãn từ invoicePaymentService (MỘT nguồn — trước đây 'Chưa TT'/'TT một phần'/'Đã TT đủ'); giữ lớp Tailwind + icon.
+// Màu theo luật dòng tiền: chưa trả vàng · một phần cam · đủ xanh lá (đỏ chỉ cho quá hạn)
 const PAYMENT_STATUS: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  unpaid: { label: 'Chưa TT', color: 'text-red-700', bg: 'bg-red-50 border-red-200', icon: AlertTriangle },
-  partial: { label: 'TT một phần', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', icon: Clock },
-  paid: { label: 'Đã TT đủ', color: 'text-green-700', bg: 'bg-green-50 border-green-200', icon: CheckCircle },
+  unpaid: { label: INVOICE_PAYMENT_STATUS_LABELS.unpaid, color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', icon: AlertTriangle },
+  partial: { label: INVOICE_PAYMENT_STATUS_LABELS.partial, color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', icon: Clock },
+  paid: { label: INVOICE_PAYMENT_STATUS_LABELS.paid, color: 'text-green-700', bg: 'bg-green-50 border-green-200', icon: CheckCircle },
 };
 
 // ============================================================================
@@ -151,6 +145,8 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  // Lỗi tải — trước đây nuốt im rồi hiện "Chưa có hóa đơn nào" (trống GIẢ)
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
 
   // --------------------------------------------------------------------------
@@ -159,9 +155,10 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
   const fetchData = useCallback(async () => {
     if (!orderId) return;
     setLoading(true);
+    setLoadError(null);
     try {
       // Fetch invoices
-      const { data: invData } = await supabase
+      const { data: invData, error: invErr } = await supabase
         .from('supplier_invoices')
         .select(`
           *,
@@ -169,6 +166,7 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
         `)
         .eq('order_id', orderId)
         .order('created_at', { ascending: false });
+      if (invErr) throw invErr;
 
       const normalizedInvoices = (invData || []).map((inv: any) => ({
         ...inv,
@@ -179,11 +177,12 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
       // Fetch all payments for these invoices
       if (normalizedInvoices.length > 0) {
         const invoiceIds = normalizedInvoices.map((inv: any) => inv.id);
-        const { data: payData } = await supabase
+        const { data: payData, error: payErr } = await supabase
           .from('invoice_payments')
           .select('*')
           .in('invoice_id', invoiceIds)
           .order('payment_date', { ascending: false });
+        if (payErr) throw payErr;
 
         setPayments(payData || []);
       } else {
@@ -191,6 +190,7 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
       }
     } catch (err) {
       console.error('Error loading invoices:', err);
+      setLoadError(err);
     } finally {
       setLoading(false);
     }
@@ -255,6 +255,13 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
   }
 
   // --------------------------------------------------------------------------
+  // RENDER: LỖI TẢI (xét TRƯỚC trống)
+  // --------------------------------------------------------------------------
+  if (loadError) {
+    return <PageState error={loadError} onRetry={fetchData} />;
+  }
+
+  // --------------------------------------------------------------------------
   // RENDER: EMPTY
   // --------------------------------------------------------------------------
   if (invoices.length === 0) {
@@ -308,13 +315,13 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
           </div>
         </div>
 
-        {/* Tổng tiền HĐ */}
+        {/* Tổng tiền hóa đơn */}
         <div className="bg-white border border-gray-200 rounded-xl p-3.5">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center">
               <DollarSign className="w-4 h-4 text-indigo-600" />
             </div>
-            <span className="text-xs text-gray-500 font-medium">Tổng tiền HĐ</span>
+            <span className="text-xs text-gray-500 font-medium">Tổng tiền hóa đơn</span>
           </div>
           <p className="text-lg font-bold text-gray-900">{fmt(summary.totalInvoiceAmount)}</p>
         </div>
@@ -328,7 +335,7 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
             <span className="text-xs text-gray-500 font-medium">Đã thanh toán</span>
           </div>
           <p className="text-lg font-bold text-green-600">{fmt(summary.totalPaid)}</p>
-          <p className="text-[10px] text-gray-400 mt-0.5">{payPercent}% tổng HĐ</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">{payPercent}% tổng hóa đơn</p>
         </div>
 
         {/* Còn nợ */}
@@ -348,7 +355,7 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
           </p>
           {summary.overdueCount > 0 && (
             <p className="text-[10px] text-red-500 mt-0.5 font-medium">
-              ⚠ {summary.overdueCount} HĐ quá hạn
+              ⚠ {summary.overdueCount} hóa đơn quá hạn
             </p>
           )}
         </div>
@@ -373,14 +380,14 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
           />
         </div>
         <div className="flex justify-between mt-1.5 text-[10px] text-gray-400">
-          <span>Đã TT: {fmt(summary.totalPaid)}</span>
+          <span>Đã trả: {fmt(summary.totalPaid)}</span>
           <span>Còn lại: {fmt(summary.totalRemaining)}</span>
         </div>
-        {/* Status breakdown */}
+        {/* Status breakdown — nhãn từ map chung của service */}
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
-          <StatusChip count={summary.paidCount} label="Đã TT đủ" color="green" />
-          <StatusChip count={summary.partialCount} label="TT một phần" color="amber" />
-          <StatusChip count={summary.unpaidCount} label="Chưa TT" color="red" />
+          <StatusChip count={summary.paidCount} label={INVOICE_PAYMENT_STATUS_LABELS.paid.toLowerCase()} color="green" />
+          <StatusChip count={summary.partialCount} label={INVOICE_PAYMENT_STATUS_LABELS.partial.toLowerCase()} color="orange" />
+          <StatusChip count={summary.unpaidCount} label={INVOICE_PAYMENT_STATUS_LABELS.unpaid.toLowerCase()} color="amber" />
         </div>
       </div>
 
@@ -397,7 +404,7 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Thêm HĐ
+            Thêm hóa đơn
           </button>
         )}
       </div>
@@ -438,7 +445,7 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
                       </span>
                       {overdue && (
                         <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-100 border border-red-300 text-red-700">
-                          Quá hạn {daysOver}d
+                          Quá hạn {daysOver} ngày
                         </span>
                       )}
                     </div>
@@ -483,7 +490,7 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
                             </div>
                           )}
                         </div>
-                        <span className="text-[10px] text-gray-400">{images.length} ảnh HĐ gốc</span>
+                        <span className="text-[10px] text-gray-400">{images.length} ảnh hóa đơn gốc</span>
                       </div>
                     )}
                   </div>
@@ -491,7 +498,7 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
                   {/* Right: Amount + actions */}
                   <div className="text-right flex-shrink-0">
                     <p className="text-sm font-bold text-gray-900">{fmt(inv.total_amount)}</p>
-                    <p className="text-[10px] text-green-600 mt-0.5">Đã TT: {fmt(inv.paid_amount)}</p>
+                    <p className="text-[10px] text-green-600 mt-0.5">Đã trả: {fmt(inv.paid_amount)}</p>
                     {inv.remaining_amount > 0 && (
                       <p className="text-[10px] text-amber-600">Nợ: {fmt(inv.remaining_amount)}</p>
                     )}
@@ -544,7 +551,7 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
                       className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg transition-colors ml-auto"
                     >
                       {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                      {invPayments.length} lần TT
+                      {invPayments.length} lần thanh toán
                     </button>
                   )}
                 </div>
@@ -574,7 +581,7 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                             pay.payment_method === 'bank_transfer' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'
                           }`}>
-                            {pay.payment_method === 'bank_transfer' ? 'CK' : 'TM'}
+                            {PAYMENT_METHOD_LABELS[pay.payment_method] || pay.payment_method}
                           </span>
                           {pay.payment_code && (
                             <span className="text-[10px] font-mono text-gray-400">{pay.payment_code}</span>
@@ -616,7 +623,7 @@ const OrderInvoiceTab: React.FC<OrderInvoiceTabProps> = ({
 // STATUS CHIP HELPER
 // ============================================================================
 
-const StatusChip: React.FC<{ count: number; label: string; color: 'green' | 'amber' | 'red' }> = ({
+const StatusChip: React.FC<{ count: number; label: string; color: 'green' | 'amber' | 'orange' | 'red' }> = ({
   count,
   label,
   color,
@@ -625,11 +632,13 @@ const StatusChip: React.FC<{ count: number; label: string; color: 'green' | 'amb
   const colors = {
     green: 'bg-green-50 text-green-700',
     amber: 'bg-amber-50 text-amber-700',
+    orange: 'bg-orange-50 text-orange-700',
     red: 'bg-red-50 text-red-700',
   };
+  const dots = { green: 'bg-green-500', amber: 'bg-amber-500', orange: 'bg-orange-500', red: 'bg-red-500' };
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${colors[color]}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${color === 'green' ? 'bg-green-500' : color === 'amber' ? 'bg-amber-500' : 'bg-red-500'}`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${dots[color]}`} />
       {count} {label}
     </span>
   );

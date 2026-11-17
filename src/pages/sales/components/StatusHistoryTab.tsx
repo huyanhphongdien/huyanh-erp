@@ -6,9 +6,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Timeline, Empty, Spin, Tag } from 'antd'
 import { HistoryOutlined, UserOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import { ORDER_STATUS_LABELS, type SalesOrderStatus, type SalesOrderStatusLog } from '../../../services/sales/salesTypes'
+import { fmtDateTime } from '../../../utils/format'
+import PageState from '../../../components/common/PageState'
 
 const statusLabel = (s?: string | null) =>
   s ? (ORDER_STATUS_LABELS[s as SalesOrderStatus] || s) : '—'
@@ -16,15 +17,19 @@ const statusLabel = (s?: string | null) =>
 export default function StatusHistoryTab({ orderId }: { orderId: string }) {
   const [rows, setRows] = useState<SalesOrderStatusLog[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có lịch sử" (trước đây catch {} nuốt lỗi)
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { setRows(await salesOrderService.getStatusLog(orderId)) } catch { /* ignore */ }
+    setLoadError(null)
+    try { setRows(await salesOrderService.getStatusLog(orderId)) } catch (e) { setLoadError(e || true) }
     setLoading(false)
   }, [orderId])
   useEffect(() => { load() }, [load])
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}><Spin /></div>
+  if (loadError) return <PageState error={loadError} onRetry={load} />
   if (rows.length === 0) {
     return <Empty description="Chưa có lịch sử đổi trạng thái (chỉ ghi từ khi bật tính năng)" style={{ padding: 40 }} />
   }
@@ -50,7 +55,7 @@ export default function StatusHistoryTab({ orderId }: { orderId: string }) {
               </div>
               {r.reason && <div style={{ fontSize: 12, color: '#92400E', marginTop: 2 }}>📝 {r.reason}</div>}
               <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
-                {dayjs(r.created_at).format('HH:mm · DD/MM/YYYY')}
+                {fmtDateTime(r.created_at)}
               </div>
             </div>
           ),

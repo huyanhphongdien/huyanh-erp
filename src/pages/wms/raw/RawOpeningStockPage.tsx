@@ -19,11 +19,11 @@ import { rawStockService, type OpeningStagingRow } from '../../../services/wms/r
 import { RAW_RUBBER_TYPES, RAW_RUBBER_TYPE_LABELS, RAW_RUBBER_TYPE_GROUP, RAW_RUBBER_TYPE_DEFAULT_DRC, type RawRubberType } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { fmtKg, fmtPct, fmtDate, fmtDateShort } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { stdPagination } from '../../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
-
-const fmtKg = (n: number | null | undefined, digits = 0) =>
-  n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: digits, minimumFractionDigits: digits })
 
 interface FormValues {
   facility_code: string
@@ -54,7 +54,7 @@ export default function RawOpeningStockPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try { setRows(await rawStockService.getOpeningStaging()) }
-    catch (e: any) { setError(e?.message || 'Không tải được bảng tồn đầu') }
+    catch (e: any) { setError(dichLoiHeThong(e, 'Không tải được bảng tồn đầu')) }
     finally { setLoading(false) }
   }, [])
 
@@ -91,7 +91,7 @@ export default function RawOpeningStockPage() {
       form.resetFields(['batch_code', 'wet_kg', 'drc_pct', 'supplier_name', 'ticket_code', 'note'])
       await load()
     } catch (e: any) {
-      message.error(e?.message || 'Không thêm được')
+      message.error(dichLoiHeThong(e, 'Không thêm được'))
     } finally { setSaving(false) }
   }
 
@@ -100,7 +100,7 @@ export default function RawOpeningStockPage() {
       title: `Xóa dòng ${r.batch_code}?`, okText: 'Xóa', okButtonProps: { danger: true }, cancelText: 'Hủy',
       onOk: async () => {
         try { await rawStockService.deleteOpeningRow(r.id); message.success('Đã xóa'); await load() }
-        catch (e: any) { message.error(e?.message || 'Không xóa được') }
+        catch (e: any) { message.error(dichLoiHeThong(e, 'Không xóa được')) }
       },
     })
   }
@@ -122,7 +122,7 @@ export default function RawOpeningStockPage() {
           const res = await rawStockService.moSoTonDau(facilityCode)
           message.success(`Đã ghi ${res.so_lo} lô · ${fmtKg(res.kho_kg)} kg khô vào sổ`)
           await load()
-        } catch (e: any) { message.error(e?.message || 'Ghi sổ thất bại') }
+        } catch (e: any) { message.error(dichLoiHeThong(e, 'Ghi sổ thất bại')) }
       },
     })
   }
@@ -131,11 +131,11 @@ export default function RawOpeningStockPage() {
     { title: 'Mã lô', dataIndex: 'batch_code', key: 'batch_code', render: (v, r) => r.batch_id ? <a onClick={() => navigate(`/wms/nvl/lo/${r.batch_id}`)}><Text code>{v}</Text></a> : <Text code>{v}</Text> },
     { title: 'Loại hàng', dataIndex: 'ma_chuan', key: 'ma_chuan', render: (v: RawRubberType, r) => RAW_RUBBER_TYPE_LABELS[v] ?? r.rubber_type },
     { title: 'Ướt (kg)', dataIndex: 'wet_kg', key: 'wet_kg', align: 'right', render: (v) => fmtKg(v) },
-    { title: 'DRC', dataIndex: 'drc_pct', key: 'drc_pct', align: 'right', render: (v, r) => v === null ? <Text type="danger">—</Text> : <span>{v.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} %{r.drc_estimated && <Tag color="gold" style={{ marginLeft: 6 }}>ước</Tag>}</span> },
+    { title: 'DRC', dataIndex: 'drc_pct', key: 'drc_pct', align: 'right', render: (v, r) => v === null ? <Text type="danger">—</Text> : <span>{fmtPct(v)}{r.drc_estimated && <Tag color="gold" style={{ marginLeft: 6 }}>ước</Tag>}</span> },
     { title: 'Khô (kg)', dataIndex: 'dry_kg', key: 'dry_kg', align: 'right', render: (v) => <Text strong>{fmtKg(v)}</Text> },
-    { title: 'Ngày nhập gốc', dataIndex: 'intake_date', key: 'intake_date', render: (v) => v ? dayjs(v).format('DD/MM/YYYY') : <Text type="secondary">ngày ghi sổ</Text> },
+    { title: 'Ngày nhập gốc', dataIndex: 'intake_date', key: 'intake_date', render: (v) => v ? fmtDate(v) : <Text type="secondary">ngày ghi sổ</Text> },
     { title: 'Trạng thái', key: 'tt', render: (_, r) => r.processed_at
-      ? <Tag color="green" icon={<CheckCircleOutlined />}>Đã ghi sổ {dayjs(r.processed_at).format('DD/MM')}</Tag>
+      ? <Tag color="green" icon={<CheckCircleOutlined />}>Đã ghi sổ {fmtDateShort(r.processed_at)}</Tag>
       : r.loi.length ? <Space direction="vertical" size={0}>{r.loi.map((l, i) => <Tag key={i} color="red">{l}</Tag>)}</Space>
       : <Tag color="blue">Chờ ghi sổ</Tag> },
     { title: '', key: 'x', width: 48, render: (_, r) => !r.processed_at && canWrite ? <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(r)} /> : null },
@@ -202,7 +202,7 @@ export default function RawOpeningStockPage() {
         </Card>
 
         <Card size="small" title={<Space>Đã ghi sổ<Tag color="green">{done.length}</Tag></Space>}>
-          <Table<OpeningStagingRow> rowKey="id" columns={columns} dataSource={done} size="small" pagination={{ pageSize: 20 }} loading={loading}
+          <Table<OpeningStagingRow> rowKey="id" columns={columns} dataSource={done} size="small" pagination={stdPagination(20)} loading={loading}
             locale={{ emptyText: 'Chưa ghi sổ đợt nào' }} />
         </Card>
       </Space>

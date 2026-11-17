@@ -1007,7 +1007,8 @@ export const shiftAssignmentService = {
     unassigned_days: number
   }> {
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-    const endDate = new Date(year, month, 0).toISOString().split('T')[0]
+    // Ngày cuối tháng theo LỊCH — toISOString (UTC) lùi về ngày hôm trước → sót ngày cuối tháng
+    const endDate = fmtDateLocal(new Date(year, month, 0))
 
     const { data, error } = await supabase
       .from('shift_assignments')

@@ -49,6 +49,9 @@ import { defaultBalesPerContainer } from '../../services/sales/baleMath'
 import type { ContainerSummary } from '../../services/sales/containerService'
 import { dispatchService, type DeliveryState } from '../../services/logistics/dispatchService'
 import { LOT_STAGES, buildLotTrackRows, lotDeliveryStats } from '../../services/sales/lotTracking'
+import { fmtNum } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
 import type {
   SalesOrder,
   SalesOrderContainer,
@@ -69,10 +72,11 @@ const { Title, Text } = Typography
 // HELPERS
 // ============================================================================
 
-const formatNumber = (v: number | null | undefined): string => {
-  if (v == null) return '-'
-  return v.toLocaleString('vi-VN')
-}
+/** Số kg / bành — fmtNum (utils/format), giữ tối đa 3 số lẻ như bản cũ, null → '—'. */
+const formatNumber = (v: number | null | undefined): string => fmtNum(v, 3)
+
+/** Cont CHƯA niêm phong — gõ seal cho các cont này thì chuyển luôn sang 'sealed' (cùng luật QuickFillDrawer). */
+const PRE_SEAL_STATUSES: ContainerStatus[] = ['planning', 'packing', 'packed']
 
 
 // ============================================================================
@@ -89,6 +93,7 @@ function ContainerPackingPage() {
   const [summary, setSummary] = useState<ContainerSummary | null>(null)
   const [deliveryMap, setDeliveryMap] = useState<Record<string, DeliveryState>>({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
   // Modals
@@ -125,6 +130,7 @@ function ContainerPackingPage() {
     if (!orderId) return
     try {
       setLoading(true)
+      setLoadError(null)
       const [o, c, s] = await Promise.all([
         salesOrderService.getById(orderId),
         containerService.getContainers(orderId),
@@ -137,8 +143,10 @@ function ContainerPackingPage() {
       try { setDeliveryMap(await dispatchService.getDeliveryStatus(c.map((x) => x.id))) }
       catch { /* best-effort */ }
     } catch (err) {
+      // Lỗi tải ≠ "Không tìm thấy đơn hàng" — khối lỗi + Thử lại (nạp lại hỏng thì toast: đang xem bản cũ)
       console.error(err)
-      message.error('Không thể tải dữ liệu đóng gói')
+      setLoadError(err)
+      message.error(dichLoiHeThong(err, 'Không thể tải dữ liệu đóng gói'))
     } finally {
       setLoading(false)
     }
@@ -171,7 +179,7 @@ function ContainerPackingPage() {
       message.success('Đã tạo container tự động')
       loadData()
     } catch (err: any) {
-      message.error(err?.message || 'Không thể tạo container tự động')
+      message.error(dichLoiHeThong(err, 'Không thể tạo container tự động'))
     } finally {
       setActionLoading(false)
     }
@@ -185,7 +193,7 @@ function ContainerPackingPage() {
       message.success('Đã phân bổ bành tự động vào các container')
       loadData()
     } catch (err: any) {
-      message.error(err?.message || 'Không thể phân bổ bành tự động')
+      message.error(dichLoiHeThong(err, 'Không thể phân bổ bành tự động'))
     } finally {
       setActionLoading(false)
     }
@@ -202,7 +210,7 @@ function ContainerPackingPage() {
       loadData()
     } catch (err: any) {
       if (err?.errorFields) return
-      message.error(err?.message || 'Không thể thêm container')
+      message.error(dichLoiHeThong(err, 'Không thể thêm container'))
     }
   }
 
@@ -213,7 +221,7 @@ function ContainerPackingPage() {
       message.success('Đã xóa container')
       loadData()
     } catch (err: any) {
-      message.error(err?.message || 'Không thể xóa container')
+      message.error(dichLoiHeThong(err, 'Không thể xóa container'))
     } finally {
       setActionLoading(false)
     }
@@ -231,7 +239,7 @@ function ContainerPackingPage() {
       loadData()
     } catch (err: any) {
       if (err?.errorFields) return
-      message.error(err?.message || 'Không thể niêm phong container')
+      message.error(dichLoiHeThong(err, 'Không thể niêm phong container'))
     }
   }
 
@@ -279,7 +287,7 @@ function ContainerPackingPage() {
       loadData()
     } catch (err: any) {
       if (err?.errorFields) return
-      message.error(err?.message || 'Không thể thêm bành')
+      message.error(dichLoiHeThong(err, 'Không thể thêm bành'))
     }
   }
 
@@ -303,7 +311,7 @@ function ContainerPackingPage() {
         }
       }
     } catch (e: any) {
-      message.error('Lỗi lưu lô: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi lưu lô'))
     }
   }
 
@@ -321,7 +329,7 @@ function ContainerPackingPage() {
       loadData()
     } catch (err: any) {
       if (err?.errorFields) return
-      message.error(err?.message || 'Không thể gán lô')
+      message.error(dichLoiHeThong(err, 'Không thể gán lô'))
     }
   }
 
@@ -349,7 +357,7 @@ function ContainerPackingPage() {
       loadData()
     } catch (err: any) {
       if (err?.errorFields) return
-      message.error(err?.message || 'Không thể tạo theo lô')
+      message.error(dichLoiHeThong(err, 'Không thể tạo theo lô'))
     }
   }
 
@@ -359,7 +367,7 @@ function ContainerPackingPage() {
       message.success('Đã xóa bành khỏi container')
       loadData()
     } catch (err: any) {
-      message.error(err?.message || 'Không thể xóa bành')
+      message.error(dichLoiHeThong(err, 'Không thể xóa bành'))
     }
   }
 
@@ -371,6 +379,14 @@ function ContainerPackingPage() {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
         <Spin size="large" />
+      </div>
+    )
+  }
+
+  if (loadError && !order) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState error={loadError} onRetry={loadData} />
       </div>
     )
   }
@@ -430,10 +446,10 @@ function ContainerPackingPage() {
       render: (v) => formatNumber(v),
     },
     {
-      title: 'Cấp mủ',
+      title: 'Loại hàng',
       dataIndex: 'grade',
       key: 'grade',
-      render: (v) => v ? <Tag color="blue">{v}</Tag> : '-',
+      render: (v) => v ? <Tag color="blue">{v}</Tag> : '—',
     },
     {
       title: 'DRC (%)',
@@ -589,10 +605,35 @@ function ContainerPackingPage() {
   // Lưu 1 field container ra DB (số cont/seal/bành/KL). Cập nhật cục bộ onChange, lưu onBlur.
   const persistField = async (id: string, patch: Record<string, any>) => {
     try { await containerService.updateContainer(id, patch as any) }
-    catch (e: any) { message.error('Lỗi lưu: ' + (e?.message || e)) }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi lưu container')) }
   }
   const patchLocal = (id: string, patch: Record<string, any>) =>
     setContainers((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)))
+
+  // MỘT đường seal (audit 17/11/2026): gõ seal ở bảng Chia lô cho cont CHƯA niêm phong → sealContainer
+  // (status 'sealed' + sealed_at) y như nút "Seal container"; xoá seal của cont đang 'sealed' → trả về
+  // 'packed'. Trước đây chỉ ghi cột seal_no → thẻ "Đã seal x/y", Tag trạng thái và cột khoá/xoá nói ngược
+  // số vừa gõ. Không đụng định nghĩa "đã giao" (DELIVERED_CONTAINER_STATUSES = shipped/delivered).
+  const persistSeal = async (r: SalesOrderContainer, raw: string) => {
+    const seal = raw.trim()
+    try {
+      if (seal && PRE_SEAL_STATUSES.includes(r.status)) {
+        await containerService.sealContainer(r.id, seal)
+        patchLocal(r.id, { seal_no: seal, status: 'sealed' })
+      } else if (!seal && r.status === 'sealed') {
+        await containerService.updateContainer(r.id, { seal_no: null } as any)
+        await containerService.updateStatus(r.id, 'packed')
+        patchLocal(r.id, { seal_no: null, status: 'packed' })
+      } else {
+        await containerService.updateContainer(r.id, { seal_no: seal || null } as any)
+        return
+      }
+      // Trạng thái vừa đổi → làm mới thẻ "Đã seal x/y" (không nạp lại cả trang)
+      if (orderId) containerService.getContainerSummary(orderId).then(setSummary).catch(() => {})
+    } catch (e: any) {
+      message.error(dichLoiHeThong(e, 'Lỗi lưu số seal'))
+    }
+  }
 
   const lotColumns: ColumnsType<SalesOrderContainer> = [
     { title: '#', key: 'idx', width: 40, render: (_: unknown, __: unknown, i: number) => <Text strong>#{i + 1}</Text> },
@@ -613,7 +654,7 @@ function ContainerPackingPage() {
       render: (_: unknown, r) => (
         <Input size="small" value={r.seal_no ?? ''} placeholder="(chưa có)"
           onChange={(e) => patchLocal(r.id, { seal_no: e.target.value })}
-          onBlur={(e) => persistField(r.id, { seal_no: e.target.value.trim() || null })} />
+          onBlur={(e) => persistSeal(r, e.target.value)} />
       ),
     },
     {
@@ -800,7 +841,7 @@ function ContainerPackingPage() {
           </Col>
           <Col xs={12} sm={4}>
             <Statistic
-              title="Cấp mủ"
+              title="Loại hàng (Grade)"
               value={gradeLabel}
               valueStyle={{ fontSize: 14, color: '#1890ff' }}
             />

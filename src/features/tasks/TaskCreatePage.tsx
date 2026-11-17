@@ -19,6 +19,8 @@ import { TaskForm, type TaskFormData } from './components/TaskForm';
 import { isExecutive, isManagerLevel, isEmployeeLevel } from './utils/taskPermissions';
 import { taskTemplateService, TaskTemplate, TEMPLATE_CATEGORIES } from '../../services/taskTemplateService';
 import { taskChecklistService } from '../../services/taskChecklistService';
+import { addDaysStr, todayVN } from '../../utils/dateVN';
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -118,7 +120,11 @@ export const TaskCreatePage: React.FC = () => {
             .eq('status', 'active')
             .order('name');
           
-          if (deptError) console.warn('Departments query error:', deptError);
+          if (deptError) {
+            console.warn('Departments query error:', deptError);
+            // Đừng để ô Phòng ban trống như thật — báo lỗi tải
+            setError(dichLoiHeThong(deptError, 'Không tải được danh sách phòng ban — tải lại trang để thử lại'));
+          }
           setDepartments(deptData || []);
         } else if (isUserManager && user?.department_id) {
           const { data: deptData, error: deptError } = await supabase
@@ -150,7 +156,11 @@ export const TaskCreatePage: React.FC = () => {
             .eq('status', 'active')
             .order('full_name');
 
-          if (empError) console.warn('Employees query error:', empError);
+          if (empError) {
+            console.warn('Employees query error:', empError);
+            // Lỗi tải ≠ "Không có nhân viên trong phòng ban này"
+            setError(dichLoiHeThong(empError, 'Không tải được danh sách nhân viên — tải lại trang để thử lại'));
+          }
           setEmployees((empData || []).filter(e => !VIP_EMAILS.includes(e.email?.toLowerCase())));
         } else if (isUserManager && user?.department_id) {
           const { data: empData, error: empError } = await supabase
@@ -160,7 +170,10 @@ export const TaskCreatePage: React.FC = () => {
             .eq('status', 'active')
             .order('full_name');
 
-          if (empError) console.warn('Employees query error:', empError);
+          if (empError) {
+            console.warn('Employees query error:', empError);
+            setError(dichLoiHeThong(empError, 'Không tải được danh sách nhân viên — tải lại trang để thử lại'));
+          }
           setEmployees((empData || []).filter(e => !VIP_EMAILS.includes(e.email?.toLowerCase())));
         } else {
           setEmployees([]);
@@ -195,8 +208,8 @@ export const TaskCreatePage: React.FC = () => {
       base.description = selectedTemplate.description || '';
       base.priority = selectedTemplate.default_priority || 'medium';
       if (selectedTemplate.default_duration_days) {
-        const due = new Date(Date.now() + selectedTemplate.default_duration_days * 86400000);
-        base.due_date = due.toISOString().split('T')[0];
+        // Hạn = hôm nay (giờ VN) + N ngày — toISOString() cũ ra ngày UTC, lệch −1 ngày trước 7h sáng
+        base.due_date = addDaysStr(todayVN(), selectedTemplate.default_duration_days);
       }
       if (selectedTemplate.department_id && !base.department_id) {
         base.department_id = selectedTemplate.department_id;
@@ -218,6 +231,8 @@ export const TaskCreatePage: React.FC = () => {
         name: formData.name,
         description: formData.description || null,
         priority: formData.priority || 'medium',
+        // Độ khó chọn trên form trước đây bị bỏ rơi ở đây → mọi việc mới đều "Bình thường" (hệ số ×1)
+        difficulty: formData.difficulty || 'normal',
         start_date: formData.start_date || null,
         due_date: formData.due_date || null,
         notes: formData.notes || null,
@@ -253,7 +268,7 @@ export const TaskCreatePage: React.FC = () => {
 
       if (insertError) {
         console.error('❌ Create error:', insertError);
-        throw new Error(insertError.message);
+        throw insertError;
       }
 
       // Create checklist items if any
@@ -273,7 +288,7 @@ export const TaskCreatePage: React.FC = () => {
 
     } catch (err: any) {
       console.error('❌ Error creating task:', err);
-      setError(err.message || 'Có lỗi xảy ra khi tạo công việc');
+      setError(dichLoiHeThong(err, 'Có lỗi xảy ra khi tạo công việc'));
     } finally {
       setIsSubmitting(false);
     }

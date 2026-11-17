@@ -35,6 +35,10 @@ import stockOutService from '../../../services/wms/stockOutService'
 import type { PickingStatus } from '../../../services/wms/wms.types'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import type { RubberGrade } from '../../../services/wms/wms.types'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtDate, fmtKg, fmtNum } from '../../../utils/format'
+import { STOCK_OUT_REASON_LABELS, PICKING_STATUS_LABELS, PICKING_STATUS_COLORS } from './stockOutLabels'
+import { BATCH_QC_STATUS_LABELS, BATCH_QC_STATUS_COLORS } from '../qc/qcLabels'
 
 const { Text } = Typography
 
@@ -102,28 +106,12 @@ const haptic = {
 // CONSTANTS
 // ============================================================================
 
-const REASON_LABELS = {
-  sale: 'Bán hàng',
-  production: 'Sản xuất',
-  transfer: 'Chuyển kho',
-  blend: 'Phối trộn',
-  adjust: 'Điều chỉnh',
-  return: 'Trả hàng',
-} as const
-
-const QC_TAG_CONFIG: Record<string, { color: string; label: string }> = {
-  passed: { color: 'success', label: 'Đạt' },
-  warning: { color: 'warning', label: 'Cảnh báo' },
-  failed: { color: 'error', label: 'Không đạt' },
-  pending: { color: 'default', label: 'Chờ kiểm' },
-}
-
-const PICKING_TAG_CONFIG: Record<string, { color: string; label: string }> = {
-  pending: { color: 'default', label: 'Chờ lấy' },
-  picking: { color: 'processing', label: 'Đang lấy' },
-  picked: { color: 'success', label: 'Đã lấy' },
-  skipped: { color: 'orange', label: 'Bỏ qua' },
-}
+// Một nguồn nhãn với Sổ / Chi tiết phiếu xuất (stockOutLabels) và QC lô (qcLabels)
+const REASON_LABELS = STOCK_OUT_REASON_LABELS
+const qcTag = (s: string) => ({
+  color: BATCH_QC_STATUS_COLORS[s] || 'default',
+  label: BATCH_QC_STATUS_LABELS[s] || BATCH_QC_STATUS_LABELS.pending,
+})
 
 const monoStyle: React.CSSProperties = { fontFamily: "'JetBrains Mono', monospace" }
 
@@ -153,9 +141,9 @@ const SwipeablePickingCard: React.FC<{
   // Build location string
   const locationStr = detail.location
     ? [
-        detail.location.shelf ? `Ke ${detail.location.shelf}` : null,
-        detail.location.row_name ? `Hang ${detail.location.row_name}` : null,
-        detail.location.column_name ? `O ${detail.location.column_name}` : null,
+        detail.location.shelf ? `Kệ ${detail.location.shelf}` : null,
+        detail.location.row_name ? `Hàng ${detail.location.row_name}` : null,
+        detail.location.column_name ? `Ô ${detail.location.column_name}` : null,
       ].filter(Boolean).join(' · ') || detail.location.code
     : null
 
@@ -212,7 +200,7 @@ const SwipeablePickingCard: React.FC<{
       ? 'rgba(250,140,22,0.04)'
       : '#fff'
 
-  const qcCfg = QC_TAG_CONFIG[detail.batch?.qc_status || 'pending'] || QC_TAG_CONFIG.pending
+  const qcCfg = qcTag(detail.batch?.qc_status || 'pending')
 
   return (
     <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 12, marginBottom: 12 }}>
@@ -280,8 +268,8 @@ const SwipeablePickingCard: React.FC<{
             </Text>
             <GradeBadge grade={detail.batch?.rubber_grade} size="small" />
           </Space>
-          <Tag color={PICKING_TAG_CONFIG[detail.picking_status]?.color || 'default'}>
-            {PICKING_TAG_CONFIG[detail.picking_status]?.label || 'Chờ lấy'}
+          <Tag color={PICKING_STATUS_COLORS[detail.picking_status] || 'default'}>
+            {PICKING_STATUS_LABELS[detail.picking_status] || PICKING_STATUS_LABELS.pending}
           </Tag>
         </div>
 
@@ -304,8 +292,9 @@ const SwipeablePickingCard: React.FC<{
             </Text>
           )}
           {detail.batch?.dry_weight != null && (
+            // dry_weight = khối lượng KHÔ (trước ghi "KL kho" — công nhân đọc thành "khối lượng kho")
             <Text style={{ ...monoStyle, fontSize: 12, color: isDone ? '#bfbfbf' : '#8c8c8c' }}>
-              KL kho: {detail.batch.dry_weight.toLocaleString('vi-VN')} kg
+              KL khô: {fmtKg(detail.batch.dry_weight)} kg
             </Text>
           )}
           <Tag color={qcCfg.color} style={{ fontSize: 11 }}>{qcCfg.label}</Tag>
@@ -326,7 +315,7 @@ const SwipeablePickingCard: React.FC<{
                   color: isPicked ? '#52c41a' : isSkipped ? '#fa8c16' : '#1B4D3E',
                 }}
               >
-                {detail.quantity.toLocaleString('vi-VN')}
+                {fmtNum(detail.quantity)}
               </Text>
               <Text type="secondary" style={{ marginLeft: 4 }}>
                 {detail.material?.unit || 'kg'}
@@ -335,7 +324,7 @@ const SwipeablePickingCard: React.FC<{
           </div>
           {detail.batch?.received_date && (
             <Text type="secondary" style={{ fontSize: 11 }}>
-              Nhập {new Date(detail.batch.received_date).toLocaleDateString('vi-VN')}
+              Nhập {fmtDate(detail.batch.received_date)}
             </Text>
           )}
         </div>
@@ -427,6 +416,8 @@ const PickingListPage: React.FC<PickingListPageProps> = ({ stockOutId: propStock
   const [details, setDetails] = useState<PickingDetail[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Lỗi của LẦN TẢI (khác lỗi thao tác) — để phân biệt "không tải được" với "phiếu chưa có dòng"
+  const [loadFailed, setLoadFailed] = useState(false)
   const [updating, setUpdating] = useState<string | null>(null)
   const [completing, setCompleting] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -445,6 +436,7 @@ const PickingListPage: React.FC<PickingListPageProps> = ({ stockOutId: propStock
     if (!stockOutId) return
     setLoading(true)
     setError(null)
+    setLoadFailed(false)
 
     try {
       const { data: order, error: orderErr } = await supabase
@@ -462,8 +454,9 @@ const PickingListPage: React.FC<PickingListPageProps> = ({ stockOutId: propStock
       const pickingDetails = await pickingService.getPickingDetails(stockOutId)
       setDetails(pickingDetails as unknown as PickingDetail[])
     } catch (err: any) {
-      console.error('Loi tai du lieu picking:', err)
-      setError(err.message || 'Không thể tải danh sách picking')
+      console.error('Lỗi tải phiếu lấy hàng:', err)
+      setError(dichLoiHeThong(err, 'Không thể tải phiếu lấy hàng'))
+      setLoadFailed(true)
     } finally {
       setLoading(false)
     }
@@ -512,9 +505,9 @@ const PickingListPage: React.FC<PickingListPageProps> = ({ stockOutId: propStock
         )
       )
     } catch (err: any) {
-      console.error('Loi cap nhat:', err)
+      console.error('Lỗi cập nhật dòng lấy hàng:', err)
       haptic.error()
-      setError(err.message)
+      setError(dichLoiHeThong(err, 'Không cập nhật được dòng lấy hàng'))
     } finally {
       setUpdating(null)
     }
@@ -527,19 +520,22 @@ const PickingListPage: React.FC<PickingListPageProps> = ({ stockOutId: propStock
     setError(null)
 
     try {
-      await supabase
+      // Supabase trả lỗi qua { error } chứ KHÔNG throw — trước đây bỏ qua nên RLS/mạng từ chối
+      // vẫn rung "thành công" và chuyển trang, phiếu thì vẫn ở trạng thái cũ.
+      const { error: upErr } = await supabase
         .from('stock_out_orders')
         .update({
           status: 'picked',
           updated_at: new Date().toISOString(),
         })
         .eq('id', stockOutId)
+      if (upErr) throw upErr
 
       haptic.success()
       navigate(`/wms/stock-out/${stockOutId}`)
     } catch (err: any) {
-      console.error('Loi hoan tat:', err)
-      setError(err.message)
+      console.error('Lỗi hoàn tất lấy hàng:', err)
+      setError(dichLoiHeThong(err, 'Không hoàn tất được lấy hàng'))
       haptic.error()
     } finally {
       setCompleting(false)
@@ -552,28 +548,32 @@ const PickingListPage: React.FC<PickingListPageProps> = ({ stockOutId: propStock
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
-        <Spin size="large" tip="Đang tải picking list..." />
+        <Spin size="large" tip="Đang tải phiếu lấy hàng…" />
       </div>
     )
   }
 
   // ========================================================================
-  // ERROR / EMPTY
+  // ERROR / EMPTY — lỗi tải (mạng/quyền) KHÁC phiếu chưa có dòng lấy hàng
   // ========================================================================
-  if (!orderInfo || details.length === 0) {
+  if (loadFailed || !orderInfo || details.length === 0) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
         <Result
-          status="info"
-          title={error || 'Không tìm thấy phiếu xuất hoặc chưa có dữ liệu picking'}
+          status={loadFailed ? 'error' : 'info'}
+          title={loadFailed ? 'Không tải được phiếu lấy hàng' : 'Không tìm thấy phiếu xuất hoặc phiếu chưa có dòng lấy hàng'}
+          subTitle={loadFailed ? error : undefined}
           extra={
-            <Button
-              type="primary"
-              onClick={() => navigate(-1)}
-              style={{ backgroundColor: '#2D8B6E', borderColor: '#2D8B6E' }}
-            >
-              Quay lại
-            </Button>
+            <Space>
+              {loadFailed && <Button onClick={() => loadData()}>Thử lại</Button>}
+              <Button
+                type="primary"
+                onClick={() => navigate(-1)}
+                style={{ backgroundColor: '#2D8B6E', borderColor: '#2D8B6E' }}
+              >
+                Quay lại
+              </Button>
+            </Space>
           }
         />
       </div>
@@ -639,7 +639,7 @@ const PickingListPage: React.FC<PickingListPageProps> = ({ stockOutId: propStock
             color: 'rgba(255,255,255,0.5)',
           }}>
             <span style={monoStyle}>
-              Đã lấy: {pickedQty.toLocaleString('vi-VN')} / {totalQty.toLocaleString('vi-VN')}
+              Đã lấy: {fmtNum(pickedQty)} / {fmtNum(totalQty)}
             </span>
             <span>
               {progressPercent}%
@@ -696,10 +696,10 @@ const PickingListPage: React.FC<PickingListPageProps> = ({ stockOutId: propStock
           }}>
             <CheckCircleOutlined style={{ fontSize: 32, color: '#52c41a' }} />
           </div>
-          <Text strong style={{ fontSize: 18 }}>Picking hoàn tất!</Text>
+          <Text strong style={{ fontSize: 18 }}>Lấy hàng hoàn tất!</Text>
           <div>
             <Text type="secondary">
-              Đã lấy {pickedQty.toLocaleString('vi-VN')} từ {pickedItems} lô
+              Đã lấy {fmtNum(pickedQty)} từ {pickedItems} lô
               {skippedItems > 0 && ` · ${skippedItems} lô bỏ qua`}
             </Text>
           </div>
@@ -742,7 +742,7 @@ const PickingListPage: React.FC<PickingListPageProps> = ({ stockOutId: propStock
             }}
           >
             {completing ? 'Đang xử lý...' :
-              allDone ? 'Hoàn tất Picking' :
+              allDone ? 'Hoàn tất lấy hàng' :
               `Còn ${pendingItems} lô chưa lấy`}
           </Button>
         </div>

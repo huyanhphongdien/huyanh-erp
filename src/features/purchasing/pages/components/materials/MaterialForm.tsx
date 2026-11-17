@@ -29,6 +29,8 @@ import { materialCategoryService, type MaterialCategory } from '../../../../../s
 import { materialTypeService, type MaterialType } from '../../../../../services/materialTypeService'
 import { unitService, type Unit } from '../../../../../services/unitService'
 import { supplierService, type Supplier } from '../../../../../services/supplierService'
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong'
+import { vndToInputText, vndInputToNumber } from '../../../moneyInput'
 
 interface MaterialFormProps {
   material?: Material | null
@@ -85,6 +87,8 @@ const MaterialForm: React.FC<MaterialFormProps> = ({ material, onClose, onSucces
         setSuppliers(supData)
       } catch (err) {
         console.error('Error loading dropdown data:', err)
+        // Báo ra form — trước đây nuốt im, ô Nhóm/ĐVT/NCC trống mà không ai biết vì sao
+        setError(dichLoiHeThong(err, 'Không tải được danh mục nhóm / đơn vị tính / NCC — đóng form rồi mở lại'))
       }
     }
     fetchData()
@@ -201,7 +205,7 @@ const MaterialForm: React.FC<MaterialFormProps> = ({ material, onClose, onSucces
 
       onSuccess()
     } catch (err: any) {
-      setError(err.message || 'Có lỗi xảy ra')
+      setError(dichLoiHeThong(err, 'Có lỗi xảy ra khi lưu vật tư'))
     } finally {
       setLoading(false)
     }
@@ -471,12 +475,13 @@ const MaterialForm: React.FC<MaterialFormProps> = ({ material, onClose, onSucces
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Giá mua gần nhất (VNĐ)
                   </label>
+                  {/* Ô tiền: chấm ngăn nghìn khi gõ (trước đây type=number, gõ 1500000 không phân cách) */}
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="last_purchase_price"
-                    value={formData.last_purchase_price ?? ''}
-                    onChange={handleChange}
-                    min={0}
+                    value={vndToInputText(formData.last_purchase_price)}
+                    onChange={(e) => setFormData(prev => ({ ...prev, last_purchase_price: vndInputToNumber(e.target.value) }))}
                     placeholder="0"
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     disabled={loading}
@@ -490,11 +495,11 @@ const MaterialForm: React.FC<MaterialFormProps> = ({ material, onClose, onSucces
                   Giá tham khảo (VNĐ)
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="reference_price"
-                  value={formData.reference_price ?? ''}
-                  onChange={handleChange}
-                  min={0}
+                  value={vndToInputText(formData.reference_price)}
+                  onChange={(e) => setFormData(prev => ({ ...prev, reference_price: vndInputToNumber(e.target.value) }))}
                   placeholder="0"
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   disabled={loading}

@@ -24,6 +24,7 @@ import {
   type ProductionStepLog,
 } from '../../services/production/productionStepService'
 import { downtimeService, REASON_CATEGORIES } from '../../services/production/downtimeService'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -103,7 +104,7 @@ export default function ProductionStepTrackerPage() {
       message.success('Đã bắt đầu bước')
       queryClient.invalidateQueries({ queryKey: ['production-steps', orderId] })
     },
-    onError: (e: Error) => message.error(e.message),
+    onError: (e: Error) => message.error(dichLoiHeThong(e, 'Không bắt đầu được bước')),
   })
 
   // Complete step
@@ -117,7 +118,7 @@ export default function ProductionStepTrackerPage() {
       setNotes('')
       queryClient.invalidateQueries({ queryKey: ['production-steps', orderId] })
     },
-    onError: (e: Error) => message.error(e.message),
+    onError: (e: Error) => message.error(dichLoiHeThong(e, 'Không hoàn tất được bước')),
   })
 
   // Record downtime
@@ -135,7 +136,7 @@ export default function ProductionStepTrackerPage() {
       setShowDowntimeModal(false)
       setDowntimeDetail('')
     },
-    onError: (e: Error) => message.error(e.message),
+    onError: (e: Error) => message.error(dichLoiHeThong(e, 'Không ghi được sự cố')),
   })
 
   if (isLoading) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>

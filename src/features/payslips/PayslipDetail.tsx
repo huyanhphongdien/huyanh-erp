@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { payrollService } from '../../services'
 import { Button, Card } from '../../components/ui'
+import PageState from '../../components/common/PageState'
+import { fmtVnd } from '../../utils/format'
 
 interface Props {
   payslipId: string
@@ -8,16 +10,16 @@ interface Props {
 }
 
 export function PayslipDetail({ payslipId, onClose }: Props) {
-  const { data: payslip, isLoading } = useQuery({
+  const { data: payslip, isLoading, error, refetch } = useQuery({
     queryKey: ['payslip', payslipId],
     queryFn: () => payrollService.getPayslipById(payslipId)
   })
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value)
-  }
+  const formatCurrency = fmtVnd
 
   if (isLoading) return <div className="p-4 text-center">Đang tải...</div>
+  // Lỗi tải ≠ "không tìm thấy" — xét lỗi trước
+  if (error) return <PageState error={error} onRetry={() => refetch()} />
   if (!payslip) return <div className="p-4 text-center">Không tìm thấy phiếu lương</div>
 
   return (

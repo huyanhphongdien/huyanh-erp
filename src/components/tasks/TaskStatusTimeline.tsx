@@ -4,27 +4,24 @@
 import { useState, useEffect } from 'react'
 import { taskHistoryService, type TaskStatusChange } from '../../services/taskAuditService'
 import { ChevronDown, ChevronUp, History, ArrowRight } from 'lucide-react'
+import { TASK_STATUS_LABELS } from '../../types'
+import { fmtDateTime } from '../../utils/format'
 
 // ============================================================
 // STATUS LABELS & COLORS (Vietnamese)
 // ============================================================
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Nháp',
-  in_progress: 'Đang thực hiện',
-  paused: 'Tạm dừng',
-  finished: 'Hoàn thành',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
+// Trạng thái VIỆC: MỘT nguồn TASK_STATUS_LABELS (types/index.ts) — bản chép cũ ghi "Đang thực hiện"
+// lệch "Đang làm" mọi nơi khác. Ở đây chỉ giữ mã KHÔNG phải trạng thái việc (mốc quá hạn, đánh giá).
+const EXTRA_LABELS: Record<string, string> = {
   overdue: 'Quá hạn',
-  pending_review: 'Chờ duyệt',
   pending_approval: 'Chờ phê duyệt',
   approved: 'Đã duyệt',
   rejected: 'Từ chối',
 }
 
 function getStatusLabel(status: string): string {
-  return STATUS_LABELS[status] || status
+  return TASK_STATUS_LABELS[status] || EXTRA_LABELS[status] || status
 }
 
 /**
@@ -52,20 +49,8 @@ function getBorderColor(oldStatus: string | null, newStatus: string): string {
   return 'border-gray-200'
 }
 
-function formatTimeAgo(dateString: string): string {
-  try {
-    const d = new Date(dateString)
-    return d.toLocaleString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    })
-  } catch {
-    return dateString
-  }
-}
+// Ngày-giờ chuẩn 'DD/MM HH:mm' (+/YYYY khi khác năm) của utils/format
+const formatTimeAgo = fmtDateTime
 
 // ============================================================
 // COMPONENT

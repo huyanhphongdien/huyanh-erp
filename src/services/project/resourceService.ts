@@ -135,7 +135,7 @@ export const MEMBER_ROLE_LABELS: Record<ProjectMemberRole, string> = {
   co_owner: 'Đồng quản lý',
   lead: 'Trưởng nhóm',
   member: 'Thành viên',
-  reviewer: 'Người review',
+  reviewer: 'Người kiểm duyệt',
   observer: 'Quan sát viên',
 }
 

@@ -25,8 +25,12 @@ import {
   Phone, MessageSquare, UserCheck, Loader2, Users,
   Plane, FileText, LogOut as LogOutIcon,
 } from 'lucide-react'
-import { Card, Button, Tag, message, Empty } from 'antd'
+import { Card, Button, Tag, message, Empty, Modal, Alert } from 'antd'
 import { supabase } from '../../lib/supabase'
+import PageState from '../../components/common/PageState'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate } from '../../utils/format'
+import { enumLabel } from '../../components/common/EnumTag'
 
 // ============================================================================
 // TYPES
@@ -114,6 +118,17 @@ const REFRESH_MS = 60_000  // 1 phút
 const LATE_GRACE_MIN = 15  // sau start + 15 phút mới flag missing
 const TRIP_LEAVE_TYPES = ['BUSINESS_TRIP', 'CONG_TAC']
 const LEAVE_TYPES_REGULAR = ['PHEP_NAM', 'NGHI_OM', 'KHONG_LUONG', 'THAI_SAN', 'VIEC_RIENG']
+
+/** Nhãn attendance.status (6 giá trị — attendanceEditService). Trước đây màn in thô 'present', 'late'…
+ *  ⚠ Chưa có map dùng chung ở attendanceService (vùng khác) — dời về đó khi chủ vùng cho phép. */
+const NHAN_CHAM_CONG: Record<string, string> = {
+  present: 'Đúng giờ',
+  late: 'Đi trễ',
+  early_leave: 'Về sớm',
+  late_and_early: 'Trễ + về sớm',
+  business_trip: 'Công tác',
+  leave: 'Nghỉ phép',
+}
 
 // ============================================================================
 // HELPERS
@@ -206,6 +221,10 @@ export default function CoverageDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [autoRefresh, setAutoRefresh] = useState(true)
+  // Lỗi tải: chưa từng tải được → khối lỗi + Thử lại (đừng hiện "Chưa có phân ca" giả);
+  // đã có số mà lần tự cập nhật sau lỗi → giữ số cũ + dải cảnh báo (không toast mỗi 60 giây).
+  const [loiNap, setLoiNap] = useState<unknown>(null)
+  const [daTai, setDaTai] = useState(false)
 
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
 
@@ -230,11 +249,13 @@ export default function CoverageDashboardPage() {
       const empIds = [...new Set((assignments || []).map((a: any) => a.employee_id))]
 
       // 2. Get attendance hôm nay
-      const { data: atts } = empIds.length === 0 ? { data: [] } : await supabase
+      // ⚠ PHẢI bắt lỗi: trước đây lỗi bị nuốt → atts rỗng → MỌI người thành "Vắng" + cảnh báo đỏ giả.
+      const { data: atts, error: attErr } = empIds.length === 0 ? { data: [], error: null } : await supabase
         .from('attendance')
         .select('employee_id, shift_id, status, check_in_time, check_out_time, late_minutes, early_leave_minutes')
         .eq('date', todayStr)
         .in('employee_id', empIds)
+      if (attErr) throw attErr
 
       const attMap = new Map<string, any>()
       ;(atts || []).forEach(a => {
@@ -245,7 +266,8 @@ export default function CoverageDashboardPage() {
       })
 
       // 3. Get leave_requests approved overlapping today
-      const { data: leaves } = empIds.length === 0 ? { data: [] } : await supabase
+      // ⚠ Bắt lỗi như trên: nuốt lỗi là người đang nghỉ phép / công tác bị báo "Vắng".
+      const { data: leaves, error: leaveErr } = empIds.length === 0 ? { data: [], error: null } : await supabase
         .from('leave_requests')
         .select(`
           employee_id, start_date, end_date, status, leave_type_id,
@@ -255,6 +277,7 @@ export default function CoverageDashboardPage() {
         .eq('status', 'approved')
         .lte('start_date', todayStr)
         .gte('end_date', todayStr)
+      if (leaveErr) throw leaveErr
 
       const leaveMap = new Map<string, { code: string | null; name: string | null }>()
       ;(leaves || []).forEach((l: any) => {
@@ -347,9 +370,11 @@ export default function CoverageDashboardPage() {
       setRows(flat)
       setOrphans(orphanList)
       setLastRefresh(new Date())
+      setLoiNap(null)
+      setDaTai(true)
     } catch (err: any) {
       console.error('[CoverageDashboard] fetch error:', err)
-      message.error('Lỗi tải dữ liệu: ' + (err.message || 'Unknown'))
+      setLoiNap(err)
     } finally {
       setLoading(false)
     }
@@ -521,33 +546,42 @@ export default function CoverageDashboardPage() {
     window.location.href = `sms:${phone}?body=${text}`
   }
 
-  async function handleMarkLateApproved(row: AssignmentRow) {
+  // Ghi một dòng chấm công thật (tính vào công/lương) → hỏi lại trước khi ghi, nói rõ hệ quả.
+  function handleMarkLateApproved(row: AssignmentRow) {
     const nowMin = getNowMinutes()
     const startMin = timeToMinutes(row.shift_start)
     const lateMin = Math.max(0, nowMin - startMin)
 
-    try {
-      const { error } = await supabase.from('attendance').insert({
-        employee_id: row.employee_id,
-        date: row.date,
-        shift_id: row.shift_id,
-        shift_date: row.date,
-        check_in_time: new Date().toISOString(),
-        status: 'late',
-        late_minutes: lateMin,
-        early_leave_minutes: 0,
-        working_minutes: 0,
-        overtime_minutes: 0,
-        is_gps_verified: false,
-        auto_checkout: false,
-        notes: 'Manager xác nhận xin phép trễ',
-      })
-      if (error) throw error
-      message.success(`Đã xác nhận xin phép trễ cho ${row.emp_full_name}`)
-      fetchData()
-    } catch (err: any) {
-      message.error('Lỗi: ' + err.message)
-    }
+    Modal.confirm({
+      title: `Xác nhận ${row.emp_full_name || 'nhân viên'} xin phép đi trễ?`,
+      content: `Hệ thống sẽ ghi chấm công vào ca "${row.shift_name}" ngay lúc này, trạng thái "Đi trễ" (trễ ${lateMin} phút). Dòng chấm công này tính vào công của nhân viên.`,
+      okText: 'Ghi chấm công',
+      cancelText: 'Không',
+      onOk: async () => {
+        try {
+          const { error } = await supabase.from('attendance').insert({
+            employee_id: row.employee_id,
+            date: row.date,
+            shift_id: row.shift_id,
+            shift_date: row.date,
+            check_in_time: new Date().toISOString(),
+            status: 'late',
+            late_minutes: lateMin,
+            early_leave_minutes: 0,
+            working_minutes: 0,
+            overtime_minutes: 0,
+            is_gps_verified: false,
+            auto_checkout: false,
+            notes: 'Manager xác nhận xin phép trễ',
+          })
+          if (error) throw error
+          message.success(`Đã xác nhận xin phép trễ cho ${row.emp_full_name}`)
+          fetchData()
+        } catch (err: any) {
+          message.error(dichLoiHeThong(err, 'Không ghi được chấm công'))
+        }
+      },
+    })
   }
 
   if (loading) {
@@ -563,9 +597,9 @@ export default function CoverageDashboardPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22 }}>📍 Coverage Dashboard</h2>
+          <h2 style={{ margin: 0, fontSize: 22 }}>📍 Quân số ca trực</h2>
           <p style={{ color: '#6b7280', marginTop: 4, fontSize: 13 }}>
-            Hôm nay {todayStr} — refresh mỗi 60 giây · Cập nhật {fmtTime(lastRefresh.toISOString())}
+            Hôm nay {fmtDate(todayStr)} — tự cập nhật mỗi 60 giây · Cập nhật {fmtTime(lastRefresh.toISOString())}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -574,22 +608,34 @@ export default function CoverageDashboardPage() {
             icon={<RefreshCw size={14} />}
             onClick={() => setAutoRefresh(!autoRefresh)}
           >
-            {autoRefresh ? 'Auto: ON' : 'Auto: OFF'}
+            {autoRefresh ? 'Tự cập nhật: BẬT' : 'Tự cập nhật: TẮT'}
           </Button>
           <Button icon={<RefreshCw size={14} />} onClick={fetchData}>
-            Refresh
+            Tải lại
           </Button>
         </div>
       </div>
 
+      {loiNap != null && daTai && (
+        <Alert
+          type="warning" showIcon style={{ marginBottom: 16 }}
+          message={`Lần cập nhật gần nhất bị lỗi — số liệu bên dưới là của lúc ${fmtTime(lastRefresh.toISOString())}`}
+          description={dichLoiHeThong(loiNap, 'Không tải được quân số ca')}
+        />
+      )}
+
+      {loiNap != null && !daTai ? (
+        <PageState error={dichLoiHeThong(loiNap, 'Không tải được quân số ca')} onRetry={fetchData} />
+      ) : (<>
       {/* Top metrics — 6 ô */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
         <Card><MetricCard label="Tổng phân ca" value={totalScheduled} color="#1f2937" /></Card>
-        <Card><MetricCard label="Đã CI" value={totalHandled} color="#16a34a" /></Card>
-        <Card><MetricCard label="Tỷ lệ" value={`${totalScheduled > 0 ? Math.round((totalHandled / totalScheduled) * 100) : 0}%`} color="#2563eb" /></Card>
+        {/* totalHandled = đã check-in + công tác + nghỉ phép (xem switch ở deptCoverage) — nhãn cũ "Đã CI" đếm lẫn người không check-in */}
+        <Card><MetricCard label="Đã ghi nhận" value={totalHandled} color="#16a34a" /></Card>
+        <Card><MetricCard label="Tỷ lệ ghi nhận" value={`${totalScheduled > 0 ? Math.round((totalHandled / totalScheduled) * 100) : 0}%`} color="#2563eb" /></Card>
         <Card><MetricCard label="🛫 Công tác" value={totalTrip} color="#0891b2" /></Card>
         <Card><MetricCard label="📋 Nghỉ phép" value={totalLeave} color="#7c3aed" /></Card>
-        <Card><MetricCard label="❌ Vắng/Alerts" value={totalAlertNV} color={totalAlertNV > 0 ? '#ef4444' : '#16a34a'} /></Card>
+        <Card><MetricCard label="❌ Vắng / cảnh báo" value={totalAlertNV} color={totalAlertNV > 0 ? '#ef4444' : '#16a34a'} /></Card>
       </div>
 
       {/* Departments */}
@@ -638,7 +684,7 @@ export default function CoverageDashboardPage() {
               <div key={o.employee_id} style={{ padding: 6, background: '#fef9c3', borderRadius: 4 }}>
                 <span style={{ fontWeight: 600 }}>{o.emp_code} {o.emp_full_name}</span>
                 <span style={{ color: '#6b7280', marginLeft: 8 }}>
-                  ({o.dept_name}) — CI lúc {fmtTime(o.check_in_time)} — status: {o.status}
+                  ({o.dept_name}) — CI lúc {fmtTime(o.check_in_time)} — trạng thái: {enumLabel(NHAN_CHAM_CONG, o.status)}
                 </span>
               </div>
             ))}
@@ -651,7 +697,7 @@ export default function CoverageDashboardPage() {
         <Card style={{ marginTop: 20, borderColor: '#fca5a5' }}>
           <h3 style={{ margin: 0, marginBottom: 12, color: '#dc2626', fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
             <AlertTriangle size={18} />
-            ALERTS — {allAlerts.length} NV chưa check-in sau giờ ca + {LATE_GRACE_MIN} phút
+            CẢNH BÁO — {allAlerts.length} NV chưa check-in sau giờ vào ca + {LATE_GRACE_MIN} phút
           </h3>
           <div style={{ display: 'grid', gap: 8 }}>
             {allAlerts.map(r => (
@@ -662,9 +708,10 @@ export default function CoverageDashboardPage() {
       )}
 
       <div style={{ textAlign: 'center', marginTop: 24, fontSize: 11, color: '#9ca3af' }}>
-        💡 Tip: NV đi công tác / nghỉ phép (đã được duyệt) tự động được ghi nhận, không cần action.
-        Chỉ alert khi NV scheduled mà CHƯA có check-in / phép / công tác.
+        💡 Mẹo: NV đi công tác / nghỉ phép (đã được duyệt) tự động được ghi nhận, không cần thao tác.
+        Chỉ cảnh báo khi NV có phân ca mà CHƯA có check-in / phép / công tác.
       </div>
+      </>)}
     </div>
   )
 }
@@ -726,7 +773,7 @@ function ShiftRow({
           </div>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
             {breakdown.join(' · ') || `0/${shift.scheduled}`}
-            {shift.start_time_status === 'before' && <span> · start lúc {shift.shift_start.substring(0, 5)}</span>}
+            {shift.start_time_status === 'before' && <span> · bắt đầu lúc {shift.shift_start.substring(0, 5)}</span>}
           </div>
         </div>
         <Tag color={
@@ -777,7 +824,7 @@ function HandledRow({ row }: { row: AssignmentRow }) {
       <span style={{ color: '#6b7280' }}>
         — {row.leave_type_name || (isTrip ? 'Công tác' : 'Nghỉ phép')}
         {row.attendance_status && row.attendance_status !== 'leave' && row.attendance_status !== 'business_trip' &&
-          ` (att: ${row.attendance_status})`}
+          ` (chấm công: ${enumLabel(NHAN_CHAM_CONG, row.attendance_status)})`}
       </span>
     </div>
   )
@@ -811,7 +858,7 @@ function AlertRow({
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ fontWeight: 600 }}>{row.emp_code} {row.emp_full_name}</span>
         <span style={{ color: '#6b7280', marginLeft: 8 }}>
-          ({row.shift_name}) — late {lateMin} phút
+          ({row.shift_name}) — trễ {lateMin} phút
         </span>
       </div>
       <div style={{ display: 'flex', gap: 4 }}>

@@ -37,8 +37,23 @@ export interface CompletionCert {
 
 const TABLE = 'production_completion_certs'
 
+// MỘT nguồn nhãn + màu trạng thái phiếu chốt thành phẩm (Đợt 3 audit UI 17/11/2026).
+// Màu theo quy ước: nháp default · chờ đại lý ký gold · đã ký đủ green.
+export const COMPLETION_CERT_STATUS_LABELS: Record<CompletionCert['status'], string> = {
+  draft: 'Nháp',
+  pending_partner: 'Chờ đại lý ký',
+  fully_signed: 'Đã ký đủ 2 bên',
+}
+
+export const COMPLETION_CERT_STATUS_COLORS: Record<CompletionCert['status'], string> = {
+  draft: 'default',
+  pending_partner: 'gold',
+  fully_signed: 'green',
+}
+
 export const completionCertService = {
-  // Lấy phiếu của 1 deal (1 deal = tối đa 1 phiếu)
+  // Lấy phiếu của 1 deal (1 deal = tối đa 1 phiếu). Không có phiếu → null.
+  // Lỗi tải → THROW (trước đây nuốt lỗi trả null → màn báo "chưa lập phiếu" sai sự thật).
   async getByDeal(dealId: string): Promise<CompletionCert | null> {
     const { data, error } = await supabase
       .schema('b2b')
@@ -46,7 +61,7 @@ export const completionCertService = {
       .select('*')
       .eq('deal_id', dealId)
       .maybeSingle()
-    if (error) { console.error('[completionCert] getByDeal', error); return null }
+    if (error) { console.error('[completionCert] getByDeal', error); throw error }
     return data as CompletionCert | null
   },
 
@@ -125,7 +140,7 @@ export const completionCertService = {
     signatureUrl: string,
   ): Promise<void> {
     if (!cert.factory_file_url) {
-      throw new Error('Cần upload file phiếu trước khi ký')
+      throw new Error('Cần tải file phiếu lên trước khi ký')
     }
     const { error } = await supabase
       .schema('b2b')

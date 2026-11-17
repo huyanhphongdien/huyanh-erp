@@ -13,28 +13,38 @@ import {
   ChevronDown, ChevronUp, AlertTriangle, Droplets, User,
   Hash, Wallet, CircleCheck, Ban, MapPin, Globe,
 } from 'lucide-react'
-import rubberIntakeService from '../../../services/rubber/rubberIntakeService'
+import { App as AntdApp } from 'antd'
+import rubberIntakeService, { RUBBER_INTAKE_STATUS_LABELS, RUBBER_INTAKE_PAYMENT_LABELS } from '../../../services/rubber/rubberIntakeService'
 import type { RubberIntake } from '../../../services/rubber/rubberIntakeService'
+import { fmtDate, fmtDateTime, fmtNum, fmtKg } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { RAW_RUBBER_TYPES } from '../../../services/wms/raw.types'
+
+/** Mã hiển thị của phiếu: lot_code → product_code (trừ khi chỉ là mã loại mủ 'mu_nuoc'… do phiếu cân
+ *  tự sinh ghi vào) → số hoá đơn. Tránh tiêu đề trang hiện mã enum thô. */
+const maPhieuOf = (r: RubberIntake) =>
+  r.lot_code || (r.product_code && !(RAW_RUBBER_TYPES as string[]).includes(r.product_code) ? r.product_code : null) || r.invoice_no || null
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
+// Nhãn lấy từ rubberIntakeService (một nguồn với sổ Lý lịch mủ); ở đây chỉ giữ phần hình (màu/icon).
 const STATUS_CONFIG: Record<string, {
   label: string; bg: string; text: string; icon: React.ReactNode; borderColor: string
 }> = {
-  draft:     { label: 'Nháp',       bg: 'bg-gray-100',    text: 'text-gray-600',    icon: <FileText size={14} />, borderColor: '#9CA3AF' },
-  confirmed: { label: 'Đã xác nhận', bg: 'bg-emerald-50', text: 'text-emerald-700', icon: <Check size={14} />,    borderColor: '#16A34A' },
-  settled:   { label: 'Đã chốt',    bg: 'bg-blue-50',     text: 'text-blue-700',    icon: <Check size={14} />,    borderColor: '#2563EB' },
-  cancelled: { label: 'Đã hủy',     bg: 'bg-red-50',      text: 'text-red-600',     icon: <X size={14} />,        borderColor: '#DC2626' },
+  draft:     { label: RUBBER_INTAKE_STATUS_LABELS.draft,     bg: 'bg-gray-100',    text: 'text-gray-600',    icon: <FileText size={14} />, borderColor: '#9CA3AF' },
+  confirmed: { label: RUBBER_INTAKE_STATUS_LABELS.confirmed, bg: 'bg-emerald-50', text: 'text-emerald-700', icon: <Check size={14} />,    borderColor: '#16A34A' },
+  settled:   { label: RUBBER_INTAKE_STATUS_LABELS.settled,   bg: 'bg-blue-50',     text: 'text-blue-700',    icon: <Check size={14} />,    borderColor: '#2563EB' },
+  cancelled: { label: RUBBER_INTAKE_STATUS_LABELS.cancelled, bg: 'bg-red-50',      text: 'text-red-600',     icon: <X size={14} />,        borderColor: '#DC2626' },
 }
 
 const PAYMENT_CONFIG: Record<string, {
   label: string; bg: string; text: string; icon: React.ReactNode
 }> = {
-  unpaid:  { label: 'Chưa thanh toán',    bg: 'bg-orange-50', text: 'text-orange-600', icon: <Wallet size={14} /> },
-  partial: { label: 'Thanh toán 1 phần',  bg: 'bg-yellow-50', text: 'text-yellow-700', icon: <Wallet size={14} /> },
-  paid:    { label: 'Đã thanh toán',      bg: 'bg-emerald-50', text: 'text-emerald-600', icon: <CircleCheck size={14} /> },
+  unpaid:  { label: RUBBER_INTAKE_PAYMENT_LABELS.unpaid,  bg: 'bg-orange-50', text: 'text-orange-600', icon: <Wallet size={14} /> },
+  partial: { label: RUBBER_INTAKE_PAYMENT_LABELS.partial, bg: 'bg-yellow-50', text: 'text-yellow-700', icon: <Wallet size={14} /> },
+  paid:    { label: RUBBER_INTAKE_PAYMENT_LABELS.paid,    bg: 'bg-emerald-50', text: 'text-emerald-600', icon: <CircleCheck size={14} /> },
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -47,29 +57,22 @@ const SOURCE_LABELS: Record<string, string> = {
 // HELPERS
 // ============================================================================
 
-function formatDate(s?: string): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-function formatDateTime(s?: string): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-function formatNumber(n?: number | null): string {
-  if (n === undefined || n === null) return '–'
-  return n.toLocaleString('vi-VN')
-}
+// Ngày / ngày-giờ / số theo chuẩn format.ts (DD/MM/YYYY · DD/MM HH:mm · vi-VN, trống → '—')
+const formatDate = (s?: string) => fmtDate(s)
+const formatDateTime = (s?: string) => fmtDateTime(s)
+const formatNumber = (n?: number | null) => fmtNum(n, 3)
 function formatWeight(kg?: number | null): string {
-  if (!kg) return '–'
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tấn`
-  return `${formatNumber(Math.round(kg * 100) / 100)} kg`
+  if (kg === null || kg === undefined) return '—'
+  if (kg >= 1000) return `${fmtNum(kg / 1000, 2)} tấn`
+  return `${fmtKg(kg, 2)} kg`
 }
 function formatTon(t?: number | null): string {
-  if (!t) return '–'
-  return `${t.toFixed(3)} tấn`
+  if (t === null || t === undefined) return '—'
+  return `${fmtNum(t, 3)} tấn`
 }
+// Đa tiền tệ (VND/LAK/BATH) nên giữ hàm riêng; VND = ' ₫' như format.ts. Trống → '—', 0 vẫn in "0".
 function formatCurrency(a?: number | null, currency?: string): string {
-  if (!a) return '–'
+  if (a === null || a === undefined) return '—'
   const c = currency || 'VND'
   if (c === 'VND') return a.toLocaleString('vi-VN') + ' ₫'
   if (c === 'LAK' || c === 'KIP') return a.toLocaleString('vi-VN') + ' ₭'
@@ -79,7 +82,7 @@ function formatCurrency(a?: number | null, currency?: string): string {
 
 // DRC Gauge
 const DRCGauge: React.FC<{ value?: number | null }> = ({ value }) => {
-  if (!value) return <span className="text-gray-400 text-[13px]">–</span>
+  if (!value) return <span className="text-gray-400 text-[13px]">—</span>
   const pct = Math.max(0, Math.min(100, ((value - 30) / 50) * 100))
   let color = '#16A34A'
   if (value < 40) color = '#DC2626'
@@ -129,6 +132,7 @@ const EudrSection: React.FC<{
   intake: RubberIntake
   onUpdate: (updated: RubberIntake) => void
 }> = ({ intake, onUpdate }) => {
+  const { message } = AntdApp.useApp()
   const [ref, setRef] = useState(intake.eudr_statement_ref || '')
   const [risk, setRisk] = useState<string>(intake.deforestation_risk_assessment || 'medium')
   const [saving, setSaving] = useState(false)
@@ -146,8 +150,9 @@ const EudrSection: React.FC<{
         deforestation_risk_assessment: risk as any,
       })
       onUpdate(updated)
+      message.success('Đã lưu thông tin EUDR')
     } catch (e: any) {
-      alert(`Lỗi: ${e?.message || 'Không cập nhật được'}`)
+      message.error(dichLoiHeThong(e, 'Không cập nhật được EUDR'))
     } finally {
       setSaving(false)
     }
@@ -249,6 +254,7 @@ const EudrSection: React.FC<{
 const RubberIntakeDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { message, modal } = AntdApp.useApp()
 
   const [intake, setIntake] = useState<RubberIntake | null>(null)
   const [loading, setLoading] = useState(true)
@@ -265,7 +271,7 @@ const RubberIntakeDetailPage: React.FC = () => {
       setIntake(data)
     } catch (err: unknown) {
       console.error('Lỗi tải chi tiết:', err)
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu'))
     } finally { setLoading(false) }
   }, [id])
 
@@ -277,21 +283,35 @@ const RubberIntakeDetailPage: React.FC = () => {
       setActionLoading('confirm')
       const updated = await rubberIntakeService.confirm(id)
       setIntake(updated)
+      message.success('Đã xác nhận phiếu nhập mủ')
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Không thể xác nhận')
+      message.error(dichLoiHeThong(err, 'Không thể xác nhận'))
     } finally { setActionLoading(null) }
   }
 
-  const handleCancel = async () => {
-    if (!id || !intake || intake.status !== 'draft') return
-    if (!window.confirm('Bạn chắc chắn muốn hủy phiếu này?')) return
+  const doCancel = async () => {
+    if (!id) return
     try {
       setActionLoading('cancel')
       const updated = await rubberIntakeService.cancel(id)
       setIntake(updated)
+      message.success('Đã hủy phiếu nhập mủ')
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Không thể hủy phiếu')
+      message.error(dichLoiHeThong(err, 'Không thể hủy phiếu'))
     } finally { setActionLoading(null) }
+  }
+
+  const handleCancel = () => {
+    if (!id || !intake || intake.status !== 'draft') return
+    const ma = maPhieuOf(intake)
+    modal.confirm({
+      title: ma ? `Hủy phiếu nhập mủ ${ma}?` : 'Hủy phiếu nhập mủ này?',
+      content: 'Phiếu chuyển sang "Đã hủy", không xác nhận hay đưa vào quyết toán được nữa. Không hoàn tác.',
+      okText: 'Hủy phiếu',
+      okButtonProps: { danger: true },
+      cancelText: 'Không',
+      onOk: doCancel,
+    })
   }
 
   // Loading
@@ -323,6 +343,12 @@ const RubberIntakeDetailPage: React.FC = () => {
             <AlertTriangle className="w-7 h-7 text-red-400" />
           </div>
           <h3 className="text-[15px] font-semibold text-gray-700 mb-1">{error || 'Không tìm thấy'}</h3>
+          {error && (
+            <button type="button" onClick={fetchDetail}
+              className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 bg-red-50 text-red-600 rounded-xl text-[14px] font-semibold active:scale-[0.97] transition-transform">
+              <RefreshCw className="w-4 h-4" /> Thử lại
+            </button>
+          )}
           <button type="button" onClick={() => navigate('/rubber/intake')}
             className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-[#1B4D3E] text-white rounded-xl text-[14px] font-semibold active:scale-[0.97] transition-transform">
             <ArrowLeft className="w-4 h-4" /> Quay lại
@@ -348,7 +374,7 @@ const RubberIntakeDetailPage: React.FC = () => {
             </button>
             <div>
               <h1 className="text-[17px] font-bold text-gray-900 leading-tight" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {intake.product_code || intake.invoice_no || `#${intake.id.slice(0, 8)}`}
+                {maPhieuOf(intake) || `#${intake.id.slice(0, 8)}`}
               </h1>
               <p className="text-[12px] text-gray-400 leading-tight">Chi tiết phiếu nhập mủ</p>
             </div>
@@ -392,7 +418,7 @@ const RubberIntakeDetailPage: React.FC = () => {
             <span className="text-[14px] font-bold text-gray-900">Nhà cung cấp</span>
           </div>
           <div className="px-4 py-1">
-            <InfoRow icon={<User size={14} className="text-gray-400" />} label="Tên" value={intake.supplier?.name || '–'} />
+            <InfoRow icon={<User size={14} className="text-gray-400" />} label="Tên" value={intake.supplier?.name || '—'} />
             {intake.supplier?.code && <InfoRow icon={<Hash size={14} className="text-gray-400" />} label="Mã" value={intake.supplier.code} mono />}
             {intake.supplier?.country && <InfoRow icon={<Globe size={14} className="text-gray-400" />} label="Quốc gia" value={intake.supplier.country === 'VN' ? '🇻🇳 Việt Nam' : '🇱🇦 Lào'} />}
             {intake.buyer_name && <InfoRow icon={<User size={14} className="text-gray-400" />} label="Người mua" value={intake.buyer_name} />}
@@ -421,8 +447,8 @@ const RubberIntakeDetailPage: React.FC = () => {
             <span className="text-[14px] font-bold text-gray-900">Khối lượng</span>
           </div>
           <div className="px-4 py-1">
-            {intake.gross_weight_kg != null && <InfoRow icon={<Scale size={14} className="text-gray-400" />} label="KL tươi (Gross)" value={formatWeight(intake.gross_weight_kg)} mono />}
-            {intake.net_weight_kg != null && <InfoRow icon={<Scale size={14} className="text-gray-400" />} label="KL nhập (Net)" value={formatWeight(intake.net_weight_kg)} mono highlight />}
+            {intake.gross_weight_kg != null && <InfoRow icon={<Scale size={14} className="text-gray-400" />} label="KL tổng" value={formatWeight(intake.gross_weight_kg)} mono />}
+            {intake.net_weight_kg != null && <InfoRow icon={<Scale size={14} className="text-gray-400" />} label="KL hàng" value={formatWeight(intake.net_weight_kg)} mono highlight />}
             {isVietnam && intake.settled_qty_ton != null && <InfoRow icon={<Scale size={14} className="text-gray-400" />} label="KL chốt" value={formatTon(intake.settled_qty_ton)} mono highlight />}
             {isLao && intake.purchase_qty_kg != null && <InfoRow icon={<Scale size={14} className="text-gray-400" />} label="KL mua" value={formatWeight(intake.purchase_qty_kg)} mono />}
             {intake.finished_product_ton != null && <InfoRow icon={<Droplets size={14} className="text-gray-400" />} label="Thành phẩm NK" value={formatTon(intake.finished_product_ton)} mono highlight />}

@@ -61,12 +61,12 @@ export async function executeProductionIntake(
   input: ProductionIntakeInput
 ): Promise<ProductionIntakeResult> {
   // Validate
-  if (input.quantity_kg <= 0) throw new Error('quantity_kg phải > 0')
+  if (input.quantity_kg <= 0) throw new Error('Khối lượng phải > 0')
   if (input.sample_drc <= 0 || input.sample_drc > 100) {
-    throw new Error('sample_drc phải trong 0-100%')
+    throw new Error('DRC mẫu phải trong khoảng 0–100%')
   }
-  if (input.expected_price <= 0) throw new Error('expected_price phải > 0')
-  if (!input.qc_user_id) throw new Error('qc_user_id bắt buộc')
+  if (input.expected_price <= 0) throw new Error('Đơn giá thương lượng phải > 0')
+  if (!input.qc_user_id) throw new Error('Phải chọn người QC đo DRC mẫu')
 
   // Lookup partner tier
   const { data: partner } = await supabase
@@ -219,7 +219,7 @@ export interface ProductionFinishResult {
 export async function onProductionFinish(
   input: ProductionFinishInput
 ): Promise<ProductionFinishResult> {
-  if (input.finished_product_kg <= 0) throw new Error('finished_product_kg phải > 0')
+  if (input.finished_product_kg <= 0) throw new Error('KL thành phẩm phải > 0')
 
   // Load deal
   const { data: deal } = await supabase
@@ -228,14 +228,14 @@ export async function onProductionFinish(
     .eq('id', input.deal_id)
     .maybeSingle()
 
-  if (!deal) throw new Error(`Deal ${input.deal_id} không tồn tại`)
+  if (!deal) throw new Error('Không tìm thấy deal — có thể đã bị xoá')
 
   const d = deal as any
   if (d.purchase_type !== 'drc_after_production') {
-    throw new Error(`Hook chỉ gọi cho drc_after_production, deal này: ${d.purchase_type}`)
+    throw new Error('Chốt KL thành phẩm chỉ áp dụng cho deal Chạy đầu ra')
   }
   if (d.status !== 'accepted') {
-    throw new Error(`Deal phải ở status=accepted mới gọi onFinish (hiện tại: ${d.status})`)
+    throw new Error('Deal phải ở trạng thái "Đã duyệt" mới chốt KL thành phẩm được')
   }
 
   // Compute actual_drc
@@ -243,7 +243,7 @@ export async function onProductionFinish(
 
   // Validate DRC range
   if (actualDrc < 0 || actualDrc > 100) {
-    throw new Error(`actual_drc=${actualDrc.toFixed(2)}% ngoài 0-100%`)
+    throw new Error(`DRC thực tế tính ra ${actualDrc.toFixed(2)}% nằm ngoài 0–100% — kiểm tra lại KL thành phẩm`)
   }
 
   // Compute final gross

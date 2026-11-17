@@ -42,6 +42,10 @@ import resourceService, {
   getAllocationColor,
   getAllocationLevel,
 } from '../../services/project/resourceService'
+import { App } from 'antd'
+import PageState from '../../components/common/PageState'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate } from '../../utils/format'
 
 // ============================================================================
 // TYPES
@@ -72,17 +76,12 @@ interface SearchResult {
 
 const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
   { key: 'members', label: 'Thành viên', icon: <Users size={18} /> },
-  { key: 'workload', label: 'Workload', icon: <BarChart3 size={18} /> },
+  { key: 'workload', label: 'Tải công việc', icon: <BarChart3 size={18} /> },
 ]
 
-const ROLE_OPTIONS: Array<{ value: ProjectMemberRole; label: string }> = [
-  { value: 'owner', label: 'Chủ DA (PM)' },
-  { value: 'co_owner', label: 'Đồng quản lý' },
-  { value: 'lead', label: 'Trưởng nhóm' },
-  { value: 'member', label: 'Thành viên' },
-  { value: 'reviewer', label: 'Reviewer' },
-  { value: 'observer', label: 'Quan sát' },
-]
+// Nhãn vai trò đọc từ MEMBER_ROLE_LABELS (resourceService — một nguồn); bản chép cũ ghi 'Reviewer'/'Chủ DA (PM)'
+const ROLE_OPTIONS: Array<{ value: ProjectMemberRole; label: string }> =
+  (Object.keys(MEMBER_ROLE_LABELS) as ProjectMemberRole[]).map(value => ({ value, label: MEMBER_ROLE_LABELS[value] }))
 
 // ============================================================================
 // COMPONENT
@@ -91,13 +90,15 @@ const ROLE_OPTIONS: Array<{ value: ProjectMemberRole; label: string }> = [
 export default function ProjectResourcePage() {
   const { id: projectId } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { message } = App.useApp()
 
   // --- State ---
   const [activeTab, setActiveTab] = useState<TabKey>('members')
   const [members, setMembers] = useState<ProjectMember[]>([])
   const [workloads, setWorkloads] = useState<EmployeeWorkload[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Giữ lỗi gốc để PageState dịch; trước đây hiện e.message thô và VẪN vẽ "Chưa có thành viên" bên dưới
+  const [error, setError] = useState<unknown>(null)
 
   // Add member modal
   const [showAddModal, setShowAddModal] = useState(false)
@@ -142,7 +143,8 @@ export default function ProjectResourcePage() {
       const s = await resourceService.getProjectResourceStats(projectId)
       setStats(s)
     } catch (err: any) {
-      setError(err.message || 'Không thể tải danh sách thành viên')
+      console.error('[ProjectResourcePage] Load error:', err)
+      setError(err || 'Không thể tải danh sách thành viên')
     } finally {
       setLoading(false)
     }
@@ -258,7 +260,7 @@ export default function ProjectResourcePage() {
         setSearchResults(results)
       }
     } catch (err: any) {
-      alert(err.message || 'Lỗi thêm thành viên')
+      message.error(dichLoiHeThong(err, 'Thêm thành viên thất bại'))
     } finally {
       setAddingId(null)
     }
@@ -270,7 +272,7 @@ export default function ProjectResourcePage() {
       setConfirmRemoveId(null)
       await loadMembers()
     } catch (err: any) {
-      alert(err.message || 'Lỗi xóa thành viên')
+      message.error(dichLoiHeThong(err, 'Xoá thành viên thất bại'))
     }
   }
 
@@ -293,7 +295,7 @@ export default function ProjectResourcePage() {
       setEditing(null)
       await loadMembers()
     } catch (err: any) {
-      alert(err.message || 'Lỗi cập nhật')
+      message.error(dichLoiHeThong(err, 'Lưu thành viên thất bại'))
     } finally {
       setSaving(false)
     }
@@ -313,7 +315,7 @@ export default function ProjectResourcePage() {
         bg: 'bg-emerald-50 border-emerald-200',
       },
       {
-        label: 'TB Allocation',
+        label: 'Phân bổ TB',
         value: `${stats.avg_allocation}%`,
         icon: <Percent size={20} className="text-blue-600" />,
         bg: 'bg-blue-50 border-blue-200',
@@ -434,9 +436,9 @@ export default function ProjectResourcePage() {
             {member.start_date && (
               <span className="text-xs text-gray-400 flex items-center gap-1">
                 <Clock size={12} />
-                {new Date(member.start_date).toLocaleDateString('vi-VN')}
+                {fmtDate(member.start_date)}
                 {member.end_date &&
-                  ` → ${new Date(member.end_date).toLocaleDateString('vi-VN')}`}
+                  ` → ${fmtDate(member.end_date)}`}
               </span>
             )}
           </div>
@@ -542,7 +544,7 @@ export default function ProjectResourcePage() {
           <div className="mt-2 text-xs text-gray-400 italic">
             Đã rời dự án
             {member.left_at &&
-              ` — ${new Date(member.left_at).toLocaleDateString('vi-VN')}`}
+              ` — ${fmtDate(member.left_at)}`}
           </div>
         )}
       </div>
@@ -912,23 +914,13 @@ export default function ProjectResourcePage() {
 
       {/* ===== CONTENT ===== */}
       <div className="p-4 pb-24 max-w-2xl mx-auto">
-        {/* Error */}
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Loading */}
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <div className="w-10 h-10 border-3 border-[#1B4D3E] border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-gray-500">Đang tải...</p>
-          </div>
+        {/* Đang tải / Lỗi (+ Thử lại) — khối dùng chung; "Chưa có thành viên" chỉ hiện khi tải THÀNH CÔNG */}
+        {(loading || !!error) && (
+          <PageState loading={loading} error={error} onRetry={loadMembers} minHeight={240} />
         )}
 
         {/* TAB: Members */}
-        {!loading && activeTab === 'members' && (
+        {!loading && !error && activeTab === 'members' && (
           <>
             {renderStats()}
 
@@ -967,7 +959,7 @@ export default function ProjectResourcePage() {
         )}
 
         {/* TAB: Workload */}
-        {!loading && activeTab === 'workload' && (
+        {!loading && !error && activeTab === 'workload' && (
           <div className="space-y-3">
             {/* Summary */}
             {workloads.length > 0 && (

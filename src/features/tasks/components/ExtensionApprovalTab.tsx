@@ -32,6 +32,10 @@ import {
   useApproveExtensionRequest,
 } from '../hooks/useExtensionRequests';
 import type { ExtensionRequestWithDetails } from '../../../types/extensionRequest';
+import { message } from 'antd';
+import PageState from '../../../components/common/PageState';
+import { fmtDate, fmtDateTime } from '../../../utils/format';
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -47,13 +51,9 @@ interface ExtensionApprovalTabProps {
 // HELPERS
 // ============================================================================
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('vi-VN');
-}
-
-function formatDateTime(dateString: string): string {
-  return new Date(dateString).toLocaleString('vi-VN');
-}
+// Ngày / ngày-giờ: chuẩn chung utils/format ('DD/MM/YYYY' · 'DD/MM HH:mm')
+const formatDate = fmtDate;
+const formatDateTime = fmtDateTime;
 
 // Kiểm tra file có phải là ảnh không
 function isImageFile(fileName: string | null | undefined, url: string | null | undefined): boolean {
@@ -419,16 +419,22 @@ export function ExtensionApprovalTab({
   const {
     data: pendingByApprover,
     isLoading: loadingByApprover,
+    error: errorByApprover,
+    refetch: refetchByApprover,
   } = usePendingExtensionRequests(employeeId);
 
   const {
     data: pendingByDept,
     isLoading: loadingByDept,
+    error: errorByDept,
+    refetch: refetchByDept,
   } = usePendingExtensionRequestsForManager(userDepartmentId || '');
 
   const {
     data: pendingAll,
     isLoading: loadingAll,
+    error: errorAll,
+    refetch: refetchAll,
   } = useAllPendingExtensionRequests();
 
   // Mutation
@@ -437,11 +443,14 @@ export function ExtensionApprovalTab({
   // Determine which data to show
   let requests: ExtensionRequestWithDetails[] = [];
   let isLoading = false;
+  // Lỗi tải: trước đây bỏ qua → "Không có yêu cầu gia hạn" giả trong khi thật ra không tải được
+  let loadError: unknown = null;
 
   if (isExecutive) {
     // Executive sees all pending requests
     requests = pendingAll || [];
     isLoading = loadingAll;
+    loadError = errorAll;
   } else if (userLevel <= 5) {
     // Manager sees requests in their department OR assigned to them
     const deptRequests = pendingByDept || [];
@@ -457,6 +466,7 @@ export function ExtensionApprovalTab({
     
     requests = merged;
     isLoading = loadingByApprover || loadingByDept;
+    loadError = errorByApprover || errorByDept;
   } else {
     // Employee - shouldn't see this tab but just in case
     requests = [];
@@ -480,13 +490,15 @@ export function ExtensionApprovalTab({
       });
     } catch (error) {
       console.error('Error approving:', error);
+      // Trước đây chỉ console.error → bấm Duyệt thất bại mà không ai biết
+      message.error(dichLoiHeThong(error, 'Duyệt gia hạn thất bại'));
     }
   };
 
   // Handle reject
   const handleReject = async (requestId: string, comment?: string) => {
     if (!comment?.trim()) {
-      alert('Vui lòng nhập lý do từ chối');
+      message.warning('Vui lòng nhập lý do từ chối');
       return;
     }
     
@@ -499,6 +511,7 @@ export function ExtensionApprovalTab({
       });
     } catch (error) {
       console.error('Error rejecting:', error);
+      message.error(dichLoiHeThong(error, 'Từ chối gia hạn thất bại'));
     }
   };
 
@@ -508,6 +521,22 @@ export function ExtensionApprovalTab({
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         <span className="ml-3 text-gray-500">Đang tải...</span>
+      </div>
+    );
+  }
+
+  // Lỗi tải (xét TRƯỚC trống)
+  if (loadError) {
+    return (
+      <div className="p-4">
+        <PageState
+          error={loadError}
+          onRetry={() => {
+            if (isExecutive) { refetchAll(); return; }
+            if (employeeId) refetchByApprover();
+            if (userDepartmentId) refetchByDept();
+          }}
+        />
       </div>
     );
   }

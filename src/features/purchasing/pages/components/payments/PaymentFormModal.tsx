@@ -31,6 +31,13 @@ import { supabase } from '../../../../../lib/supabase';
 import { invoicePaymentService } from '../../../../../services/invoicePaymentService';
 import type { CreatePaymentInput } from '../../../../../services/invoicePaymentService';
 import { useAuthStore } from '../../../../../stores/authStore';
+import { fmtVnd as fmt } from '../../../../../utils/format';
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong';
+
+// Ô tiền VND hiện CHẤM ngăn nghìn ngay khi gõ (cùng kiểu vndInputProps của antd) — state `amount` vẫn giữ
+// chuỗi số thô "150000000" (hoặc "1234567.5" khi bấm "Thanh toán hết" mà số còn lại có lẻ).
+// Trước đây ô hiện số trần 150000000 → kế toán chi trăm triệu phải tự đếm số 0.
+import { vndRawToDisplay as toAmountDisplay, vndTypedToRaw as fromAmountInput } from '../../../moneyInput';
 
 // ============================================================================
 // TYPES
@@ -88,6 +95,9 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
   // Invoice info (fetched or from props)
   const [invoiceInfo, setInvoiceInfo] = useState<InvoiceInfo | null>(null);
   const [fetchingInfo, setFetchingInfo] = useState(false);
+  // Lỗi tải thông tin hóa đơn — trước đây nuốt im, modal chỉ còn tiêu đề trống không form
+  const [infoError, setInfoError] = useState<unknown>(null);
+  const [infoReloadKey, setInfoReloadKey] = useState(0);
 
   // Form state
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank_transfer'>('bank_transfer');
@@ -128,8 +138,9 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
     // Fetch từ DB
     const fetchInfo = async () => {
       setFetchingInfo(true);
+      setInfoError(null);
       try {
-        const { data } = await supabase
+        const { data, error: fetchErr } = await supabase
           .from('supplier_invoices')
           .select(`
             invoice_number, total_amount, paid_amount, remaining_amount, due_date,
@@ -137,6 +148,7 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
           `)
           .eq('id', invoiceId)
           .single();
+        if (fetchErr) throw fetchErr;
 
         if (data) {
           const sup = Array.isArray(data.supplier) ? data.supplier[0] : data.supplier;
@@ -151,12 +163,13 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
         }
       } catch (err) {
         console.error('Error fetching invoice info:', err);
+        setInfoError(err);
       } finally {
         setFetchingInfo(false);
       }
     };
     fetchInfo();
-  }, [isOpen, invoiceId, invoiceNumber, supplierName, totalAmount, paidAmount, remainingAmount, dueDate]);
+  }, [isOpen, invoiceId, invoiceNumber, supplierName, totalAmount, paidAmount, remainingAmount, dueDate, infoReloadKey]);
 
   // ========================================================================
   // RESET on open
@@ -325,7 +338,7 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
       onSuccess();
     } catch (err: any) {
       console.error('Payment error:', err);
-      setError(err.message || 'Có lỗi xảy ra khi tạo thanh toán');
+      setError(dichLoiHeThong(err, 'Có lỗi xảy ra khi tạo thanh toán'));
     } finally {
       setIsSubmitting(false);
       setUploadProgress(0);
@@ -335,11 +348,10 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
   // ========================================================================
   // HELPERS
   // ========================================================================
-  const fmt = (v: number) =>
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(v);
+  // fmt = fmtVnd (utils/format) — bản Intl tự viết cũ đã xoá
 
   const handleAmountChange = (value: string) => {
-    const cleaned = value.replace(/[^0-9.]/g, '');
+    const cleaned = fromAmountInput(value);
     setAmount(cleaned);
     const num = parseFloat(cleaned);
     if (!isNaN(num) && invoiceInfo && num > invoiceInfo.remaining_amount) {
@@ -358,6 +370,9 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
     ? Math.round((info.paid_amount / info.total_amount) * 100)
     : 0;
 
+  // Form đã có dữ liệu → bấm trúng nền đen KHÔNG đóng (trước đây mất sạch số tiền/UNC/ảnh đang nhập)
+  const isDirty = !!(amount || referenceNumber.trim() || bankName.trim() || notes.trim() || files.length > 0);
+
   // ========================================================================
   // RENDER
   // ========================================================================
@@ -365,8 +380,8 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      {/* Backdrop — chỉ đóng khi form còn trống và không đang lưu */}
+      <div className="fixed inset-0 bg-black/50" onClick={!isSubmitting && !isDirty ? onClose : undefined} />
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
@@ -386,7 +401,9 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              disabled={isSubmitting}
+              title="Đóng"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center disabled:opacity-50"
             >
               <X className="w-5 h-5 text-gray-400" />
             </button>
@@ -400,13 +417,29 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
             </div>
           )}
 
+          {/* Lỗi tải thông tin hóa đơn — báo + Thử lại (không để modal trống trơn) */}
+          {!fetchingInfo && !info && !!infoError && (
+            <div className="p-6 text-center">
+              <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+              <p className="text-sm font-medium text-red-700">Không tải được thông tin hóa đơn</p>
+              <p className="text-xs text-red-600 mt-1">{dichLoiHeThong(infoError, 'Có lỗi khi tải')}</p>
+              <button
+                type="button"
+                onClick={() => setInfoReloadKey((k) => k + 1)}
+                className="mt-3 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
+
           {!fetchingInfo && info && (
             <form onSubmit={handleSubmit}>
               {/* Invoice Summary */}
               <div className="px-5 pt-4 pb-3">
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">Tổng HĐ</p>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">Tổng hóa đơn</p>
                     <p className="text-sm font-bold text-gray-900 mt-0.5">{fmt(info.total_amount)}</p>
                   </div>
                   <div>
@@ -499,9 +532,9 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={amount}
+                      value={toAmountDisplay(amount)}
                       onChange={(e) => handleAmountChange(e.target.value)}
-                      placeholder="Nhập số tiền..."
+                      placeholder="VD: 10.000.000"
                       className="w-full min-h-[48px] px-3.5 py-3 pr-28 bg-white text-[15px] text-gray-900 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
                       required
                     />

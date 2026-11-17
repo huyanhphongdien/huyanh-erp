@@ -14,6 +14,12 @@ export const VEHICLE_KIND_LABELS: Record<VehicleKind, string> = {
   trailer: 'Rơ-moóc',
   other: 'Xe khác',
 }
+/** Màu Tag theo loại xe — cùng màu biển số đầu kéo (xanh) / rơ-moóc (vàng) ở Sổ lệnh. */
+export const VEHICLE_KIND_COLORS: Record<VehicleKind, string> = {
+  tractor: 'blue',
+  trailer: 'gold',
+  other: 'default',
+}
 
 export interface FleetDriver {
   id: string

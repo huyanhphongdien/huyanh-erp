@@ -13,6 +13,8 @@ import {
   User, ChevronRight as ChevRight, Droplets, ClipboardList,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { fmtNum, fmtDateShort } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -47,27 +49,23 @@ interface LaoBatch {
 // HELPERS
 // ============================================================================
 
-function fmt(n?: number | null): string {
-  if (n == null || n === 0) return '–'
-  return n.toLocaleString('vi-VN')
-}
+// Tiền KIP/BATH (đa tiền tệ) giữ hàm riêng, rút gọn B/M/K cho thẻ — số theo vi-VN qua format.ts
+// (toFixed cũ ra DẤU CHẤM thập phân). Trống → '—'.
+const fmt = (n?: number | null): string => (n ? fmtNum(n, 2) : '—')
 function fmtWeight(kg?: number | null): string {
-  if (!kg) return '–'
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}T`
-  return `${fmt(Math.round(kg))} kg`
+  if (!kg) return '—'
+  if (kg >= 1000) return `${fmtNum(kg / 1000, 1)}T`
+  return `${fmtNum(kg)} kg`
 }
 function fmtMoney(a?: number | null, c?: string): string {
-  if (!a) return '–'
+  if (!a) return '—'
   const symbol = c === 'BATH' ? ' ฿' : c === 'LAK' || c === 'KIP' ? ' ₭' : ''
-  if (Math.abs(a) >= 1e9) return `${(a / 1e9).toFixed(1)}B${symbol}`
-  if (Math.abs(a) >= 1e6) return `${(a / 1e6).toFixed(1)}M${symbol}`
-  if (Math.abs(a) >= 1e3) return `${(a / 1e3).toFixed(0)}K${symbol}`
+  if (Math.abs(a) >= 1e9) return `${fmtNum(a / 1e9, 1)}B${symbol}`
+  if (Math.abs(a) >= 1e6) return `${fmtNum(a / 1e6, 1)}M${symbol}`
+  if (Math.abs(a) >= 1e3) return `${fmtNum(a / 1e3, 0)}K${symbol}`
   return fmt(a) + symbol
 }
-function fmtDate(s?: string): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-}
+const fmtDate = (s?: string): string => fmtDateShort(s)
 function getMonthLabel(y: number, m: number) { return `Tháng ${m}/${y}` }
 
 const STATUS_CFG: Record<string, { label: string; className: string; border: string }> = {
@@ -259,7 +257,7 @@ const LaoPurchasePage: React.FC = () => {
       setBatches((data || []) as unknown as LaoBatch[])
     } catch (err: unknown) {
       console.error('Lỗi tải thu mua Lào:', err)
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu'))
     } finally {
       setLoading(false)
     }

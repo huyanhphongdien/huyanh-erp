@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { contractService } from '../../services'
+import { contractService, LABOR_CONTRACT_STATUS_LABELS, LABOR_CONTRACT_STATUS_COLORS } from '../../services'
 import { Card, Button, Input, Select, DataTable, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { ContractForm } from './ContractForm'
+import PageState from '../../components/common/PageState'
+import { EnumTag } from '../../components/common/EnumTag'
+import { fmtVnd, fmtDate } from '../../utils/format'
 import type { Contract } from '../../types'
- 
+
 export function ContractListPage() {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
@@ -13,17 +16,17 @@ export function ContractListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
- 
-  const { data, isLoading } = useQuery({
+
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['contracts', page, search, statusFilter],
-    queryFn: () => contractService.getAll({ 
-      page, 
-      pageSize: 10, 
+    queryFn: () => contractService.getAll({
+      page,
+      pageSize: 10,
       search,
       status: statusFilter || undefined
     })
   })
- 
+
   const deleteMutation = useMutation({
     mutationFn: contractService.delete,
     onSuccess: () => {
@@ -31,20 +34,11 @@ export function ContractListPage() {
       setDeleteId(null)
     }
   })
- 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', { 
-      style: 'currency', 
-      currency: 'VND' 
-    }).format(value)
-  }
- 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('vi-VN')
-  }
- 
+
+  // Cột chữ trần PHẢI có dataIndex (thiếu → antd vẽ ô trống). Cột có render(item) cố ý
+  // KHÔNG khai dataIndex để render nhận cả bản ghi.
   const columns = [
-    { key: 'contract_number', title: 'Số hợp đồng' },
+    { key: 'contract_number', dataIndex: 'contract_number', title: 'Số hợp đồng' },
     {
       key: 'employee',
       title: 'Nhân viên',
@@ -60,9 +54,9 @@ export function ContractListPage() {
       title: 'Thời hạn',
       render: (item: Contract) => (
         <div className="text-sm">
-          <div>{formatDate(item.start_date)}</div>
+          <div>{fmtDate(item.start_date)}</div>
           <div className="text-gray-500">
-            {item.end_date ? `đến ${formatDate(item.end_date)}` : 'Không xác định'}
+            {item.end_date ? `đến ${fmtDate(item.end_date)}` : 'Không xác định'}
           </div>
         </div>
       )
@@ -70,30 +64,14 @@ export function ContractListPage() {
     {
       key: 'base_salary',
       title: 'Lương cơ bản',
-      render: (item: Contract) => formatCurrency(item.base_salary ?? 0)
+      render: (item: Contract) => fmtVnd(item.base_salary)
     },
     {
       key: 'status',
       title: 'Trạng thái',
-      render: (item: Contract) => {
-        const statusColors: Record<string, string> = {
-          active: 'bg-green-100 text-green-800',
-          expired: 'bg-yellow-100 text-yellow-800',
-          terminated: 'bg-red-100 text-red-800',
-          renewed: 'bg-blue-100 text-blue-800'
-        }
-        const statusLabels: Record<string, string> = {
-          active: 'Hiệu lực',
-          expired: 'Hết hạn',
-          terminated: 'Chấm dứt',
-          renewed: 'Đã gia hạn'
-        }
-        return (
-          <span className={`px-2 py-1 rounded-full text-xs ${statusColors[item.status]}`}>
-            {statusLabels[item.status]}
-          </span>
-        )
-      }
+      render: (item: Contract) => (
+        <EnumTag value={item.status} labels={LABOR_CONTRACT_STATUS_LABELS} colors={LABOR_CONTRACT_STATUS_COLORS} />
+      )
     },
     {
       key: 'actions',
@@ -113,7 +91,7 @@ export function ContractListPage() {
       )
     }
   ]
- 
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -122,7 +100,7 @@ export function ContractListPage() {
           + Thêm hợp đồng
         </Button>
       </div>
- 
+
       <Card>
         <div className="p-4 border-b flex gap-4">
           <Input
@@ -136,23 +114,27 @@ export function ContractListPage() {
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
             options={[
               { value: '', label: 'Tất cả trạng thái' },
-              { value: 'active', label: 'Đang hiệu lực' },
-              { value: 'expired', label: 'Hết hạn' },
-              { value: 'terminated', label: 'Đã chấm dứt' },
-              { value: 'renewed', label: 'Đã gia hạn' }
+              ...Object.entries(LABOR_CONTRACT_STATUS_LABELS).map(([value, label]) => ({ value, label }))
             ]}
             className="w-48"
           />
         </div>
- 
-        <DataTable
-          columns={columns}
-          data={data?.data || []}
-          isLoading={isLoading}
-          emptyMessage="Chưa có hợp đồng nào"
-        />
- 
-        {data && data.totalPages > 1 && (
+
+        {error ? (
+          <PageState error={error} onRetry={() => refetch()} />
+        ) : (
+          // Phân trang ở server → tắt thanh phân trang của bảng, chỉ giữ <Pagination> bên dưới
+          <DataTable
+            columns={columns}
+            data={data?.data || []}
+            isLoading={isLoading}
+            emptyMessage="Chưa có hợp đồng nào"
+            pagination={false}
+            showSearch={false}
+          />
+        )}
+
+        {!error && data && data.totalPages > 1 && (
           <div className="p-4 border-t">
             <Pagination
               currentPage={page}
@@ -162,7 +144,7 @@ export function ContractListPage() {
           </div>
         )}
       </Card>
- 
+
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -178,7 +160,7 @@ export function ContractListPage() {
           onCancel={() => setIsModalOpen(false)}
         />
       </Modal>
- 
+
       <ConfirmDialog
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}

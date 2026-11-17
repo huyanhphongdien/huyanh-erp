@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { shiftService } from '../../services';
 import { Save, X, AlertCircle } from 'lucide-react';
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong';
 
 // ============================================================
 // TYPES
@@ -128,13 +129,13 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
   const createMutation = useMutation({
     mutationFn: (data: any) => shiftService.create(data),
     onSuccess: () => onSuccess(),
-    onError: (err: any) => setApiError(err.message || 'Lỗi tạo ca'),
+    onError: (err: any) => setApiError(dichLoiHeThong(err, 'Lỗi tạo ca')),
   });
 
   const updateMutation = useMutation({
     mutationFn: (data: any) => shiftService.update(initialData!.id, data),
     onSuccess: () => onSuccess(),
-    onError: (err: any) => setApiError(err.message || 'Lỗi cập nhật ca'),
+    onError: (err: any) => setApiError(dichLoiHeThong(err, 'Lỗi cập nhật ca')),
   });
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;

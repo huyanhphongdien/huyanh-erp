@@ -57,6 +57,8 @@ import GradeBadge from '../../../components/wms/GradeBadge'
 import { rubberGradeService } from '../../../services/wms/rubberGradeService'
 import type { RubberGrade, RubberType } from '../../../services/wms/wms.types'
 import { RUBBER_TYPE_LABELS } from '../../../services/wms/wms.types'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { useUnsavedWarning } from '../../../hooks/useUnsavedWarning'
 
 const { Title, Text } = Typography
 
@@ -352,6 +354,9 @@ const StockInCreatePage = () => {
   const [error, setError] = useState<string | null>(null)
   const [successCode, setSuccessCode] = useState<string | null>(null)
 
+  // Đã thêm dòng nhập mà lỡ F5 / đóng tab → trình duyệt hỏi lại (audit 17/11)
+  useUnsavedWarning(details.length > 0 && !successCode)
+
   // Khi đổi mode NVL ↔ TP: reset kho + source về default hợp lệ
   useEffect(() => {
     setWarehouseId('')
@@ -367,7 +372,11 @@ const StockInCreatePage = () => {
       try {
         const deals = await dealWmsService.getActiveDealsForStockIn()
         setActiveDeals(deals)
-      } catch (err) { console.error(err) }
+      } catch (err) {
+        console.error(err)
+        // Ô Deal rỗng vì lỗi khác hẳn "không có Deal nào đang mở"
+        message.error(dichLoiHeThong(err, 'Không tải được danh sách Deal B2B'))
+      }
       setLoadingDeals(false)
     }
     load()
@@ -409,7 +418,9 @@ const StockInCreatePage = () => {
         .eq('code', trimmed)
         .single()
 
-      if (ticketError || !ticket) {
+      // PGRST116 = không có dòng → "không tìm thấy"; lỗi khác (mạng/quyền) báo đúng là lỗi
+      if (ticketError && ticketError.code !== 'PGRST116') throw ticketError
+      if (!ticket) {
         message.error(`Không tìm thấy phiếu cân: ${trimmed}`)
         setScanLoading(false)
         return
@@ -448,9 +459,9 @@ const StockInCreatePage = () => {
         }, 500)
       }
 
-      message.success(`Đã tìm thấy phiếu cân: ${ticket.code} - KL ròng: ${ticket.net_weight ? `${ticket.net_weight.toLocaleString('vi-VN')} kg` : 'N/A'}`)
+      message.success(`Đã tìm thấy phiếu cân: ${ticket.code} - KL ròng: ${ticket.net_weight ? `${ticket.net_weight.toLocaleString('vi-VN')} kg` : '—'}`)
     } catch (err: any) {
-      message.error(`Lỗi tra cứu phiếu cân: ${err.message}`)
+      message.error(dichLoiHeThong(err, 'Lỗi tra cứu phiếu cân'))
     } finally {
       setScanLoading(false)
     }
@@ -511,7 +522,7 @@ const StockInCreatePage = () => {
 
       setSuccessCode(order.code)
     } catch (err: any) {
-      setError(err.message || 'Không thể tạo phiếu')
+      setError(dichLoiHeThong(err, 'Không thể tạo phiếu'))
     } finally {
       setSaving(false)
     }

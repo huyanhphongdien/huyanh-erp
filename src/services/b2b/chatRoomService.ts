@@ -4,6 +4,10 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import {
+  TIER_LABELS as PARTNER_TIER_LABELS,
+  TIER_COLORS as PARTNER_TIER_COLORS,
+} from './partnerService'
 
 // ============================================
 // INTERFACES
@@ -82,7 +86,7 @@ export interface ChatRoomCreateData {
 
 export const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   general: 'Chung',
-  deal: 'Giao dịch',
+  deal: 'Deal',
   support: 'Hỗ trợ',
 }
 
@@ -92,21 +96,10 @@ export const ROOM_TYPE_COLORS: Record<RoomType, string> = {
   support: 'orange',
 }
 
-export const TIER_LABELS: Record<PartnerTier, string> = {
-  diamond: 'Kim cương',
-  gold: 'Vàng',
-  silver: 'Bạc',
-  bronze: 'Đồng',
-  new: 'Mới',
-}
-
-export const TIER_COLORS: Record<PartnerTier, string> = {
-  diamond: 'purple',
-  gold: 'gold',
-  silver: 'default',
-  bronze: 'orange',
-  new: 'cyan',
-}
+// Hạng đại lý: MỘT nguồn ở partnerService (Đợt 3 audit UI) — 2 tên dưới là alias giữ cho
+// các trang chat + barrel src/index.ts đang import từ đây. Đừng chép lại map.
+export const TIER_LABELS: Record<PartnerTier, string> = PARTNER_TIER_LABELS
+export const TIER_COLORS: Record<PartnerTier, string> = PARTNER_TIER_COLORS
 
 // ============================================
 // SERVICE
@@ -151,11 +144,9 @@ export const chatRoomService = {
       query = query.eq('room_type', room_type)
     }
 
-    // Filter theo tier
-    if (filter && filter !== 'all' && filter !== 'unread') {
-      // Filter theo tier của partner - cần dùng inner query
-      // Tạm thời skip vì cần RPC function
-    }
+    // Filter theo tier: lọc phía client sau khi gộp partner (xem cuối hàm) — trước đây
+    // nhánh này để trống nên chip "Kim cương/Vàng/Bạc" ở danh sách chat bấm không có tác dụng.
+    const tierFilter = filter && filter !== 'all' && filter !== 'unread' ? filter : null
 
     // Tìm kiếm theo tên partner hoặc room_name
     if (search) {
@@ -220,6 +211,10 @@ export const chatRoomService = {
     let filteredRooms = roomsWithUnread
     if (filter === 'unread') {
       filteredRooms = roomsWithUnread.filter(r => (r.unread_count || 0) > 0)
+    }
+    // Filter theo hạng đại lý — cùng kiểu với 'unread': lọc trong trang vừa tải (pageSize)
+    if (tierFilter) {
+      filteredRooms = filteredRooms.filter(r => r.partner?.tier === tierFilter)
     }
 
     return {

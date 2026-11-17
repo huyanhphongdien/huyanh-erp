@@ -8,6 +8,8 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
+import { toDateStrVN } from '../utils/dateVN'
+import { invoiceDaysOverdue } from './invoicePaymentService'
 
 // ============================================================================
 // TYPES — Báo cáo
@@ -92,14 +94,17 @@ export interface ReportFilters {
 // ============================================================================
 // HELPERS
 // ============================================================================
+// ⚠ Date dựng theo giờ máy (new Date(y, m, d)) → lấy NGÀY bằng toDateStrVN.
+// Trước 17/11/2026 dùng toISOString().split('T')[0] → ở giờ VN (UTC+7) lùi 1 ngày:
+// "đầu tháng" thành ngày cuối tháng trước, "cuối tháng" mất ngày cuối → số tháng này/tháng trước lệch.
 
 function getMonthRange(monthsBack: number = 12): { from: string; to: string } {
   const now = new Date()
   const to = new Date(now.getFullYear(), now.getMonth() + 1, 0) // cuối tháng hiện tại
   const from = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 1) // đầu tháng (monthsBack) trước
   return {
-    from: from.toISOString().split('T')[0],
-    to: to.toISOString().split('T')[0],
+    from: toDateStrVN(from),
+    to: toDateStrVN(to),
   }
 }
 
@@ -108,8 +113,8 @@ function getCurrentMonthRange(): { from: string; to: string } {
   const from = new Date(now.getFullYear(), now.getMonth(), 1)
   const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
   return {
-    from: from.toISOString().split('T')[0],
-    to: to.toISOString().split('T')[0],
+    from: toDateStrVN(from),
+    to: toDateStrVN(to),
   }
 }
 
@@ -118,8 +123,8 @@ function getPrevMonthRange(): { from: string; to: string } {
   const from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const to = new Date(now.getFullYear(), now.getMonth(), 0)
   return {
-    from: from.toISOString().split('T')[0],
-    to: to.toISOString().split('T')[0],
+    from: toDateStrVN(from),
+    to: toDateStrVN(to),
   }
 }
 
@@ -147,7 +152,9 @@ const purchaseReportService = {
       orderQuery = orderQuery.eq('supplier_id', filters.supplier_id)
     }
 
-    const { data: orders, count: orderCount } = await orderQuery
+    // Lỗi tải phải NỔI lên trang (hiện khối lỗi + Thử lại), không được thành số 0 giả
+    const { data: orders, count: orderCount, error: orderErr } = await orderQuery
+    if (orderErr) throw orderErr
 
     const total_order_amount = (orders || []).reduce(
       (sum, o) => sum + (Number(o.total_amount) || 0),
@@ -164,7 +171,8 @@ const purchaseReportService = {
     if (from_date) invQuery = invQuery.gte('invoice_date', from_date)
     if (to_date) invQuery = invQuery.lte('invoice_date', to_date)
 
-    const { data: invoices } = await invQuery
+    const { data: invoices, error: invErr } = await invQuery
+    if (invErr) throw invErr
 
     const total_invoiced = (invoices || []).reduce(
       (sum, i) => sum + (Number(i.total_amount) || 0),
@@ -188,19 +196,21 @@ const purchaseReportService = {
     const curMonth = getCurrentMonthRange()
     const prevMonth = getPrevMonthRange()
 
-    const { count: curCount } = await supabase
+    const { count: curCount, error: curErr } = await supabase
       .from('purchase_orders')
       .select('id', { count: 'exact', head: true })
       .neq('status', 'cancelled')
       .gte('order_date', curMonth.from)
       .lte('order_date', curMonth.to)
+    if (curErr) throw curErr
 
-    const { count: prevCount } = await supabase
+    const { count: prevCount, error: prevErr } = await supabase
       .from('purchase_orders')
       .select('id', { count: 'exact', head: true })
       .neq('status', 'cancelled')
       .gte('order_date', prevMonth.from)
       .lte('order_date', prevMonth.to)
+    if (prevErr) throw prevErr
 
     const orders_this_month = curCount || 0
     const orders_prev_month = prevCount || 0
@@ -232,20 +242,22 @@ const purchaseReportService = {
     const { from, to } = getMonthRange(monthsBack)
 
     // Lấy đơn hàng
-    const { data: orders } = await supabase
+    const { data: orders, error: orderErr } = await supabase
       .from('purchase_orders')
       .select('order_date, total_amount')
       .neq('status', 'cancelled')
       .gte('order_date', from)
       .lte('order_date', to)
+    if (orderErr) throw orderErr
 
     // Lấy hóa đơn
-    const { data: invoices } = await supabase
+    const { data: invoices, error: invErr } = await supabase
       .from('supplier_invoices')
       .select('invoice_date, total_amount, paid_amount')
       .neq('status', 'cancelled')
       .gte('invoice_date', from)
       .lte('invoice_date', to)
+    if (invErr) throw invErr
 
     // Gom theo tháng
     const monthMap = new Map<
@@ -317,7 +329,8 @@ const purchaseReportService = {
     if (filters?.from_date) query = query.gte('invoice_date', filters.from_date)
     if (filters?.to_date) query = query.lte('invoice_date', filters.to_date)
 
-    const { data } = await query
+    const { data, error } = await query
+    if (error) throw error
 
     // Gom theo supplier
     const supplierMap = new Map<
@@ -395,7 +408,8 @@ const purchaseReportService = {
     if (filters?.to_date)
       query = query.lte('purchase_orders.order_date', filters.to_date)
 
-    const { data } = await query
+    const { data, error } = await query
+    if (error) throw error
 
     // Gom theo category
     const catMap = new Map<string, { total_amount: number; item_count: number }>()
@@ -437,7 +451,7 @@ const purchaseReportService = {
   async getOverdueInvoices(limit: number = 20): Promise<OverdueInvoice[]> {
     const today = new Date().toLocaleDateString('sv-SE')
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('supplier_invoices')
       .select(`
         id,
@@ -453,12 +467,11 @@ const purchaseReportService = {
       .neq('status', 'cancelled')
       .order('due_date', { ascending: true })
       .limit(limit)
+    if (error) throw error
 
     return (data || []).map((inv: any) => {
-      const dueDate = new Date(inv.due_date)
-      const now = new Date()
-      const diffMs = now.getTime() - dueDate.getTime()
-      const days_overdue = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+      // Ngày quá hạn theo NGÀY LỊCH (trước 7h sáng phép trừ mili-giây với hạn UTC ra 0 ngày)
+      const days_overdue = invoiceDaysOverdue(inv.due_date)
 
       return {
         invoice_id: inv.id,
@@ -478,7 +491,7 @@ const purchaseReportService = {
   // 6. ĐƠN HÀNG GẦN ĐÂY
   // ==========================================================================
   async getRecentOrders(limit: number = 10): Promise<RecentOrder[]> {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('purchase_orders')
       .select(`
         id, order_code, order_date, total_amount, status,
@@ -487,6 +500,7 @@ const purchaseReportService = {
       .neq('status', 'cancelled')
       .order('order_date', { ascending: false })
       .limit(limit)
+    if (error) throw error
 
     // Lấy supplier names cho mỗi order
     const results: RecentOrder[] = []
@@ -511,7 +525,7 @@ const purchaseReportService = {
         id: order.id,
         order_code: order.order_code,
         order_date: order.order_date,
-        supplier_names: Array.from(supplierSet).join(', ') || 'N/A',
+        supplier_names: Array.from(supplierSet).join(', ') || '—',
         total_amount: totalAmt,
         status: order.status,
         payment_progress: totalAmt > 0 ? Math.round((paidAmt / totalAmt) * 100) : 0,
@@ -537,7 +551,9 @@ const purchaseReportService = {
           .order('order_date', { ascending: false })
         if (filters?.from_date) q = q.gte('order_date', filters.from_date)
         if (filters?.to_date) q = q.lte('order_date', filters.to_date)
-        const { data } = await q
+        // Lỗi phải nổi lên: nuốt đi thì trang báo "Không có dữ liệu để xuất" — sai nghĩa
+        const { data, error } = await q
+        if (error) throw error
         return data || []
       }
       case 'invoices': {
@@ -552,7 +568,8 @@ const purchaseReportService = {
           .order('invoice_date', { ascending: false })
         if (filters?.from_date) q = q.gte('invoice_date', filters.from_date)
         if (filters?.to_date) q = q.lte('invoice_date', filters.to_date)
-        const { data } = await q
+        const { data, error } = await q
+        if (error) throw error
         return data || []
       }
       case 'payments': {
@@ -565,11 +582,12 @@ const purchaseReportService = {
           .order('payment_date', { ascending: false })
         if (filters?.from_date) q = q.gte('payment_date', filters.from_date)
         if (filters?.to_date) q = q.lte('payment_date', filters.to_date)
-        const { data } = await q
+        const { data, error } = await q
+        if (error) throw error
         return data || []
       }
       case 'debt': {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('supplier_invoices')
           .select(`
             invoice_code, invoice_number, invoice_date, due_date,
@@ -579,6 +597,7 @@ const purchaseReportService = {
           .gt('remaining_amount', 0)
           .neq('status', 'cancelled')
           .order('due_date', { ascending: true })
+        if (error) throw error
         return data || []
       }
       default:

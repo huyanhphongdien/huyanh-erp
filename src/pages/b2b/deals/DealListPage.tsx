@@ -18,27 +18,23 @@ import {
 import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
 import { useOpenTab } from '../../../hooks/useOpenTab'
 import { B2BSectionTabs, MUA_HANG_TABS } from '../../../components/b2b/B2BSectionTabs'
+import { TIER_LABELS, TIER_COLORS } from '../../../services/b2b/partnerService'
+import EnumTag from '../../../components/common/EnumTag'
+import { fmtDate, fmtNum, fmtVndNum } from '../../../utils/format'
 // DealInlineDetail bỏ — click row thay vì expand inline
 
 const { Text } = Typography
 
+// Tab trạng thái lấy thẳng từ DEAL_STATUS_LABELS (một map chung) — không chép lại nhãn
 const STATUS_TABS = [
   { key: 'all', label: 'Tất cả' },
-  { key: 'pending', label: 'Chờ xử lý' },
-  { key: 'processing', label: 'Đang xử lý' },
-  { key: 'accepted', label: 'Đã duyệt' },
-  { key: 'settled', label: 'Đã quyết toán' },
-  { key: 'cancelled', label: 'Đã hủy' },
+  ...Object.entries(DEAL_STATUS_LABELS).map(([key, label]) => ({ key, label })),
 ]
 
-const formatCurrency = (v: number | null): string => {
-  if (!v) return '—'
-  if (v >= 1e9) return `${(v / 1e9).toFixed(2)} tỷ`
-  if (v >= 1e6) return `${(v / 1e6).toFixed(1)} tr`
-  return v.toLocaleString('vi-VN')
-}
+// Sổ Deal tải một cục tối đa N dòng — chạm trần thì bảng báo
+const LOAD_LIMIT = 500
 
-const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—'
+// Cột tiền in số ĐẦY ĐỦ (tiêu đề ghi ₫) — bản cũ viết tắt "1.23 tỷ"/"1.2 tr" chấm kiểu Mỹ (audit 17/11/2026)
 
 // ============================================================================
 // COMPONENT
@@ -48,10 +44,10 @@ const DealListPage = () => {
   const openTab = useOpenTab()
   const [activeTab, setActiveTab] = useState('all')
 
-  const { data: allDeals = [], isLoading, refetch } = useQuery({
+  const { data: allDeals = [], isLoading, error, refetch } = useQuery({
     queryKey: ['b2b-deals-all'],
     queryFn: async () => {
-      const response = await dealService.getDeals({ page: 1, pageSize: 500 })
+      const response = await dealService.getDeals({ page: 1, pageSize: LOAD_LIMIT })
       return response.data
     },
     staleTime: 60000,
@@ -93,7 +89,7 @@ const DealListPage = () => {
           <Text strong style={{ fontSize: 13 }}>{r.partner?.name || '—'}</Text>
           <div style={{ fontSize: 11, color: '#999' }}>
             {r.partner?.code}
-            {r.partner?.tier && <Tag style={{ marginLeft: 4, fontSize: 10 }}>{r.partner.tier}</Tag>}
+            {r.partner?.tier && <EnumTag value={r.partner.tier} labels={TIER_LABELS} colors={TIER_COLORS} style={{ marginLeft: 4, fontSize: 10 }} />}
           </div>
         </div>
       ),
@@ -114,7 +110,7 @@ const DealListPage = () => {
       width: 110,
       align: 'right',
       sortable: true,
-      render: (v) => v ? <Text strong>{v.toFixed(1)}</Text> : '—',
+      render: (v) => v ? <Text strong>{fmtNum(v, 1)}</Text> : '—',
       exportRender: (v) => v || 0,
       exportNumFmt: '#,##0.0',
       summary: 'sum',
@@ -135,7 +131,7 @@ const DealListPage = () => {
         return (
           <div>
             <Text strong style={{ color, fontSize: 12.5 }}>
-              {(done / 1000).toFixed(1)}/{(target / 1000).toFixed(1)} T
+              {fmtNum(done / 1000, 1)}/{fmtNum(target / 1000, 1)} T
             </Text>
             <div style={{ fontSize: 10, color }}>{pct}%{enough ? ' ✓ đủ' : ''}</div>
           </div>
@@ -149,7 +145,7 @@ const DealListPage = () => {
     },
     {
       key: 'unit_price',
-      title: 'Đơn giá',
+      title: 'Đơn giá (₫/kg)',
       dataIndex: 'unit_price',
       width: 100,
       align: 'right',
@@ -160,12 +156,12 @@ const DealListPage = () => {
     },
     {
       key: 'total_value',
-      title: 'Giá trị',
+      title: 'Giá trị (₫)',
       dataIndex: 'total_value_vnd',
-      width: 120,
+      width: 135,
       align: 'right',
       sortable: true,
-      render: (v) => <Text strong style={{ color: '#1B4D3E' }}>{formatCurrency(v)}</Text>,
+      render: (v) => <Text strong style={{ color: '#1B4D3E' }}>{v ? fmtVndNum(v) : '—'}</Text>,
       exportRender: (v) => v || 0,
       exportNumFmt: '#,##0',
       summary: 'sum',
@@ -206,8 +202,8 @@ const DealListPage = () => {
       dataIndex: 'created_at',
       width: 100,
       sortable: true,
-      render: (v) => formatDate(v),
-      exportRender: (v) => v ? new Date(v).toLocaleDateString('vi-VN') : '',
+      render: (v) => fmtDate(v),
+      exportRender: (v) => v ? fmtDate(v) : '',
     },
     // Actions column removed — floating eye button handles detail view
   ]
@@ -253,7 +249,9 @@ const DealListPage = () => {
         dataSource={tabDeals}
         rowKey="id"
         loading={isLoading}
-        title={`Deals B2B`}
+        error={error}
+        loadLimit={LOAD_LIMIT}
+        title="Sổ Deal (thoả thuận mua mủ với đại lý)"
         dateRangeField="created_at"
         onRefresh={() => refetch()}
         onRowClick={(deal) => openTab({

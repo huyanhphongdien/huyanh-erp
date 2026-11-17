@@ -17,7 +17,6 @@ import {
   ReloadOutlined, DownloadOutlined, SearchOutlined, FilterOutlined,
   CalendarOutlined,
 } from '@ant-design/icons'
-import { Factory } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -30,14 +29,23 @@ import {
   type PartnerAggregate,
   type RegionAggregate,
 } from '../../../services/b2b/rubberIntakeB2BService'
-import { facilityService, type Facility } from '../../../services/wms/facilityService'
-import { partnerService } from '../../../services/b2b/partnerService'
+import { partnerService, TIER_LABELS, TIER_COLORS } from '../../../services/b2b/partnerService'
 import type { Partner } from '../../../services/b2b/partnerService'
 import { RAW_RUBBER_TYPE_LABELS, type RawRubberType } from '../../../services/b2b/intakeManualEntryService'
 import { B2BSectionTabs, DASHBOARD_TABS } from '../../../components/b2b/B2BSectionTabs'
+import FacilityPicker from '../../../components/wms/FacilityPicker'
+import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { useFacilityFilter } from '../../../stores/facilityFilterStore'
+import EnumTag, { enumLabel } from '../../../components/common/EnumTag'
+import { fmtVndCompact } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
+
+// Tấn 2 số lẻ CỐ ĐỊNH theo vi-VN ("12,34" — không "12.34": dấu chấm ở VN là ngăn nghìn).
+// format.ts chưa có tuỳ chọn số lẻ cố định nên giữ cục bộ cho cột monospace thẳng hàng.
+const fmtT2 = (kg: number) => (kg / 1000).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 type TimeRange = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'custom'
 type Grouping = 'day' | 'week' | 'month'
@@ -254,14 +262,18 @@ export default function B2BRubberIntakeStatsPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>('month')
   const [customRange, setCustomRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf('month'), dayjs()])
   const [grouping, setGrouping] = useState<Grouping>('day')
-  const [facilityFilter, setFacilityFilter] = useState<string>('')
+  // Nhà máy: FacilityPicker persist — nhớ lựa chọn qua các sổ, khởi tạo từ store (audit 17/11/2026)
+  const { currentFacilityId } = useFacilityFilter()
+  const [facilityFilter, setFacilityFilter] = useState<string>(currentFacilityId ?? '')
   const [rawTypeFilter, setRawTypeFilter] = useState<RawRubberType | ''>('')
   const [partnerFilter, setPartnerFilter] = useState<string>('')
   const [search, setSearch] = useState('')
+  // Từ khoá sau debounce — fetchData chỉ phụ thuộc giá trị này (trước đây mỗi phím tải 2 lần)
+  const [searchDebounced, setSearchDebounced] = useState('')
   const [chartMetric, setChartMetric] = useState<'count' | 'dry' | 'amount'>('dry')
 
   // Reference data
-  const [facilities, setFacilities] = useState<Facility[]>([])
+  const { data: facilities = [] } = useActiveFacilities()
   const [partners, setPartners] = useState<Partner[]>([])
 
   // ── Resolved date range (preset "kỳ này" → từ đầu kỳ đến hôm nay)
@@ -282,9 +294,8 @@ export default function B2BRubberIntakeStatsPage() {
     else if (timeRange === 'year') setGrouping('month')
   }, [timeRange])
 
-  // Load reference data
+  // Load reference data (danh sách nhà máy đã lấy qua useActiveFacilities — cache dùng chung)
   useEffect(() => {
-    facilityService.getAllActive().then(setFacilities).catch(() => setFacilities([]))
     partnerService.getAllActive().then(setPartners).catch(() => setPartners([]))
   }, [])
 
@@ -298,22 +309,22 @@ export default function B2BRubberIntakeStatsPage() {
         facility_id: facilityFilter || undefined,
         raw_rubber_type: rawTypeFilter || undefined,
         partner_id: partnerFilter || undefined,
-        search: search || undefined,
+        search: searchDebounced || undefined,
       })
       setData(res)
     } catch (e: any) {
-      setError(e?.message || 'Lỗi tải thống kê')
+      setError(dichLoiHeThong(e, 'Lỗi tải thống kê'))
       setData(null)
     } finally {
       setLoading(false)
     }
-  }, [dateRange, facilityFilter, rawTypeFilter, partnerFilter, search])
+  }, [dateRange, facilityFilter, rawTypeFilter, partnerFilter, searchDebounced])
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // Debounce search
+  // Debounce search — chỉ cập nhật từ khoá; effect fetchData ở trên tải đúng một lượt
   useEffect(() => {
-    const t = setTimeout(fetchData, 400)
+    const t = setTimeout(() => setSearchDebounced(search), 400)
     return () => clearTimeout(t)
   }, [search])
 
@@ -392,7 +403,7 @@ export default function B2BRubberIntakeStatsPage() {
           { title: 'Giá trị (đ)', numFmt: '#,##0', total: 'sum', align: 'right' },
         ],
         rows: data.byPartner.map(p => [
-          p.code, p.name, p.tier || '', p.count, Math.round(p.net_kg), Math.round(p.dry_kg),
+          p.code, p.name, p.tier ? enumLabel(TIER_LABELS, p.tier) : '', p.count, Math.round(p.net_kg), Math.round(p.dry_kg),
           Math.round(p.deal_dry_kg || 0), Math.round(p.adhoc_dry_kg || 0),
           p.avg_drc != null ? Number(p.avg_drc.toFixed(2)) : '', Math.round(p.amount),
         ]),
@@ -446,7 +457,7 @@ export default function B2BRubberIntakeStatsPage() {
       URL.revokeObjectURL(url)
       message.success(`Đã xuất ${fileName}`)
     } catch (e: any) {
-      message.error('Xuất Excel thất bại: ' + (e?.message || ''))
+      message.error(dichLoiHeThong(e, 'Xuất Excel thất bại'))
     }
   }
 
@@ -481,28 +492,29 @@ export default function B2BRubberIntakeStatsPage() {
         <div>
           <div style={{ fontWeight: 600 }}>{r.name}</div>
           <Text type="secondary" style={{ fontSize: 11 }}>{r.code}</Text>
-          {r.tier && <Tag style={{ marginLeft: 6, fontSize: 10 }} color="purple">{r.tier}</Tag>}
+          {r.tier && <EnumTag value={r.tier} labels={TIER_LABELS} colors={TIER_COLORS} style={{ marginLeft: 6, fontSize: 10 }} />}
         </div>
       ),
     },
     { title: 'Phiếu', dataIndex: 'count', width: 70, align: 'right',
       sorter: (a, b) => a.count - b.count },
     { title: 'KL (T)', dataIndex: 'net_kg', width: 100, align: 'right',
-      render: v => <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>{((v || 0) / 1000).toFixed(2)}</span>,
+      render: v => <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>{fmtT2(v || 0)}</span>,
       sorter: (a, b) => a.net_kg - b.net_kg },
     { title: 'KL khô (T)', dataIndex: 'dry_kg', width: 100, align: 'right',
-      render: v => <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0F766E' }}>{(v / 1000).toFixed(2)}</span>,
+      render: v => <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0F766E' }}>{fmtT2(v || 0)}</span>,
       sorter: (a, b) => a.dry_kg - b.dry_kg, defaultSortOrder: 'descend' },
     { title: 'Deal (T khô)', dataIndex: 'deal_dry_kg', width: 100, align: 'right',
-      render: v => <span style={{ fontFamily: 'monospace', color: '#15803D' }}>{((v || 0) / 1000).toFixed(2)}</span>,
+      render: v => <span style={{ fontFamily: 'monospace', color: '#15803D' }}>{fmtT2(v || 0)}</span>,
       sorter: (a, b) => a.deal_dry_kg - b.deal_dry_kg },
     { title: 'Bộc phát (T khô)', dataIndex: 'adhoc_dry_kg', width: 120, align: 'right',
-      render: v => <span style={{ fontFamily: 'monospace', color: '#1D4ED8' }}>{((v || 0) / 1000).toFixed(2)}</span>,
+      render: v => <span style={{ fontFamily: 'monospace', color: '#1D4ED8' }}>{fmtT2(v || 0)}</span>,
       sorter: (a, b) => a.adhoc_dry_kg - b.adhoc_dry_kg },
     { title: 'DRC TB', dataIndex: 'avg_drc', width: 80, align: 'right',
-      render: v => v != null ? <span style={{ color: '#15803D' }}>{v.toFixed(1)}%</span> : '—' },
+      render: v => v != null ? <span style={{ color: '#15803D' }}>{v.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</span> : '—' },
+    // Bảng xếp hạng (thống kê) — tiền rút gọn tỷ/tr theo vi-VN (trước "12.3M": chấm kiểu Mỹ + chữ M)
     { title: 'Giá trị', dataIndex: 'amount', width: 100, align: 'right',
-      render: v => v ? <span style={{ fontFamily: 'monospace', color: '#92400E' }}>{(v / 1_000_000).toFixed(1)}M</span> : '—',
+      render: v => v ? <span style={{ fontFamily: 'monospace', color: '#92400E' }}>{fmtVndCompact(v)}</span> : '—',
       sorter: (a, b) => a.amount - b.amount },
   ]
 
@@ -512,10 +524,10 @@ export default function B2BRubberIntakeStatsPage() {
     { title: 'Phiếu', dataIndex: 'count', width: 70, align: 'right',
       sorter: (a, b) => a.count - b.count },
     { title: 'KL khô (T)', dataIndex: 'dry_kg', width: 100, align: 'right',
-      render: v => <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0F766E' }}>{(v / 1000).toFixed(2)}</span>,
+      render: v => <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0F766E' }}>{fmtT2(v || 0)}</span>,
       sorter: (a, b) => a.dry_kg - b.dry_kg, defaultSortOrder: 'descend' },
     { title: 'Giá trị', dataIndex: 'amount', width: 100, align: 'right',
-      render: v => v ? <span style={{ fontFamily: 'monospace', color: '#92400E' }}>{(v / 1_000_000).toFixed(1)}M</span> : '—' },
+      render: v => v ? <span style={{ fontFamily: 'monospace', color: '#92400E' }}>{fmtVndCompact(v)}</span> : '—' },
   ]
 
   // ── RENDER ──
@@ -608,18 +620,13 @@ export default function B2BRubberIntakeStatsPage() {
               <Col>
                 <Space size={4} wrap>
                   <Text type="secondary" style={{ fontSize: 11 }}>NHÀ MÁY:</Text>
-                  <Tag.CheckableTag checked={facilityFilter === ''} onChange={() => setFacilityFilter('')}>
-                    Tất cả
-                  </Tag.CheckableTag>
-                  {facilities.map(f => (
-                    <Tag.CheckableTag
-                      key={f.id}
-                      checked={facilityFilter === f.id}
-                      onChange={() => setFacilityFilter(facilityFilter === f.id ? '' : f.id)}
-                    >
-                      <Factory size={10} style={{ display: 'inline', marginRight: 3 }} /> {f.code}
-                    </Tag.CheckableTag>
-                  ))}
+                  {/* FacilityPicker dùng chung: cache danh sách nhà máy + nhớ lựa chọn qua các sổ */}
+                  <FacilityPicker
+                    persist
+                    size="small"
+                    style={{ minWidth: 200 }}
+                    onChange={(id) => setFacilityFilter(id ?? '')}
+                  />
                 </Space>
               </Col>
             )}
@@ -664,6 +671,7 @@ export default function B2BRubberIntakeStatsPage() {
         <Card style={{ marginBottom: 12, background: '#FEF2F2', borderColor: '#FECACA' }}>
           <Text type="danger" strong>Không tải được thống kê: </Text>
           <Text type="danger">{error}</Text>
+          <Button size="small" icon={<ReloadOutlined />} onClick={fetchData} style={{ marginLeft: 8 }}>Thử lại</Button>
         </Card>
       )}
 
@@ -680,12 +688,14 @@ export default function B2BRubberIntakeStatsPage() {
               <Col xs={12} sm={8} md={4}>
                 <Card size="small" style={{ borderRadius: 12, borderTop: '3px solid #15803D' }}>
                   <Statistic title="KL tươi" value={data.totals.net_kg / 1000} precision={2} suffix="T"
+                    groupSeparator="." decimalSeparator=","
                     valueStyle={{ color: '#15803D', fontSize: 22 }} />
                 </Card>
               </Col>
               <Col xs={12} sm={8} md={4}>
                 <Card size="small" style={{ borderRadius: 12, borderTop: '3px solid #0F766E' }}>
                   <Statistic title="KL khô" value={data.totals.dry_kg / 1000} precision={2} suffix="T"
+                    groupSeparator="." decimalSeparator=","
                     valueStyle={{ color: '#0F766E', fontSize: 22 }} />
                 </Card>
               </Col>
@@ -695,12 +705,13 @@ export default function B2BRubberIntakeStatsPage() {
                     value={data.totals.avg_drc ?? 0}
                     precision={1}
                     suffix="%"
+                    groupSeparator="." decimalSeparator=","
                     valueStyle={{ color: '#8B5CF6', fontSize: 22 }} />
                 </Card>
               </Col>
               <Col xs={12} sm={8} md={4}>
                 <Card size="small" style={{ borderRadius: 12, borderTop: '3px solid #D97706' }}>
-                  <Statistic title="Giá trị" value={data.totals.amount / 1_000_000} precision={1} suffix=" tr đ"
+                  <Statistic title="Giá trị" value={data.totals.amount} formatter={(v) => fmtVndCompact(Number(v))}
                     valueStyle={{ color: '#D97706', fontSize: 22 }} />
                 </Card>
               </Col>
@@ -709,7 +720,8 @@ export default function B2BRubberIntakeStatsPage() {
                   <Statistic title="Giá TB / kg khô"
                     value={data.totals.avg_price_per_dry_kg ?? 0}
                     precision={0}
-                    suffix=" đ"
+                    suffix=" ₫"
+                    groupSeparator="." decimalSeparator=","
                     valueStyle={{ color: '#06B6D4', fontSize: 22 }} />
                 </Card>
               </Col>

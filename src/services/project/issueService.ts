@@ -15,6 +15,37 @@ import { supabase } from '../../lib/supabase'
 export type IssueSeverity = 'critical' | 'high' | 'medium' | 'low'
 export type IssueStatus = 'open' | 'in_progress' | 'resolved' | 'closed' | 'escalated'
 
+// Nhãn + màu antd — MỘT nguồn cho Theo dõi vấn đề, tab Báo cáo… (Đợt 3 audit UI 17/11/2026). Trang đọc chữ từ đây.
+export const ISSUE_STATUS_LABELS: Record<IssueStatus, string> = {
+  open: 'Mở',
+  in_progress: 'Đang xử lý',
+  resolved: 'Đã giải quyết',
+  closed: 'Đã đóng',
+  escalated: 'Leo thang',
+}
+
+export const ISSUE_STATUS_COLORS: Record<IssueStatus, string> = {
+  open: 'gold',
+  in_progress: 'blue',
+  resolved: 'green',
+  closed: 'default',
+  escalated: 'red',
+}
+
+export const ISSUE_SEVERITY_LABELS: Record<IssueSeverity, string> = {
+  critical: 'Nghiêm trọng',
+  high: 'Cao',
+  medium: 'Trung bình',
+  low: 'Thấp',
+}
+
+export const ISSUE_SEVERITY_COLORS: Record<IssueSeverity, string> = {
+  critical: 'red',
+  high: 'orange',
+  medium: 'gold',
+  low: 'default',
+}
+
 export interface ProjectIssue {
   id: string
   project_id: string

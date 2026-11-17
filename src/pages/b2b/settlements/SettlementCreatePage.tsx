@@ -13,7 +13,6 @@ import {
   Row,
   Col,
   Divider,
-  Tag,
   Descriptions,
   DatePicker,
   Result,
@@ -39,17 +38,13 @@ import { advanceService, Advance } from '../../../services/b2b/advanceService'
 import SettlementItemsTable from '../../../components/b2b/SettlementItemsTable'
 import type { SettlementItemRow } from '../../../components/b2b/SettlementItemsTable'
 import { supabase } from '../../../lib/supabase'
-import dayjs from 'dayjs'
+import { useAuthStore } from '../../../stores/authStore'
+import { TIER_LABELS, TIER_COLORS } from '../../../services/b2b/partnerService'
+import { fmtDate, fmtKg, fmtNum, fmtVnd, vndInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import EnumTag from '../../../components/common/EnumTag'
 
 const { Title, Text } = Typography
-
-const TIER_COLORS: Record<string, string> = {
-  diamond: 'purple',
-  gold: 'gold',
-  silver: 'default',
-  bronze: 'orange',
-  new: 'cyan',
-}
 
 const PRODUCT_OPTIONS = [
   { value: 'SVR 10', label: 'SVR 10' },
@@ -58,7 +53,8 @@ const PRODUCT_OPTIONS = [
   { value: 'Mủ nước', label: 'Mủ nước' },
   { value: 'Mủ tạp', label: 'Mủ tạp' },
   { value: 'Mủ đông', label: 'Mủ đông' },
-  { value: 'Khac', label: 'Khac' },
+  // value 'Khac' GIỮ NGUYÊN (đã lưu trong data) — chỉ sửa chữ hiển thị
+  { value: 'Khac', label: 'Khác' },
 ]
 
 const SETTLEMENT_TYPE_OPTIONS = [
@@ -75,13 +71,17 @@ interface Partner {
   phone: string | null
 }
 
-const formatCurrency = (value: number | undefined | null): string => {
-  if (value == null) return '0'
-  return new Intl.NumberFormat('vi-VN').format(value)
+// Ô nhập KG: chấm ngăn nghìn, PHẨY thập phân như fmtNum — parser cũ xoá cả dấu phẩy thập phân nên
+// sửa "KL thành phẩm" 3.456,78 thành 345678 kg (audit 17/11/2026).
+const kgInputProps = {
+  formatter: (value: string | number | undefined) => (value ? fmtNum(Number(value), 2) : ''),
+  parser: (value: string | undefined) =>
+    Number((value || '').replace(/\./g, '').replace(',', '.')) as unknown as number,
 }
 
 const SettlementCreatePage: React.FC = () => {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [searchParams] = useSearchParams()
   const prefilledDealId = searchParams.get('deal_id')
   const [currentStep, setCurrentStep] = useState(0)
@@ -89,6 +89,7 @@ const SettlementCreatePage: React.FC = () => {
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null)
   const [deals, setDeals] = useState<any[]>([])
   const [unlinkedAdvances, setUnlinkedAdvances] = useState<Advance[]>([])
+  const [advancesFailed, setAdvancesFailed] = useState(false)
   const [selectedAdvanceIds, setSelectedAdvanceIds] = useState<string[]>([])
   const [items, setItems] = useState<SettlementItemRow[]>([])
   const [form] = Form.useForm()
@@ -98,11 +99,13 @@ const SettlementCreatePage: React.FC = () => {
   // Fetch partners on mount
   useEffect(() => {
     const fetchPartners = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('b2b_partners')
         .select('id, code, name, tier, phone')
         .eq('is_active', true)
         .order('name')
+      // Lỗi tải ≠ "không có đối tác" — báo rõ thay vì để ô chọn trống im lặng
+      if (error) message.error(dichLoiHeThong(error, 'Không tải được danh sách đối tác'))
       if (data) setPartners(data)
     }
     fetchPartners()
@@ -152,14 +155,19 @@ const SettlementCreatePage: React.FC = () => {
   useEffect(() => {
     if (!selectedPartner) {
       setUnlinkedAdvances([])
+      setAdvancesFailed(false)
       return
     }
     const fetchAdvances = async () => {
       try {
+        setAdvancesFailed(false)
         const data = await advanceService.getUnlinkedAdvances(selectedPartner.id)
         setUnlinkedAdvances(data)
-      } catch {
+      } catch (e) {
+        // Lỗi tải ≠ "không có tạm ứng": nếu im lặng, phiếu lập ra không trừ tạm ứng → "Còn phải trả" bị thổi lên
         setUnlinkedAdvances([])
+        setAdvancesFailed(true)
+        message.error(dichLoiHeThong(e, 'Không tải được danh sách tạm ứng của đối tác'))
       }
     }
     fetchAdvances()
@@ -194,17 +202,10 @@ const SettlementCreatePage: React.FC = () => {
 
   const handleNext = async () => {
     if (currentStep === 0) {
-      const values = form.getFieldsValue(['partner_id', 'settlement_type', 'product_type'])
-      if (!values.partner_id) {
-        message.warning('Vui lòng chọn đối tác')
-        return
-      }
-      if (!values.settlement_type) {
-        message.warning('Vui lòng chọn loại quyết toán')
-        return
-      }
-      if (!values.product_type) {
-        message.warning('Vui lòng chọn loại sản phẩm')
+      // validateFields: antd tô đỏ + cuộn tới ô thiếu, thay 3 toast rời rạc (audit 17/11/2026)
+      try {
+        await form.validateFields(['partner_id', 'settlement_type', 'product_type'])
+      } catch {
         return
       }
     }
@@ -222,12 +223,35 @@ const SettlementCreatePage: React.FC = () => {
     setCurrentStep((prev) => prev - 1)
   }
 
+  // Người lập = employee của tài khoản đang đăng nhập (cùng cách SettlementDetailPage.getCurrentEmployeeId).
+  // b2b.settlements.created_by là uuid NOT NULL, khoá ngoại sang employees(id) → chỉ nhận mã nhân viên;
+  // chuỗi kiểu 'system' hay auth uid đều làm insert lỗi, nên chưa liên kết nhân viên thì báo rõ.
+  const resolveCreatedBy = async (): Promise<string> => {
+    if (user?.employee_id) return user.employee_id
+    const { data: emp } = user?.id
+      ? await supabase.from('employees').select('id').eq('user_id', user.id).maybeSingle()
+      : { data: null }
+    if (!emp?.id) throw new Error('Tài khoản chưa liên kết hồ sơ nhân viên nên không lập được phiếu quyết toán — nhờ HCNS/IT gán nhân viên cho tài khoản này.')
+    return emp.id
+  }
+
+  // "Tạo phiếu mới": về bước 1 trong SPA thay vì window.location.reload() (nháy trắng, mất state app)
+  const handleStartNew = () => {
+    form.resetFields()
+    setItems([])
+    setSelectedAdvanceIds([])
+    setSelectedPartner(null)
+    setCreatedId(null)
+    setCurrentStep(0)
+  }
+
   const handleSubmit = async () => {
     setLoading(true)
     try {
       const values = form.getFieldsValue()
+      const createdBy = await resolveCreatedBy()
       const data: SettlementCreateData = {
-        created_by: 'system',
+        created_by: createdBy,
         partner_id: values.partner_id,
         settlement_type: values.settlement_type,
         product_type: values.product_type,
@@ -275,9 +299,9 @@ const SettlementCreatePage: React.FC = () => {
       const result = await settlementService.createSettlement(data)
       setCreatedId(result.id)
       setCurrentStep(4)
-      message.success('Tao phieu quyet toan thanh cong!')
+      message.success('Tạo phiếu quyết toán thành công!')
     } catch (err: any) {
-      message.error(err?.message || 'Có lỗi xảy ra khi tạo phiếu quyết toán')
+      message.error(dichLoiHeThong(err, 'Có lỗi xảy ra khi tạo phiếu quyết toán'))
     } finally {
       setLoading(false)
     }
@@ -300,7 +324,7 @@ const SettlementCreatePage: React.FC = () => {
       >
         <Select
           showSearch
-          placeholder="Tim va chon doi tac..."
+          placeholder="Tìm và chọn đối tác..."
           optionFilterProp="label"
           onChange={handlePartnerChange}
           options={partners.map((p) => ({
@@ -315,7 +339,7 @@ const SettlementCreatePage: React.FC = () => {
                 <UserOutlined />
                 <span>{p.name}</span>
                 <Text type="secondary">({p.code})</Text>
-                <Tag color={TIER_COLORS[p.tier] || 'default'}>{p.tier}</Tag>
+                <EnumTag value={p.tier} labels={TIER_LABELS} colors={TIER_COLORS} />
               </Space>
             )
           }}
@@ -339,10 +363,10 @@ const SettlementCreatePage: React.FC = () => {
       </Form.Item>
 
       {selectedPartner && deals.length > 0 && (
-        <Form.Item name="deal_id" label="Lien ket deal (tuy chon)">
+        <Form.Item name="deal_id" label="Liên kết Deal (tuỳ chọn)">
           <Select
             allowClear
-            placeholder="Chon deal lien ket..."
+            placeholder="Chọn Deal liên kết..."
             options={deals.map((d) => ({
               value: d.id,
               label: `${d.deal_number} - ${d.product_name}`,
@@ -354,14 +378,12 @@ const SettlementCreatePage: React.FC = () => {
       {selectedPartner && (
         <Card size="small" style={{ marginTop: 16, background: '#f6ffed' }}>
           <Descriptions column={2} size="small">
-            <Descriptions.Item label="Ten">{selectedPartner.name}</Descriptions.Item>
-            <Descriptions.Item label="Ma">{selectedPartner.code}</Descriptions.Item>
-            <Descriptions.Item label="Hang">
-              <Tag color={TIER_COLORS[selectedPartner.tier] || 'default'}>
-                {selectedPartner.tier}
-              </Tag>
+            <Descriptions.Item label="Tên">{selectedPartner.name}</Descriptions.Item>
+            <Descriptions.Item label="Mã">{selectedPartner.code}</Descriptions.Item>
+            <Descriptions.Item label="Hạng">
+              <EnumTag value={selectedPartner.tier} labels={TIER_LABELS} colors={TIER_COLORS} />
             </Descriptions.Item>
-            <Descriptions.Item label="SDT">
+            <Descriptions.Item label="SĐT">
               {selectedPartner.phone || 'Chưa cập nhật'}
             </Descriptions.Item>
           </Descriptions>
@@ -376,36 +398,34 @@ const SettlementCreatePage: React.FC = () => {
         <Col span={8}>
           <Form.Item
             name="weighed_kg"
-            label="KL can (kg)"
+            label="KL cân (kg)"
             rules={[{ required: true, message: 'Vui lòng nhập khối lượng cân' }]}
           >
             <InputNumber
               style={{ width: '100%' }}
               min={0}
-              placeholder="Nhap KL can"
-              formatter={(value) => (value ? formatCurrency(Number(value)) : '')}
-              parser={(value) => Number(value?.replace(/\./g, '').replace(/,/g, '')) as any}
+              placeholder="Nhập KL cân"
+              {...kgInputProps}
             />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item name="drc_percent" label="Ham luong DRC (%)">
+          <Form.Item name="drc_percent" label="Hàm lượng DRC (%)">
             <InputNumber
               style={{ width: '100%' }}
               min={0}
               max={100}
-              placeholder="Nhap DRC"
+              placeholder="Nhập DRC"
             />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item name="finished_kg" label="KL thanh pham (kg)">
+          <Form.Item name="finished_kg" label="KL thành phẩm (kg)">
             <InputNumber
               style={{ width: '100%' }}
               min={0}
               placeholder="Tự động tính"
-              formatter={(value) => (value ? formatCurrency(Number(value)) : '')}
-              parser={(value) => Number(value?.replace(/\./g, '').replace(/,/g, '')) as any}
+              {...kgInputProps}
             />
           </Form.Item>
         </Col>
@@ -415,16 +435,15 @@ const SettlementCreatePage: React.FC = () => {
         <Col span={12}>
           <Form.Item
             name="approved_price"
-            label="Don gia duyet (VND/kg)"
+            label="Đơn giá duyệt (₫/kg)"
             rules={[{ required: true, message: 'Vui lòng nhập đơn giá' }]}
           >
             <InputNumber
               style={{ width: '100%' }}
               min={0}
               placeholder="Nhập đơn giá"
-              formatter={(value) => (value ? formatCurrency(Number(value)) : '')}
-              parser={(value) => Number(value?.replace(/\./g, '').replace(/,/g, '')) as any}
-              suffix="VND"
+              {...vndInputProps}
+              suffix="₫"
             />
           </Form.Item>
         </Col>
@@ -439,9 +458,9 @@ const SettlementCreatePage: React.FC = () => {
               textAlign: 'center',
             }}
           >
-            <Text type="secondary">Thanh tien (tam tinh)</Text>
+            <Text type="secondary">Thành tiền (tạm tính)</Text>
             <Title level={4} style={{ margin: 0, color: '#1890ff' }}>
-              {formatCurrency(grossAmount)} VND
+              {fmtVnd(grossAmount)}
             </Title>
           </div>
         </Col>
@@ -451,7 +470,7 @@ const SettlementCreatePage: React.FC = () => {
 
       <Row gutter={16}>
         <Col span={12}>
-          <Form.Item name="vehicle_plates" label="Biến số xe">
+          <Form.Item name="vehicle_plates" label="Biển số xe">
             <Input placeholder="VD: 51C-123.45" />
           </Form.Item>
         </Col>
@@ -462,7 +481,7 @@ const SettlementCreatePage: React.FC = () => {
         </Col>
         <Col span={6}>
           <Form.Item name="driver_phone" label="SĐT tài xế">
-            <Input placeholder="Nhap SDT" />
+            <Input placeholder="Nhập SĐT" />
           </Form.Item>
         </Col>
       </Row>
@@ -489,13 +508,17 @@ const SettlementCreatePage: React.FC = () => {
 
   const renderStep2 = () => (
     <>
-      <Title level={5}>Hang muc quyet toan</Title>
+      <Title level={5}>Hạng mục quyết toán</Title>
       <SettlementItemsTable editable items={items} onChange={setItems} />
 
       <Divider />
 
-      <Title level={5}>Tam ung da chi</Title>
-      {unlinkedAdvances.length === 0 ? (
+      <Title level={5}>Tạm ứng đã chi</Title>
+      {advancesFailed ? (
+        <Text type="danger">
+          Không tải được danh sách tạm ứng — đừng lập phiếu lúc này (sẽ không trừ được tạm ứng). Chọn lại đối tác hoặc tải lại trang.
+        </Text>
+      ) : unlinkedAdvances.length === 0 ? (
         <Text type="secondary">Không có tạm ứng chưa liên kết cho đối tác này.</Text>
       ) : (
         <List
@@ -511,10 +534,10 @@ const SettlementCreatePage: React.FC = () => {
                 <Space>
                   <Text strong>{advance.advance_number}</Text>
                   <Text type="secondary">
-                    {advance.payment_date ? dayjs(advance.payment_date).format('DD/MM/YYYY') : ''}
+                    {advance.payment_date ? fmtDate(advance.payment_date) : ''}
                   </Text>
                   <Text style={{ color: '#f5222d' }}>
-                    {formatCurrency(advance.amount)} VND
+                    {fmtVnd(advance.amount)}
                   </Text>
                 </Space>
               </Checkbox>
@@ -528,32 +551,32 @@ const SettlementCreatePage: React.FC = () => {
       <Card size="small" style={{ background: '#fffbe6', borderColor: '#ffe58f' }}>
         <Row gutter={16}>
           <Col span={8} style={{ textAlign: 'center' }}>
-            <Text type="secondary">Thanh tien</Text>
+            <Text type="secondary">Thành tiền</Text>
             <br />
             <Text strong style={{ fontSize: 16 }}>
-              {formatCurrency(grossAmount)} VND
+              {fmtVnd(grossAmount)}
             </Text>
           </Col>
           <Col span={8} style={{ textAlign: 'center' }}>
-            <Text type="secondary">Tong hang muc</Text>
+            <Text type="secondary">Tổng hạng mục</Text>
             <br />
             <Text strong style={{ fontSize: 16, color: totalItemsAmount >= 0 ? '#52c41a' : '#f5222d' }}>
-              {totalItemsAmount >= 0 ? '+' : ''}{formatCurrency(totalItemsAmount)} VND
+              {totalItemsAmount >= 0 ? '+' : ''}{fmtVnd(totalItemsAmount)}
             </Text>
           </Col>
           <Col span={8} style={{ textAlign: 'center' }}>
-            <Text type="secondary">Tong tam ung</Text>
+            <Text type="secondary">Tổng tạm ứng</Text>
             <br />
             <Text strong style={{ fontSize: 16, color: '#f5222d' }}>
-              -{formatCurrency(totalAdvanceAmount)} VND
+              -{fmtVnd(totalAdvanceAmount)}
             </Text>
           </Col>
         </Row>
         <Divider style={{ margin: '12px 0' }} />
         <div style={{ textAlign: 'center' }}>
-          <Text type="secondary">Con phai tra</Text>
+          <Text type="secondary">Còn phải trả</Text>
           <Title level={3} style={{ margin: 0, color: remaining >= 0 ? '#52c41a' : '#f5222d' }}>
-            {formatCurrency(remaining)} VND
+            {fmtVnd(remaining)}
           </Title>
         </div>
       </Card>
@@ -573,10 +596,8 @@ const SettlementCreatePage: React.FC = () => {
         <Descriptions bordered column={2} size="small" title="Thông tin đối tác">
           <Descriptions.Item label="Đối tác">{selectedPartner?.name}</Descriptions.Item>
           <Descriptions.Item label="Mã đối tác">{selectedPartner?.code}</Descriptions.Item>
-          <Descriptions.Item label="Hang">
-            <Tag color={TIER_COLORS[selectedPartner?.tier || ''] || 'default'}>
-              {selectedPartner?.tier}
-            </Tag>
+          <Descriptions.Item label="Hạng">
+            <EnumTag value={selectedPartner?.tier} labels={TIER_LABELS} colors={TIER_COLORS} />
           </Descriptions.Item>
           <Descriptions.Item label="Loại quyết toán">{typeLabel}</Descriptions.Item>
           <Descriptions.Item label="Sản phẩm">{productLabel}</Descriptions.Item>
@@ -589,20 +610,20 @@ const SettlementCreatePage: React.FC = () => {
 
         <Divider />
 
-        <Descriptions bordered column={2} size="small" title="Thong tin can & DRC">
-          <Descriptions.Item label="KL can (kg)">
-            {formatCurrency(values.weighed_kg)}
+        <Descriptions bordered column={2} size="small" title="Thông tin cân & DRC">
+          <Descriptions.Item label="KL cân (kg)">
+            {fmtKg(values.weighed_kg, 2)}
           </Descriptions.Item>
           <Descriptions.Item label="DRC (%)">
             {values.drc_percent ?? 'Chưa nhập'}
           </Descriptions.Item>
-          <Descriptions.Item label="KL thanh pham (kg)">
-            {formatCurrency(values.finished_kg)}
+          <Descriptions.Item label="KL thành phẩm (kg)">
+            {fmtKg(values.finished_kg, 2)}
           </Descriptions.Item>
-          <Descriptions.Item label="Don gia (VND/kg)">
-            {formatCurrency(values.approved_price)}
+          <Descriptions.Item label="Đơn giá (₫/kg)">
+            {fmtVnd(values.approved_price)}
           </Descriptions.Item>
-          <Descriptions.Item label="Biến số xe">
+          <Descriptions.Item label="Biển số xe">
             {values.vehicle_plates || 'Chưa nhập'}
           </Descriptions.Item>
           <Descriptions.Item label="Tài xế">
@@ -611,15 +632,15 @@ const SettlementCreatePage: React.FC = () => {
           </Descriptions.Item>
           <Descriptions.Item label="Ngày cân">
             {values.weigh_date_start
-              ? dayjs(values.weigh_date_start).format('DD/MM/YYYY')
+              ? fmtDate(values.weigh_date_start)
               : ''}{' '}
             {values.weigh_date_end
-              ? `- ${dayjs(values.weigh_date_end).format('DD/MM/YYYY')}`
+              ? `- ${fmtDate(values.weigh_date_end)}`
               : ''}
           </Descriptions.Item>
           <Descriptions.Item label="Ngày nhập kho">
             {values.stock_in_date
-              ? dayjs(values.stock_in_date).format('DD/MM/YYYY')
+              ? fmtDate(values.stock_in_date)
               : 'Chưa chọn'}
           </Descriptions.Item>
         </Descriptions>
@@ -628,11 +649,11 @@ const SettlementCreatePage: React.FC = () => {
 
         <Descriptions bordered column={1} size="small" title="Hạng mục quyết toán">
           {items.length === 0 ? (
-            <Descriptions.Item label="Hạng mục">Khong co hang muc</Descriptions.Item>
+            <Descriptions.Item label="Hạng mục">Không có hạng mục</Descriptions.Item>
           ) : (
             items.map((item, idx) => (
-              <Descriptions.Item key={idx} label={item.description || `Hang muc ${idx + 1}`}>
-                {formatCurrency(item.amount)} VND
+              <Descriptions.Item key={idx} label={item.description || `Hạng mục ${idx + 1}`}>
+                {fmtVnd(item.amount)}
               </Descriptions.Item>
             ))
           )}
@@ -646,7 +667,7 @@ const SettlementCreatePage: React.FC = () => {
                 .filter((a) => selectedAdvanceIds.includes(a.id))
                 .map((a) => (
                   <Descriptions.Item key={a.id} label={a.advance_number}>
-                    -{formatCurrency(a.amount)} VND
+                    -{fmtVnd(a.amount)}
                   </Descriptions.Item>
                 ))}
             </Descriptions>
@@ -661,24 +682,24 @@ const SettlementCreatePage: React.FC = () => {
         >
           <Row gutter={16}>
             <Col span={8} style={{ textAlign: 'center' }}>
-              <Text type="secondary">Thanh tien</Text>
+              <Text type="secondary">Thành tiền</Text>
               <Title level={4} style={{ margin: 0 }}>
-                {formatCurrency(grossAmount)} VND
+                {fmtVnd(grossAmount)}
               </Title>
             </Col>
             <Col span={8} style={{ textAlign: 'center' }}>
-              <Text type="secondary">Tong tam ung</Text>
+              <Text type="secondary">Tổng tạm ứng</Text>
               <Title level={4} style={{ margin: 0, color: '#f5222d' }}>
-                -{formatCurrency(totalAdvanceAmount)} VND
+                -{fmtVnd(totalAdvanceAmount)}
               </Title>
             </Col>
             <Col span={8} style={{ textAlign: 'center' }}>
-              <Text type="secondary">Con phai tra</Text>
+              <Text type="secondary">Còn phải trả</Text>
               <Title
                 level={4}
                 style={{ margin: 0, color: remaining >= 0 ? '#52c41a' : '#f5222d' }}
               >
-                {formatCurrency(remaining)} VND
+                {fmtVnd(remaining)}
               </Title>
             </Col>
           </Row>
@@ -692,7 +713,7 @@ const SettlementCreatePage: React.FC = () => {
             loading={loading}
             onClick={handleSubmit}
           >
-            Xac nhan tao phieu quyet toan
+            Xác nhận tạo phiếu quyết toán
           </Button>
         </div>
       </>
@@ -702,21 +723,21 @@ const SettlementCreatePage: React.FC = () => {
   const renderSuccess = () => (
     <Result
       status="success"
-      title="Tao phieu quyet toan thanh cong!"
-      subTitle={`Phieu quyet toan da duoc tao cho doi tac ${selectedPartner?.name}.`}
+      title="Tạo phiếu quyết toán thành công!"
+      subTitle={`Phiếu quyết toán đã được tạo cho đối tác ${selectedPartner?.name}.`}
       extra={[
         <Button
           type="primary"
           key="detail"
           onClick={() => navigate(`/b2b/settlements/${createdId}`)}
         >
-          Xem chi tiet
+          Xem chi tiết
         </Button>,
         <Button key="list" onClick={() => navigate('/b2b/settlements')}>
-          Danh sach quyet toan
+          Danh sách quyết toán
         </Button>,
-        <Button key="new" onClick={() => window.location.reload()}>
-          Tao phieu moi
+        <Button key="new" onClick={handleStartNew}>
+          Tạo phiếu mới
         </Button>,
       ]}
     />
@@ -724,8 +745,8 @@ const SettlementCreatePage: React.FC = () => {
 
   const steps = [
     { title: 'Chọn đối tác', icon: <UserOutlined /> },
-    { title: 'Thong tin can & DRC', icon: <FileTextOutlined /> },
-    { title: 'Hang muc & Tam ung', icon: <DollarOutlined /> },
+    { title: 'Thông tin cân & DRC', icon: <FileTextOutlined /> },
+    { title: 'Hạng mục & Tạm ứng', icon: <DollarOutlined /> },
     { title: 'Xác nhận', icon: <CheckCircleOutlined /> },
   ]
 
@@ -736,7 +757,7 @@ const SettlementCreatePage: React.FC = () => {
         items={[
           { title: 'B2B' },
           {
-            title: <a onClick={() => navigate('/b2b/settlements')}>Quyet toan</a>,
+            title: <a onClick={() => navigate('/b2b/settlements')}>Quyết toán</a>,
           },
           { title: 'Tạo mới' },
         ]}
@@ -747,10 +768,10 @@ const SettlementCreatePage: React.FC = () => {
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate('/b2b/settlements')}
         >
-          Quay lai
+          Quay lại
         </Button>
         <Title level={4} style={{ margin: 0 }}>
-          Tao phieu quyet toan
+          Tạo phiếu quyết toán
         </Title>
       </Space>
 
@@ -792,17 +813,17 @@ const SettlementCreatePage: React.FC = () => {
                   disabled={currentStep === 0}
                   onClick={handlePrev}
                 >
-                  Truoc
+                  Trước
                 </Button>
                 <Button type="primary" onClick={handleNext}>
-                  Tiep theo
+                  Tiếp theo
                 </Button>
               </div>
             )}
 
             {currentStep === 3 && (
               <div style={{ marginTop: 24, textAlign: 'left' }}>
-                <Button onClick={handlePrev}>Truoc</Button>
+                <Button onClick={handlePrev}>Trước</Button>
               </div>
             )}
           </>

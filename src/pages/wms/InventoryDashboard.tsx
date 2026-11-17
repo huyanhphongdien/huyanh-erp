@@ -47,6 +47,7 @@ import { supabase } from '../../lib/supabase'
 import GradeBadge from '../../components/wms/GradeBadge'
 import type { RubberGrade } from '../../services/wms/wms.types'
 import { RUBBER_GRADE_LABELS, RUBBER_GRADE_COLORS } from '../../services/wms/wms.types'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 
@@ -146,7 +147,7 @@ const InventoryDashboard = () => {
       }
     } catch (err: any) {
       console.error('Dashboard load error:', err)
-      setError(err.message || 'Lỗi tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Lỗi tải dữ liệu tồn kho'))
     } finally {
       setLoading(false)
       setRefreshing(false)

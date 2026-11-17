@@ -8,9 +8,9 @@
 // Mock dựa trên docs/SALES_OVERVIEW_DASHBOARD_MOCKUP.html.
 // ============================================================================
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Tag, Button, Spin, message } from 'antd'
+import { Tag, Button, Spin } from 'antd'
 import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Trophy,
   ShoppingCart, Activity, CreditCard, TrendingUp, Calendar,
@@ -21,26 +21,25 @@ import { supabase } from '../../lib/supabase'
 import { salesDashboardService } from '../../services/sales/salesDashboardService'
 import { salesLotService } from '../../services/sales/salesLotService'
 import { getSalesRole, SALES_ROLE_LABELS } from '../../services/sales/salesPermissionService'
-import { ORDER_STATUS_LABELS } from '../../services/sales/salesTypes'
+import { ORDER_STATUS_LABELS, countryFlag } from '../../services/sales/salesTypes'
+import { fmtMoney, isVnd } from '../../services/sales/salesMoney'
+import { fmtDate, fmtDateShort } from '../../utils/format'
+import { toDateStrVN } from '../../utils/dateVN'
+import PageState from '../../components/common/PageState'
+import SalesCommandPalette from './components/SalesCommandPalette'
 import type { TopCustomer, PipelineStage } from '../../services/sales/salesDashboardService'
 
 const PRIMARY = '#1B4D3E'
 
 // ─── Format helpers ─────────────────────────────────────────────────
-const fmtUSD = (v: number) => {
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v)}`
-}
+/** USD rút gọn cho thẻ/widget hẹp ($5.90M / $307K) — chính là fmtMoney compact. */
+const fmtUSD = (v: number) => fmtMoney(v, 'USD', { compact: true })
 const daysFromNow = (d: string) => {
   const ms = new Date(d).getTime() - Date.now()
   return Math.round(ms / 86400000)
 }
 
-const FLAG: Record<string, string> = {
-  IN: '🇮🇳', PH: '🇵🇭', ID: '🇮🇩', KR: '🇰🇷', SG: '🇸🇬', FR: '🇫🇷',
-  AE: '🇦🇪', TW: '🇹🇼', TR: '🇹🇷', ES: '🇪🇸', BD: '🇧🇩', CN: '🇨🇳', LK: '🇱🇰',
-}
+// Cờ quốc gia: countryFlag() (salesTypes) — bảng FLAG 13 nước cũ thiếu JP/US/DE/MY → khách Nhật/Mỹ/Đức ra 🌐.
 
 const STAGE_META: Record<string, { icon: string; color: string; bg: string }> = {
   draft:      { icon: '📝', color: '#8c8c8c', bg: '#f5f5f5' },
@@ -50,6 +49,7 @@ const STAGE_META: Record<string, { icon: string; color: string; bg: string }> = 
   packing:    { icon: '🚚', color: '#531dab', bg: '#f9f0ff' },
   shipped:    { icon: '🚢', color: '#6366f1', bg: '#eef2ff' },
   delivered:  { icon: '✅', color: '#389e0d', bg: '#f6ffed' },
+  invoiced:   { icon: '🧾', color: '#d48806', bg: '#fffbe6' },
   paid:       { icon: '💰', color: '#1B4D3E', bg: '#d9f7e8' },
 }
 
@@ -108,6 +108,8 @@ export default function SalesDashboardPage() {
 
   const [period, setPeriod] = useState<'month' | 'quarter' | 'year'>('month')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const lastLoadRef = useRef(0)
   const [data, setData] = useState<DashboardData>({
     kpis: null,
     pipeline: [],
@@ -121,15 +123,17 @@ export default function SalesDashboardPage() {
     lotsDeliveredUnpaidUsd: 0,
   })
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  // silent = nạp lại nền (quay lại trang) — không thay cả trang bằng vòng quay
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    lastLoadRef.current = Date.now()
     try {
       const [kpis, pipeline, topCustomers, slaRisk, activityFeed, lcNearExpiry,
              calendar, cashflow, lotsUnpaid] =
         await Promise.all([
           salesDashboardService.getKPIs(period),
           salesDashboardService.getPipeline(),
-          salesDashboardService.getTopCustomers(5),
+          salesDashboardService.getTopCustomers(5, period),   // CÙNG kỳ với tiêu đề "Top KH tháng này"
           fetchSlaAtRisk(),
           fetchActivityFeed(),
           fetchLcNearExpiry(),
@@ -150,15 +154,26 @@ export default function SalesDashboardPage() {
         lotsDeliveredUnpaid: lotsUnpaid.count,
         lotsDeliveredUnpaidUsd: lotsUnpaid.remainingUsd,
       })
+      setLoadError(null)
     } catch (e) {
+      // Lỗi tải ≠ "chưa có đơn": hiện khối lỗi + Thử lại thay cho các widget trống giả
       console.error('Dashboard load error', e)
-      message.error('Không tải được dashboard')
+      if (!silent) setLoadError(e)
     } finally {
       setLoading(false)
     }
   }, [period])
 
   useEffect(() => { void loadData() }, [loadData])
+
+  // Tự làm mới khi quay lại trang (đúng như dòng phụ ở đầu trang hứa) — tối đa 1 lần / phút
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastLoadRef.current > 60_000) void loadData(true)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [loadData])
 
   const aiSummary = useMemo(() => {
     if (!data.kpis) return null
@@ -172,7 +187,15 @@ export default function SalesDashboardPage() {
   if (loading) {
     return (
       <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spin size="large" tip="Đang tải dashboard..." />
+        <Spin size="large" tip="Đang tải tổng quan..." />
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ padding: '20px 24px 48px' }}>
+        <PageState error={loadError} onRetry={() => loadData()} />
       </div>
     )
   }
@@ -191,7 +214,7 @@ export default function SalesDashboardPage() {
             📊 Tổng quan Đơn hàng bán
           </div>
           <div style={{ fontSize: 11, color: '#8c8c8c' }}>
-            Bento dashboard · Auto-refresh khi quay lại trang
+            Tự làm mới khi quay lại trang
           </div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -217,7 +240,7 @@ export default function SalesDashboardPage() {
         <div style={aiBanner}>
           <div style={aiIcon}><Sparkles size={20} /></div>
           <div style={{ flex: 1 }}>
-            <div style={aiLabel}>AI Summary · {periodLabel}</div>
+            <div style={aiLabel}>Tóm tắt · {periodLabel}</div>
             <div style={aiText}>
               <strong style={{ color: '#FFD700' }}>{aiSummary.k.ordersThisPeriod} đơn</strong> đang ghi nhận,
               tổng <strong style={{ color: '#FFD700' }}>{fmtUSD(aiSummary.k.revenueThisPeriod)}</strong>.
@@ -241,7 +264,7 @@ export default function SalesDashboardPage() {
               {data.lcNearExpiry.length > 0 && (
                 <span style={aiAction} onClick={() => navigate('/sales/cash-flow')}>→ Xem L/C</span>
               )}
-              <span style={aiAction} onClick={() => loadData()}>↻ Refresh</span>
+              <span style={aiAction} onClick={() => loadData()}>↻ Làm mới</span>
             </div>
           </div>
         </div>
@@ -251,9 +274,9 @@ export default function SalesDashboardPage() {
       {k && aiSummary && (
         <div style={kpiRow}>
           <KpiCard label="Đang xử lý" value={k.processingOrders}
-                   sub={`đơn · ${fmtUSD(k.revenueThisPeriod)} pipeline`}
+                   sub={`đơn · đặt trong kỳ ${fmtUSD(k.revenueThisPeriod)}`}
                    trend={aiSummary.trend} trendLabel="so với kỳ trước" />
-          <KpiCard label="SLA at risk" value={data.slaRisk.length} sub="đơn quá hạn giao"
+          <KpiCard label="Quá hạn giao" value={data.slaRisk.length} sub="đơn chưa xuất, đã quá hạn giao"
                    trendLabel={data.slaRisk.length > 0 ? 'Cần xử lý' : 'Trong tầm kiểm soát'}
                    accent={data.slaRisk.length > 0 ? 'alert' : 'success'} />
           <KpiCard label="Lô đã giao chưa thu" value={data.lotsDeliveredUnpaid}
@@ -261,7 +284,7 @@ export default function SalesDashboardPage() {
                    trendLabel={data.lotsDeliveredUnpaid > 0 ? 'Hàng đã đi, tiền chưa về' : 'Không có lô chờ thu'}
                    accent={data.lotsDeliveredUnpaid > 0 ? 'warn' : 'success'} />
           <KpiCard label="L/C theo dõi" value={data.lcNearExpiry.length}
-                   sub={lcUrgentCount + ' hết hạn ≤7d'}
+                   sub={lcUrgentCount + ' hết hạn ≤ 7 ngày'}
                    trendLabel={data.lcNearExpiry.length > 0 ? `${data.lcNearExpiry[0].bank_name || ''}` : '—'} />
         </div>
       )}
@@ -295,7 +318,7 @@ export default function SalesDashboardPage() {
           })}
         </Widget>
 
-        <Widget icon={<AlertTriangle size={14} />} title="SLA at risk" iconColor="red"
+        <Widget icon={<AlertTriangle size={14} />} title="Quá hạn giao" iconColor="red"
                 sub={`${data.slaRisk.length} đơn`}>
           {data.slaRisk.length === 0 ? (
             <div style={emptyStyle}>Không có đơn quá hạn 🎉</div>
@@ -305,12 +328,13 @@ export default function SalesDashboardPage() {
                           background: sla.daysOver > 3 ? '#fff1f0' : '#fff7e6',
                           borderColor: sla.daysOver > 3 ? '#ffccc7' : '#ffd591' }}
                  onClick={() => navigate(`/sales/orders/${sla.id}`)}>
-              <div style={{ ...slaRing, background: sla.daysOver > 3 ? '#cf1322' : '#d46b08' }}>
-                +{sla.daysOver}d
+              <div style={{ ...slaRing, background: sla.daysOver > 3 ? '#cf1322' : '#d46b08', flexDirection: 'column', lineHeight: 1.1 }}>
+                +{sla.daysOver}
+                <span style={{ fontSize: 9, fontWeight: 500 }}>ngày</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 700 }}>
-                  {sla.contract_no} {FLAG[sla.country || ''] || ''} {sla.customer.slice(0, 20)}
+                  {sla.contract_no} {countryFlag(sla.country)} {sla.customer.slice(0, 20)}
                 </div>
                 <div style={{ fontSize: 11, color: '#8c8c8c' }}>
                   {sla.grade} · {sla.quantity_tons}MT · {fmtUSD(sla.total_value_usd)}
@@ -324,7 +348,7 @@ export default function SalesDashboardPage() {
       {/* ═══ BENTO ROW 2: Action + Calendar + Top customers ═══ */}
       <div style={{ ...bento, gridTemplateColumns: '1fr 1fr 1fr' }}>
 
-        <Widget icon={<CheckCircle size={14} />} title="Cần action của bạn" iconColor="purple"
+        <Widget icon={<CheckCircle size={14} />} title="Việc cần làm" iconColor="purple"
                 sub={`${lcUrgentCount + data.lotsDeliveredUnpaid} mục`}>
           {data.lotsDeliveredUnpaid > 0 && (
             <ActionGroup title="📦 Lô đã giao chưa thu tiền"
@@ -333,7 +357,7 @@ export default function SalesDashboardPage() {
               onClick={() => navigate('/sales/lots')} />
           )}
           {lcUrgentCount > 0 && (
-            <ActionGroup title="💰 LC sắp hết hạn ≤7d"
+            <ActionGroup title="💰 L/C sắp hết hạn ≤ 7 ngày"
               count={lcUrgentCount} countColor="red"
               ctaLabel="Xem L/C"
               onClick={() => navigate('/sales/cash-flow')} />
@@ -352,13 +376,13 @@ export default function SalesDashboardPage() {
         <Widget icon={<Trophy size={14} />} title={`Top KH ${periodLabel.toLowerCase()}`}
                 iconColor="green" sub="USD">
           {data.topCustomers.length === 0 ? (
-            <div style={emptyStyle}>Chưa có data</div>
+            <div style={emptyStyle}>Chưa có đơn trong kỳ</div>
           ) : data.topCustomers.map((c) => {
             const max = data.topCustomers[0]?.total_revenue || 1
             const pct = (c.total_revenue / max) * 100
             return (
               <div key={c.customer_id} style={custRow}>
-                <span style={{ fontSize: 18 }}>{FLAG[c.country || ''] || '🌐'}</span>
+                <span style={{ fontSize: 18 }}>{countryFlag(c.country) || '🌐'}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 600 }}>{c.name}</div>
                   <div style={custBarWrap}>
@@ -402,7 +426,7 @@ export default function SalesDashboardPage() {
       <div style={{ ...bento, gridTemplateColumns: '1fr 1fr' }}>
 
         <Widget icon={<CreditCard size={14} />} title="L/C theo dõi" iconColor="yellow"
-                sub={`${data.lcNearExpiry.length} LC ≤30d`}>
+                sub={`${data.lcNearExpiry.length} L/C ≤ 30 ngày`}>
           {data.lcNearExpiry.length === 0 ? (
             <div style={emptyStyle}>Không có L/C sắp hết hạn</div>
           ) : (
@@ -411,7 +435,7 @@ export default function SalesDashboardPage() {
                 <tr style={{ borderBottom: '1px solid #e8e8e8' }}>
                   <th style={th}>HĐ</th>
                   <th style={th}>KH</th>
-                  <th style={th}>Bank</th>
+                  <th style={th}>Ngân hàng</th>
                   <th style={{ ...th, textAlign: 'right' }}>Giá trị</th>
                   <th style={{ ...th, textAlign: 'right' }}>Còn lại</th>
                 </tr>
@@ -427,7 +451,7 @@ export default function SalesDashboardPage() {
                     <td style={{ ...td, textAlign: 'right',
                                  color: lc.daysLeft <= 7 ? '#cf1322' : lc.daysLeft <= 14 ? '#d46b08' : '#8c8c8c',
                                  fontWeight: 600 }}>
-                      {lc.daysLeft}d {lc.daysLeft <= 7 ? '🔴' : lc.daysLeft <= 14 ? '⚠' : ''}
+                      {lc.daysLeft} ngày {lc.daysLeft <= 7 ? '🔴' : lc.daysLeft <= 14 ? '⚠' : ''}
                     </td>
                   </tr>
                 ))}
@@ -436,24 +460,15 @@ export default function SalesDashboardPage() {
           )}
         </Widget>
 
-        <Widget icon={<TrendingUp size={14} />} title="Cash flow dự kiến" iconColor="green"
-                sub="7 tuần tới">
+        <Widget icon={<TrendingUp size={14} />} title="Dòng tiền dự kiến" iconColor="green"
+                sub="4 tuần qua · 3 tuần tới">
           <CashflowWidget bars={data.cashflow} />
         </Widget>
       </div>
 
-      {/* ═══ FOOTER NOTE ═══ */}
-      <div style={{
-        marginTop: 16, padding: '12px 16px', background: '#fafafa',
-        borderRadius: 8, fontSize: 11, color: '#8c8c8c', textAlign: 'center',
-      }}>
-        💡 Bento dashboard auto-refresh khi quay lại trang. AI summary tính từ real
-        data Supabase. Widget có thể tùy chỉnh sau (drag-to-rearrange, hide theo role).
-      </div>
-
       {/* ═══ QUICK ACTIONS STICKY ═══ */}
       <div style={quickActions}>
-        <span style={qaTitle}>⚡ Quick actions</span>
+        <span style={qaTitle}>⚡ Thao tác nhanh</span>
         <Button type="primary" icon={<Plus size={14} />} onClick={() => navigate('/sales/orders/new')}
                 style={{ background: PRIMARY }}>
           Tạo đơn mới
@@ -461,10 +476,14 @@ export default function SalesDashboardPage() {
         <Button icon={<TrendingUp size={14} />} onClick={() => navigate('/sales/kanban')}>
           Xem Kanban
         </Button>
-        <Button icon={<Search size={14} />} style={{ marginLeft: 'auto' }} disabled>
-          Tìm nhanh (Ctrl+K — coming soon)
+        <Button icon={<Search size={14} />} style={{ marginLeft: 'auto' }}
+                onClick={() => window.dispatchEvent(new Event('sales-cmdk-open'))}>
+          Tìm nhanh (Ctrl+K)
         </Button>
       </div>
+
+      {/* Ctrl+K — nhóm "Hành động" chạy được không cần danh sách đơn */}
+      <SalesCommandPalette orders={[]} />
     </div>
   )
 }
@@ -540,7 +559,8 @@ function CalendarWidget({ events, onClickDay }: {
   for (let i = 0; i < 21; i++) {
     const d = new Date(start)
     d.setDate(d.getDate() + i)
-    const dateStr = d.toISOString().split('T')[0]
+    // Giờ VN — toISOString() (UTC) làm ô ngày N mang chuỗi ngày N−1: dấu ETD lệch 1 ô, bấm ô mở sai ngày
+    const dateStr = toDateStrVN(d)
     const event = events.find(e => e.date === dateStr)
     days.push({
       date: dateStr,
@@ -586,7 +606,7 @@ function CalendarWidget({ events, onClickDay }: {
       {events.length > 0 && (
         <div style={{ marginTop: 10, fontSize: 11, color: '#8c8c8c', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {events.slice(0, 2).map((e) => (
-            <span key={e.date}>📍 {new Date(e.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} {e.topLabel || `${e.count} đơn`}</span>
+            <span key={e.date}>📍 {fmtDateShort(e.date)} {e.topLabel || `${e.count} đơn`}</span>
           ))}
         </div>
       )}
@@ -670,7 +690,7 @@ async function fetchSlaAtRisk(): Promise<SlaItem[]> {
     .select('id, contract_no, grade, quantity_tons, total_value_usd, delivery_date, status, customer:sales_customers!customer_id(name, country)')
     .not('delivery_date', 'is', null)
     .in('status', ['draft', 'confirmed', 'producing', 'ready', 'packing'])
-    .lt('delivery_date', now.toISOString().split('T')[0])
+    .lt('delivery_date', toDateStrVN(now))
     .order('delivery_date', { ascending: true })
     .limit(10)
   return ((data as any[]) || []).map((o) => ({
@@ -726,7 +746,7 @@ async function fetchActivityFeed(): Promise<ActivityItem[]> {
     const amount = Number(r.amount || 0)
     const money = !r.currency || r.currency === 'USD'
       ? fmtUSD(amount)
-      : `${amount.toLocaleString('vi-VN')} ${r.currency}`
+      : isVnd(r.currency) ? fmtMoney(amount, 'VND') : `${amount.toLocaleString('vi-VN')} ${r.currency}`
     items.push({
       id: `pay-${r.id}`,
       actor: 'Khách',
@@ -757,8 +777,8 @@ async function fetchCalendar(): Promise<CalendarEvent[]> {
   const { data } = await supabase
     .from('sales_orders')
     .select('etd, delivery_date, contract_no, customer:sales_customers!customer_id(short_name, name)')
-    .or(`etd.gte.${now.toISOString().split('T')[0]},delivery_date.gte.${now.toISOString().split('T')[0]}`)
-    .lte('etd', limit.toISOString().split('T')[0])
+    .or(`etd.gte.${toDateStrVN(now)},delivery_date.gte.${toDateStrVN(now)}`)
+    .lte('etd', toDateStrVN(limit))
     .neq('status', 'cancelled')
     .order('etd', { ascending: true })
 
@@ -779,29 +799,29 @@ async function fetchCalendar(): Promise<CalendarEvent[]> {
 async function fetchCashflow(): Promise<CashflowBar[]> {
   // 7 tuần: 4 đã/đang xử lý + 3 dự kiến. Tính từ sales_orders với delivery_date trong window.
   const now = new Date()
-  const bars: CashflowBar[] = []
   // Week boundaries: [-4w, -3w], [-3w, -2w], [-2w, -1w], [-1w, now], [now, +1w], [+1w, +2w], [+2w, +3w]
-  for (let offset = -4; offset < 3; offset++) {
+  // 7 truy vấn chạy SONG SONG (trước đây await nối đuôi 7 lần) · mốc ngày theo giờ VN.
+  const offsets = [-4, -3, -2, -1, 0, 1, 2]
+  return Promise.all(offsets.map(async (offset): Promise<CashflowBar> => {
     const start = new Date(now); start.setDate(start.getDate() + offset * 7)
     const end = new Date(start); end.setDate(end.getDate() + 7)
     const { data } = await supabase
       .from('sales_orders')
       .select('total_value_usd')
-      .gte('delivery_date', start.toISOString().split('T')[0])
-      .lt('delivery_date', end.toISOString().split('T')[0])
+      .gte('delivery_date', toDateStrVN(start))
+      .lt('delivery_date', toDateStrVN(end))
       .neq('status', 'cancelled')
     const sum = ((data as { total_value_usd: number | null }[]) || []).reduce(
       (s, r) => s + (r.total_value_usd || 0), 0,
     )
-    bars.push({
+    return {
       label: offset < 0
-        ? `T${-offset}w trước`
-        : offset === 0 ? 'Tuần này' : `+${offset}w`,
+        ? `−${-offset} tuần`
+        : offset === 0 ? 'Tuần này' : `+${offset} tuần`,
       value: sum,
       future: offset > 0,
-    })
-  }
-  return bars
+    }
+  }))
 }
 
 async function fetchLcNearExpiry(): Promise<LcItem[]> {
@@ -812,8 +832,8 @@ async function fetchLcNearExpiry(): Promise<LcItem[]> {
     .from('sales_orders')
     .select('id, contract_no, lc_expiry_date, lc_bank, contract_price, total_value_usd, customer:sales_customers!customer_id(name)')
     .not('lc_expiry_date', 'is', null)
-    .gte('lc_expiry_date', now.toISOString().split('T')[0])
-    .lte('lc_expiry_date', limit.toISOString().split('T')[0])
+    .gte('lc_expiry_date', toDateStrVN(now))
+    .lte('lc_expiry_date', toDateStrVN(limit))
     .order('lc_expiry_date', { ascending: true })
   return ((data as any[]) || []).map((o) => ({
     id: o.id, contract_no: o.contract_no || '—',
@@ -844,7 +864,7 @@ function timeAgo(s: string): string {
   if (diff < 60) return `${Math.round(diff)} phút trước`
   if (diff < 1440) return `${Math.round(diff / 60)} giờ trước`
   if (diff < 10080) return `${Math.round(diff / 1440)} ngày trước`
-  return new Date(s).toLocaleDateString('vi-VN')
+  return fmtDate(s)
 }
 
 // ─── Inline styles ──────────────────────────────────────────────────

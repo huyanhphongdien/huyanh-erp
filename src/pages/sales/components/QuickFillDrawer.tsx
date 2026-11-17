@@ -11,15 +11,19 @@ import { ExportOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import type { ReadyGroup, ReadyCtx } from '../../../services/sales/docReadiness'
 import { GROUP_LABEL } from '../../../services/sales/docReadiness'
-import { INCOTERM_LABELS, type SalesOrderContainer } from '../../../services/sales/salesTypes'
+import { INCOTERM_LABELS, PORT_OF_LOADING_OPTIONS, type SalesOrderContainer, type ContainerStatus } from '../../../services/sales/salesTypes'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
-import { isVnd } from '../../../services/sales/salesMoney'
+import { isVnd, fmtMoney, vndInputProps } from '../../../services/sales/salesMoney'
 import { containerService } from '../../../services/sales/containerService'
 import { customerExportProfileService, type CompanyBank } from '../../../services/sales/customerExportProfileService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtKg, usdInputProps } from '../../../utils/format'
 
 const { Text } = Typography
 const BRAND = '#1B4D3E'
 const CIF_TERMS = ['CIF', 'CNF', 'CFR', 'DDP']
+// Cont chưa niêm phong — gõ seal cho các cont này thì chuyển luôn sang 'sealed'
+const PRE_SEAL_STATUSES: ContainerStatus[] = ['planning', 'packing', 'packed']
 
 export default function QuickFillDrawer(
   { open, group, ctx, onClose, onSaved, onOpenFullTab }:
@@ -126,18 +130,32 @@ export default function QuickFillDrawer(
           const r = rows[c.id]; if (!r) continue
           const patch: Partial<SalesOrderContainer> = {}
           if ((r.container_no || '') !== (c.container_no || '')) patch.container_no = r.container_no.trim() || null
-          if ((r.seal_no || '') !== (c.seal_no || '')) patch.seal_no = r.seal_no.trim() || null
+          // MỘT đường seal (audit 17/11/2026): gõ seal cho cont CHƯA niêm phong → sealContainer
+          // (status 'sealed' + sealed_at), y như nút "Seal container" ở trang Đóng gói. Trước đây đi
+          // updateContainer chỉ ghi số → thẻ "Đã seal x/y" và Tag trạng thái nói ngược số vừa gõ.
+          const newSeal = (r.seal_no || '').trim()
+          let sealNow = false
+          let unseal = false
+          if (newSeal !== (c.seal_no || '').trim()) {
+            if (newSeal && PRE_SEAL_STATUSES.includes(c.status)) sealNow = true
+            else {
+              patch.seal_no = newSeal || null
+              unseal = !newSeal && c.status === 'sealed'   // xoá seal → về "Đã đóng xong"
+            }
+          }
           if ((r.gross_weight_kg ?? null) !== (c.gross_weight_kg ?? null)) patch.gross_weight_kg = r.gross_weight_kg ?? null
           if ((r.pallet_count ?? null) !== (c.pallet_count ?? null)) patch.pallet_count = r.pallet_count ?? null
           if ((r.lot_no ?? null) !== (c.lot_no ?? null)) patch.lot_no = r.lot_no ?? null
           if (Object.keys(patch).length) await containerService.updateContainer(c.id, patch)
+          if (sealNow) await containerService.sealContainer(c.id, newSeal)
+          if (unseal) await containerService.updateStatus(c.id, 'packed')
         }
       }
       message.success('Đã lưu — kiểm tra lại dữ liệu chứng từ')
       onSaved()
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return // lỗi validate form → antd tự hiện
-      message.error(err instanceof Error ? err.message : 'Lưu thất bại')
+      message.error(dichLoiHeThong(err, 'Lưu thất bại'))
     } finally {
       setSaving(false)
     }
@@ -195,7 +213,8 @@ export default function QuickFillDrawer(
             <InputNumber min={0} style={{ width: '100%' }} addonAfter="tấn" />
           </Form.Item>
           <Form.Item name="unit_price" label="Đơn giá" rules={[{ required: true }]}>
-            <InputNumber min={0} style={{ width: '100%' }} addonAfter={isVnd(order.currency) ? '₫/tấn' : 'USD/tấn'} />
+            <InputNumber min={0} style={{ width: '100%' }} addonAfter={isVnd(order.currency) ? '₫/tấn' : 'USD/tấn'}
+              {...(isVnd(order.currency) ? vndInputProps : usdInputProps)} />
           </Form.Item>
           <Form.Item name="incoterm" label="Incoterm" rules={[{ required: true }]}>
             <Select options={Object.entries(INCOTERM_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
@@ -210,22 +229,25 @@ export default function QuickFillDrawer(
               message="Đơn CIF: cần Cước + Bảo hiểm"
               description={
                 costPreview
-                  ? <span>CIF ≈ <b>${costPreview.cif.toLocaleString('en-US')}</b>. FOB(COST) trên Hối phiếu = CIF − Cước − Bảo hiểm.</span>
+                  ? <span>CIF ≈ <b>{fmtMoney(costPreview.cif, order.currency, { decimals: 0 })}</b>. FOB(COST) trên Hối phiếu = CIF − Cước − Bảo hiểm.</span>
                   : 'Thiếu → FOB(COST) sẽ bằng đúng CIF (sai giá trị hối phiếu).'
               }
             />
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <Form.Item name="freight_amount" label="Cước (Freight, USD)">
-              <InputNumber min={0} style={{ width: '100%' }} />
+              <InputNumber min={0} style={{ width: '100%' }} {...usdInputProps} />
             </Form.Item>
             <Form.Item name="insurance_amount" label="Bảo hiểm (Insurance, USD)">
-              <InputNumber min={0} style={{ width: '100%' }} />
+              <InputNumber min={0} style={{ width: '100%' }} {...usdInputProps} />
             </Form.Item>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {/* Cùng danh mục với tab Hợp đồng / Vận chuyển (PORT_OF_LOADING_OPTIONS) — trước đây ô gõ tự do
+                tạo ra danh mục thứ 3; chứng từ map mã → tên tiếng Anh qua PORT_LABELS (documentService). */}
             <Form.Item name="port_of_loading" label="Cảng xếp">
-              <Input placeholder="VD: Ho Chi Minh City Port" />
+              <Select allowClear showSearch optionFilterProp="label" placeholder="Chọn cảng xếp"
+                options={PORT_OF_LOADING_OPTIONS.map((p) => ({ value: p.value, label: p.label }))} />
             </Form.Item>
             <Form.Item name="port_of_destination" label="Cảng đến">
               <Input placeholder="VD: Colombo" />
@@ -267,7 +289,7 @@ export default function QuickFillDrawer(
                 <Input size="small" value={c.id ? rows[c.id]?.seal_no : ''} placeholder="TBD"
                   onChange={(e) => c.id && setRow(c.id, 'seal_no', e.target.value)} />) },
               { title: 'Net (kg)', width: 80, align: 'right', render: (_: unknown, c: SalesOrderContainer) =>
-                c.net_weight_kg ? c.net_weight_kg.toLocaleString('en-US') : <Text type="secondary">—</Text> },
+                c.net_weight_kg ? fmtKg(c.net_weight_kg) : <Text type="secondary">—</Text> },
               { title: 'Gross', width: 90, render: (_: unknown, c: SalesOrderContainer) => (
                 <InputNumber size="small" min={0} style={{ width: '100%' }} value={c.id ? rows[c.id]?.gross_weight_kg ?? undefined : undefined}
                   onChange={(val) => c.id && setRow(c.id, 'gross_weight_kg', (val as number) ?? null)} />) },

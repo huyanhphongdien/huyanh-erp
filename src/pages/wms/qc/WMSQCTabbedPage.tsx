@@ -45,7 +45,7 @@ const WMSQCTabbedPage = () => {
       items={[
         {
           key: 'dashboard',
-          label: 'Dashboard',
+          label: 'Tổng quan',
           children: (
             <Suspense fallback={<TabFallback />}>
               <QCDashboardPage />
@@ -54,7 +54,7 @@ const WMSQCTabbedPage = () => {
         },
         {
           key: 'recheck',
-          label: 'Recheck',
+          label: 'Tái kiểm',
           children: (
             <Suspense fallback={<TabFallback />}>
               <QCRecheckPage />
@@ -63,7 +63,7 @@ const WMSQCTabbedPage = () => {
         },
         {
           key: 'quick-scan',
-          label: 'Quick Scan',
+          label: 'QC nhanh',
           children: (
             <Suspense fallback={<TabFallback />}>
               <QCQuickScanPage />

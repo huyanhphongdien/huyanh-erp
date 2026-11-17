@@ -15,11 +15,15 @@ import {
 import { useAuthStore } from '../../stores/authStore'
 import { overtimeRequestService, type OvertimeRequest } from '../../services/overtimeRequestService'
 import type { BatchResult } from '../../types/common'
+import { approvalStatus } from '../attendance/labels'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDateTime } from '../../utils/format'
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
+// Có thứ trong tuần ("T2, 17/11") — cố ý giữ riêng, không phải fmtDate
 function formatDate(dateStr: string): string {
   if (!dateStr) return '—'
   const d = new Date(dateStr + 'T00:00:00')
@@ -39,18 +43,7 @@ function formatMinutes(m: number): string {
   return `${h}h${r.toString().padStart(2, '0')}`
 }
 
-function formatDateTime(dt: string): string {
-  if (!dt) return '—'
-  return new Date(dt).toLocaleString('vi-VN', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-  })
-}
-
-const STATUS_CFG: Record<string, { label: string; cls: string }> = {
-  pending:  { label: 'Chờ duyệt', cls: 'bg-amber-100 text-amber-800 border-amber-200' },
-  approved: { label: 'Đã duyệt',  cls: 'bg-green-100 text-green-800 border-green-200' },
-  rejected: { label: 'Từ chối',   cls: 'bg-red-100 text-red-800 border-red-200' },
-}
+const formatDateTime = fmtDateTime
 
 // ============================================================================
 // COMPONENT
@@ -77,6 +70,8 @@ export default function OvertimeApprovalPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Lỗi riêng của tab "Đã xử lý" — lịch sử hỏng không được che danh sách CHỜ DUYỆT
+  const [historyError, setHistoryError] = useState<string | null>(null)
 
   // Multi-select
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -106,17 +101,26 @@ export default function OvertimeApprovalPage() {
     if (!employeeId) return
     setLoading(true)
     setLoadError(null)
+    setHistoryError(null)
     try {
-      const [pending, history] = await Promise.all([
+      // allSettled: lịch sử duyệt hỏng KHÔNG kéo đổ danh sách chờ duyệt (việc chính của trang) — mỗi phần báo lỗi riêng
+      const [pendingRes, historyRes] = await Promise.allSettled([
         overtimeRequestService.getPendingApprovals(employeeId, 'pending', dateFrom || undefined, dateTo || undefined),
         overtimeRequestService.getApprovalHistory(employeeId, 30),
       ])
-      setPendingList(pending)
-      setHistoryList(history)
+      if (pendingRes.status === 'fulfilled') {
+        setPendingList(pendingRes.value)
+      } else {
+        console.error('Load pending error:', pendingRes.reason)
+        setLoadError(dichLoiHeThong(pendingRes.reason, 'Không tải được danh sách chờ duyệt'))
+      }
+      if (historyRes.status === 'fulfilled') {
+        setHistoryList(historyRes.value)
+      } else {
+        console.error('Load history error:', historyRes.reason)
+        setHistoryError(dichLoiHeThong(historyRes.reason, 'Không tải được lịch sử duyệt'))
+      }
       setSelected(new Set())
-    } catch (err: any) {
-      console.error('Load error:', err)
-      setLoadError(err?.message || 'Không tải được danh sách')
     } finally {
       setLoading(false)
     }
@@ -157,7 +161,7 @@ export default function OvertimeApprovalPage() {
       await overtimeRequestService.approve(id, employeeId)
       await loadData()
     } catch (e: any) {
-      setActionError(e.message || 'Lỗi duyệt phiếu')
+      setActionError(dichLoiHeThong(e, 'Lỗi duyệt phiếu'))
     } finally {
       setActionLoading(false)
     }
@@ -173,7 +177,7 @@ export default function OvertimeApprovalPage() {
       setRejectReason('')
       await loadData()
     } catch (e: any) {
-      setActionError(e.message || 'Lỗi từ chối')
+      setActionError(dichLoiHeThong(e, 'Lỗi từ chối'))
     } finally {
       setActionLoading(false)
     }
@@ -188,7 +192,7 @@ export default function OvertimeApprovalPage() {
       setBatchResult(r)
       await loadData()
     } catch (e: any) {
-      setActionError(e.message || 'Lỗi duyệt hàng loạt')
+      setActionError(dichLoiHeThong(e, 'Lỗi duyệt hàng loạt'))
     } finally {
       setBatchProcessing(false)
     }
@@ -205,7 +209,7 @@ export default function OvertimeApprovalPage() {
       setBatchRejectReason('')
       await loadData()
     } catch (e: any) {
-      setActionError(e.message || 'Lỗi từ chối hàng loạt')
+      setActionError(dichLoiHeThong(e, 'Lỗi từ chối hàng loạt'))
     } finally {
       setBatchProcessing(false)
     }
@@ -368,12 +372,12 @@ export default function OvertimeApprovalPage() {
             <Loader2 className="w-7 h-7 animate-spin text-blue-500" />
             <span className="mt-2 text-sm text-gray-500">Đang tải...</span>
           </div>
-        ) : loadError ? (
-          /* LOAD ERROR */
+        ) : (tab === 'pending' ? loadError : historyError) ? (
+          /* LOAD ERROR — theo tab: chờ duyệt và lịch sử báo lỗi riêng */
           <div className="text-center py-16 bg-white rounded-2xl border">
             <AlertTriangle className="w-14 h-14 text-red-300 mx-auto mb-4" />
-            <p className="text-gray-700 font-medium">Không tải được danh sách</p>
-            <p className="text-xs text-gray-400 mt-1 px-6">{loadError}</p>
+            <p className="text-gray-700 font-medium">{tab === 'pending' ? 'Không tải được danh sách chờ duyệt' : 'Không tải được lịch sử duyệt'}</p>
+            <p className="text-xs text-gray-400 mt-1 px-6">{tab === 'pending' ? loadError : historyError}</p>
             <button
               onClick={loadData}
               className="mt-4 inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl active:bg-red-100"
@@ -572,7 +576,7 @@ export default function OvertimeApprovalPage() {
             <div className="space-y-2.5 pb-4">
               {historyList.map(req => {
                 const emp = Array.isArray(req.employee) ? req.employee[0] : req.employee
-                const st = STATUS_CFG[req.status] || STATUS_CFG.pending
+                const st = approvalStatus(req.status)
 
                 return (
                   <div key={req.id} className="bg-white rounded-2xl border border-gray-100 p-4">
@@ -582,7 +586,7 @@ export default function OvertimeApprovalPage() {
                           <h3 className="text-[15px] font-semibold text-gray-900">
                             {emp?.full_name || 'N/A'}
                           </h3>
-                          <span className={`px-2 py-0.5 text-[11px] font-bold rounded-full border ${st.cls}`}>
+                          <span className={`px-2 py-0.5 text-[11px] font-bold rounded-full border ${st.badge}`}>
                             {st.label}
                           </span>
                         </div>

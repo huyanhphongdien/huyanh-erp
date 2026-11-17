@@ -24,6 +24,7 @@ import {
   DatePicker,
   Empty,
   Result,
+  message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -34,6 +35,7 @@ import {
   CarOutlined,
   CloseOutlined,
   WarningOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons'
 import weighbridgeService from '../../../services/wms/weighbridgeService'
 import { dealWmsService } from '../../../services/b2b/dealWmsService'
@@ -46,6 +48,12 @@ import { ticketTypeLabel } from '../../../services/wms/wms.types'
 import dayjs from 'dayjs'
 import { B2BSectionTabs, INTAKE_TABS } from '../../../components/b2b/B2BSectionTabs'
 import { useIsB2BPurchaser } from '../../../hooks/useIsB2BPurchaser'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { addDaysStr, todayVN } from '../../../utils/dateVN'
+import { fmtDate, fmtNum, fmtTime } from '../../../utils/format'
+import { LimitNotice } from '../../../components/common/tableDefaults'
+import { WEIGHBRIDGE_STATUS_LABELS, WEIGHBRIDGE_STATUS_COLORS } from './weighbridgeLabels'
+import { xuatExcelBaoCao } from '../reports/wmsReportExcel'
 
 // Màu tag theo facility code — giống convention multi-facility các nơi khác
 const FACILITY_TAG_COLOR: Record<string, string> = {
@@ -60,20 +68,22 @@ const { Title, Text } = Typography
 // CONSTANTS
 // ============================================================================
 
-const STATUS_TAG_CONFIG: Record<WeighbridgeStatus, { label: string; color: string }> = {
-  weighing_gross: { label: 'Chờ cân L1', color: 'processing' },
-  weighing_tare: { label: 'Chờ cân L2', color: 'warning' },
-  completed: { label: 'Hoàn tất', color: 'success' },
-  cancelled: { label: 'Đã hủy', color: 'error' },
-}
+// Một nguồn nhãn với Chi tiết phiếu cân (trước: sổ 'Chờ cân L1', chi tiết 'Chờ cân lần 1')
+const STATUS_TAG_CONFIG: Record<WeighbridgeStatus, { label: string; color: string }> = Object.fromEntries(
+  (Object.keys(WEIGHBRIDGE_STATUS_LABELS) as WeighbridgeStatus[]).map(s => [s, { label: WEIGHBRIDGE_STATUS_LABELS[s], color: WEIGHBRIDGE_STATUS_COLORS[s] }]),
+) as Record<WeighbridgeStatus, { label: string; color: string }>
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả' },
-  { value: 'weighing_gross', label: 'Chờ cân L1' },
-  { value: 'weighing_tare', label: 'Chờ cân L2' },
-  { value: 'completed', label: 'Hoàn tất' },
-  { value: 'cancelled', label: 'Đã hủy' },
+  ...(Object.keys(WEIGHBRIDGE_STATUS_LABELS) as WeighbridgeStatus[]).map(s => ({ value: s, label: WEIGHBRIDGE_STATUS_LABELS[s] })),
 ]
+
+/** Lọc theo Deal: phiếu khớp deal rải trên nhiều trang server → tải 1 cửa sổ N phiếu gần nhất
+ *  (vẫn theo mọi bộ lọc khác) rồi lọc + phân trang tại client. Trước đây lọc trong 15 dòng của
+ *  trang đang xem mà chân bảng vẫn báo tổng cũ → màn trống nhưng ghi "312 phiếu". */
+const DEAL_WINDOW = 500
+/** Xuất Excel: PostgREST trả tối đa 1.000 dòng/lần — vượt thì báo người dùng lọc thêm */
+const EXPORT_LIMIT = 1000
 
 const TYPE_OPTIONS = [
   { value: '', label: 'Tất cả' },
@@ -111,7 +121,9 @@ export default function WeighbridgeListPage() {
   const [typeFilter, setTypeFilter] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
+  // Máy tính trạm cân/kế toán: thanh lọc hiện sẵn (trước ẩn sau nút "Lọc" — ngày nào cũng phải mở)
+  const [showFilters, setShowFilters] = useState(true)
+  const [exporting, setExporting] = useState(false)
 
   // Phase 4: Deal filter
   const [dealFilter, setDealFilter] = useState('')
@@ -160,29 +172,39 @@ export default function WeighbridgeListPage() {
   // DATA LOADING
   // ============================================================================
 
+  // Đang lọc theo Deal → tải cửa sổ DEAL_WINDOW phiếu (trang 1) rồi lọc/phân trang client
+  const dealMode = dealStockInIds !== null
+  const serverPage = dealMode ? 1 : page
+  const serverPageSize = dealMode ? DEAL_WINDOW : pageSize
+
+  // Bộ lọc server hiện tại — dùng chung cho bảng và Xuất Excel
+  const buildFilter = useCallback(() => ({
+    search: searchDebounced || undefined,
+    status: statusFilter || undefined,
+    type: typeFilter || undefined,
+    from_date: fromDate || undefined,
+    to_date: toDate || undefined,
+    ticket_type: (typeFilter as TicketType) || undefined,
+    facility_id: facilityFilter || undefined,
+  }), [searchDebounced, statusFilter, typeFilter, fromDate, toDate, facilityFilter])
+
   const loadData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const result = await weighbridgeService.getAll({
-        page,
-        pageSize,
-        search: searchDebounced || undefined,
-        status: statusFilter || undefined,
-        type: typeFilter || undefined,
-        from_date: fromDate || undefined,
-        to_date: toDate || undefined,
-        ticket_type: (typeFilter as TicketType) || undefined,
-        facility_id: facilityFilter || undefined,
+        page: serverPage,
+        pageSize: serverPageSize,
+        ...buildFilter(),
       })
       setData(result)
     } catch (err: any) {
       console.error('Load weighbridge list error:', err)
-      setError(err?.message || 'Không tải được danh sách phiếu cân')
+      setError(dichLoiHeThong(err, 'Không tải được danh sách phiếu cân'))
     } finally {
       setLoading(false)
     }
-  }, [page, searchDebounced, statusFilter, typeFilter, fromDate, toDate, facilityFilter])
+  }, [serverPage, serverPageSize, buildFilter])
 
   const loadStats = useCallback(async () => {
     try {
@@ -210,6 +232,14 @@ export default function WeighbridgeListPage() {
     if (page === 1 && search === searchDebounced) loadData()
   }
 
+  // Chip ngày nhanh — việc "xem phiếu hôm nay / 7 ngày" mỗi sáng
+  function setQuickRange(days: 0 | 6) {
+    const today = todayVN()
+    setFromDate(days === 0 ? today : addDaysStr(today, -days))
+    setToDate(today)
+    setPage(1)
+  }
+
   function clearFilters() {
     setSearch('')
     setStatusFilter('')
@@ -227,10 +257,59 @@ export default function WeighbridgeListPage() {
   // TABLE COLUMNS
   // ============================================================================
 
-  // Filter data by deal if needed
+  // Lọc theo Deal (client, trên cửa sổ DEAL_WINDOW phiếu — xem dealMode ở trên)
   const filteredData = dealStockInIds
     ? data?.data.filter(t => t.reference_type === 'stock_in' && dealStockInIds.includes(t.reference_id || ''))
     : data?.data
+  const shownTotal = dealMode ? (filteredData?.length || 0) : (data?.total || 0)
+
+  // Xuất Excel theo ĐÚNG bộ lọc đang chọn (không chỉ 15 dòng của trang)
+  async function handleExportExcel() {
+    setExporting(true)
+    try {
+      const res = await weighbridgeService.getAll({ page: 1, pageSize: EXPORT_LIMIT, ...buildFilter() })
+      const rows = dealStockInIds
+        ? res.data.filter(t => t.reference_type === 'stock_in' && dealStockInIds.includes(t.reference_id || ''))
+        : res.data
+      await xuatExcelBaoCao('lich-su-can-xe', [{
+        name: 'Phiếu cân',
+        title: 'Lịch sử cân xe',
+        columns: [
+          { title: 'Mã phiếu', align: 'left' },
+          { title: 'Nhà máy' },
+          { title: 'Biển số', align: 'left' },
+          { title: 'Tài xế', align: 'left' },
+          { title: 'Loại' },
+          { title: 'Trạng thái' },
+          { title: 'Xe + hàng (kg)', summary: 'sum' },
+          { title: 'Xe rỗng (kg)', summary: 'sum' },
+          { title: 'KL hàng (kg)', summary: 'sum' },
+          { title: 'Ngày tạo' },
+          { title: 'Giờ' },
+        ],
+        rows: rows.map(t => [
+          t.code,
+          t.facility?.code || '',
+          t.vehicle_plate,
+          t.driver_name || '',
+          ticketTypeLabel(t.ticket_type, 'short'),
+          WEIGHBRIDGE_STATUS_LABELS[t.status] || t.status,
+          t.gross_weight ?? '',
+          t.tare_weight ?? '',
+          t.net_weight ?? '',
+          fmtDate(t.created_at),
+          fmtTime(t.created_at),
+        ]),
+      }])
+      if (res.total > res.data.length) {
+        message.warning(`Chỉ xuất ${fmtNum(res.data.length)} / ${fmtNum(res.total)} phiếu gần nhất — lọc theo ngày để xuất đủ`)
+      }
+    } catch (err) {
+      message.error(dichLoiHeThong(err, 'Xuất Excel thất bại'))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const columns: ColumnsType<WeighbridgeTicket> = [
     {
@@ -263,7 +342,7 @@ export default function WeighbridgeListPage() {
       key: 'status',
       width: 120,
       render: (status: WeighbridgeStatus) => {
-        const cfg = STATUS_TAG_CONFIG[status]
+        const cfg = STATUS_TAG_CONFIG[status] || { label: status || '—', color: 'default' }
         return <Tag color={cfg.color}>{cfg.label}</Tag>
       },
     },
@@ -285,17 +364,18 @@ export default function WeighbridgeListPage() {
       render: (name: string | undefined) => name || <Text type="secondary">—</Text>,
     },
     {
-      title: 'Gross (kg)',
+      // Nhãn tiếng Việt khớp app cân + phiếu in (trước: Gross / Tare / NET)
+      title: 'Xe + hàng (kg)',
       dataIndex: 'gross_weight',
       key: 'gross_weight',
-      width: 110,
+      width: 120,
       align: 'right',
       render: (w: number | null) => w != null
         ? <Text style={MONO_FONT}>{w.toLocaleString('vi-VN')}</Text>
         : <Text type="secondary">—</Text>,
     },
     {
-      title: 'Tare (kg)',
+      title: 'Xe rỗng (kg)',
       dataIndex: 'tare_weight',
       key: 'tare_weight',
       width: 110,
@@ -305,7 +385,7 @@ export default function WeighbridgeListPage() {
         : <Text type="secondary">—</Text>,
     },
     {
-      title: 'NET (kg)',
+      title: 'KL hàng (kg)',
       dataIndex: 'net_weight',
       key: 'net_weight',
       width: 120,
@@ -321,10 +401,10 @@ export default function WeighbridgeListPage() {
       width: 140,
       render: (d: string) => (
         <div>
-          <Text style={{ fontSize: 12 }}>{new Date(d).toLocaleDateString('vi-VN')}</Text>
+          <Text style={{ fontSize: 12 }}>{fmtDate(d)}</Text>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>
-            {new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+            {fmtTime(d)}
           </Text>
         </div>
       ),
@@ -339,24 +419,29 @@ export default function WeighbridgeListPage() {
     <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       {/* Header */}
       <div style={{ background: PRIMARY_COLOR, padding: '16px', position: 'sticky', top: 0, zIndex: 20 }}>
+        {/* (Đã bỏ nút ← trỏ về /wms/weighbridge — chính là trang này từ khi cân chuyển sang app Trạm cân) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Button
-            type="text"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/wms/weighbridge')}
-            style={{ color: '#fff' }}
-          />
           <div style={{ flex: 1 }}>
             <Title level={5} style={{ color: '#fff', margin: 0 }}>Lịch sử cân xe</Title>
             <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
-              {data ? `${data.total} phiếu` : 'Đang tải...'}
+              {data ? `${fmtNum(shownTotal)} phiếu` : 'Đang tải...'}
             </Text>
           </div>
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={handleExportExcel}
+            loading={exporting}
+            disabled={!!error}
+            ghost
+          >
+            Xuất Excel
+          </Button>
           <Button
             type="text"
             icon={<ReloadOutlined spin={loading} />}
             onClick={() => { loadData(); loadStats() }}
             style={{ color: '#fff' }}
+            title="Tải lại"
           />
         </div>
       </div>
@@ -402,8 +487,9 @@ export default function WeighbridgeListPage() {
                   <Statistic
                     title={<Text type="secondary" style={{ fontSize: 11 }}>Tấn nay</Text>}
                     value={stats.totalNetWeight >= 1000 ? stats.totalNetWeight / 1000 : stats.totalNetWeight}
-                    precision={stats.totalNetWeight >= 1000 ? 1 : 0}
                     suffix={stats.totalNetWeight >= 1000 ? 't' : 'kg'}
+                    // Số vi-VN (antd mặc định ngăn nghìn bằng dấu phẩy → "1,234.5" lệch cả hệ)
+                    formatter={(v) => fmtNum(Number(v), stats.totalNetWeight >= 1000 ? 1 : 0)}
                     valueStyle={{ fontSize: 20, fontWeight: 700, color: PRIMARY_COLOR, ...MONO_FONT }}
                   />
                 </Card>
@@ -455,7 +541,7 @@ export default function WeighbridgeListPage() {
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
                             <Text style={{ fontSize: 11, color: '#666' }}>Tấn nay</Text>
                             <Text strong style={{ ...MONO_FONT, fontSize: 16, color: PRIMARY_COLOR }}>
-                              {tons >= 1 ? tons.toFixed(1) + 't' : fs.totalNetWeight + 'kg'}
+                              {tons >= 1 ? fmtNum(tons, 1) + 't' : fmtNum(fs.totalNetWeight) + 'kg'}
                             </Text>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#888' }}>
@@ -469,7 +555,7 @@ export default function WeighbridgeListPage() {
                 })}
               </Row>
               <div style={{ marginTop: 8, fontSize: 11, color: '#999' }}>
-                💡 Click card để filter danh sách theo nhà máy. Click lại để bỏ filter.
+                💡 Bấm thẻ để lọc danh sách theo nhà máy. Bấm lại để bỏ lọc.
               </div>
             </Card>
           )}
@@ -547,6 +633,13 @@ export default function WeighbridgeListPage() {
                         placeholder="Đến ngày"
                       />
                     </Col>
+                    <Col xs={24} sm={6}>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Nhanh</Text>
+                      <Space size={6}>
+                        <Button size="middle" onClick={() => setQuickRange(0)}>Hôm nay</Button>
+                        <Button size="middle" onClick={() => setQuickRange(6)}>7 ngày</Button>
+                      </Space>
+                    </Col>
                   </Row>
 
                   {/* Phase 4: Deal filter */}
@@ -618,10 +711,10 @@ export default function WeighbridgeListPage() {
                     image={<CarOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />}
                     description={
                       <div>
-                        <Text type="secondary" strong>Chưa có phiếu cân nào</Text>
+                        <Text type="secondary" strong>{hasFilters ? 'Không có phiếu cân khớp bộ lọc' : 'Chưa có phiếu cân nào'}</Text>
                         <br />
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                          {hasFilters ? 'Thử thay đổi bộ lọc' : 'Bắt đầu bằng cách tạo phiếu cân mới'}
+                          {hasFilters ? 'Thử thay đổi bộ lọc' : 'Phiếu cân được tạo ở app Trạm cân (can.huyanhrubber.vn)'}
                         </Text>
                       </div>
                     }
@@ -631,28 +724,32 @@ export default function WeighbridgeListPage() {
               pagination={{
                 current: page,
                 pageSize,
-                total: data?.total || 0,
+                // Lọc Deal: phân trang client trên dòng đã lọc → tổng đúng với bảng
+                total: shownTotal,
                 showSizeChanger: false,
-                showTotal: (total) => <Text type="secondary">{total} phiếu</Text>,
+                showTotal: (total) => <Text type="secondary">{fmtNum(total)} phiếu</Text>,
                 onChange: (p) => setPage(p),
               }}
               onRow={(record) => ({
+                // Mọi trạng thái đều mở chi tiết. Trước đây phiếu đang cân điều hướng về
+                // /wms/weighbridge — chính trang này (cân đã chuyển sang app Trạm cân) → bấm không có gì xảy ra.
                 onClick: () => {
-                  if (record.status === 'completed' || record.status === 'cancelled') {
-                    openTab({
-                      key: `weighbridge-${record.id}`,
-                      title: `Phiếu cân ${(record as any).code || record.id.slice(0, 8)}`,
-                      componentId: 'weighbridge-detail',
-                      props: { id: record.id },
-                      path: `/wms/weighbridge/${record.id}`,
-                    })
-                  } else {
-                    navigate('/wms/weighbridge')
-                  }
+                  openTab({
+                    key: `weighbridge-${record.id}`,
+                    title: `Phiếu cân ${(record as any).code || record.id.slice(0, 8)}`,
+                    componentId: 'weighbridge-detail',
+                    props: { id: record.id },
+                    path: `/wms/weighbridge/${record.id}`,
+                  })
                 },
                 style: { cursor: 'pointer' },
               })}
             />
+            )}
+            {dealMode && !error && data && (
+              <div style={{ padding: '0 12px' }}>
+                <LimitNotice shown={data.data.length} limit={DEAL_WINDOW} what="phiếu" />
+              </div>
             )}
           </Card>
         </Space>

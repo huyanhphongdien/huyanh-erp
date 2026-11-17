@@ -18,6 +18,7 @@ import {
 } from 'antd'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
+import { fmtNum, fmtVnd, fmtVndNum, vndInputProps } from '../../utils/format'
 
 const { Text } = Typography
 
@@ -49,10 +50,6 @@ const ITEM_TYPE_OPTIONS = [
   { value: 'other', label: 'Khác' },
 ]
 
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('vi-VN').format(value)
-}
-
 const SettlementItemsTable: React.FC<SettlementItemsTableProps> = ({
   items,
   editable = false,
@@ -71,7 +68,9 @@ const SettlementItemsTable: React.FC<SettlementItemsTableProps> = ({
         const qty = field === 'quantity' ? value : item.quantity
         const price = field === 'unit_price' ? value : item.unit_price
         if (qty && price) {
-          updated.amount = qty * price
+          // Tiền VNĐ không có xu — làm tròn đồng (như autoSettlementService/dealWmsService). Để số lẻ thì ô
+          // vndInputProps (chấm ngăn nghìn) chèn '.' vào phần lẻ, rời ô parse lại thành số ×10.
+          updated.amount = Math.round(qty * price)
         }
       }
 
@@ -155,7 +154,7 @@ const SettlementItemsTable: React.FC<SettlementItemsTableProps> = ({
             style={{ width: '100%' }}
           />
         ) : (
-          value?.toLocaleString('vi-VN') || '-'
+          fmtNum(value, 3)
         ),
     },
     {
@@ -170,12 +169,11 @@ const SettlementItemsTable: React.FC<SettlementItemsTableProps> = ({
             value={value}
             onChange={v => handleFieldChange(record.key, 'unit_price', v)}
             min={0}
-            formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-            parser={v => Number(v?.replace(/,/g, '') || 0)}
+            {...vndInputProps}
             style={{ width: '100%' }}
           />
         ) : (
-          value ? formatCurrency(value) : '-'
+          fmtVndNum(value)
         ),
     },
     {
@@ -190,16 +188,16 @@ const SettlementItemsTable: React.FC<SettlementItemsTableProps> = ({
             value={value}
             onChange={v => handleFieldChange(record.key, 'amount', v || 0)}
             min={0}
-            formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-            parser={v => Number(v?.replace(/,/g, '') || 0)}
+            precision={0}
+            {...vndInputProps}
             style={{ width: '100%' }}
           />
         ) : (
-          <Text strong>{formatCurrency(value)} ₫</Text>
+          <Text strong>{fmtVnd(value)}</Text>
         ),
     },
     {
-      title: 'Loại',
+      title: 'Có/Nợ',
       dataIndex: 'is_credit',
       width: 90,
       align: 'center',
@@ -224,7 +222,7 @@ const SettlementItemsTable: React.FC<SettlementItemsTableProps> = ({
       width: 50,
       align: 'center',
       render: (_: any, record) => (
-        <Popconfirm title="Xóa hạng mục này?" onConfirm={() => handleRemove(record.key)}>
+        <Popconfirm title="Xóa hạng mục này?" okText="Xoá" okButtonProps={{ danger: true }} onConfirm={() => handleRemove(record.key)}>
           <Button type="text" size="small" danger icon={<DeleteOutlined />} />
         </Popconfirm>
       ),
@@ -248,7 +246,7 @@ const SettlementItemsTable: React.FC<SettlementItemsTableProps> = ({
               </Table.Summary.Cell>
               <Table.Summary.Cell index={4} align="right">
                 <Text strong style={{ color: '#1B4D3E' }}>
-                  {formatCurrency(netTotal)} ₫
+                  {fmtVnd(netTotal)}
                 </Text>
               </Table.Summary.Cell>
               <Table.Summary.Cell index={5} colSpan={editable ? 2 : 1} />
@@ -259,7 +257,7 @@ const SettlementItemsTable: React.FC<SettlementItemsTableProps> = ({
                   <Text type="secondary">Khấu trừ:</Text>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={4} align="right">
-                  <Text type="danger">-{formatCurrency(totalDebit)} ₫</Text>
+                  <Text type="danger">-{fmtVnd(totalDebit)}</Text>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={5} colSpan={editable ? 2 : 1} />
               </Table.Summary.Row>

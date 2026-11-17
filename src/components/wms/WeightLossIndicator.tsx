@@ -5,6 +5,7 @@
 
 import { Tag, Tooltip } from 'antd'
 import { ArrowDownOutlined } from '@ant-design/icons'
+import { fmtKg, fmtPct } from '../../utils/format'
 
 interface WeightLossIndicatorProps {
   initialWeight?: number | null
@@ -37,12 +38,13 @@ const WeightLossIndicator = ({
   else if (lossPercent > 3) color = 'orange'
   else color = 'default'
 
+  // Số theo vi-VN (format.ts) — toFixed cũ ra dấu CHẤM thập phân
   const label = showKg
-    ? `${lossPercent.toFixed(1)}% (${lossKg.toFixed(1)} kg)`
-    : `${lossPercent.toFixed(1)}%`
+    ? `${fmtPct(lossPercent, 1)} (${fmtKg(lossKg, 1)} kg)`
+    : fmtPct(lossPercent, 1)
 
   return (
-    <Tooltip title={`Hao hut: ${lossKg.toFixed(1)} kg / ${initialWeight?.toFixed(1)} kg`}>
+    <Tooltip title={`Hao hụt: ${fmtKg(lossKg, 1)} kg / ${fmtKg(initialWeight, 1)} kg`}>
       <Tag
         color={color}
         icon={<ArrowDownOutlined />}

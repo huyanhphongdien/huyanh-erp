@@ -68,10 +68,21 @@ import {
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
+// Đợt 3 audit UI (17/11/2026): định dạng + dịch lỗi + 3 trạng thái + nhãn dùng chung
+import { fmtDate, fmtPct, fmtVndCompact } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
+import {
+  PROJECT_STATUS_LABELS,
+  PROJECT_PRIORITY_LABELS,
+  PHASE_STATUS_LABELS,
+  MILESTONE_STATUS_LABELS,
+} from '../../services/project/project.types'
+
 // PM4 — Gantt imports
 import GanttChart from '../../components/project/GanttChart'
 import type { ZoomLevel } from '../../components/project/GanttChart'
-import { ganttService } from '../../services/project/ganttService'
+import { ganttService, GANTT_ITEM_TYPE_LABELS, ganttStatusLabel } from '../../services/project/ganttService'
 import type { GanttData, GanttItem } from '../../services/project/ganttService'
 
 // PM5 — Resource imports
@@ -192,28 +203,30 @@ interface ProjectStats {
 // CONSTANTS
 // ============================================================================
 
+// Lớp màu + icon là của màn này; CHỮ đọc từ project.types (một nguồn — Đợt 3 audit UI 17/11/2026)
 const STATUS_CONFIG: Record<ProjectStatus, { label: string; className: string; icon: React.ReactNode }> = {
-  draft:       { label: 'Nháp',           className: 'bg-gray-50 text-gray-600 border-gray-200',       icon: <FileEdit className="w-3.5 h-3.5" /> },
-  planning:    { label: 'Lập kế hoạch',   className: 'bg-blue-50 text-blue-600 border-blue-200',       icon: <Target className="w-3.5 h-3.5" /> },
-  approved:    { label: 'Đã duyệt',       className: 'bg-indigo-50 text-indigo-600 border-indigo-200', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-  in_progress: { label: 'Đang thực hiện', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <BarChart3 className="w-3.5 h-3.5" /> },
-  on_hold:     { label: 'Tạm dừng',       className: 'bg-amber-50 text-amber-600 border-amber-200',   icon: <PauseCircle className="w-3.5 h-3.5" /> },
-  completed:   { label: 'Hoàn thành',     className: 'bg-green-50 text-green-700 border-green-200',   icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-  cancelled:   { label: 'Đã hủy',         className: 'bg-red-50 text-red-600 border-red-200',         icon: <Ban className="w-3.5 h-3.5" /> },
+  draft:       { label: PROJECT_STATUS_LABELS.draft,       className: 'bg-gray-50 text-gray-600 border-gray-200',       icon: <FileEdit className="w-3.5 h-3.5" /> },
+  planning:    { label: PROJECT_STATUS_LABELS.planning,    className: 'bg-blue-50 text-blue-600 border-blue-200',       icon: <Target className="w-3.5 h-3.5" /> },
+  approved:    { label: PROJECT_STATUS_LABELS.approved,    className: 'bg-indigo-50 text-indigo-600 border-indigo-200', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
+  in_progress: { label: PROJECT_STATUS_LABELS.in_progress, className: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <BarChart3 className="w-3.5 h-3.5" /> },
+  on_hold:     { label: PROJECT_STATUS_LABELS.on_hold,     className: 'bg-amber-50 text-amber-600 border-amber-200',   icon: <PauseCircle className="w-3.5 h-3.5" /> },
+  completed:   { label: PROJECT_STATUS_LABELS.completed,   className: 'bg-green-50 text-green-700 border-green-200',   icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
+  cancelled:   { label: PROJECT_STATUS_LABELS.cancelled,   className: 'bg-red-50 text-red-600 border-red-200',         icon: <Ban className="w-3.5 h-3.5" /> },
 }
 
 const PRIORITY_CONFIG: Record<ProjectPriority, { label: string; dotColor: string; color: string }> = {
-  critical: { label: 'Khẩn cấp', dotColor: 'bg-red-500',    color: 'text-red-600' },
-  high:     { label: 'Cao',      dotColor: 'bg-orange-500', color: 'text-orange-600' },
-  medium:   { label: 'Trung bình', dotColor: 'bg-blue-500',  color: 'text-blue-600' },
-  low:      { label: 'Thấp',     dotColor: 'bg-gray-400',   color: 'text-gray-500' },
+  critical: { label: PROJECT_PRIORITY_LABELS.critical, dotColor: 'bg-red-500',    color: 'text-red-600' },
+  high:     { label: PROJECT_PRIORITY_LABELS.high,     dotColor: 'bg-orange-500', color: 'text-orange-600' },
+  medium:   { label: PROJECT_PRIORITY_LABELS.medium,   dotColor: 'bg-blue-500',  color: 'text-blue-600' },
+  low:      { label: PROJECT_PRIORITY_LABELS.low,      dotColor: 'bg-gray-400',   color: 'text-gray-500' },
 }
 
+// Trước đây bản chép này ghi "Đang chạy"/"Xong" trong khi mọi nơi khác ghi "Đang thực hiện"/"Hoàn thành"
 const PHASE_STATUS_CONFIG: Record<PhaseStatus, { label: string; icon: React.ReactNode; color: string; bgColor: string }> = {
-  pending:     { label: 'Chờ',     icon: <CircleDot className="w-4 h-4" />, color: 'text-gray-500',   bgColor: 'bg-gray-100' },
-  in_progress: { label: 'Đang chạy', icon: <Play className="w-4 h-4" />,    color: 'text-blue-600',   bgColor: 'bg-blue-100' },
-  completed:   { label: 'Xong',    icon: <Check className="w-4 h-4" />,     color: 'text-green-600',  bgColor: 'bg-green-100' },
-  skipped:     { label: 'Bỏ qua',  icon: <SkipForward className="w-4 h-4" />, color: 'text-gray-400', bgColor: 'bg-gray-50' },
+  pending:     { label: PHASE_STATUS_LABELS.pending,     icon: <CircleDot className="w-4 h-4" />, color: 'text-gray-500',   bgColor: 'bg-gray-100' },
+  in_progress: { label: PHASE_STATUS_LABELS.in_progress, icon: <Play className="w-4 h-4" />,    color: 'text-blue-600',   bgColor: 'bg-blue-100' },
+  completed:   { label: PHASE_STATUS_LABELS.completed,   icon: <Check className="w-4 h-4" />,     color: 'text-green-600',  bgColor: 'bg-green-100' },
+  skipped:     { label: PHASE_STATUS_LABELS.skipped,     icon: <SkipForward className="w-4 h-4" />, color: 'text-gray-400', bgColor: 'bg-gray-50' },
 }
 
 const MS_STATUS_ICON: Record<MilestoneStatus, { icon: string; color: string }> = {
@@ -239,10 +252,10 @@ type TabKey = 'overview' | 'phases' | 'gantt' | 'resources' | 'tasks' | 'budget'
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode; phase?: string }[] = [
   { key: 'overview',  label: 'Tổng quan',  icon: <FolderKanban className="w-4 h-4" /> },
-  { key: 'phases',    label: 'Phases',      icon: <ListTodo className="w-4 h-4" /> },
+  { key: 'phases',    label: 'Giai đoạn',   icon: <ListTodo className="w-4 h-4" /> },
   { key: 'gantt',     label: 'Gantt',       icon: <GanttChartIcon className="w-4 h-4" /> },
   { key: 'resources', label: 'Nhân sự',     icon: <UserCog className="w-4 h-4" /> },
-  { key: 'tasks',     label: 'Tasks',       icon: <CheckCircle2 className="w-4 h-4" /> },
+  { key: 'tasks',     label: 'Công việc',   icon: <CheckCircle2 className="w-4 h-4" /> },
   { key: 'budget',    label: 'Khái toán',   icon: <DollarSign className="w-4 h-4" />,   phase: 'PM11' },
   { key: 'risks',     label: 'Rủi ro',      icon: <ShieldAlert className="w-4 h-4" /> },
   { key: 'docs',      label: 'Tài liệu',   icon: <FolderOpen className="w-4 h-4" /> },
@@ -342,16 +355,27 @@ const DEFAULT_STATS: ProjectStats = {
 // HELPERS
 // ============================================================================
 
-function formatDate(d?: string): string {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
+// formatDate / formatBudget cục bộ đã bỏ → fmtDate / fmtVndCompact (src/utils/format.ts)
 
-function formatBudget(n: number): string {
-  if (!n) return '—'
-  if (n >= 1e9) return `${(n / 1e9).toFixed(1)} tỷ`
-  if (n >= 1e6) return `${(n / 1e6).toFixed(0)} tr`
-  return n.toLocaleString('vi-VN')
+type ModalApi = ReturnType<typeof App.useApp>['modal']
+
+/** Hộp xác nhận antd dạng await — thay window.confirm (hộp hệ thống, nút OK/Cancel tiếng Anh).
+ *  Trả true khi người dùng bấm nút đồng ý. */
+function hoiXacNhan(
+  modal: ModalApi,
+  opts: { title: string; content?: React.ReactNode; okText: string; danger?: boolean },
+): Promise<boolean> {
+  return new Promise(resolve => {
+    modal.confirm({
+      title: opts.title,
+      content: opts.content,
+      okText: opts.okText,
+      cancelText: 'Thôi',
+      okButtonProps: opts.danger ? { danger: true } : undefined,
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false),
+    })
+  })
 }
 
 function timeAgo(dateStr: string): string {
@@ -450,13 +474,13 @@ const OverviewTab: React.FC<{
       {/* Stats grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
-          label="Phases"
+          label="Giai đoạn"
           value={stats.phase_count}
           icon={<ListTodo className="w-4 h-4 text-blue-600" />}
           color="bg-blue-50"
         />
         <StatCard
-          label="Milestones"
+          label="Mốc"
           value={`${stats.milestone_completed}/${stats.milestone_count}`}
           sub={stats.milestone_count > 0 ? `${Math.round((stats.milestone_completed / stats.milestone_count) * 100)}% hoàn thành` : undefined}
           icon={<Milestone className="w-4 h-4 text-purple-600" />}
@@ -470,8 +494,8 @@ const OverviewTab: React.FC<{
         />
         <StatCard
           label="Ngân sách"
-          value={formatBudget(project.budget_actual)}
-          sub={`/ ${formatBudget(project.budget_planned)} (${budgetPct}%)`}
+          value={fmtVndCompact(project.budget_actual)}
+          sub={`/ ${fmtVndCompact(project.budget_planned)} (${budgetPct}%)`}
           icon={<DollarSign className="w-4 h-4 text-amber-600" />}
           color="bg-amber-50"
         />
@@ -488,7 +512,7 @@ const OverviewTab: React.FC<{
       {/* Milestones mini timeline */}
       <div className="bg-white rounded-xl border border-gray-100 p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[12px] font-semibold text-gray-500 uppercase">Milestones sắp tới</h3>
+          <h3 className="text-[12px] font-semibold text-gray-500 uppercase">Mốc sắp tới</h3>
           <span className="text-[11px] text-gray-400">{milestones.length} mốc</span>
         </div>
         <div className="space-y-2.5">
@@ -508,7 +532,7 @@ const OverviewTab: React.FC<{
                   </div>
                   <div className="flex items-center gap-2">
                     <p className="text-[11px] text-gray-500">
-                      {formatDate(ms.due_date)}
+                      {fmtDate(ms.due_date)}
                       {ms.phase && <span className="ml-1.5">• {ms.phase.name}</span>}
                     </p>
                     {(ms.total_tasks || 0) > 0 && (
@@ -551,10 +575,10 @@ const OverviewTab: React.FC<{
         <h3 className="text-[12px] font-semibold text-gray-500 uppercase mb-3">Thông tin chi tiết</h3>
         <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-[13px]">
           <div><span className="text-gray-500">Phòng ban:</span> <span className="font-medium text-gray-800 ml-1">{project.department?.name || '—'}</span></div>
-          <div><span className="text-gray-500">Sponsor:</span> <span className="font-medium text-gray-800 ml-1">{project.sponsor?.full_name || '—'}</span></div>
-          <div><span className="text-gray-500">Bắt đầu DK:</span> <span className="font-medium text-gray-800 ml-1">{formatDate(project.planned_start)}</span></div>
-          <div><span className="text-gray-500">Kết thúc DK:</span> <span className="font-medium text-gray-800 ml-1">{formatDate(project.planned_end)}</span></div>
-          <div><span className="text-gray-500">Bắt đầu TT:</span> <span className="font-medium text-gray-800 ml-1">{formatDate(project.actual_start)}</span></div>
+          <div><span className="text-gray-500">Người bảo trợ:</span> <span className="font-medium text-gray-800 ml-1">{project.sponsor?.full_name || '—'}</span></div>
+          <div><span className="text-gray-500">Bắt đầu DK:</span> <span className="font-medium text-gray-800 ml-1">{fmtDate(project.planned_start)}</span></div>
+          <div><span className="text-gray-500">Kết thúc DK:</span> <span className="font-medium text-gray-800 ml-1">{fmtDate(project.planned_end)}</span></div>
+          <div><span className="text-gray-500">Bắt đầu TT:</span> <span className="font-medium text-gray-800 ml-1">{fmtDate(project.actual_start)}</span></div>
           <div><span className="text-gray-500">Rủi ro:</span> <span className="font-medium text-gray-800 ml-1">{stats.risk_count} ({stats.open_issues} vấn đề mở)</span></div>
         </div>
         {project.tags && project.tags.length > 0 && (
@@ -581,7 +605,7 @@ const PhasesTab: React.FC<{
   onDelete: (id: string) => void
 }> = ({ phases, projectId, onRefresh, onUpdateStatus, onDelete }) => {
   // Báo lỗi mutation milestone cho người dùng (AntdApp đã bọc toàn app trong main.tsx)
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [expandedId, setExpandedId] = useState<string | null>(phases[0]?.id || null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [newPhaseName, setNewPhaseName] = useState('')
@@ -727,7 +751,7 @@ const PhasesTab: React.FC<{
       }
     } catch (err: any) {
       console.error('Add milestone failed:', err)
-      alert('Thêm milestone thất bại: ' + (err.message || 'Lỗi'))
+      message.error(dichLoiHeThong(err, 'Thêm mốc thất bại'))
     } finally {
       setSavingMs(false)
     }
@@ -740,12 +764,12 @@ const PhasesTab: React.FC<{
       const { error } = await supabase.from('project_milestones')
         .update({ status: newStatus, completed_date: completedDate, updated_at: new Date().toISOString() })
         .eq('id', msId)
-      if (error) { alert('Lỗi: ' + error.message); return }
+      if (error) { message.error(dichLoiHeThong(error, 'Không lưu được trạng thái mốc')); return }
       if (phaseId) await loadMilestones(phaseId)
       else await loadProjectMilestones()
     } catch (err: any) {
       console.error('Update milestone status failed:', err)
-      message.error(err?.message || 'Không lưu được trạng thái milestone, thử lại')
+      message.error(dichLoiHeThong(err, 'Không lưu được trạng thái mốc, thử lại'))
     }
   }
 
@@ -753,14 +777,26 @@ const PhasesTab: React.FC<{
   const handleRecalcMilestones = async () => {
     try {
       const { error } = await supabase.rpc('fn_recalc_project_milestones', { p_project_id: projectId })
-      if (error) console.warn('Recalc RPC:', error.message)
+      if (error) {
+        console.warn('Recalc RPC:', error.message)
+        message.error(dichLoiHeThong(error, 'Không cập nhật được trạng thái mốc từ công việc'))
+      }
       for (const phId of Array.from(milestonesMap.keys())) { await loadMilestones(phId) }
       await loadProjectMilestones()
-    } catch (err) { console.error('Recalc failed:', err) }
+    } catch (err) {
+      console.error('Recalc failed:', err)
+      message.error(dichLoiHeThong(err, 'Không cập nhật được trạng thái mốc từ công việc'))
+    }
   }
 
   const handleDeleteMilestone = async (msId: string, phaseId: string | null) => {
-    if (!confirm('Xóa milestone này?')) return
+    const ok = await hoiXacNhan(modal, {
+      title: 'Xoá mốc này?',
+      content: 'Mốc sẽ bị xoá hẳn khỏi dự án, không hoàn tác được.',
+      okText: 'Xoá mốc',
+      danger: true,
+    })
+    if (!ok) return
     try {
       // Supabase không throw — phải đọc error trả về, kẻo xoá hụt mà vẫn im lặng
       const { error } = await supabase.from('project_milestones').delete().eq('id', msId)
@@ -769,7 +805,7 @@ const PhasesTab: React.FC<{
       else await loadProjectMilestones()
     } catch (err: any) {
       console.error('Delete milestone failed:', err)
-      message.error(err?.message || 'Không xóa được milestone, thử lại')
+      message.error(dichLoiHeThong(err, 'Không xoá được mốc, thử lại'))
     }
   }
 
@@ -778,12 +814,13 @@ const PhasesTab: React.FC<{
   const MilestoneList: React.FC<{ milestones: MilestoneItem[]; phaseId: string | null; isLoading?: boolean }> = ({ milestones, phaseId, isLoading }) => {
     const isAddingHere = phaseId === null ? addProjectMs : addMsPhaseId === phaseId
     const [statusMenuId, setStatusMenuId] = useState<string | null>(null)
+    // Nhãn đọc từ MILESTONE_STATUS_LABELS (trước đây "Sắp đến" lệch "Sắp đến hạn" ở nơi khác)
     const MS_STATUS_OPTIONS: { value: MilestoneStatus; label: string; icon: string; color: string }[] = [
-      { value: 'pending', label: 'Chờ', icon: '⬜', color: 'text-gray-600' },
-      { value: 'approaching', label: 'Sắp đến', icon: '🔵', color: 'text-blue-600' },
-      { value: 'completed', label: 'Hoàn thành', icon: '✅', color: 'text-green-600' },
-      { value: 'overdue', label: 'Quá hạn', icon: '🔴', color: 'text-red-600' },
-      { value: 'cancelled', label: 'Đã hủy', icon: '⚫', color: 'text-gray-400' },
+      { value: 'pending', label: MILESTONE_STATUS_LABELS.pending, icon: '⬜', color: 'text-gray-600' },
+      { value: 'approaching', label: MILESTONE_STATUS_LABELS.approaching, icon: '🔵', color: 'text-blue-600' },
+      { value: 'completed', label: MILESTONE_STATUS_LABELS.completed, icon: '✅', color: 'text-green-600' },
+      { value: 'overdue', label: MILESTONE_STATUS_LABELS.overdue, icon: '🔴', color: 'text-red-600' },
+      { value: 'cancelled', label: MILESTONE_STATUS_LABELS.cancelled, icon: '⚫', color: 'text-gray-400' },
     ]
 
     const handleClickAdd = () => {
@@ -807,13 +844,13 @@ const PhasesTab: React.FC<{
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold text-gray-500 uppercase flex items-center gap-1">
             <Milestone className="w-3.5 h-3.5" />
-            Milestones ({milestones.length})
+            Mốc ({milestones.length})
           </span>
           <div className="flex items-center gap-2">
             {milestones.length > 0 && (
               <button onClick={handleRecalcMilestones}
                 className="text-[11px] text-gray-400 hover:text-[#1B4D3E] flex items-center gap-0.5"
-                title="Cập nhật trạng thái từ tasks">
+                title="Cập nhật trạng thái mốc từ công việc">
                 <RefreshCw className="w-3 h-3" />
               </button>
             )}
@@ -833,7 +870,7 @@ const PhasesTab: React.FC<{
         )}
 
         {!isLoading && milestones.length === 0 && !isAddingHere && (
-          <p className="text-[12px] text-gray-400 py-1">Chưa có milestone</p>
+          <p className="text-[12px] text-gray-400 py-1">Chưa có mốc</p>
         )}
 
         {milestones.map(ms => {
@@ -865,7 +902,7 @@ const PhasesTab: React.FC<{
                 <div className="flex-1 min-w-0">
                   <span className={`text-[12px] font-medium ${ms.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{ms.name}</span>
                 </div>
-                <span className={`text-[11px] shrink-0 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>{formatDate(ms.due_date)}</span>
+                <span className={`text-[11px] shrink-0 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>{fmtDate(ms.due_date)}</span>
                 {ms.assignee && (<span className="text-[10px] text-gray-400 shrink-0 hidden sm:block">{ms.assignee.full_name}</span>)}
                 <button onClick={() => handleDeleteMilestone(ms.id, phaseId)}
                   className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-300 hover:text-red-500 transition-opacity shrink-0">
@@ -882,7 +919,7 @@ const PhasesTab: React.FC<{
                 </div>
               )}
               {!hasTasks && ms.status !== 'completed' && ms.status !== 'cancelled' && (
-                <div className="mt-1 ml-7"><span className="text-[10px] text-gray-400 italic">Chưa gán task</span></div>
+                <div className="mt-1 ml-7"><span className="text-[10px] text-gray-400 italic">Chưa gán công việc</span></div>
               )}
             </div>
           )
@@ -891,10 +928,10 @@ const PhasesTab: React.FC<{
         {/* Inline form — NOT a sub-component (avoids remount on state change) */}
         {isAddingHere && (
           <div className="bg-amber-50/50 border border-amber-200 rounded-lg p-3 space-y-2">
-            <div className="text-[11px] font-semibold text-amber-700 uppercase">Thêm Milestone mới</div>
+            <div className="text-[11px] font-semibold text-amber-700 uppercase">Thêm mốc mới</div>
             <input
               type="text" value={msName} onChange={e => setMsName(e.target.value)}
-              placeholder="Tên milestone..."
+              placeholder="Tên mốc..."
               className="w-full px-3 py-2 text-[13px] bg-white rounded-lg border border-gray-200 outline-none focus:border-[#2D8B6E]"
             />
             <div className="grid grid-cols-2 gap-2">
@@ -956,7 +993,7 @@ const PhasesTab: React.FC<{
       onRefresh()
     } catch (err: any) {
       console.error('Add phase failed:', err)
-      alert('Thêm giai đoạn thất bại: ' + (err.message || 'Lỗi'))
+      message.error(dichLoiHeThong(err, 'Thêm giai đoạn thất bại'))
     } finally {
       setAdding(false)
     }
@@ -998,7 +1035,7 @@ const PhasesTab: React.FC<{
       onRefresh()
     } catch (err: any) {
       console.error('Save phase failed:', err)
-      alert('Lưu thất bại: ' + (err.message || 'Lỗi'))
+      message.error(dichLoiHeThong(err, 'Lưu giai đoạn thất bại'))
     } finally {
       setSaving(false)
     }
@@ -1046,7 +1083,7 @@ const PhasesTab: React.FC<{
       onRefresh()
     } catch (err: any) {
       console.error('Move phase failed:', err)
-      alert('Di chuyển giai đoạn thất bại: ' + (err.message || 'Lỗi'))
+      message.error(dichLoiHeThong(err, 'Di chuyển giai đoạn thất bại'))
     } finally {
       // Clear animation state after a brief delay
       setTimeout(() => {
@@ -1146,7 +1183,7 @@ const PhasesTab: React.FC<{
 
               <span className="text-[11px] text-gray-400 hidden sm:block shrink-0">
                 {phase.planned_start && phase.planned_end
-                  ? `${formatDate(phase.planned_start)} → ${formatDate(phase.planned_end)}`
+                  ? `${fmtDate(phase.planned_start)} → ${fmtDate(phase.planned_end)}`
                   : '—'
                 }
               </span>
@@ -1167,11 +1204,11 @@ const PhasesTab: React.FC<{
                 <div className="grid grid-cols-2 gap-3 text-[12px]">
                   <div>
                     <span className="text-gray-500">Bắt đầu DK:</span>
-                    <span className="font-medium text-gray-800 ml-1">{formatDate(phase.planned_start)}</span>
+                    <span className="font-medium text-gray-800 ml-1">{fmtDate(phase.planned_start)}</span>
                   </div>
                   <div>
                     <span className="text-gray-500">Kết thúc DK:</span>
-                    <span className="font-medium text-gray-800 ml-1">{formatDate(phase.planned_end)}</span>
+                    <span className="font-medium text-gray-800 ml-1">{fmtDate(phase.planned_end)}</span>
                   </div>
                 </div>
 
@@ -1348,6 +1385,7 @@ const GanttTab: React.FC<{
   projectCode?: string
   onNavigateFullPage?: () => void
 }> = ({ projectId, projectCode, onNavigateFullPage }) => {
+  const { message, modal } = App.useApp()
   const [ganttData, setGanttData] = useState<GanttData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1387,12 +1425,12 @@ const GanttTab: React.FC<{
           setResolvedProjectId(data[0].id)
         } else {
           setLoading(false)
-          setError('Không tìm thấy dự án trong database.')
+          setError(err2 ? dichLoiHeThong(err2, 'Không đọc được dự án') : 'Không tìm thấy dự án.')
         }
       } catch (err: any) {
         console.error('Failed to resolve project ID:', err)
         setLoading(false)
-        setError('Không thể kết nối database: ' + (err?.message || 'Unknown'))
+        setError(dichLoiHeThong(err, 'Không đọc được dự án'))
       }
     }
     resolveId()
@@ -1407,7 +1445,7 @@ const GanttTab: React.FC<{
       setGanttData(data)
     } catch (err: any) {
       console.error('Failed to load Gantt data:', err)
-      setError(err?.message || 'Không thể tải dữ liệu Gantt')
+      setError(dichLoiHeThong(err, 'Không tải được dữ liệu Gantt'))
     } finally {
       setLoading(false)
     }
@@ -1421,14 +1459,21 @@ const GanttTab: React.FC<{
 
   const handleAutoSchedule = async () => {
     if (!resolvedProjectId) return
+    // Tự xếp lịch GHI ĐÈ ngày kế hoạch của giai đoạn/công việc (autoSchedule bỏ qua mốc), không hoàn tác → hỏi trước
+    const ok = await hoiXacNhan(modal, {
+      title: 'Tự xếp lịch cho cả dự án?',
+      content: 'Hệ thống sẽ dời ngày bắt đầu/kết thúc của các giai đoạn và công việc theo quan hệ phụ thuộc, rồi GHI ĐÈ vào kế hoạch (không hoàn tác được). Mốc KHÔNG tự dời — xem lại hạn các mốc sau khi xếp. Nên bấm "Lưu đường cơ sở" trước để còn so lại.',
+      okText: 'Tự xếp lịch',
+    })
+    if (!ok) return
     try {
       setAutoScheduling(true)
       const result = await ganttService.autoSchedule(resolvedProjectId)
-      console.log(`Auto-scheduled: ${result.updated_count} items updated`)
+      message.success(`Tự xếp lịch xong: đã dời ${result.updated_count} mục`)
       await loadGanttData()
     } catch (err: any) {
       console.error('Auto-schedule failed:', err)
-      alert('Auto-schedule thất bại: ' + (err?.message || 'Lỗi không xác định'))
+      message.error(dichLoiHeThong(err, 'Tự xếp lịch thất bại'))
     } finally {
       setAutoScheduling(false)
     }
@@ -1437,11 +1482,11 @@ const GanttTab: React.FC<{
   const handleSaveBaseline = async () => {
     if (!resolvedProjectId) return
     try {
-      await ganttService.saveBaseline(resolvedProjectId)
-      alert('Đã lưu baseline thành công!')
+      const result = await ganttService.saveBaseline(resolvedProjectId)
+      message.success(`Đã lưu đường cơ sở: ${result.item_count} mục (ngày ${fmtDate(result.snapshot_date)})`)
     } catch (err: any) {
       console.error('Save baseline failed:', err)
-      alert('Lưu baseline thất bại: ' + (err?.message || 'Lỗi'))
+      message.error(dichLoiHeThong(err, 'Lưu đường cơ sở thất bại'))
     }
   }
 
@@ -1453,7 +1498,7 @@ const GanttTab: React.FC<{
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <Loader2 className="w-8 h-8 text-[#1B4D3E] animate-spin mb-3" />
-        <p className="text-[13px] text-gray-500">Đang tải Gantt chart...</p>
+        <p className="text-[13px] text-gray-500">Đang tải biểu đồ Gantt...</p>
       </div>
     )
   }
@@ -1480,7 +1525,7 @@ const GanttTab: React.FC<{
         <GanttChartIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
         <h3 className="text-[15px] font-semibold text-gray-600 mb-1">Chưa có dữ liệu Gantt</h3>
         <p className="text-[13px] text-gray-400 mb-4">
-          Hãy tạo phases và milestones trong tab Phases trước, sau đó quay lại đây.
+          Hãy tạo giai đoạn và mốc ở tab Giai đoạn trước, sau đó quay lại đây.
         </p>
       </div>
     )
@@ -1494,12 +1539,12 @@ const GanttTab: React.FC<{
             <span>
               <strong className="text-gray-800" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                 {ganttData.items.length}
-              </strong> items
+              </strong> mục
             </span>
             {ganttData.critical_path.length > 0 && (
               <span className="inline-flex items-center gap-1 text-red-600">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                {ganttData.critical_path.length} critical path
+                {ganttData.critical_path.length} mục trên đường găng
               </span>
             )}
             <span>{ganttData.total_duration_days} ngày</span>
@@ -1512,13 +1557,14 @@ const GanttTab: React.FC<{
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50 text-blue-600 text-[12px] font-semibold active:scale-[0.97] disabled:opacity-50"
             >
               {autoScheduling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              Auto-schedule
+              Tự xếp lịch
             </button>
             <button
               onClick={handleSaveBaseline}
+              title="Chụp lại ngày kế hoạch hiện tại làm mốc để so về sau"
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 text-amber-600 text-[12px] font-semibold active:scale-[0.97]"
             >
-              <Save className="w-3.5 h-3.5" /> Lưu baseline
+              <Save className="w-3.5 h-3.5" /> Lưu đường cơ sở
             </button>
             {onNavigateFullPage && (
               <button
@@ -1559,11 +1605,11 @@ const GanttTab: React.FC<{
                   selectedItem.type === 'milestone' ? 'bg-amber-100 text-amber-700' :
                   'bg-gray-100 text-gray-600'
                 }`}>
-                  {selectedItem.type}
+                  {GANTT_ITEM_TYPE_LABELS[selectedItem.type] ?? selectedItem.type}
                 </span>
                 {selectedItem.is_critical && (
                   <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-red-100 text-red-600">
-                    Critical
+                    Đường găng
                   </span>
                 )}
               </div>
@@ -1577,11 +1623,11 @@ const GanttTab: React.FC<{
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[12px]">
             <div>
               <span className="text-gray-500">Bắt đầu</span>
-              <p className="font-medium text-gray-800">{formatDate(selectedItem.start || undefined)}</p>
+              <p className="font-medium text-gray-800">{fmtDate(selectedItem.start || undefined)}</p>
             </div>
             <div>
               <span className="text-gray-500">Kết thúc</span>
-              <p className="font-medium text-gray-800">{formatDate(selectedItem.end || undefined)}</p>
+              <p className="font-medium text-gray-800">{fmtDate(selectedItem.end || undefined)}</p>
             </div>
             <div>
               <span className="text-gray-500">Tiến độ</span>
@@ -1601,7 +1647,7 @@ const GanttTab: React.FC<{
             )}
             {selectedItem.total_float !== undefined && (
               <div>
-                <span className="text-gray-500">Float</span>
+                <span className="text-gray-500" title="Số ngày mục này được trễ mà không kéo lùi ngày xong dự án">Dự phòng thời gian</span>
                 <p className={`font-medium ${selectedItem.total_float === 0 ? 'text-red-600' : 'text-gray-800'}`}
                    style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   {selectedItem.total_float} ngày
@@ -1611,12 +1657,12 @@ const GanttTab: React.FC<{
             {selectedItem.status && (
               <div>
                 <span className="text-gray-500">Trạng thái</span>
-                <p className="font-medium text-gray-800 capitalize">{selectedItem.status.replace('_', ' ')}</p>
+                <p className="font-medium text-gray-800">{ganttStatusLabel(selectedItem.type, selectedItem.status)}</p>
               </div>
             )}
             {selectedItem.dependencies.length > 0 && (
               <div>
-                <span className="text-gray-500">Dependencies</span>
+                <span className="text-gray-500">Phụ thuộc</span>
                 <p className="font-medium text-gray-800">{selectedItem.dependencies.length} liên kết</p>
               </div>
             )}
@@ -1632,9 +1678,10 @@ const GanttTab: React.FC<{
 // ============================================================================
 
 const ResourcesTab: React.FC<{ projectId: string }> = ({ projectId }) => {
+  const { message } = App.useApp()
   const [members, setMembers] = useState<ProjectMember[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
 
   const [showAdd, setShowAdd] = useState(false)
   const [searchQ, setSearchQ] = useState('')
@@ -1665,7 +1712,8 @@ const ResourcesTab: React.FC<{ projectId: string }> = ({ projectId }) => {
       const s = await resourceService.getProjectResourceStats(projectId)
       setStats({ active: s.active_members, avg: s.avg_allocation, over: s.overallocated_count })
     } catch (err: any) {
-      setError(err.message)
+      console.error('Load members failed:', err)
+      setError(err || 'Không tải được danh sách thành viên')
     } finally {
       setLoading(false)
     }
@@ -1716,7 +1764,7 @@ const ResourcesTab: React.FC<{ projectId: string }> = ({ projectId }) => {
       await resourceService.addMember({ project_id: projectId, employee_id: empId, role: addRole, allocation_pct: addPct })
       await loadMembers()
       resourceService.searchEmployeesForProject(projectId, searchQ).then(setSearchResults).catch(() => {})
-    } catch (e: any) { alert(e.message) }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Thêm thành viên thất bại')) }
     finally { setAddingId(null) }
   }
 
@@ -1725,7 +1773,7 @@ const ResourcesTab: React.FC<{ projectId: string }> = ({ projectId }) => {
       await resourceService.removeMember(mid)
       setRemoveId(null)
       await loadMembers()
-    } catch (e: any) { alert(e.message) }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Xoá thành viên thất bại')) }
   }
 
   const handleSaveEdit = async () => {
@@ -1735,7 +1783,7 @@ const ResourcesTab: React.FC<{ projectId: string }> = ({ projectId }) => {
       await resourceService.updateMember(editId, { role: editRole, allocation_pct: editPct })
       setEditId(null)
       await loadMembers()
-    } catch (e: any) { alert(e.message) }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Lưu thành viên thất bại')) }
     finally { setSaving(false) }
   }
 
@@ -1745,27 +1793,12 @@ const ResourcesTab: React.FC<{ projectId: string }> = ({ projectId }) => {
     setEditPct(m.allocation_pct)
   }
 
-  const ROLES: { value: ProjectMemberRole; label: string }[] = [
-    { value: 'owner', label: 'PM' },
-    { value: 'co_owner', label: 'Đồng QĐ' },
-    { value: 'lead', label: 'Trưởng nhóm' },
-    { value: 'member', label: 'Thành viên' },
-    { value: 'reviewer', label: 'Reviewer' },
-    { value: 'observer', label: 'Quan sát' },
-  ]
+  // Nhãn vai trò đọc từ MEMBER_ROLE_LABELS (resourceService) — trước đây chép tay 'PM'/'Đồng QĐ'/'Reviewer'
+  const ROLES: { value: ProjectMemberRole; label: string }[] =
+    (Object.keys(MEMBER_ROLE_LABELS) as ProjectMemberRole[]).map(value => ({ value, label: MEMBER_ROLE_LABELS[value] }))
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 animate-spin text-[#1B4D3E]" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>
-    )
+  if (loading || error) {
+    return <PageState loading={loading} error={error} onRetry={loadMembers} />
   }
 
   const activeMembers = members.filter(m => m.is_active)
@@ -1781,7 +1814,7 @@ const ResourcesTab: React.FC<{ projectId: string }> = ({ projectId }) => {
         </div>
         <div className="bg-white border rounded-xl p-3 text-center">
           <div className="text-lg font-bold text-blue-600">{stats.avg}%</div>
-          <div className="text-[11px] text-gray-500">TB Allocation</div>
+          <div className="text-[11px] text-gray-500">Phân bổ TB</div>
         </div>
         <div className={`border rounded-xl p-3 text-center ${stats.over > 0 ? 'bg-red-50 border-red-200' : 'bg-white'}`}>
           <div className={`text-lg font-bold ${stats.over > 0 ? 'text-red-600' : 'text-gray-400'}`}>{stats.over}</div>
@@ -1796,7 +1829,7 @@ const ResourcesTab: React.FC<{ projectId: string }> = ({ projectId }) => {
             <Users className="w-3.5 h-3.5 inline mr-1" />Thành viên
           </button>
           <button onClick={() => setSubTab('workload')} className={`px-3 py-1.5 text-xs font-medium rounded-md ${subTab === 'workload' ? 'bg-white text-[#1B4D3E] shadow-sm' : 'text-gray-500'}`}>
-            <BarChart3 className="w-3.5 h-3.5 inline mr-1" />Workload
+            <BarChart3 className="w-3.5 h-3.5 inline mr-1" />Tải công việc
           </button>
         </div>
         <button onClick={() => setShowAdd(true)} className="h-9 px-3 bg-[#1B4D3E] text-white rounded-lg text-xs font-medium flex items-center gap-1.5 active:scale-95">
@@ -1847,8 +1880,8 @@ const ResourcesTab: React.FC<{ projectId: string }> = ({ projectId }) => {
                     </span>
                     {m.start_date && (
                       <span className="text-[11px] text-gray-400">
-                        {new Date(m.start_date).toLocaleDateString('vi-VN')}
-                        {m.end_date && ` → ${new Date(m.end_date).toLocaleDateString('vi-VN')}`}
+                        {fmtDate(m.start_date)}
+                        {m.end_date && ` → ${fmtDate(m.end_date)}`}
                       </span>
                     )}
                   </div>
@@ -1900,7 +1933,7 @@ const ResourcesTab: React.FC<{ projectId: string }> = ({ projectId }) => {
               <div className="space-y-1.5 mt-2">
                 {inactiveMembers.map(m => (
                   <div key={m.id} className="bg-white border rounded-lg p-2.5 opacity-50 text-xs text-gray-500">
-                    {m.employee?.full_name} — {MEMBER_ROLE_LABELS[m.role]} — Rời {m.left_at && new Date(m.left_at).toLocaleDateString('vi-VN')}
+                    {m.employee?.full_name} — {MEMBER_ROLE_LABELS[m.role]} — Rời {m.left_at && fmtDate(m.left_at)}
                   </div>
                 ))}
               </div>
@@ -2033,7 +2066,8 @@ const PlaceholderTab: React.FC<{ tabName: string; phase: string }> = ({ tabName,
       <FolderKanban className="w-8 h-8 text-gray-300" />
     </div>
     <h3 className="text-[15px] font-semibold text-gray-600 mb-1">{tabName}</h3>
-    <p className="text-[13px] text-gray-400">Sẽ triển khai trong {phase}</p>
+    {/* trước đây in mã đợt nội bộ "PM11" ra người dùng */}
+    <p className="text-[13px] text-gray-400">Tính năng đang được xây dựng{phase ? ' — sẽ có ở đợt sau' : ''}</p>
   </div>
 )
 
@@ -2046,6 +2080,11 @@ export const ProjectDetailPage: React.FC = () => {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { user } = useAuthStore()
+  const { message, modal } = App.useApp()
+
+  // Lỗi tải dự án (mạng/quyền…) — tách khỏi "không tìm thấy" để không báo sai "Không tìm thấy dự án"
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   // ✅ Real data state — no more mock
   const [project, setProject] = useState<Project>(DEFAULT_PROJECT)
@@ -2181,6 +2220,7 @@ export const ProjectDetailPage: React.FC = () => {
     if (!id) return
     const loadProject = async () => {
       setLoading(true)
+      setLoadError(null)
       try {
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
@@ -2210,6 +2250,8 @@ export const ProjectDetailPage: React.FC = () => {
 
         if (err || !data) {
           console.error('Project load error:', err)
+          // PGRST116 = không có dòng nào → "Không tìm thấy dự án"; lỗi khác (mạng, quyền…) → khối lỗi + Thử lại
+          if (err && err.code !== 'PGRST116') setLoadError(err)
           setLoading(false)
           return
         }
@@ -2377,12 +2419,13 @@ export const ProjectDetailPage: React.FC = () => {
 
       } catch (e) {
         console.error('Failed to load project:', e)
+        setLoadError(e || 'Không tải được dự án')
       } finally {
         setLoading(false)
       }
     }
     loadProject()
-  }, [id])
+  }, [id, reloadKey])
 
   // ========================================================================
   // RELOAD PHASES (called after add/delete/update)
@@ -2430,7 +2473,7 @@ export const ProjectDetailPage: React.FC = () => {
   const handleSaveName = async () => {
     const trimmed = editName.trim()
     if (!trimmed) {
-      alert('Tên dự án không được để trống')
+      message.warning('Tên dự án không được để trống')
       return
     }
     if (trimmed === project.name) {
@@ -2446,7 +2489,7 @@ export const ProjectDetailPage: React.FC = () => {
         .eq('id', realProjectId)
 
       if (error) {
-        alert('Lỗi cập nhật tên: ' + error.message)
+        message.error(dichLoiHeThong(error, 'Không đổi được tên dự án'))
         return
       }
 
@@ -2471,7 +2514,7 @@ export const ProjectDetailPage: React.FC = () => {
           })
       })
     } catch (e: any) {
-      alert('Lỗi: ' + (e.message || 'Không xác định'))
+      message.error(dichLoiHeThong(e, 'Không đổi được tên dự án'))
     } finally {
       setSavingName(false)
     }
@@ -2490,7 +2533,7 @@ export const ProjectDetailPage: React.FC = () => {
         // Validate transition
         const allowed = VALID_TRANSITIONS[project.status] || []
         if (!allowed.includes(newStatus)) {
-          alert(`Không thể chuyển từ "${project.status}" sang "${newStatus}"`)
+          message.warning(`Không thể chuyển từ "${STATUS_CONFIG[project.status]?.label ?? project.status}" sang "${STATUS_CONFIG[newStatus]?.label ?? newStatus}"`)
           return
         }
 
@@ -2515,7 +2558,7 @@ export const ProjectDetailPage: React.FC = () => {
 
         if (error) {
           console.error('Status update failed:', error)
-          alert('Cập nhật trạng thái thất bại: ' + error.message)
+          message.error(dichLoiHeThong(error, 'Cập nhật trạng thái dự án thất bại'))
           return
         }
 
@@ -2532,7 +2575,8 @@ export const ProjectDetailPage: React.FC = () => {
                 actor_id: emp?.id,
                 old_value: { status: project.status },
                 new_value: { status: newStatus },
-                description: `Chuyển trạng thái: ${project.status} → ${newStatus}`,
+                // Ghi NHÃN tiếng Việt (dòng này hiện thẳng ở tab Hoạt động) — mã thô vẫn nằm ở old/new_value
+                description: `Chuyển trạng thái: ${STATUS_CONFIG[project.status]?.label ?? project.status} → ${STATUS_CONFIG[newStatus]?.label ?? newStatus}`,
               })
             })
         })
@@ -2540,7 +2584,7 @@ export const ProjectDetailPage: React.FC = () => {
       setProject(prev => ({ ...prev, status: newStatus }))
     } catch (e: any) {
       console.error('Status update failed:', e)
-      alert('Lỗi cập nhật trạng thái: ' + (e.message || 'Lỗi không xác định'))
+      message.error(dichLoiHeThong(e, 'Cập nhật trạng thái dự án thất bại'))
     }
   }
 
@@ -2570,7 +2614,7 @@ export const ProjectDetailPage: React.FC = () => {
 
       if (error) {
         console.error('Phase status update failed:', error)
-        alert('Cập nhật trạng thái giai đoạn thất bại: ' + error.message)
+        message.error(dichLoiHeThong(error, 'Cập nhật trạng thái giai đoạn thất bại'))
         return
       }
 
@@ -2597,7 +2641,7 @@ export const ProjectDetailPage: React.FC = () => {
       await loadPhases()
     } catch (e: any) {
       console.error('Phase status update failed:', e)
-      alert('Lỗi: ' + (e.message || 'Lỗi không xác định'))
+      message.error(dichLoiHeThong(e, 'Cập nhật trạng thái giai đoạn thất bại'))
     }
   }
 
@@ -2610,11 +2654,22 @@ export const ProjectDetailPage: React.FC = () => {
       .eq('phase_id', phaseId)
 
     const phaseName = phases.find(p => p.id === phaseId)?.name || 'này'
-    const taskWarning = taskCount && taskCount > 0
-      ? `\n⚠️ ${taskCount} công việc trong giai đoạn sẽ bị XÓA VĨNH VIỄN!`
-      : ''
 
-    if (!confirm(`Xóa giai đoạn "${phaseName}"?${taskWarning}\n\nMilestones sẽ được chuyển về cấp dự án.`)) return
+    // Hộp xác nhận antd (thay confirm() hệ thống) — nêu rõ hệ quả, nhất là số công việc bị XOÁ VĨNH VIỄN
+    const ok = await hoiXacNhan(modal, {
+      title: `Xoá giai đoạn "${phaseName}"?`,
+      content: (
+        <div className="space-y-1.5">
+          {taskCount && taskCount > 0 ? (
+            <p className="font-semibold text-red-600">⚠️ {taskCount} công việc trong giai đoạn sẽ bị XOÁ VĨNH VIỄN (kèm bình luận, file, đánh giá).</p>
+          ) : null}
+          <p>Các mốc của giai đoạn sẽ được chuyển về cấp dự án.</p>
+        </div>
+      ),
+      okText: 'Xoá giai đoạn',
+      danger: true,
+    })
+    if (!ok) return
 
     try {
       // ── 1. Unlink milestones → set phase_id = null ──
@@ -2625,7 +2680,7 @@ export const ProjectDetailPage: React.FC = () => {
 
       if (msError) {
         console.error('Unlink milestones failed:', msError)
-        alert('Không thể gỡ milestones: ' + msError.message)
+        message.error(dichLoiHeThong(msError, 'Không gỡ được mốc khỏi giai đoạn'))
         return
       }
 
@@ -2704,7 +2759,7 @@ export const ProjectDetailPage: React.FC = () => {
 
           if (taskError) {
             console.error('Delete tasks failed:', taskError)
-            alert('Xóa công việc thất bại: ' + taskError.message)
+            message.error(dichLoiHeThong(taskError, 'Xoá công việc của giai đoạn thất bại'))
             return
           }
 
@@ -2720,7 +2775,7 @@ export const ProjectDetailPage: React.FC = () => {
 
       if (error) {
         console.error('Phase delete failed:', error)
-        alert('Xóa giai đoạn thất bại: ' + error.message)
+        message.error(dichLoiHeThong(error, 'Xoá giai đoạn thất bại'))
         return
       }
 
@@ -2763,7 +2818,7 @@ export const ProjectDetailPage: React.FC = () => {
       await loadPhases()
     } catch (e: any) {
       console.error('Phase delete failed:', e)
-      alert('Lỗi xóa giai đoạn: ' + (e.message || 'Lỗi không xác định'))
+      message.error(dichLoiHeThong(e, 'Xoá giai đoạn thất bại'))
     }
   }
 
@@ -2792,6 +2847,7 @@ export const ProjectDetailPage: React.FC = () => {
       console.log(`✅ Progress recalculated: ${result.project_progress}%, ${result.phases_updated} phases updated`)
     } catch (err) {
       console.error('Refresh progress failed:', err)
+      message.error(dichLoiHeThong(err, 'Không cập nhật được tiến độ'))
     } finally {
       setRefreshing(false)
     }
@@ -2812,6 +2868,7 @@ export const ProjectDetailPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Toggle mode failed:', err)
+      message.error(dichLoiHeThong(err, 'Không đổi được cách tính tiến độ'))
     }
   }
 
@@ -2819,13 +2876,16 @@ export const ProjectDetailPage: React.FC = () => {
   // RENDER
   // ============================================================================
 
-  if (loading) {
+  if (loading || loadError) {
+    // Lỗi xét TRƯỚC "không tìm thấy": mạng rớt không được hiện như dự án không tồn tại
     return (
-      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1B4D3E] mx-auto mb-3" />
-          <p className="text-[13px] text-gray-500">Đang tải dự án...</p>
-        </div>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+        {!loading && (
+          <button onClick={() => navigate('/projects/list')} className="mb-3 text-[13px] text-[#1B4D3E] hover:underline">
+            ← Về danh sách
+          </button>
+        )}
+        <PageState loading={loading} error={loadError} onRetry={() => setReloadKey(k => k + 1)} minHeight={320} />
       </div>
     )
   }
@@ -3009,7 +3069,7 @@ export const ProjectDetailPage: React.FC = () => {
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[11px] text-gray-500">Tiến độ</span>
               <span className="text-[14px] font-bold text-gray-800" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {project.progress_pct.toFixed(1)}%
+                {fmtPct(project.progress_pct, 1)}
               </span>
               {/* ✅ AUTO-PROGRESS: Mode badge */}
               <button
@@ -3021,14 +3081,14 @@ export const ProjectDetailPage: React.FC = () => {
                 }`}
                 title={progressMode === 'auto' ? 'Đang tự động — nhấn để chuyển sang nhập tay' : 'Đang nhập tay — nhấn để chuyển sang tự động'}
               >
-                {progressMode === 'auto' ? 'Auto' : 'Nhập tay'}
+                {progressMode === 'auto' ? 'Tự động' : 'Nhập tay'}
               </button>
               {/* ✅ AUTO-PROGRESS: Refresh button */}
               <button
                 onClick={refreshProgress}
                 disabled={refreshing}
                 className="p-1 rounded-md text-gray-400 hover:text-[#1B4D3E] hover:bg-gray-100 transition-colors disabled:opacity-50"
-                title="Cập nhật tiến độ từ tasks"
+                title="Cập nhật tiến độ từ công việc"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
@@ -3063,7 +3123,7 @@ export const ProjectDetailPage: React.FC = () => {
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5" />
-              {formatDate(project.planned_start)} → {formatDate(project.planned_end)}
+              {fmtDate(project.planned_start)} → {fmtDate(project.planned_end)}
             </span>
           </div>
 

@@ -55,6 +55,7 @@ import {
 } from '../../services/sales/contractGeneratorService'
 import { BANK_PRESETS, getBankPreset } from '../../config/sales.config'
 import { riskReasonText } from '../../services/sales/contractRisk'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -127,8 +128,7 @@ export default function ContractReviewPage() {
       )
       setRows(data)
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      message.error(`Không tải được queue: ${msg}`)
+      message.error(dichLoiHeThong(e, 'Không tải được hàng chờ'))
     } finally {
       setLoading(false)
     }
@@ -200,8 +200,7 @@ export default function ContractReviewPage() {
       }
       message.success('Đã sinh .docx (preview, không lưu lên server)')
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      message.error(`Sinh .docx thất bại: ${msg}`)
+      message.error(dichLoiHeThong(e, 'Sinh .docx thất bại'))
     } finally {
       setDocLoading(null)
     }
@@ -265,8 +264,7 @@ export default function ContractReviewPage() {
           closeReview()
           void refresh()
         } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e)
-          message.error(`Duyệt thất bại: ${msg}`)
+          message.error(dichLoiHeThong(e, 'Duyệt thất bại'))
         } finally {
           setApproving(false)
         }
@@ -307,8 +305,7 @@ export default function ContractReviewPage() {
       closeReview()
       void refresh()
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      message.error(`Trả lại thất bại: ${msg}`)
+      message.error(dichLoiHeThong(e, 'Trả lại thất bại'))
     } finally {
       setRejecting(false)
     }
@@ -923,7 +920,7 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
         message.success(`Đã auto-fill ${filledCount} file. Verify rồi bấm "Duyệt + Trình ký".`)
       }
     } catch (e: unknown) {
-      message.error(`Auto-fill thất bại: ${e instanceof Error ? e.message : String(e)}`)
+      message.error(dichLoiHeThong(e, 'Tự điền thất bại'))
     } finally {
       setAutoFilling(false)
     }
@@ -935,7 +932,7 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
       const url = await salesContractWorkflowService.getDownloadUrl(path)
       window.open(url, '_blank')
     } catch (e: unknown) {
-      message.error(`Download thất bại: ${e instanceof Error ? e.message : String(e)}`)
+      message.error(dichLoiHeThong(e, 'Tải xuống thất bại'))
     } finally {
       setDownloadingIdx(null)
     }
@@ -969,7 +966,7 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
       setFiles([])
       onFilled(updated)
     } catch (e: unknown) {
-      message.error(`Upload thất bại: ${e instanceof Error ? e.message : String(e)}`)
+      message.error(dichLoiHeThong(e, 'Tải lên thất bại'))
     } finally {
       setUploading(false)
     }
@@ -1163,7 +1160,7 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
                         const url = await salesContractWorkflowService.getDownloadUrl(p)
                         window.open(url, '_blank')
                       } catch (e: unknown) {
-                        message.error(`Tải thất bại: ${e instanceof Error ? e.message : String(e)}`)
+                        message.error(dichLoiHeThong(e, 'Tải thất bại'))
                       } finally {
                         setDownloadingIdx(null)
                       }

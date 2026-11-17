@@ -5,15 +5,14 @@
 // ============================================================================
 
 import { useQuery } from '@tanstack/react-query'
-import { Card, Tag, Progress, Empty, Spin, Typography, Button, Tooltip } from 'antd'
+import { Card, Progress, Empty, Spin, Typography, Button, Tooltip } from 'antd'
 import { TrophyOutlined, SendOutlined, StarFilled } from '@ant-design/icons'
 import { partnerMatchingService, type MatchCriteria } from '../../services/b2b/partnerMatchingService'
+import { TIER_LABELS, TIER_COLORS } from '../../services/b2b/partnerService'
+import { EnumTag } from '../common/EnumTag'
+import PageState from '../common/PageState'
 
 const { Text } = Typography
-
-const TIER_COLOR: Record<string, string> = {
-  platinum: '#722ed1', gold: '#faad14', silver: '#8c8c8c', bronze: '#d48806', new: '#d9d9d9',
-}
 
 interface Props {
   criteria: MatchCriteria
@@ -23,7 +22,7 @@ interface Props {
 export default function PartnerMatchSuggestions({ criteria, onInvite }: Props) {
   const hasAnyCriteria = criteria.product_type || criteria.min_drc || criteria.region
 
-  const { data: matches = [], isLoading } = useQuery({
+  const { data: matches = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['partner-matches', criteria],
     queryFn: () => partnerMatchingService.findMatches(criteria, 8),
     enabled: !!hasAnyCriteria,
@@ -32,6 +31,7 @@ export default function PartnerMatchSuggestions({ criteria, onInvite }: Props) {
 
   if (!hasAnyCriteria) return null
   if (isLoading) return <Card size="small" style={{ borderRadius: 12 }}><Spin size="small" /> Đang tìm đại lý phù hợp...</Card>
+  if (isError) return <Card size="small" style={{ borderRadius: 12 }}><PageState error={error} onRetry={() => refetch()} minHeight={80} /></Card>
   if (matches.length === 0) return null
 
   return (
@@ -58,9 +58,7 @@ export default function PartnerMatchSuggestions({ criteria, onInvite }: Props) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Text strong style={{ fontSize: 13 }}>{m.name}</Text>
-                <Tag color={TIER_COLOR[m.tier]} style={{ fontSize: 10, lineHeight: '16px', margin: 0 }}>
-                  {m.tier}
-                </Tag>
+                <EnumTag value={m.tier} labels={TIER_LABELS} colors={TIER_COLORS} style={{ fontSize: 10, lineHeight: '16px', margin: 0 }} />
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 3 }}>
                 {m.reasons.slice(0, 3).map((r, i) => (

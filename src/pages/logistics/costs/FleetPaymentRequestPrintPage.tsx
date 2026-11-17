@@ -12,6 +12,7 @@ import { ArrowLeft, Printer } from 'lucide-react'
 import logoImg from '../../../assets/logo.png'
 import { useAuthStore } from '../../../stores/authStore'
 import { readVietnameseNumber } from '../../../utils/readVietnameseNumber'
+import PageState from '../../../components/common/PageState'
 import {
   fleetPaymentRequestService, FLEET_PR_METHOD_LABELS,
   type FleetPaymentRequest, type FleetPaymentRequestLine,
@@ -27,14 +28,26 @@ export default function FleetPaymentRequestPrintPage() {
   const [req, setReq] = useState<FleetPaymentRequest | null>(null)
   const [lines, setLines] = useState<FleetPaymentRequestLine[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải (mạng/quyền) ≠ "không tìm thấy" — trước đây gộp chung, người in tưởng phiếu đã bị xoá.
+  const [loadErr, setLoadErr] = useState<unknown>(null)
+  const [reloadTick, setReloadTick] = useState(0)
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    fleetPaymentRequestService.getById(id).then((res) => { if (res) { setReq(res.request); setLines(res.lines) } setLoading(false) }).catch(() => setLoading(false))
-  }, [id])
+    setLoadErr(null)
+    fleetPaymentRequestService.getById(id).then((res) => { if (res) { setReq(res.request); setLines(res.lines) } setLoading(false) }).catch((e) => { setLoadErr(e); setLoading(false) })
+  }, [id, reloadTick])
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600" /></div>
+  if (loadErr && !req) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <PageState error={loadErr} onRetry={() => setReloadTick((t) => t + 1)} />
+        <button onClick={() => navigate('/logistics/costs')} className="mt-4 text-blue-600 text-sm">Quay lại</button>
+      </div>
+    )
+  }
   if (!req) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center text-gray-400">

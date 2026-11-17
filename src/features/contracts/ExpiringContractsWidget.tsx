@@ -1,17 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
 import { contractService } from '../../services'
 import { Card } from '../../components/ui'
- 
+import PageState from '../../components/common/PageState'
+import { fmtDate as formatDate } from '../../utils/format'
+
 export function ExpiringContractsWidget() {
-  const { data: contracts, isLoading } = useQuery({
+  const { data: contracts, isLoading, error, refetch } = useQuery({
     queryKey: ['expiring-contracts'],
     queryFn: () => contractService.getExpiringContracts(30)
   })
- 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('vi-VN')
-  }
- 
+
   const getDaysRemaining = (endDate: string) => {
     const end = new Date(endDate)
     const today = new Date()
@@ -22,7 +20,16 @@ export function ExpiringContractsWidget() {
   if (isLoading) {
     return <Card className="p-4">Đang tải...</Card>
   }
- 
+
+  if (error) {
+    return (
+      <Card className="p-4">
+        <h3 className="font-semibold mb-2">Hợp đồng sắp hết hạn</h3>
+        <PageState error={error} onRetry={() => refetch()} minHeight={120} />
+      </Card>
+    )
+  }
+
   if (!contracts || contracts.length === 0) {
     return (
       <Card className="p-4">

@@ -9,7 +9,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   Card,
   Table,
-  Tag,
   Button,
   Space,
   Typography,
@@ -29,6 +28,9 @@ import {
 } from '@ant-design/icons'
 import blendingService from '../../../services/wms/blendingService'
 import GradeBadge from '../../../components/wms/GradeBadge'
+import EnumTag from '../../../components/common/EnumTag'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { BATCH_QC_STATUS_LABELS, BATCH_QC_STATUS_COLORS } from '../qc/qcLabels'
 import type { StockBatch } from '../../../services/wms/wms.types'
 
 const { Title, Text } = Typography
@@ -58,6 +60,8 @@ const BlendSuggestPage = () => {
   const [loadingBatches, setLoadingBatches] = useState(true)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // "Không tìm thấy gợi ý" chỉ được nói SAU một lần tìm THÀNH CÔNG cho đúng lô + DRC đang chọn
+  const [daTim, setDaTim] = useState(false)
 
   // Load batches needing blend
   useEffect(() => {
@@ -68,7 +72,7 @@ const BlendSuggestPage = () => {
         setBatchesNeedingBlend(batches)
       } catch (err: any) {
         console.error(err)
-        setError(err.message || 'Không thể tải danh sách lô')
+        setError(dichLoiHeThong(err, 'Không tải được danh sách lô cần phối trộn'))
       } finally {
         setLoadingBatches(false)
       }
@@ -76,16 +80,21 @@ const BlendSuggestPage = () => {
     load()
   }, [])
 
+  // ⚠ Đổi lô hoặc DRC mục tiêu → xoá gợi ý cũ. Trước đây gợi ý của lô A vẫn nằm trên bảng sau khi
+  //   chọn lô B, và nút "Tạo lệnh trộn từ gợi ý" ghép lô B với đối tác + tỉ lệ tính cho lô A.
+  const boGoiYCu = () => { setSuggestions([]); setDaTim(false) }
+
   const handleSearch = async () => {
     if (!selectedBatchId || !targetDrc) return
     setLoadingSuggestions(true)
     setError(null)
-    setSuggestions([])
+    boGoiYCu()
     try {
       const results = await blendingService.getSuggestedBlends(selectedBatchId, targetDrc)
       setSuggestions(results)
+      setDaTim(true)
     } catch (err: any) {
-      setError(err.message || 'Không thể tìm gợi ý')
+      setError(dichLoiHeThong(err, 'Không tìm được gợi ý phối trộn'))
     } finally {
       setLoadingSuggestions(false)
     }
@@ -148,7 +157,6 @@ const BlendSuggestPage = () => {
             if (selectedBatch?.rubber_grade) params.set('grade', selectedBatch.rubber_grade)
             navigate(`/wms/blending/new?${params.toString()}`)
           }}
-          style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
         >
           Tạo lệnh trộn từ gợi ý
         </Button>
@@ -185,7 +193,7 @@ const BlendSuggestPage = () => {
             <Text strong style={{ display: 'block', marginBottom: 4 }}>Chọn lô cần phối trộn</Text>
             <Select
               value={selectedBatchId || undefined}
-              onChange={setSelectedBatchId}
+              onChange={(v) => { setSelectedBatchId(v); boGoiYCu() }}
               placeholder="Chọn lô..."
               style={{ width: '100%' }}
               showSearch
@@ -199,7 +207,7 @@ const BlendSuggestPage = () => {
             <Text strong style={{ display: 'block', marginBottom: 4 }}>DRC mục tiêu (%)</Text>
             <InputNumber
               value={targetDrc}
-              onChange={v => setTargetDrc(v)}
+              onChange={v => { setTargetDrc(v); boGoiYCu() }}
               min={0}
               max={100}
               step={0.5}
@@ -215,7 +223,7 @@ const BlendSuggestPage = () => {
               loading={loadingSuggestions}
               disabled={!selectedBatchId || !targetDrc}
               size="large"
-              style={{ background: '#1B4D3E', borderColor: '#1B4D3E', width: '100%' }}
+              style={{ width: '100%' }}
             >
               Tìm
             </Button>
@@ -229,7 +237,7 @@ const BlendSuggestPage = () => {
             style={{ marginTop: 16, borderRadius: 8 }}
             message={
               <Space>
-                <Text>Lo:</Text>
+                <Text>Lô:</Text>
                 <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>{selectedBatch.batch_no}</Text>
                 <Text style={{ marginLeft: 8 }}>Grade:</Text>
                 <GradeBadge grade={selectedBatch.rubber_grade} size="small" />
@@ -242,9 +250,8 @@ const BlendSuggestPage = () => {
                   {selectedBatch.quantity_remaining.toLocaleString('vi-VN')} kg
                 </Text>
                 <Text style={{ marginLeft: 8 }}>QC:</Text>
-                <Tag color={selectedBatch.qc_status === 'needs_blend' ? 'warning' : 'default'}>
-                  {selectedBatch.qc_status}
-                </Tag>
+                {/* Nhãn QC của lô dùng chung (qcLabels) — trước đây in thô 'needs_blend' */}
+                <EnumTag value={selectedBatch.qc_status} labels={BATCH_QC_STATUS_LABELS} colors={BATCH_QC_STATUS_COLORS} />
               </Space>
             }
             showIcon
@@ -269,7 +276,7 @@ const BlendSuggestPage = () => {
             pagination={{ pageSize: 10, showSizeChanger: false }}
           />
         </Card>
-      ) : selectedBatchId && !loadingSuggestions ? (
+      ) : daTim && selectedBatchId && !loadingSuggestions ? (
         <Card style={{ borderRadius: 12 }}>
           <Empty description="Không tìm thấy gợi ý phối trộn phù hợp. Thử thay đổi DRC mục tiêu." />
         </Card>

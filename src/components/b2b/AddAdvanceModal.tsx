@@ -25,6 +25,7 @@ import {
 } from '@ant-design/icons'
 import type { DealCardMetadata } from '../../types/b2b.types'
 import { PRODUCT_TYPE_LABELS } from '../../services/b2b/chatMessageService'
+import { fmtVnd, vndInputProps } from '../../utils/format'
 
 const { Text } = Typography
 const { TextArea } = Input
@@ -48,14 +49,6 @@ interface AddAdvanceModalProps {
   loading?: boolean
   deal: DealCardMetadata | null
   partnerName?: string
-}
-
-// ============================================
-// HELPERS
-// ============================================
-
-const formatCurrency = (value: number): string => {
-  return value.toLocaleString('vi-VN')
 }
 
 // ============================================
@@ -133,17 +126,17 @@ const AddAdvanceModal = ({
         </Row>
         <Row justify="space-between" style={{ marginBottom: 4 }}>
           <Text type="secondary">Giá trị Deal</Text>
-          <Text strong>{formatCurrency(deal.estimated_value)} VNĐ</Text>
+          <Text strong>{fmtVnd(deal.estimated_value)}</Text>
         </Row>
         <Row justify="space-between" style={{ marginBottom: 4 }}>
           <Text type="secondary">Đã ứng</Text>
-          <Text style={{ color: '#52c41a' }}>{formatCurrency(deal.total_advanced)} VNĐ</Text>
+          <Text style={{ color: '#52c41a' }}>{fmtVnd(deal.total_advanced)}</Text>
         </Row>
         <Divider style={{ margin: '8px 0' }} />
         <Row justify="space-between">
           <Text strong>Còn nợ</Text>
           <Text strong style={{ color: '#1890ff', fontSize: 15 }}>
-            {formatCurrency(deal.balance_due)} VNĐ
+            {fmtVnd(deal.balance_due)}
           </Text>
         </Row>
       </div>
@@ -162,7 +155,7 @@ const AddAdvanceModal = ({
       >
         <Form.Item
           name="amount"
-          label="Số tiền ứng (VNĐ)"
+          label="Số tiền ứng (₫)"
           rules={[
             { required: true, message: 'Nhập số tiền ứng' },
             { type: 'number', min: 1, message: 'Số tiền phải > 0' },
@@ -177,9 +170,8 @@ const AddAdvanceModal = ({
             style={{ width: '100%' }}
             min={1}
             step={1000000}
-            formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-            parser={(v) => Number(v!.replace(/,/g, '')) || 0}
-            placeholder="VD: 10,000,000"
+            {...vndInputProps}
+            placeholder="VD: 10.000.000"
             size="large"
           />
         </Form.Item>
@@ -233,20 +225,20 @@ const AddAdvanceModal = ({
           <Row justify="space-between" style={{ marginBottom: 4 }}>
             <Text>Ứng thêm lần này:</Text>
             <Text strong style={{ color: '#cf1322' }}>
-              + {formatCurrency(liveAmount)} VNĐ
+              + {fmtVnd(liveAmount)}
             </Text>
           </Row>
           <Row justify="space-between" style={{ marginBottom: 4 }}>
             <Text>Tổng đã ứng:</Text>
             <Text strong style={{ color: '#52c41a' }}>
-              {formatCurrency(deal.total_advanced + liveAmount)} VNĐ
+              {fmtVnd(deal.total_advanced + liveAmount)}
             </Text>
           </Row>
           <Divider style={{ margin: '8px 0' }} />
           <Row justify="space-between">
             <Text strong>Còn phải trả:</Text>
             <Text strong style={{ color: newBalanceDue > 0 ? '#1890ff' : '#52c41a', fontSize: 15 }}>
-              {formatCurrency(Math.max(0, newBalanceDue))} VNĐ
+              {fmtVnd(Math.max(0, newBalanceDue))}
             </Text>
           </Row>
         </div>

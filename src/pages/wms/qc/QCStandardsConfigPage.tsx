@@ -5,15 +5,16 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Card, Table, Button, Space, Typography, Spin, Modal,
   Form, InputNumber, Select, Row, Col, Tag, message, Divider,
 } from 'antd'
 import {
-  ArrowLeftOutlined, PlusOutlined, EditOutlined,
+  PlusOutlined, EditOutlined,
   SettingOutlined, ExperimentOutlined,
 } from '@ant-design/icons'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { supabase } from '../../../lib/supabase'
 import qcService from '../../../services/wms/qcService'
 import { rubberGradeService } from '../../../services/wms/rubberGradeService'
@@ -30,16 +31,20 @@ const { Title, Text } = Typography
 interface MaterialOption { id: string; sku: string; name: string }
 interface StandardRow extends MaterialQCStandard { material_name?: string; material_sku?: string }
 
+// Mùa vụ (material_qc_standards.season) — trước hiện mã thô 'dry'/'rainy' dưới cột ghi nhầm "Mua"
+const SEASON_LABELS: Record<string, string> = { all: 'Tất cả', dry: 'Mùa khô', rainy: 'Mùa mưa' }
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
 const QCStandardsConfigPage = () => {
-  const navigate = useNavigate()
   const [standards, setStandards] = useState<StandardRow[]>([])
   const [materials, setMaterials] = useState<MaterialOption[]>([])
   const [gradeStandards, setGradeStandards] = useState<RubberGradeStandard[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "chưa cấu hình tiêu chuẩn nào"
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   // Modal
   const [modalOpen, setModalOpen] = useState(false)
@@ -50,10 +55,14 @@ const QCStandardsConfigPage = () => {
 
   const loadData = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const [stds, mats, grades] = await Promise.all([
         qcService.getAllStandards(),
-        supabase.from('materials').select('id, sku, name').eq('is_active', true).order('name').then(r => r.data || []),
+        supabase.from('materials').select('id, sku, name').eq('is_active', true).order('name').then(r => {
+          if (r.error) throw r.error
+          return r.data || []
+        }),
         rubberGradeService.getAll(),
       ])
 
@@ -66,7 +75,7 @@ const QCStandardsConfigPage = () => {
       setStandards(enriched)
       setMaterials(mats as MaterialOption[])
       setGradeStandards(grades)
-    } catch (err) { console.error('Load standards error:', err) }
+    } catch (err) { console.error('Load standards error:', err); setLoadError(err) }
     finally { setLoading(false) }
   }, [])
 
@@ -166,7 +175,7 @@ const QCStandardsConfigPage = () => {
       loadData()
     } catch (err: any) {
       if (err.errorFields) return // validation error
-      message.error(err.message || 'Loi luu tieu chuan')
+      message.error(dichLoiHeThong(err, 'Lỗi lưu tiêu chuẩn'))
     } finally { setSaving(false) }
   }
 
@@ -192,14 +201,14 @@ const QCStandardsConfigPage = () => {
       ),
     },
     { title: 'PRI min', dataIndex: 'pri_min', key: 'pri', render: (v: number) => v || '—' },
-    { title: 'Moisture', dataIndex: 'moisture_max', key: 'moisture', render: (v: number) => v ? `≤${v}%` : '—' },
-    { title: 'Dirt', dataIndex: 'dirt_max', key: 'dirt', render: (v: number) => v ? `≤${v}%` : '—' },
+    { title: 'Độ ẩm', dataIndex: 'moisture_max', key: 'moisture', render: (v: number) => v ? `≤${v}%` : '—' },
+    { title: 'Tạp chất', dataIndex: 'dirt_max', key: 'dirt', render: (v: number) => v ? `≤${v}%` : '—' },
     {
       title: 'Tái kiểm',
       key: 'recheck',
-      render: (_: any, r: StandardRow) => <Text type="secondary">{r.recheck_interval_days}d / {r.recheck_shortened_days}d</Text>,
+      render: (_: any, r: StandardRow) => <Text type="secondary">{r.recheck_interval_days} / {r.recheck_shortened_days} ngày</Text>,
     },
-    { title: 'Mua', dataIndex: 'season', key: 'season', render: (v: string) => v === 'all' ? '—' : <Tag>{v}</Tag> },
+    { title: 'Mùa vụ', dataIndex: 'season', key: 'season', render: (v: string) => !v || v === 'all' ? '—' : <Tag>{SEASON_LABELS[v] || v}</Tag> },
     {
       title: '',
       key: 'action',
@@ -210,12 +219,11 @@ const QCStandardsConfigPage = () => {
 
   if (loading) return <div style={{ padding: 24, textAlign: 'center', paddingTop: 100 }}><Spin size="large" /></div>
 
+  if (loadError) return <div style={{ padding: 24 }}><PageState error={loadError} onRetry={() => loadData()} /></div>
+
   return (
     <div style={{ padding: 24 }}>
-      {/* Header */}
-      <Space style={{ marginBottom: 16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/qc')}>Quay lại</Button>
-      </Space>
+      {/* Header — trang sống trong tab "Tiêu chuẩn" của /wms/qc nên không có nút Quay lại */}
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col><Title level={4} style={{ margin: 0, color: '#1B4D3E' }}><SettingOutlined style={{ marginRight: 8 }} />Tiêu chuẩn QC</Title></Col>
         <Col><Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}
@@ -233,18 +241,19 @@ const QCStandardsConfigPage = () => {
           columns={[
             { title: 'Grade', dataIndex: 'grade', render: (v: string) => <GradeBadge grade={v as RubberGrade} size="small" /> },
             { title: 'DRC min', dataIndex: 'drc_min', render: (v: number) => `${v}%` },
-            { title: 'Dirt max', dataIndex: 'dirt_max', render: (v: number) => `${v}%` },
-            { title: 'Ash max', dataIndex: 'ash_max', render: (v: number) => `${v}%` },
+            { title: 'Tạp chất max', dataIndex: 'dirt_max', render: (v: number) => `${v}%` },
+            { title: 'Tro max', dataIndex: 'ash_max', render: (v: number) => `${v}%` },
             { title: 'N₂ max', dataIndex: 'nitrogen_max', render: (v: number) => `${v}%` },
             { title: 'PRI min', dataIndex: 'pri_min', render: (v: number | null) => v || '—' },
-            { title: 'Moisture', dataIndex: 'moisture_max', render: (v: number) => `${v}%` },
+            { title: 'Độ ẩm max', dataIndex: 'moisture_max', render: (v: number) => `${v}%` },
           ]}
         />
       </Card>
 
       {/* Standards table */}
-      <Card title={`Tiêu chuẩn da cau hinh (${standards.length})`}>
-        <Table dataSource={standards} columns={columns} rowKey="id" size="small" pagination={false} />
+      <Card title={`Tiêu chuẩn đã cấu hình (${standards.length})`}>
+        <Table dataSource={standards} columns={columns} rowKey="id" size="small" pagination={false}
+          locale={{ emptyText: 'Chưa cấu hình tiêu chuẩn cho vật liệu nào' }} />
       </Card>
 
       {/* Edit Modal */}
@@ -279,7 +288,7 @@ const QCStandardsConfigPage = () => {
             <Col span={8}><Form.Item name="drc_max" label="Max (%)"><InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}><Form.Item name="drc_warning_low" label="Cảnh báo thap (%)"><InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={12}><Form.Item name="drc_warning_low" label="Cảnh báo thấp (%)"><InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
             <Col span={12}><Form.Item name="drc_warning_high" label="Cảnh báo cao (%)"><InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
           </Row>
 
@@ -289,20 +298,20 @@ const QCStandardsConfigPage = () => {
             <Col span={12}><Form.Item name="recheck_shortened_days" label="Rút ngắn (ngày)"><InputNumber min={1} max={365} style={{ width: '100%' }} /></Form.Item></Col>
           </Row>
 
-          <Divider style={{ margin: '8px 0', fontSize: 12 }}>Tiêu chuẩn SVR bo sung</Divider>
+          <Divider style={{ margin: '8px 0', fontSize: 12 }}>Tiêu chuẩn SVR bổ sung</Divider>
           <Row gutter={16}>
-            <Col span={8}><Form.Item name="moisture_max" label="Moisture max (%)"><InputNumber min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
-            <Col span={8}><Form.Item name="volatile_matter_max" label="Volatile max (%)"><InputNumber min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
-            <Col span={8}><Form.Item name="dirt_max" label="Dirt max (%)"><InputNumber min={0} max={1} step={0.001} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="moisture_max" label="Độ ẩm tối đa (%)"><InputNumber min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="volatile_matter_max" label="Chất bay hơi tối đa (%)"><InputNumber min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="dirt_max" label="Tạp chất tối đa (%)"><InputNumber min={0} max={1} step={0.001} style={{ width: '100%' }} /></Form.Item></Col>
           </Row>
           <Row gutter={16}>
-            <Col span={8}><Form.Item name="ash_max" label="Ash max (%)"><InputNumber min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="ash_max" label="Tro tối đa (%)"><InputNumber min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
             <Col span={8}><Form.Item name="nitrogen_max" label="N₂ max (%)"><InputNumber min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
             <Col span={8}><Form.Item name="pri_min" label="PRI min"><InputNumber min={0} max={100} step={1} style={{ width: '100%' }} /></Form.Item></Col>
           </Row>
           <Row gutter={16}>
             <Col span={8}><Form.Item name="mooney_max" label="Mooney max"><InputNumber min={0} max={200} step={1} style={{ width: '100%' }} /></Form.Item></Col>
-            <Col span={8}><Form.Item name="color_lovibond_max" label="Color Lovibond max"><InputNumber min={0} max={20} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="color_lovibond_max" label="Màu Lovibond tối đa"><InputNumber min={0} max={20} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
             <Col span={8}><Form.Item name="season" label="Mùa vụ"><Select options={[{ value: 'all', label: 'Tất cả' }, { value: 'dry', label: 'Mùa khô' }, { value: 'rainy', label: 'Mùa mưa' }]} /></Form.Item></Col>
           </Row>
         </Form>

@@ -7,12 +7,22 @@
 // ============================================================================
 
 import { useState, useEffect } from 'react'
-import { Card, Steps, Typography, Tag, Spin, Alert, Space, Divider } from 'antd'
+import { Card, Steps, Typography, Tag, Spin, Space, Divider } from 'antd'
 import { CheckCircleOutlined, ClockCircleOutlined, SyncOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
 import { getTimeline, type ProductionTimeline } from '../../services/b2b/productionProgressService'
+import { PURCHASE_TYPE_LABELS } from '../../services/b2b/dealService'
+import PageState from '../common/PageState'
+import { fmtDateTime } from '../../utils/format'
 
 const { Text } = Typography
+
+// Biểu tượng giữ như cũ, chữ lấy từ PURCHASE_TYPE_LABELS (trước đây ghi "Outright", "Walk-in"...)
+const FLOW_ICON: Record<string, string> = {
+  drc_after_production: '🅱️',
+  outright: '🅰️',
+  farmer_walkin: '🅲',
+  standard: '📦',
+}
 
 export interface ProductionProgressProps {
   dealId: string
@@ -23,15 +33,15 @@ export interface ProductionProgressProps {
 export default function ProductionProgress({ dealId, refreshInterval = 30 }: ProductionProgressProps) {
   const [timeline, setTimeline] = useState<ProductionTimeline | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
 
   const load = async () => {
     try {
       const t = await getTimeline(dealId)
       setTimeline(t)
       setError(null)
-    } catch (e: any) {
-      setError(e.message || 'Load failed')
+    } catch (e: unknown) {
+      setError(e)
     } finally {
       setLoading(false)
     }
@@ -46,7 +56,7 @@ export default function ProductionProgress({ dealId, refreshInterval = 30 }: Pro
   }, [dealId, refreshInterval])
 
   if (loading) return <Spin />
-  if (error) return <Alert type="error" message={error} />
+  if (error) return <PageState error={error} onRetry={load} minHeight={120} />
   if (!timeline) return null
 
   const items = timeline.stages.map(s => ({
@@ -55,7 +65,7 @@ export default function ProductionProgress({ dealId, refreshInterval = 30 }: Pro
       <Space direction="vertical" size={2}>
         {s.timestamp && (
           <Text type="secondary" style={{ fontSize: 12 }}>
-            {dayjs(s.timestamp).format('DD/MM HH:mm')}
+            {fmtDateTime(s.timestamp)}
           </Text>
         )}
         {s.note && <Tag color="blue" style={{ fontSize: 11 }}>{s.note}</Tag>}
@@ -69,11 +79,10 @@ export default function ProductionProgress({ dealId, refreshInterval = 30 }: Pro
           <ClockCircleOutlined />,
   }))
 
-  const flowLabel =
-    timeline.purchase_type === 'drc_after_production' ? '🅱️ DRC-after (đại lý)' :
-    timeline.purchase_type === 'outright' ? '🅰️ Outright (mua đứt)' :
-    timeline.purchase_type === 'farmer_walkin' ? '🅲 Walk-in (hộ nông dân)' :
-    '📦 Standard'
+  const flowKey = (timeline.purchase_type || 'standard') as keyof typeof PURCHASE_TYPE_LABELS
+  const flowLabel = `${FLOW_ICON[flowKey] || FLOW_ICON.standard} ${PURCHASE_TYPE_LABELS[flowKey] || PURCHASE_TYPE_LABELS.standard}`
+  const currentStageLabel =
+    timeline.stages.find(s => s.key === timeline.current_stage)?.label || timeline.current_stage
 
   return (
     <Card
@@ -84,7 +93,7 @@ export default function ProductionProgress({ dealId, refreshInterval = 30 }: Pro
         </Space>
       }
       extra={
-        refreshInterval > 0 && <Text type="secondary">Auto refresh {refreshInterval}s</Text>
+        refreshInterval > 0 && <Text type="secondary">Tự làm mới mỗi {refreshInterval} giây</Text>
       }
     >
       <Steps
@@ -95,7 +104,7 @@ export default function ProductionProgress({ dealId, refreshInterval = 30 }: Pro
       />
       <Divider />
       <Text type="secondary" style={{ fontSize: 12 }}>
-        Stage hiện tại: <strong>{timeline.current_stage}</strong>
+        Bước hiện tại: <strong>{currentStageLabel}</strong>
       </Text>
     </Card>
   )

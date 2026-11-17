@@ -162,7 +162,8 @@ const AlertListPage = () => {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#F7F5F2' }}>
+      // minHeight cố định thay 100vh — trang nằm trong tab "Cảnh báo" của /wms/vat-tu (MainLayout)
+      <div style={{ minHeight: 240, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#F7F5F2' }}>
         <Spin size="large" />
         <Text type="secondary" style={{ marginTop: 12 }}>Đang kiểm tra cảnh báo...</Text>
       </div>

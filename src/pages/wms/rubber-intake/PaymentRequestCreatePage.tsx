@@ -5,19 +5,18 @@
 // Linh hoạt: gom CẢ lô-trong-deal lẫn lô-lẻ (không phân biệt) — PA1.
 // ============================================================================
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Loader2, Check, Scale, Truck, Tag, Search, CheckSquare, Square,
+  ArrowLeft, Loader2, Check, Scale, Truck, Tag, Search, CheckSquare, Square, AlertTriangle, RefreshCw,
 } from 'lucide-react'
+import { App as AntdApp } from 'antd'
 import { paymentRequestService, type AvailableTicket, type PaymentCurrency } from '../../../services/wms/paymentRequestService'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import { useFacilityFilter } from '../../../stores/facilityFilterStore'
 import { useAuthStore } from '../../../stores/authStore'
-
-function fmtVnd(a?: number | null): string {
-  return (a || 0).toLocaleString('vi-VN') + 'đ'
-}
+import { fmtVnd, fmtKg } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const RUBBER_TYPES: Array<{ value: string; label: string }> = [
   { value: '', label: 'Tất cả loại' },
@@ -56,6 +55,7 @@ const today = () => new Date().toLocaleDateString('sv-SE')
 const PaymentRequestCreatePage: React.FC = () => {
   const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
+  const { message } = AntdApp.useApp()
 
   // Danh sách nhà máy qua cache dùng chung (TanStack) — không fetch lại mỗi lần mở màn
   const { data: facilities = [] } = useActiveFacilities()
@@ -69,6 +69,9 @@ const PaymentRequestCreatePage: React.FC = () => {
   const [tickets, setTickets] = useState<AvailableTicket[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
+  // Lỗi tải phiếu cân: hiện khối lỗi + Thử lại, KHÔNG rơi vào "Không có phiếu cân nào khớp bộ lọc"
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const reqSeq = useRef(0)   // chỉ nhận kết quả của lần tìm MỚI NHẤT (đổi bộ lọc liên tục)
   const [creating, setCreating] = useState(false)
   const [title, setTitle] = useState('')
   const [currency, setCurrency] = useState<PaymentCurrency>('VND')
@@ -83,9 +86,11 @@ const PaymentRequestCreatePage: React.FC = () => {
   }, [facilities, currentFacilityId])
 
   const search = useCallback(async () => {
+    const my = ++reqSeq.current
     // BẮT chọn nhà máy: mỗi đề nghị thanh toán chỉ gom 1 cơ sở (tránh lẫn PD/QT/Lào).
-    if (!facilityId) { setTickets([]); setSelected(new Set()); return }
+    if (!facilityId) { setTickets([]); setSelected(new Set()); setLoadError(null); setLoading(false); return }
     setLoading(true)
+    setLoadError(null)
     try {
       const data = await paymentRequestService.listAvailableTickets({
         facility_id: facilityId,
@@ -93,17 +98,30 @@ const PaymentRequestCreatePage: React.FC = () => {
         date_to: dateTo || undefined,
         rubber_type: rubberType || undefined,
       })
+      if (my !== reqSeq.current) return
       setTickets(data)
       setSelected(new Set(data.map(t => t.id))) // mặc định chọn hết
     } catch (e) {
+      if (my !== reqSeq.current) return
       console.error('[PaymentRequestCreate] search error', e)
       setTickets([])
+      setSelected(new Set())
+      setLoadError(e || 'Không tải được phiếu cân')
+    } finally {
+      if (my === reqSeq.current) setLoading(false)
     }
-    setLoading(false)
   }, [facilityId, dateFrom, dateTo, rubberType])
 
-  // Tự tìm khi đã chọn nhà máy (đổi NM/ngày/loại → tìm lại)
-  useEffect(() => { search() }, [facilityId])
+  // Đổi NM / ngày / loại mủ → BỎ NGAY danh sách + tick của bộ lọc cũ (tránh tạo đề nghị mang ngày
+  // mới nhưng gom phiếu cũ — finding #13), rồi tự tìm lại sau 300 ms (ô ngày gõ tay không bắn liên tục).
+  useEffect(() => {
+    reqSeq.current++              // bỏ ngay kết quả của lần tìm đang chạy theo bộ lọc cũ
+    setTickets([])
+    setSelected(new Set())
+    if (facilityId) setLoading(true)
+    const t = setTimeout(() => { search() }, 300)
+    return () => clearTimeout(t)
+  }, [search, facilityId])
 
   const toggle = (id: string) => {
     setSelected(prev => {
@@ -123,7 +141,7 @@ const PaymentRequestCreatePage: React.FC = () => {
 
   const handleCreate = async () => {
     if (chosen.length === 0) return
-    if (!facilityId) { alert('Vui lòng chọn nhà máy trước khi tạo đề nghị'); return }
+    if (!facilityId) { message.warning('Vui lòng chọn nhà máy trước khi tạo đề nghị'); return }
     setCreating(true)
     try {
       const req = await paymentRequestService.create({
@@ -138,7 +156,7 @@ const PaymentRequestCreatePage: React.FC = () => {
       navigate(`/rubber/payment-requests/${req.id}`)
     } catch (e: any) {
       console.error('[PaymentRequestCreate] create error', e)
-      alert('Tạo đề nghị thất bại: ' + (e?.message || 'lỗi không rõ'))
+      message.error(dichLoiHeThong(e, 'Tạo đề nghị thất bại'))
       setCreating(false)
     }
   }
@@ -224,6 +242,15 @@ const PaymentRequestCreatePage: React.FC = () => {
           <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 text-emerald-500 animate-spin" /></div>
         ) : !facilityId ? (
           <div className="text-center py-12 text-amber-600 text-[13.5px]">↑ Chọn nhà máy để xem phiếu cân (mỗi đề nghị chỉ gom 1 cơ sở)</div>
+        ) : loadError ? (
+          <div className="text-center py-12">
+            <AlertTriangle className="w-10 h-10 mx-auto mb-2 text-red-300" />
+            <p className="text-[14px] font-medium text-red-600">Không tải được phiếu cân</p>
+            <p className="text-[12px] text-gray-400 mt-1">{dichLoiHeThong(loadError, 'Có lỗi khi tải')}</p>
+            <button onClick={search} className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 text-red-600 text-[13px] font-semibold active:bg-red-100">
+              <RefreshCw className="w-4 h-4" /> Thử lại
+            </button>
+          </div>
         ) : tickets.length === 0 ? (
           <div className="text-center py-12 text-gray-400 text-[13.5px]">Không có phiếu cân nào khớp bộ lọc</div>
         ) : (
@@ -255,7 +282,7 @@ const PaymentRequestCreatePage: React.FC = () => {
                         {t.vehicle_plate && <span className="flex items-center gap-1"><Truck className="w-3.5 h-3.5" />{t.vehicle_plate}</span>}
                         <span className="flex items-center gap-1">
                           <Scale className="w-3.5 h-3.5" />
-                          {t.billable_weight.toLocaleString('vi-VN')} kg
+                          {fmtKg(t.billable_weight, 2)} kg
                           {t.drc != null && t.price_unit === 'dry' && <span className="text-gray-300">(khô, DRC {t.drc}%)</span>}
                         </span>
                         <span className="flex items-center gap-1"><Tag className="w-3.5 h-3.5" />{fmtVnd(t.unit_price)}/kg</span>
@@ -290,7 +317,7 @@ const PaymentRequestCreatePage: React.FC = () => {
         <div className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-100 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[12px] text-gray-400">{chosen.length} phiếu · {totalWeight.toLocaleString('vi-VN')} kg</p>
+              <p className="text-[12px] text-gray-400">{chosen.length} phiếu · {fmtKg(totalWeight, 2)} kg</p>
               <p className="text-[18px] font-bold text-emerald-600 font-mono">{fmtVnd(totalAmount)}</p>
             </div>
             <button onClick={handleCreate} disabled={creating} className="flex items-center gap-1.5 px-5 py-3 rounded-xl bg-emerald-600 text-white text-[14px] font-semibold shadow-sm active:scale-95 transition disabled:opacity-50">

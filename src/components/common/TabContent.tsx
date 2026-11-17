@@ -14,6 +14,7 @@ import { memo, Suspense } from 'react'
 import type { OpenTab } from '../../stores/tabStore'
 import { getTabComponent } from '../../stores/tabStore'
 import { Result, Spin } from 'antd'
+import { ErrorBoundary } from './ErrorBoundary'
 
 interface TabContentProps {
   tab: OpenTab
@@ -45,15 +46,18 @@ function TabContentInner({ tab, isActive }: TabContentProps) {
       }}
       data-tab-key={tab.key}
     >
-      <Suspense
-        fallback={
-          <div style={{ textAlign: 'center', padding: 48 }}>
-            <Spin size="large" />
-          </div>
-        }
-      >
-        <Component {...tab.props} />
-      </Suspense>
+      {/* Mỗi tab một lưới đỡ: 1 tab lỗi render không kéo trắng các tab khác */}
+      <ErrorBoundary compact>
+        <Suspense
+          fallback={
+            <div style={{ textAlign: 'center', padding: 48 }}>
+              <Spin size="large" />
+            </div>
+          }
+        >
+          <Component {...tab.props} />
+        </Suspense>
+      </ErrorBoundary>
     </div>
   )
 }

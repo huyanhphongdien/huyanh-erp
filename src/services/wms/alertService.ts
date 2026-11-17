@@ -9,6 +9,8 @@
 
 import { supabase } from '../../lib/supabase'
 import type { Material, StockBatch } from './wms.types'
+import { forecastService } from './forecastService'
+import { fmtDate, fmtKg, fmtNum, fmtPct } from '../../utils/format'
 
 // ============================================================================
 // TYPES
@@ -51,24 +53,23 @@ let alertCounter = 0
 const generateAlertId = () => `alert-${Date.now()}-${++alertCounter}`
 
 // ============================================================================
-// ALERT CONFIG — Ngưỡng cảnh báo cấu hình được (localStorage)
+// ALERT CONFIG — Ngưỡng cảnh báo: MỘT nguồn là cấu hình trang "Cài đặt cảnh báo"
+// (forecastService.getConfig — localStorage CỦA TRÌNH DUYỆT NÀY, mỗi máy tự tính cảnh báo).
+// ⚠ Trước 17/11/2026 file này tự đọc cùng key 'wms_alert_config' nhưng bằng TÊN TRƯỜNG KHÁC
+//   (weight_loss_percent, storage_days_*) với bản mặc định chép riêng → ngưỡng hao hụt / lưu kho
+//   chỉnh ở trang cài đặt KHÔNG BAO GIỜ có tác dụng (chỉ expiry_warning_days trùng tên).
+//   Giờ đổi tên trường từ cấu hình chung; mặc định y như cũ (5% · ×2 = 10% · 30/60 ngày · 7 ngày).
 // ============================================================================
 
 export interface AlertConfig {
-  weight_loss_percent: number    // % hao hụt cảnh báo (mặc định 5)
-  storage_days_warning: number   // ngày lưu kho cảnh báo (mặc định 30)
-  storage_days_critical: number  // ngày lưu kho nghiêm trọng (mặc định 60)
+  weight_loss_percent: number    // % hao hụt cảnh báo (mặc định 5)       ← shrinkage_warning_pct
+  /** % hao hụt nghiêm trọng (mặc định 10 = 2 × cảnh báo)                  ← shrinkage_critical_pct */
+  weight_loss_critical_percent?: number
+  storage_days_warning: number   // ngày lưu kho cảnh báo (mặc định 30)    ← storage_warning_days
+  storage_days_critical: number  // ngày lưu kho nghiêm trọng (mặc định 60) ← storage_critical_days
   expiry_warning_days: number    // ngày trước hết hạn cảnh báo (mặc định 7)
 }
 
-const DEFAULT_ALERT_CONFIG: AlertConfig = {
-  weight_loss_percent: 5,
-  storage_days_warning: 30,
-  storage_days_critical: 60,
-  expiry_warning_days: 7,
-}
-
-const ALERT_CONFIG_KEY = 'wms_alert_config'
 const DISMISSED_ALERTS_KEY = 'wms_dismissed_alerts'
 
 // ============================================================================
@@ -81,25 +82,29 @@ export const alertService = {
   // CẤU HÌNH NGƯỠNG CẢNH BÁO
   // --------------------------------------------------------------------------
 
-  /** Lấy cấu hình ngưỡng cảnh báo (từ localStorage, fallback defaults) */
+  /** Ngưỡng cảnh báo = cấu hình trang "Cài đặt cảnh báo" (forecastService), đổi sang tên trường của file này */
   getAlertConfig(): AlertConfig {
-    try {
-      const stored = localStorage.getItem(ALERT_CONFIG_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        return { ...DEFAULT_ALERT_CONFIG, ...parsed }
-      }
-    } catch {
-      // Lỗi parse → dùng mặc định
+    const c = forecastService.getConfig()
+    return {
+      weight_loss_percent: c.shrinkage_warning_pct,
+      weight_loss_critical_percent: c.shrinkage_critical_pct,
+      storage_days_warning: c.storage_warning_days,
+      storage_days_critical: c.storage_critical_days,
+      expiry_warning_days: c.expiry_warning_days,
     }
-    return { ...DEFAULT_ALERT_CONFIG }
   },
 
-  /** Lưu cấu hình ngưỡng cảnh báo */
+  /** Lưu ngưỡng — ghi THẲNG vào cấu hình chung (forecastService, chỉ trình duyệt này), không giữ bản riêng */
   setAlertConfig(config: Partial<AlertConfig>): void {
-    const current = this.getAlertConfig()
-    const merged = { ...current, ...config }
-    localStorage.setItem(ALERT_CONFIG_KEY, JSON.stringify(merged))
+    const c = forecastService.getConfig()
+    forecastService.saveConfig({
+      ...c,
+      ...(config.weight_loss_percent !== undefined ? { shrinkage_warning_pct: config.weight_loss_percent } : {}),
+      ...(config.weight_loss_critical_percent !== undefined ? { shrinkage_critical_pct: config.weight_loss_critical_percent } : {}),
+      ...(config.storage_days_warning !== undefined ? { storage_warning_days: config.storage_days_warning } : {}),
+      ...(config.storage_days_critical !== undefined ? { storage_critical_days: config.storage_days_critical } : {}),
+      ...(config.expiry_warning_days !== undefined ? { expiry_warning_days: config.expiry_warning_days } : {}),
+    })
   },
 
   // --------------------------------------------------------------------------
@@ -206,8 +211,8 @@ export const alertService = {
           material: mat,
           message: totalQty <= 0
             ? `${mat.name}: HẾT HÀNG!`
-            : `${mat.name}: Tồn ${totalQty} ${mat.unit} (dưới mức tối thiểu ${mat.min_stock})`,
-          detail: `Tồn hiện tại: ${totalQty} / Min: ${mat.min_stock}`,
+            : `${mat.name}: Tồn ${fmtNum(totalQty, 3)} ${mat.unit} (dưới mức tối thiểu ${fmtNum(mat.min_stock, 3)})`,
+          detail: `Tồn hiện tại: ${fmtNum(totalQty, 3)} / Tối thiểu: ${fmtNum(mat.min_stock, 3)}`,
           created_at: new Date().toISOString(),
         })
       }
@@ -220,8 +225,8 @@ export const alertService = {
           severity: 'low',
           material_id: mat.id,
           material: mat,
-          message: `${mat.name}: Tồn ${totalQty} ${mat.unit} (vượt mức tối đa ${mat.max_stock})`,
-          detail: `Tồn hiện tại: ${totalQty} / Max: ${mat.max_stock}`,
+          message: `${mat.name}: Tồn ${fmtNum(totalQty, 3)} ${mat.unit} (vượt mức tối đa ${fmtNum(mat.max_stock, 3)})`,
+          detail: `Tồn hiện tại: ${fmtNum(totalQty, 3)} / Tối đa: ${fmtNum(mat.max_stock, 3)}`,
           created_at: new Date().toISOString(),
         })
       }
@@ -272,7 +277,7 @@ export const alertService = {
           batch_id: batch.id,
           batch: { batch_no: batch.batch_no, quantity_remaining: batch.quantity_remaining },
           message: `Lô ${batch.batch_no}: ĐÃ QUÁ HẠN ${Math.abs(daysUntilExpiry)} ngày!`,
-          detail: `Hết hạn: ${expiryDate.toLocaleDateString('vi-VN')} | Còn ${batch.quantity_remaining} ${batch.material?.unit || ''}`,
+          detail: `Hết hạn: ${fmtDate(batch.expiry_date)} | Còn ${fmtNum(batch.quantity_remaining, 3)} ${batch.material?.unit || ''}`,
           created_at: new Date().toISOString(),
         })
       } else if (daysUntilExpiry <= expiryWarning) {
@@ -286,7 +291,7 @@ export const alertService = {
           batch_id: batch.id,
           batch: { batch_no: batch.batch_no, quantity_remaining: batch.quantity_remaining },
           message: `Lô ${batch.batch_no}: Hết hạn trong ${daysUntilExpiry} ngày!`,
-          detail: `Hết hạn: ${expiryDate.toLocaleDateString('vi-VN')} | Còn ${batch.quantity_remaining} ${batch.material?.unit || ''}`,
+          detail: `Hết hạn: ${fmtDate(batch.expiry_date)} | Còn ${fmtNum(batch.quantity_remaining, 3)} ${batch.material?.unit || ''}`,
           created_at: new Date().toISOString(),
         })
       } else if (daysUntilExpiry <= expiryWarning * 2) {
@@ -299,7 +304,7 @@ export const alertService = {
           batch_id: batch.id,
           batch: { batch_no: batch.batch_no, quantity_remaining: batch.quantity_remaining },
           message: `Lô ${batch.batch_no}: Hết hạn trong ${daysUntilExpiry} ngày`,
-          detail: `Hết hạn: ${expiryDate.toLocaleDateString('vi-VN')}`,
+          detail: `Hết hạn: ${fmtDate(batch.expiry_date)}`,
           created_at: new Date().toISOString(),
         })
       } else if (daysUntilExpiry <= expiryWarning * 4) {
@@ -312,7 +317,7 @@ export const alertService = {
           batch_id: batch.id,
           batch: { batch_no: batch.batch_no, quantity_remaining: batch.quantity_remaining },
           message: `Lô ${batch.batch_no}: Hết hạn trong ${daysUntilExpiry} ngày`,
-          detail: `Hết hạn: ${expiryDate.toLocaleDateString('vi-VN')}`,
+          detail: `Hết hạn: ${fmtDate(batch.expiry_date)}`,
           created_at: new Date().toISOString(),
         })
       }
@@ -358,7 +363,7 @@ export const alertService = {
         batch_id: batch.id,
         batch: { batch_no: batch.batch_no, quantity_remaining: batch.quantity_remaining },
         message: `Lô ${batch.batch_no}: Cần tái kiểm DRC${daysPast > 0 ? ` (quá hạn ${daysPast} ngày)` : ''}`,
-        detail: `DRC hiện tại: ${batch.latest_drc || '?'}% | Hạn tái kiểm: ${recheckDate.toLocaleDateString('vi-VN')}`,
+        detail: `DRC hiện tại: ${batch.latest_drc || '?'}% | Hạn tái kiểm: ${fmtDate(batch.next_recheck_date)}`,
         created_at: new Date().toISOString(),
       })
     }
@@ -395,7 +400,7 @@ export const alertService = {
         batch_id: batch.id,
         batch: { batch_no: batch.batch_no, quantity_remaining: batch.quantity_remaining },
         message: `Lô ${batch.batch_no}: DRC ${batch.latest_drc || '?'}% — cần phối trộn`,
-        detail: `Còn ${batch.quantity_remaining} ${batch.material?.unit || ''} chờ phối trộn`,
+        detail: `Còn ${fmtNum(batch.quantity_remaining, 3)} ${batch.material?.unit || ''} chờ phối trộn`,
         created_at: new Date().toISOString(),
       })
     }
@@ -424,6 +429,8 @@ export const alertService = {
 
     const config = this.getAlertConfig()
     const weightLossThreshold = config.weight_loss_percent
+    // Ngưỡng "nghiêm trọng" của trang cài đặt; thiếu thì giữ luật cũ 2 × ngưỡng cảnh báo (mặc định cùng = 10%)
+    const weightLossCritical = config.weight_loss_critical_percent ?? weightLossThreshold * 2
 
     for (const batch of (batches || [])) {
       const lossPercent = (batch.weight_loss / batch.initial_weight) * 100
@@ -432,13 +439,13 @@ export const alertService = {
         alerts.push({
           id: generateAlertId(),
           type: 'weight_loss_excessive',
-          severity: lossPercent > weightLossThreshold * 2 ? 'high' : lossPercent > weightLossThreshold ? 'medium' : 'low',
+          severity: lossPercent > weightLossCritical ? 'high' : lossPercent > weightLossThreshold ? 'medium' : 'low',
           material_id: batch.material_id,
           material: batch.material,
           batch_id: batch.id,
           batch: { id: batch.id, batch_no: batch.batch_no, rubber_grade: batch.rubber_grade },
-          message: `Lô ${batch.batch_no} hao hụt ${lossPercent.toFixed(1)}% (${batch.weight_loss?.toFixed(1)} kg)`,
-          detail: `Ban đầu: ${batch.initial_weight} kg → Hiện tại: ${batch.current_weight} kg`,
+          message: `Lô ${batch.batch_no} hao hụt ${fmtPct(lossPercent, 1)} (${fmtKg(batch.weight_loss)} kg)`,
+          detail: `Ban đầu: ${fmtKg(batch.initial_weight)} kg → Hiện tại: ${fmtKg(batch.current_weight)} kg`,
           created_at: new Date().toISOString(),
         })
       }

@@ -12,9 +12,12 @@
 // ============================================================================
 
 import { useEffect, useState, useRef, useMemo } from 'react'
-import { Input, Button, Spin, message as antMessage, Tooltip, Empty } from 'antd'
+import { Input, Button, Spin, message as antMessage, Tooltip, Empty, Modal } from 'antd'
 import { PaperClipOutlined, SendOutlined, PushpinOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useAuthStore } from '../../../stores/authStore'
+import { fmtDate, fmtDateTime } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
 import {
   salesOrderMessageService,
   type SalesOrderMessage,
@@ -33,18 +36,17 @@ const ROLE_META: Record<string, { bg: string; label: string; color: string }> = 
   logistics:  { bg: 'linear-gradient(135deg,#531dab,#722ed1)', label: 'Logistics',  color: '#531dab' },
   production: { bg: 'linear-gradient(135deg,#d4380d,#fa541c)', label: 'Sản xuất',   color: '#d4380d' },
   admin:      { bg: 'linear-gradient(135deg,#1B4D3E,#2E7D5B)', label: 'Admin',      color: '#1B4D3E' },
-  system:     { bg: 'linear-gradient(135deg,#8c8c8c,#595959)', label: 'System',     color: '#595959' },
+  system:     { bg: 'linear-gradient(135deg,#8c8c8c,#595959)', label: 'Hệ thống',   color: '#595959' },
 }
 
-const fmtTime = (s: string) => new Date(s).toLocaleString('vi-VN', {
-  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-})
+// Ngày-giờ chuẩn toàn hệ 'DD/MM HH:mm' (format.ts) — toLocaleString('vi-VN') in giờ TRƯỚC ngày
+const fmtTime = (s: string) => fmtDateTime(s)
 const fmtRelTime = (s: string) => {
   const diff = (Date.now() - new Date(s).getTime()) / 60000
   if (diff < 1) return 'vừa xong'
   if (diff < 60) return `${Math.round(diff)} phút trước`
   if (diff < 1440) return `${Math.round(diff / 60)} giờ trước`
-  return new Date(s).toLocaleDateString('vi-VN')
+  return fmtDate(s)
 }
 
 interface Props {
@@ -59,6 +61,9 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
   const [pinned, setPinned] = useState<SalesOrderMessage[]>([])
   const [mentionables, setMentionables] = useState<MentionableUser[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có tin nào" — trước đây nuốt lỗi rồi hiện khung chat trống
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [sending, setSending] = useState(false)
   const [input, setInput] = useState('')
   const [showMentionMenu, setShowMentionMenu] = useState(false)
@@ -120,6 +125,7 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
   useEffect(() => {
     let mounted = true
     setLoading(true)
+    setLoadError(null)
     Promise.all([
       salesOrderMessageService.listByOrder(salesOrderId),
       salesOrderMessageService.listPinned(salesOrderId),
@@ -131,8 +137,8 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
       setMentionables(users)
       setLoading(false)
       setTimeout(scrollToBottom, 100)
-    }).catch(() => {
-      if (mounted) setLoading(false)
+    }).catch((e) => {
+      if (mounted) { setLoadError(e || true); setLoading(false) }
     })
 
     // Realtime subscribe
@@ -172,7 +178,7 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
       mounted = false
       channel.unsubscribe()
     }
-  }, [salesOrderId])
+  }, [salesOrderId, reloadKey])
 
   const scrollToBottom = () => {
     if (messagesRef.current) {
@@ -260,7 +266,7 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
       setPickedMentions({})
       // Realtime sẽ tự thêm tin vào list
     } catch (e: unknown) {
-      antMessage.error('Gửi tin thất bại: ' + (e instanceof Error ? e.message : String(e)))
+      antMessage.error(dichLoiHeThong(e, 'Gửi tin thất bại'))
     } finally {
       setSending(false)
       setUploading(false)
@@ -273,25 +279,34 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
       const newPinned = await salesOrderMessageService.listPinned(salesOrderId)
       setPinned(newPinned)
     } catch (e: unknown) {
-      antMessage.error('Pin thất bại: ' + (e instanceof Error ? e.message : String(e)))
+      antMessage.error(dichLoiHeThong(e, 'Ghim tin thất bại'))
     }
   }
 
-  const handleDelete = async (msg: SalesOrderMessage) => {
+  const handleDelete = (msg: SalesOrderMessage) => {
     if (myRole !== 'admin') {
       antMessage.warning('Chỉ Admin mới được xóa tin nhắn')
       return
     }
-    if (!confirm('Xóa tin này?')) return
-    try {
-      await salesOrderMessageService.deleteMessage(msg.id)
-      // Gỡ ngay khỏi UI (không đợi realtime) — soft-delete là UPDATE nên phải tự lọc
-      setMessages((prev) => prev.filter((m) => m.id !== msg.id))
-      setPinned((prev) => prev.filter((m) => m.id !== msg.id))
-      antMessage.success('Đã xóa tin')
-    } catch (e: unknown) {
-      antMessage.error('Xóa thất bại: ' + (e instanceof Error ? e.message : String(e)))
-    }
+    // Modal.confirm thay window.confirm (audit 17/11/2026): nêu hệ quả + nút đỏ tiếng Việt
+    Modal.confirm({
+      title: 'Xóa tin nhắn này?',
+      content: 'Tin sẽ bị gỡ khỏi khung trao đổi của đơn với mọi người (kể cả mục đã ghim).',
+      okText: 'Xóa tin',
+      cancelText: 'Không',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await salesOrderMessageService.deleteMessage(msg.id)
+          // Gỡ ngay khỏi UI (không đợi realtime) — soft-delete là UPDATE nên phải tự lọc
+          setMessages((prev) => prev.filter((m) => m.id !== msg.id))
+          setPinned((prev) => prev.filter((m) => m.id !== msg.id))
+          antMessage.success('Đã xóa tin')
+        } catch (e: unknown) {
+          antMessage.error(dichLoiHeThong(e, 'Xóa tin thất bại'))
+        }
+      },
+    })
   }
 
   const insertMention = (u: MentionableUser) => {
@@ -362,7 +377,15 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
   if (loading) {
     return (
       <div style={{ padding: 48, textAlign: 'center' }}>
-        <Spin /> <span style={{ color: '#8c8c8c', marginLeft: 8 }}>Đang tải chat...</span>
+        <Spin /> <span style={{ color: '#8c8c8c', marginLeft: 8 }}>Đang tải trao đổi...</span>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ padding: 16 }}>
+        <PageState error={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
       </div>
     )
   }

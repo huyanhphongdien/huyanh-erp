@@ -22,9 +22,12 @@ import { salesDocumentUploadService } from '../../../services/sales/salesDocumen
 import { useAuthStore } from '../../../stores/authStore'
 import { getSalesRole } from '../../../services/sales/salesPermissionService'
 import {
-  ORDER_STATUS_LABELS, ORDER_STATUS_COLORS,
+  ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode,
   type SalesOrderStatus,
 } from '../../../services/sales/salesTypes'
+import { fmtDate, fmtDateTime, fmtNum } from '../../../utils/format'
+import { stdPagination, TABLE_PAGE } from '../../../components/common/tableDefaults'
+import PageState from '../../../components/common/PageState'
 
 const { Text, Title } = Typography
 
@@ -43,12 +46,7 @@ interface OrderRow {
   stats: DocStat
 }
 
-const fmtDate = (d: string | null | undefined) =>
-  d ? new Date(d).toLocaleDateString('vi-VN') : '-'
-const fmtDateTime = (d: string | null | undefined) =>
-  d ? new Date(d).toLocaleString('vi-VN') : '-'
-const fmtUSD = (v: number | null | undefined) =>
-  v ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v) : '-'
+// (fmtDate / fmtDateTime / fmtUSD cục bộ đã gỡ — dùng utils/format; fmtUSD vốn không dùng tới)
 
 export default function CustomerDocSetHistoryTab({ customerId }: { customerId: string }) {
   const navigate = useNavigate()
@@ -58,11 +56,14 @@ export default function CustomerDocSetHistoryTab({ customerId }: { customerId: s
 
   const [rows, setRows] = useState<OrderRow[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có bộ chứng từ nào"
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [onlyCompleted, setOnlyCompleted] = useState(false)
   const [marking, setMarking] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const { data, error } = await supabase
         .from('sales_orders')
@@ -78,8 +79,8 @@ export default function CustomerDocSetHistoryTab({ customerId }: { customerId: s
         ...o,
         stats: stats[o.id] || { total: 0, received: 0, uploaded: 0 },
       })))
-    } catch (e: any) {
-      message.error(e?.message || 'Lỗi tải lịch sử chứng từ')
+    } catch (e: unknown) {
+      setLoadError(e || true)
     } finally {
       setLoading(false)
     }
@@ -111,7 +112,7 @@ export default function CustomerDocSetHistoryTab({ customerId }: { customerId: s
         <div>
           <Button type="link" style={{ padding: 0, height: 'auto', fontWeight: 600 }}
             onClick={() => navigate(`/sales/orders/${r.id}/documents`)}>
-            {r.contract_no || r.code || '—'}
+            {soDisplayCode(r)}
           </Button>
           {r.contract_no && r.code && (
             <div><Text type="secondary" style={{ fontSize: 11 }}>{r.code}</Text></div>
@@ -133,7 +134,7 @@ export default function CustomerDocSetHistoryTab({ customerId }: { customerId: s
       render: (_, r) => (
         <Space size={4} wrap>
           {r.grade ? <Tag color="blue" style={{ margin: 0 }}>{r.grade}</Tag> : null}
-          {r.quantity_tons != null && <Text style={{ fontSize: 12 }}>{r.quantity_tons.toFixed(1)}t</Text>}
+          {r.quantity_tons != null && <Text style={{ fontSize: 12 }}>{fmtNum(r.quantity_tons, 1)} t</Text>}
         </Space>
       ),
     },
@@ -212,6 +213,7 @@ export default function CustomerDocSetHistoryTab({ customerId }: { customerId: s
   ]
 
   if (loading) return <div style={{ textAlign: 'center', padding: 40 }}><Spin tip="Đang tải..." /></div>
+  if (loadError) return <PageState error={loadError} onRetry={load} />
 
   return (
     <div>
@@ -243,7 +245,7 @@ export default function CustomerDocSetHistoryTab({ customerId }: { customerId: s
           dataSource={shown}
           columns={columns}
           size="middle"
-          pagination={{ pageSize: 15, hideOnSinglePage: true }}
+          pagination={stdPagination(TABLE_PAGE.thaoTac, { hideOnSinglePage: true })}
           locale={{ emptyText: <Empty description="Chưa có bộ chứng từ nào" /> }}
         />
       </Card>

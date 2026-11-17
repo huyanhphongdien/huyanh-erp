@@ -39,6 +39,7 @@ import { ExtensionApprovalTab } from '../../features/tasks/components/ExtensionA
 import { extensionService } from '../../services/extensionService';
 // Nhãn xếp loại dùng MỘT nguồn chung (evaluation.types.ts), không giữ bản cục bộ
 import { RATING_LABELS, calculateRating, type RatingLevel } from '../../types/evaluation.types';
+import { computeFinalScore, explainScore, getScoringInputs, type ScoreInput } from '../../services/taskScoring';
 
 // ============================================================================
 // TYPES
@@ -160,6 +161,8 @@ export const ApprovalsPage: React.FC = () => {
   const [extensionCount, setExtensionCount] = useState(0);
 
   const [modalData, setModalData] = useState<ApprovalModalData | null>(null);
+  // Đầu vào công thức điểm (tự chấm, độ khó, hạn, ngày xong, miễn trễ) — CÙNG nguồn với lúc lưu
+  const [scoreInputs, setScoreInputs] = useState<Omit<ScoreInput, 'managerPoints'> | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     score: 80,
@@ -325,6 +328,14 @@ export const ApprovalsPage: React.FC = () => {
       setFormData(prev => ({ ...prev, score: item.self_score! }));
     }
     setModalData({ type, item });
+    setScoreInputs(null);
+    if (type === 'approve' || type === 'quick-approve') {
+      const taskId = 'task_id' in item ? item.task_id : item.id;
+      getScoringInputs(taskId)
+        // Phê duyệt nhanh bỏ qua tự chấm (cửa duyệt chung: ignoreSelf) → xem trước cũng bỏ
+        .then((inp) => setScoreInputs(type === 'quick-approve' ? { ...inp, selfScore: null } : inp))
+        .catch(() => setScoreInputs(null));
+    }
   };
 
   const getPendingCardClass = () => {
@@ -774,7 +785,7 @@ export const ApprovalsPage: React.FC = () => {
                 {(modalData.type === 'approve' || modalData.type === 'quick-approve') && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Điểm đánh giá <span className="text-red-500">*</span>
+                      Điểm QL chấm (0–100) <span className="text-red-500">*</span>
                     </label>
                     <div className="flex items-center gap-4">
                       <input type="range" min="0" max="100" value={formData.score}
@@ -787,7 +798,18 @@ export const ApprovalsPage: React.FC = () => {
                         <span className="text-gray-500">/100</span>
                       </div>
                     </div>
-                    <p className="mt-1 text-sm text-gray-500">Xếp loại: <span className="font-medium">{getScoreRating(formData.score)}</span></p>
+                    {scoreInputs ? (() => {
+                      const inp = { ...scoreInputs, managerPoints: formData.score };
+                      const fin = computeFinalScore(inp).final;
+                      return (
+                        <div className="mt-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">
+                          <p className="text-sm text-gray-700">Điểm cuối sẽ lưu: <span className="text-lg font-bold text-emerald-700">{fin}</span> · xếp loại <span className="font-medium">{getScoreRating(fin)}</span></p>
+                          <p className="text-xs text-gray-500 mt-0.5">{explainScore(inp)}</p>
+                        </div>
+                      );
+                    })() : (
+                      <p className="mt-1 text-sm text-gray-500">Đang tính điểm cuối…</p>
+                    )}
                   </div>
                 )}
                 {(modalData.type === 'approve' || modalData.type === 'reject' || modalData.type === 'quick-approve') && (

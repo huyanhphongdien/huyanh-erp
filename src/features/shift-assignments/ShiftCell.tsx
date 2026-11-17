@@ -5,6 +5,7 @@
 // ============================================================
 
 import { Star } from 'lucide-react';
+import { TEAM_SOLID, TEAM_SOLID_DEFAULT } from '../attendance/labels';
 
 // ============================================================
 // TYPES
@@ -66,10 +67,8 @@ const SHIFT_SHORT_LABELS: Record<string, string> = {
   ADMIN_OFFICE: 'HC-VP',
 };
 
-const TEAM_BADGE_COLORS: Record<string, string> = {
-  A: 'bg-blue-500 text-white',
-  B: 'bg-rose-500 text-white',
-};
+// Màu đội — một nguồn ở attendance/labels (Đội A xanh dương, Đội B hồng)
+const TEAM_BADGE_COLORS = TEAM_SOLID;
 
 function getColors(code: string) {
   return SHIFT_COLORS[code] || { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700' };
@@ -154,7 +153,7 @@ export function ShiftCell({
     const colors = getColors(a.shift_code);
     const shortLabel = SHIFT_SHORT_LABELS[a.shift_code] || a.shift_name;
     const timeRange = `${formatTime(a.start_time)}-${formatTime(a.end_time)}`;
-    const teamBadge = a.team_code ? TEAM_BADGE_COLORS[a.team_code] || 'bg-gray-500 text-white' : null;
+    const teamBadge = a.team_code ? TEAM_BADGE_COLORS[a.team_code] || TEAM_SOLID_DEFAULT : null;
 
     return (
       <td className="p-0.5">
@@ -206,7 +205,7 @@ export function ShiftCell({
         {sorted.map((a, idx) => {
           const colors = getColors(a.shift_code);
           const shortLabel = SHIFT_SHORT_LABELS[a.shift_code] || a.shift_name;
-          const teamBadge = a.team_code ? TEAM_BADGE_COLORS[a.team_code] || 'bg-gray-500 text-white' : null;
+          const teamBadge = a.team_code ? TEAM_BADGE_COLORS[a.team_code] || TEAM_SOLID_DEFAULT : null;
 
           return (
             <div

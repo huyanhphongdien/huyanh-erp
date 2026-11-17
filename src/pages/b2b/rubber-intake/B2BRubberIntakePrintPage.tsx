@@ -14,6 +14,8 @@ import { rubberIntakeB2BService, type B2BRubberIntake } from '../../../services/
 import { partnerService, type Partner } from '../../../services/b2b/partnerService'
 import { partnerBankService, type EffectiveBank } from '../../../services/b2b/partnerBankService'
 import { RAW_RUBBER_TYPE_LABELS, type RawRubberType } from '../../../services/b2b/intakeManualEntryService'
+import { TIER_LABELS } from '../../../services/b2b/partnerService'
+import { enumLabel } from '../../../components/common/EnumTag'
 
 export default function B2BRubberIntakePrintPage() {
   const { id } = useParams<{ id: string }>()
@@ -115,6 +117,9 @@ export default function B2BRubberIntakePrintPage() {
 // PNK SHEET — 1 trang A4 nội bộ
 // ============================================================================
 
+// Một bản fmt dùng cho cả 2 liên (trước đây chép y hệt 2 lần trong file) — trang in giữ nguyên định dạng mẫu giấy
+const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString('vi-VN') : '—'
+
 function PnkSheet({ item, proxyName, effectiveBank }: { item: B2BRubberIntake; proxyName: string | null; effectiveBank?: EffectiveBank | null }) {
   const netKg = item.net_weight_kg || 0
   const dryKg = item.dry_weight_kg ?? (item.drc_percent != null && netKg ? Math.round(netKg * item.drc_percent / 100 * 100) / 100 : null)
@@ -122,7 +127,6 @@ function PnkSheet({ item, proxyName, effectiveBank }: { item: B2BRubberIntake; p
   const pricePerKg = item.unit_price ?? (item.settled_price_per_ton ? item.settled_price_per_ton / 1000 : null)
   const rawLabel = item.raw_rubber_type ? RAW_RUBBER_TYPE_LABELS[item.raw_rubber_type as RawRubberType] : null
   const intakeDate = new Date(item.intake_date)
-  const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString('vi-VN') : '—'
 
   // Truy ngược số phiếu cân từ notes "Auto-tạo từ phiếu cân WB-XXX"
   const wbMatch = item.notes?.match(/phiếu cân\s+(\S+)/i)
@@ -193,7 +197,7 @@ function PnkSheet({ item, proxyName, effectiveBank }: { item: B2BRubberIntake; p
                   marginLeft: 8, fontSize: 11, padding: '1px 6px',
                   background: '#F3E8FF', color: '#6B21A8', borderRadius: 3, fontWeight: 600,
                 }}>
-                  Tier {item.partner.tier}
+                  Hạng {enumLabel(TIER_LABELS, item.partner.tier)}
                 </span>
               )}
             </td>
@@ -340,7 +344,6 @@ function PnkSheet({ item, proxyName, effectiveBank }: { item: B2BRubberIntake; p
 // ============================================================================
 
 function CustomerSlip({ item, partner, proxyName, effectiveBank }: { item: B2BRubberIntake; partner: Partner | null; proxyName: string | null; effectiveBank?: EffectiveBank | null }) {
-  const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString('vi-VN') : '—'
   const d = new Date(item.intake_date)
   const dd = String(d.getDate()).padStart(2, '0')
   const mm = String(d.getMonth() + 1).padStart(2, '0')

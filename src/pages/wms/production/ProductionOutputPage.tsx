@@ -38,6 +38,10 @@ import {
 import { supabase } from '../../../lib/supabase'
 import productionService from '../../../services/wms/productionService'
 import GradeBadge from '../../../components/wms/GradeBadge'
+import EnumTag from '../../../components/common/EnumTag'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { OUTPUT_BATCH_STATUS_LABELS, OUTPUT_BATCH_STATUS_COLORS } from './productionLabels'
 import type {
   ProductionOrder,
   ProductionOutputBatch,
@@ -94,7 +98,7 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
       setOrder(orderData)
       setBatches(batchData)
     } catch (err: any) {
-      setError(err.message || 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không tải được thành phẩm của lệnh'))
     } finally {
       setLoading(false)
     }
@@ -107,12 +111,14 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
   // Load materials + warehouses for create modal
   useEffect(() => {
     const load = async () => {
-      const [{ data: mats }, { data: whs }] = await Promise.all([
+      const [{ data: mats, error: matErr }, { data: whs, error: whErr }] = await Promise.all([
         supabase.from('materials').select('id, sku, name').eq('is_active', true).order('name'),
         supabase.from('warehouses').select('id, code, name').eq('is_active', true).order('name'),
       ])
       if (mats) setMaterials(mats)
       if (whs) setWarehouses(whs)
+      // Không đọc được danh mục thì ô chọn trong form "Tạo lô" trống — nói ra, đừng để người dùng tưởng chưa có SP/kho
+      if (matErr || whErr) message.error(dichLoiHeThong(matErr || whErr, 'Không tải được danh mục sản phẩm / kho'))
     }
     load()
   }, [])
@@ -135,7 +141,7 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
       loadData()
     } catch (err: any) {
       if (err.errorFields) return // validation error
-      message.error(err.message || 'Không thể tạo lô thành phẩm')
+      message.error(dichLoiHeThong(err, 'Không tạo được lô thành phẩm'))
     } finally {
       setCreateLoading(false)
     }
@@ -166,7 +172,7 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
       loadData()
     } catch (err: any) {
       if (err.errorFields) return
-      message.error(err.message || 'Không thể ghi nhận QC')
+      message.error(dichLoiHeThong(err, 'Không ghi nhận được QC'))
     } finally {
       setQcLoading(false)
     }
@@ -185,8 +191,10 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
   if (!order) {
     return (
       <div style={{ padding: 24 }}>
-        {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon />}
-        <Empty description="Không tìm thấy lệnh sản xuất" />
+        {/* Lỗi tải ≠ "không tìm thấy": lỗi thì hiện lỗi + Thử lại */}
+        {error
+          ? <PageState error={error} onRetry={loadData} />
+          : <Empty description="Không tìm thấy lệnh sản xuất" />}
       </div>
     )
   }
@@ -194,14 +202,6 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
   const totalProduced = batches.reduce((s, b) => s + (b.quantity_produced || 0), 0)
   const totalBales = batches.reduce((s, b) => s + (b.bale_count || 0), 0)
   const qcPassed = batches.filter(b => b.status === 'qc_passed').length
-
-  const batchStatusMap: Record<string, { color: string; label: string }> = {
-    created: { color: 'default', label: 'Mới' },
-    qc_pending: { color: 'processing', label: 'Chờ QC' },
-    qc_passed: { color: 'success', label: 'Đạt QC' },
-    qc_failed: { color: 'error', label: 'Không đạt' },
-    stored: { color: 'blue', label: 'Đã nhập kho' },
-  }
 
   const columns = [
     {
@@ -248,10 +248,8 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      render: (v: string) => {
-        const cfg = batchStatusMap[v] || batchStatusMap.created
-        return <Tag color={cfg.color}>{cfg.label}</Tag>
-      },
+      // Map dùng chung với tab Thành phẩm của Chi tiết lệnh (productionLabels)
+      render: (v: string) => <EnumTag value={v} labels={OUTPUT_BATCH_STATUS_LABELS} colors={OUTPUT_BATCH_STATUS_COLORS} />,
     },
     {
       title: 'Thao tác',
@@ -264,7 +262,9 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
             </Button>
           )}
           {r.status === 'qc_passed' && (
-            <Button type="link" size="small" onClick={() => navigate(`/wms/stock-in/new`)}>
+            // Gửi kèm id lô thành phẩm để form nhập kho điền sẵn mã lô / kg / grade / kho.
+            // ⚠ StockInCreatePage (vùng khác) CHƯA đọc tham số này — xem ghi chú bàn giao Đợt 3.
+            <Button type="link" size="small" onClick={() => navigate(`/wms/stock-in/new?from_output_batch=${r.id}`)}>
               Nhập kho
             </Button>
           )}
@@ -301,7 +301,6 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => { createForm.resetFields(); setShowCreateModal(true) }}
-            style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
           >
             Tạo lô thành phẩm
           </Button>
@@ -360,7 +359,6 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
         onOk={handleCreateBatch}
         okText="Tạo"
         confirmLoading={createLoading}
-        okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
       >
         <Form form={createForm} layout="vertical">
           <Form.Item name="material_id" label="Sản phẩm" rules={[{ required: true, message: 'Chọn sản phẩm' }]}>
@@ -416,7 +414,6 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
         onOk={handleQC}
         okText="Ghi nhận QC"
         confirmLoading={qcLoading}
-        okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
         width={800}
       >
         <Form form={qcForm} layout="vertical">

@@ -3,10 +3,10 @@
 // File: src/features/purchasing/pages/POListPage.tsx
 // ============================================================================
 
-import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Tag, Typography, Button, Tabs, Descriptions, Progress, Card, Row, Col, Statistic } from 'antd'
+import { Tag, Typography, Button, Tabs, Descriptions, Progress, Card, Row, Col, Statistic, App as AntdApp } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import {
   purchaseOrderService,
@@ -16,26 +16,38 @@ import {
   formatCurrency,
 } from '../../../services/purchaseOrderService'
 import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
+import { fmtDate, fmtDate as formatDate } from '../../../utils/format'
 
 const { Text } = Typography
 
-const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Nháp' },
-  { value: 'confirmed', label: 'Xác nhận' },
-  { value: 'partial', label: 'Nhận 1 phần' },
-  { value: 'completed', label: 'Hoàn thành' },
-  { value: 'cancelled', label: 'Đã hủy' },
-]
+// Ô lọc trạng thái sinh từ CHÍNH map nhãn của service → dropdown lọc và tag trong cột luôn cùng chữ
+// (trước đây lọc ghi 'Nhận 1 phần' còn tag ghi 'Đang giao' ngay trong một cột)
+const STATUS_OPTIONS = Object.entries(PO_STATUS_LABELS).map(([value, label]) => ({ value, label }))
 
-const formatDate = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString('vi-VN') : '—'
+// formatDate = fmtDate (utils/format) — bản toLocaleDateString tự viết cũ đã xoá
+
+/** Sổ tải một cục tối đa N đơn — chạm trần thì chân bảng báo (loadLimit), không im lặng mất đơn cũ */
+const PO_LOAD_LIMIT = 500
 
 export default function POListPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const { message } = AntdApp.useApp()
 
-  const { data: orders = [], isLoading, refetch } = useQuery({
+  // Thông báo do trang chi tiết gửi sang (vd "Đã xóa đơn hàng DH-…") — trước đây bị rơi mất
+  useEffect(() => {
+    const msg = (location.state as { message?: string } | null)?.message
+    if (msg) {
+      message.success(msg)
+      refetch() // vừa xoá/sửa đơn ở trang chi tiết → tải lại, đừng hiện cache cũ (staleTime 60s) còn đơn đã xoá
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [])
+
+  const { data: orders = [], isLoading, error, refetch } = useQuery({
     queryKey: ['purchase-orders-all'],
     queryFn: async () => {
-      const result = await purchaseOrderService.getAll(1, 500)
+      const result = await purchaseOrderService.getAll(1, PO_LOAD_LIMIT)
       return result.data
     },
     staleTime: 60000,
@@ -51,7 +63,7 @@ export default function POListPage() {
       render: (_, r) => <Text>{(r as any).supplier?.name || '—'}</Text>,
       exportRender: (_, r) => (r as any).supplier?.name || '' },
     { key: 'order_date', title: 'Ngày tạo', dataIndex: 'order_date', width: 100, sortable: true,
-      render: (v) => formatDate(v), exportRender: (v) => v ? new Date(v).toLocaleDateString('vi-VN') : '' },
+      render: (v) => formatDate(v), exportRender: (v) => v ? fmtDate(v) : '' },
     { key: 'department', title: 'Phòng ban', dataIndex: ['department', 'name'], width: 120, ellipsis: true,
       render: (_, r) => (r as any).department?.name || '—',
       exportRender: (_, r) => (r as any).department?.name || '' },
@@ -116,6 +128,8 @@ export default function POListPage() {
         title="Đơn đặt hàng"
         dateRangeField="order_date"
         onRefresh={() => refetch()}
+        error={error}
+        loadLimit={PO_LOAD_LIMIT}
         expandedRowRender={renderInlineDetail}
         exportFileName="Don_Dat_Hang"
         pageSize={50}

@@ -5,13 +5,12 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Card, Table, Button, Space, Typography, Row, Col,
   Select, DatePicker,
 } from 'antd'
 import {
-  ArrowLeftOutlined, ReloadOutlined, FileTextOutlined, DownloadOutlined,
+  ReloadOutlined, FileTextOutlined, DownloadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import wmsReportService from '../../../services/wms/wmsReportService'
@@ -24,7 +23,6 @@ const { Title, Text } = Typography
 const { RangePicker } = DatePicker
 
 const StockMovementReportPage = () => {
-  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<StockMovementReport[]>([])
@@ -108,7 +106,7 @@ const StockMovementReportPage = () => {
 
   const columns = [
     {
-      title: 'Ngay', dataIndex: 'date', key: 'date', width: 120,
+      title: 'Ngày', dataIndex: 'date', key: 'date', width: 120,
       render: (v: string) => <Text style={numStyle}>{dayjs(v).format('DD/MM/YYYY')}</Text>,
     },
     {
@@ -139,11 +137,7 @@ const StockMovementReportPage = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      {/* Header */}
-      <Space style={{ marginBottom: 16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/reports')}>Quay lại</Button>
-      </Space>
-
+      {/* Header — trang sống trong tab của /wms/reports; nút "Quay lại" cũ chỉ bật về tab Tổng quan */}
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
           <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>

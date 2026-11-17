@@ -14,6 +14,7 @@ import {
   type ProjectComment, type MentionableUser,
 } from '../../../services/project/projectCommentService'
 import { notify } from '../../../services/notificationHelper'
+import PageState from '../../../components/common/PageState'
 
 // ============================================================================
 // MENTION DROPDOWN
@@ -305,20 +306,27 @@ export default function ProjectCommentSection({ projectId, projectName, currentU
   const [editContent, setEditContent] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Lỗi TẢI bình luận (khác `error` = lỗi gửi) — xét trước "Chưa có bình luận nào"
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   // Load data
   useEffect(() => {
     if (!projectId) return
     setLoading(true)
+    setLoadError(null)
     Promise.all([
       getComments(projectId),
       getMentionableUsers(projectId),
     ]).then(([c, u]) => {
       setComments(c)
       setMentionableUsers(u)
+    }).catch(err => {
+      setLoadError(err || 'Không tải được bình luận')
+    }).finally(() => {
       setLoading(false)
     })
-  }, [projectId])
+  }, [projectId, reloadKey])
 
   const totalCount = comments.reduce((sum, c) => sum + 1 + (c.replies?.length || 0), 0)
 
@@ -494,11 +502,8 @@ export default function ProjectCommentSection({ projectId, projectName, currentU
           )}
 
           {/* Comments List */}
-          {loading ? (
-            <div className="py-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
-              <p className="mt-2 text-sm text-gray-500">Đang tải bình luận...</p>
-            </div>
+          {(loading || !!loadError) ? (
+            <PageState loading={loading} error={loadError} onRetry={() => setReloadKey(k => k + 1)} minHeight={140} />
           ) : comments.length === 0 ? (
             <div className="py-8 text-center">
               <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-2" />

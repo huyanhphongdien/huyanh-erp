@@ -40,12 +40,21 @@ import {
   ArrowUpRight,
   Eye,
 } from 'lucide-react';
+import { App as AntdApp } from 'antd';
 import { supabase } from '../../../lib/supabase';
-import { invoicePaymentService } from '../../../services/invoicePaymentService';
+import {
+  invoicePaymentService,
+  INVOICE_PAYMENT_STATUS_LABELS,
+  PAYMENT_METHOD_LABELS,
+  isInvoiceOverdue,
+  invoiceDaysOverdue,
+} from '../../../services/invoicePaymentService';
 import type { InvoicePayment } from '../../../services/invoicePaymentService';
 import { supplierInvoiceService, INVOICE_CONFIG } from '../../../services/supplierInvoiceService';
 import PaymentFormModal from './components/payments/PaymentFormModal';
 import { useAuthStore } from '../../../stores/authStore';
+import { fmtVnd as fmt, fmtDate, fmtDateTime, fmtNum } from '../../../utils/format';
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -89,16 +98,18 @@ type TabKey = 'materials' | 'payments' | 'images' | 'info';
 // CONSTANTS
 // ============================================================================
 
+// Nhãn trạng thái lấy từ invoicePaymentService (MỘT nguồn); ở đây chỉ giữ lớp màu Tailwind + icon.
+// Màu theo luật dòng tiền: chưa trả = vàng (chờ chi), một phần = cam, đủ = xanh lá (đỏ dành cho quá hạn).
 const PAYMENT_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  unpaid: { label: 'Chưa thanh toán', color: 'text-red-700', bg: 'bg-red-100 border-red-300', icon: AlertTriangle },
-  partial: { label: 'Thanh toán một phần', color: 'text-amber-700', bg: 'bg-amber-100 border-amber-300', icon: Clock },
-  paid: { label: 'Đã thanh toán đủ', color: 'text-green-700', bg: 'bg-green-100 border-green-300', icon: CheckCircle },
+  unpaid: { label: INVOICE_PAYMENT_STATUS_LABELS.unpaid, color: 'text-amber-700', bg: 'bg-amber-100 border-amber-300', icon: AlertTriangle },
+  partial: { label: INVOICE_PAYMENT_STATUS_LABELS.partial, color: 'text-orange-700', bg: 'bg-orange-100 border-orange-300', icon: Clock },
+  paid: { label: INVOICE_PAYMENT_STATUS_LABELS.paid, color: 'text-green-700', bg: 'bg-green-100 border-green-300', icon: CheckCircle },
 };
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'materials', label: 'Vật tư', icon: Package },
   { key: 'payments', label: 'Thanh toán', icon: CreditCard },
-  { key: 'images', label: 'Ảnh HĐ gốc', icon: ImageIcon },
+  { key: 'images', label: 'Ảnh hóa đơn gốc', icon: ImageIcon },
   { key: 'info', label: 'Thông tin', icon: Info },
 ];
 
@@ -106,28 +117,13 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
 // HELPERS
 // ============================================================================
 
-const fmt = (amount: number): string =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(amount);
+// fmt = fmtVnd · fmtDate · fmtDateTime: utils/format (bản tự viết cũ đã xoá)
 
-const fmtDate = (dateStr: string): string => {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-};
+// Quá hạn theo NGÀY LỊCH (dùng chung service) — trước đây so `new Date(due) < new Date()`:
+// hạn hôm nay đã báo "Quá hạn 1 ngày" từ 7h sáng
+const isOverdue = (dueDate?: string, paymentStatus?: string): boolean => isInvoiceOverdue(dueDate, paymentStatus);
 
-const fmtDateTime = (dateStr: string): string => {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-};
-
-const isOverdue = (dueDate?: string, paymentStatus?: string): boolean => {
-  if (!dueDate || paymentStatus === 'paid') return false;
-  return new Date(dueDate) < new Date();
-};
-
-const getDaysOverdue = (dueDate: string): number => {
-  const diff = new Date().getTime() - new Date(dueDate).getTime();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-};
+const getDaysOverdue = (dueDate: string): number => invoiceDaysOverdue(dueDate);
 
 // ============================================================================
 // COMPONENT
@@ -137,6 +133,7 @@ const InvoiceDetailPage: React.FC = () => {
   const { id: invoiceId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { message, modal } = AntdApp.useApp();
 
   // State
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
@@ -211,7 +208,7 @@ const InvoiceDetailPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Error loading invoice:', err);
-      setError(err.message || 'Không thể tải thông tin hóa đơn');
+      setError(dichLoiHeThong(err, 'Không thể tải thông tin hóa đơn'));
     } finally {
       setLoading(false);
     }
@@ -236,15 +233,24 @@ const InvoiceDetailPage: React.FC = () => {
     fetchInvoice();
   };
 
-  const handleDeletePayment = async (paymentId: string) => {
-    if (!confirm('Bạn có chắc muốn xóa thanh toán này? Số tiền sẽ được hoàn lại.')) return;
-    try {
-      await invoicePaymentService.delete(paymentId);
-      setSuccessMsg('Đã xóa thanh toán');
-      fetchInvoice();
-    } catch (err: any) {
-      alert('Lỗi xóa thanh toán: ' + err.message);
-    }
+  // Xoá khoản chi = đụng TIỀN → hộp xác nhận antd nêu rõ số tiền + hệ quả, nút đỏ tiếng Việt
+  const handleDeletePayment = (payment: InvoicePayment) => {
+    modal.confirm({
+      title: `Xóa khoản thanh toán ${fmt(payment.amount)}?`,
+      content: `Ngày ${fmtDate(payment.payment_date)} · ${PAYMENT_METHOD_LABELS[payment.payment_method] || payment.payment_method}. Số tiền này sẽ được cộng lại vào "Còn nợ" của hóa đơn. Không hoàn tác được.`,
+      okText: 'Xóa thanh toán',
+      okButtonProps: { danger: true },
+      cancelText: 'Không',
+      onOk: async () => {
+        try {
+          await invoicePaymentService.delete(payment.id);
+          setSuccessMsg('Đã xóa thanh toán');
+          fetchInvoice();
+        } catch (err: any) {
+          message.error(dichLoiHeThong(err, 'Lỗi xóa thanh toán'));
+        }
+      },
+    });
   };
 
   const handleAddImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,7 +264,7 @@ const InvoiceDetailPage: React.FC = () => {
       }
       setSuccessMsg(files.length > 1 ? `Đã thêm ${files.length} ảnh hóa đơn` : 'Đã thêm ảnh hóa đơn');
     } catch (err: any) {
-      alert('Lỗi tải ảnh hóa đơn: ' + (err.message || 'Không rõ nguyên nhân'));
+      message.error(dichLoiHeThong(err, 'Lỗi tải ảnh hóa đơn'));
     } finally {
       setUploadingImage(false);
       fetchInvoice();
@@ -296,8 +302,17 @@ const InvoiceDetailPage: React.FC = () => {
     return (
       <div className="max-w-2xl mx-auto text-center py-20">
         <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-gray-800 mb-2">Không tìm thấy hóa đơn</h2>
+        {/* Lỗi tải (mạng/quyền) ≠ hóa đơn không tồn tại → có nút Thử lại */}
+        <h2 className="text-xl font-bold text-gray-800 mb-2">{error ? 'Không tải được hóa đơn' : 'Không tìm thấy hóa đơn'}</h2>
         <p className="text-gray-500 mb-6">{error || 'Hóa đơn không tồn tại hoặc đã bị xóa.'}</p>
+        {error && (
+          <button
+            onClick={fetchInvoice}
+            className="inline-flex items-center gap-2 px-4 py-2.5 mr-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Thử lại
+          </button>
+        )}
         <button
           onClick={() => navigate(-1)}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
@@ -386,7 +401,7 @@ const InvoiceDetailPage: React.FC = () => {
                     className="text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
                   >
                     <Camera className="w-3 h-3" />
-                    {images.length} ảnh HĐ
+                    {images.length} ảnh hóa đơn
                   </button>
                 </>
               )}
@@ -412,7 +427,7 @@ const InvoiceDetailPage: React.FC = () => {
       {/* ================================================================ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <SummaryCard
-          label="Tổng tiền HĐ"
+          label="Tổng tiền hóa đơn"
           value={fmt(invoice.total_amount)}
           sub={invoice.vat_amount ? `VAT: ${fmt(invoice.vat_amount)}` : undefined}
           accent="blue"
@@ -420,7 +435,7 @@ const InvoiceDetailPage: React.FC = () => {
         <SummaryCard
           label="Đã thanh toán"
           value={fmt(invoice.paid_amount)}
-          sub={`${payPercent}% · ${payments.length} lần TT`}
+          sub={`${payPercent}% · ${payments.length} lần thanh toán`}
           accent="green"
         />
         <SummaryCard
@@ -455,8 +470,8 @@ const InvoiceDetailPage: React.FC = () => {
           />
         </div>
         <div className="flex justify-between mt-1.5 text-[10px] text-gray-400">
-          <span>Đã TT: {fmt(invoice.paid_amount)}</span>
-          <span>Tổng HĐ: {fmt(invoice.total_amount)}</span>
+          <span>Đã trả: {fmt(invoice.paid_amount)}</span>
+          <span>Tổng hóa đơn: {fmt(invoice.total_amount)}</span>
         </div>
       </div>
 
@@ -513,9 +528,9 @@ const InvoiceDetailPage: React.FC = () => {
                     <thead>
                       <tr className="text-left text-xs text-gray-500 uppercase tracking-wider border-b border-gray-100">
                         <th className="pb-3 pr-4">#</th>
-                        <th className="pb-3 pr-4">Mã VT</th>
+                        <th className="pb-3 pr-4">Mã vật tư</th>
                         <th className="pb-3 pr-4">Tên vật tư</th>
-                        <th className="pb-3 pr-4 text-center">ĐVT</th>
+                        <th className="pb-3 pr-4 text-center" title="Đơn vị tính">ĐVT</th>
                         <th className="pb-3 pr-4 text-right">Số lượng</th>
                         <th className="pb-3 pr-4 text-right">Đơn giá</th>
                         <th className="pb-3 text-right">Thành tiền</th>
@@ -528,7 +543,7 @@ const InvoiceDetailPage: React.FC = () => {
                           <td className="py-3 pr-4 font-mono text-xs text-gray-600">{item.material?.code || '—'}</td>
                           <td className="py-3 pr-4 font-medium text-gray-900">{item.material?.name || '—'}</td>
                           <td className="py-3 pr-4 text-center text-gray-500">{item.material?.unit || '—'}</td>
-                          <td className="py-3 pr-4 text-right font-medium">{item.quantity?.toLocaleString('vi-VN')}</td>
+                          <td className="py-3 pr-4 text-right font-medium">{fmtNum(item.quantity, 3)}</td>
                           <td className="py-3 pr-4 text-right text-gray-600">{fmt(item.unit_price)}</td>
                           <td className="py-3 text-right font-bold text-gray-900">{fmt(item.total_price)}</td>
                         </tr>
@@ -569,7 +584,7 @@ const InvoiceDetailPage: React.FC = () => {
                       className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                     >
                       <Camera className="w-3.5 h-3.5" />
-                      {images.length} ảnh HĐ gốc
+                      {images.length} ảnh hóa đơn gốc
                     </button>
                   )}
                   {invoice.payment_status !== 'paid' && invoice.remaining_amount > 0 && (
@@ -587,7 +602,7 @@ const InvoiceDetailPage: React.FC = () => {
               {/* Mini progress in payments tab */}
               <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                 <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-gray-500">Tiến độ TT</span>
+                  <span className="text-gray-500">Tiến độ thanh toán</span>
                   <span className="font-bold text-blue-600">{payPercent}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
@@ -599,7 +614,7 @@ const InvoiceDetailPage: React.FC = () => {
                   />
                 </div>
                 <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-                  <span>Đã TT: {fmt(invoice.paid_amount)}</span>
+                  <span>Đã trả: {fmt(invoice.paid_amount)}</span>
                   <span>Còn nợ: {fmt(invoice.remaining_amount)}</span>
                 </div>
               </div>
@@ -640,7 +655,7 @@ const InvoiceDetailPage: React.FC = () => {
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                             payment.payment_method === 'bank_transfer' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
                           }`}>
-                            {payment.payment_method === 'bank_transfer' ? 'Chuyển khoản' : 'Tiền mặt'}
+                            {PAYMENT_METHOD_LABELS[payment.payment_method] || payment.payment_method}
                           </span>
                           {payment.payment_code && (
                             <span className="text-xs font-mono text-gray-400">{payment.payment_code}</span>
@@ -659,7 +674,7 @@ const InvoiceDetailPage: React.FC = () => {
                               UNC: {payment.reference_number}
                             </span>
                           )}
-                          {payment.bank_name && <span>NH: {payment.bank_name}</span>}
+                          {payment.bank_name && <span>Ngân hàng: {payment.bank_name}</span>}
                           {payment.created_by_name && (
                             <span className="flex items-center gap-1">
                               <User className="w-3 h-3" />
@@ -679,7 +694,7 @@ const InvoiceDetailPage: React.FC = () => {
                             className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 mt-1.5 font-medium"
                           >
                             <Camera className="w-3 h-3" />
-                            Xem ảnh HĐ gốc ({images.length})
+                            Xem ảnh hóa đơn gốc ({images.length})
                             <ArrowUpRight className="w-3 h-3" />
                           </button>
                         )}
@@ -688,7 +703,7 @@ const InvoiceDetailPage: React.FC = () => {
                       {/* Delete */}
                       {payment.created_by === user?.id && (
                         <button
-                          onClick={() => handleDeletePayment(payment.id)}
+                          onClick={() => handleDeletePayment(payment)}
                           className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
                           title="Xóa thanh toán"
                         >
@@ -816,10 +831,10 @@ const InvoiceDetailPage: React.FC = () => {
                 <InfoRow label="Ngày tạo" value={fmtDateTime(invoice.created_at)} />
                 <InfoRow label="Tổng tiền" value={fmt(invoice.total_amount)} />
                 {invoice.vat_amount ? <InfoRow label="VAT" value={fmt(invoice.vat_amount)} /> : null}
-                <InfoRow label="Đã TT" value={<span className="text-green-600 font-semibold">{fmt(invoice.paid_amount)}</span>} />
+                <InfoRow label="Đã thanh toán" value={<span className="text-green-600 font-semibold">{fmt(invoice.paid_amount)}</span>} />
                 <InfoRow label="Còn nợ" value={<span className={invoice.remaining_amount > 0 ? 'text-amber-600 font-semibold' : 'text-gray-400'}>{fmt(invoice.remaining_amount)}</span>} />
                 <InfoRow
-                  label="Ảnh HĐ gốc"
+                  label="Ảnh hóa đơn gốc"
                   value={
                     images.length > 0 ? (
                       <button onClick={goToImagesTab} className="text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 text-sm">

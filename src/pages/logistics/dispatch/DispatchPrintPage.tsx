@@ -17,6 +17,7 @@ import {
   type DispatchOrder, type DispatchLine,
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
+import PageState from '../../../components/common/PageState'
 
 const fmt = (n: number | null | undefined) => (n != null ? n.toLocaleString('vi-VN') : '')
 const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString('vi-VN') : '')
@@ -29,6 +30,9 @@ export default function DispatchPrintPage() {
   const [order, setOrder] = useState<DispatchOrder | null>(null)
   const [lines, setLines] = useState<DispatchLine[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải (mạng/quyền) ≠ "không tìm thấy lệnh" — trước đây gộp chung thành câu "Không tìm thấy".
+  const [loadErr, setLoadErr] = useState<unknown>(null)
+  const [reloadTick, setReloadTick] = useState(0)
   // Khách hàng theo từng container (chỉ dùng khi 1 lệnh chở hàng của ≥2 khách khác nhau).
   const [lineCustomer, setLineCustomer] = useState<Record<string, string>>({})
   const [multiCustomer, setMultiCustomer] = useState(false)
@@ -36,6 +40,7 @@ export default function DispatchPrintPage() {
   useEffect(() => {
     if (!id) return
     setLoading(true)
+    setLoadErr(null)
     dispatchService.getById(id).then(async res => {
       if (res) {
         setOrder(res.order); setLines(res.lines)
@@ -51,11 +56,19 @@ export default function DispatchPrintPage() {
         }
       }
       setLoading(false)
-    }).catch(() => setLoading(false))
-  }, [id])
+    }).catch((e) => { setLoadErr(e); setLoading(false) })
+  }, [id, reloadTick])
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600" /></div>
+  }
+  if (loadErr && !order) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <PageState error={loadErr} onRetry={() => setReloadTick(t => t + 1)} />
+        <button onClick={() => navigate('/logistics/dispatch')} className="mt-4 text-blue-600 text-sm">Quay lại</button>
+      </div>
+    )
   }
   if (!order) {
     return (

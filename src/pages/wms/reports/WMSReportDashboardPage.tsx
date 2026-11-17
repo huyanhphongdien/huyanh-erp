@@ -24,6 +24,7 @@ import type { RubberGrade } from '../../../services/wms/wms.types'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import PageState from '../../../components/common/PageState'
 import { xuatExcelBaoCao } from './wmsReportExcel'
+import { fmtDateShort, fmtNum } from '../../../utils/format'
 
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
@@ -83,7 +84,7 @@ const WMSReportDashboardPage = () => {
           ['Nhập kho (kg)', kpis.total_stock_in_kg || 0],
           ['Xuất kho (kg)', kpis.total_stock_out_kg || 0],
           ['Sản xuất (kg)', kpis.total_production_kg || 0],
-          ['Yield TB (%)', kpis.avg_yield_percent || 0],
+          ['Hiệu suất TB (%)', kpis.avg_yield_percent || 0],
           ['DRC TB (%)', kpis.avg_drc || 0],
           ['Lô hoạt động', kpis.total_batches_active || 0],
         ],
@@ -150,7 +151,7 @@ const WMSReportDashboardPage = () => {
           { title: 'Nhập kho (kg)', value: kpis?.total_stock_in_kg || 0, color: '#16A34A', icon: <ImportOutlined /> },
           { title: 'Xuất kho (kg)', value: kpis?.total_stock_out_kg || 0, color: '#DC2626', icon: <ExportOutlined /> },
           { title: 'Sản xuất (kg)', value: kpis?.total_production_kg || 0, color: '#2563EB', icon: <ExperimentOutlined /> },
-          { title: 'Yield TB', value: kpis?.avg_yield_percent || 0, color: '#E8A838', icon: <PercentageOutlined />, suffix: '%' },
+          { title: 'Hiệu suất TB', value: kpis?.avg_yield_percent || 0, color: '#E8A838', icon: <PercentageOutlined />, suffix: '%' },
           { title: 'DRC TB', value: kpis?.avg_drc || 0, color: '#1B4D3E', icon: <ExperimentOutlined />, suffix: '%' },
           { title: 'Lô hoạt động', value: kpis?.total_batches_active || 0, color: '#7C3AED', icon: <DatabaseOutlined /> },
         ].map((item, i) => (
@@ -162,6 +163,7 @@ const WMSReportDashboardPage = () => {
                 suffix={item.suffix}
                 valueStyle={{ color: item.color, fontFamily: "'JetBrains Mono'", fontSize: 20 }}
                 prefix={item.icon}
+                formatter={(v) => fmtNum(Number(v), item.suffix ? 2 : 1)}
               />
             </Card>
           </Col>
@@ -184,7 +186,7 @@ const WMSReportDashboardPage = () => {
                       strokeColor={RUBBER_GRADE_COLORS[grade as RubberGrade] || '#6B7280'}
                       format={() => `${pct}%`} />
                     <Text type="secondary" style={{ fontSize: 11, fontFamily: "'JetBrains Mono'", minWidth: 60, textAlign: 'right' }}>
-                      {(weight / 1000).toFixed(1)}T
+                      {fmtNum(weight / 1000, 1)} tấn
                     </Text>
                   </div>
                 )
@@ -195,7 +197,7 @@ const WMSReportDashboardPage = () => {
 
         {/* DRC Trend */}
         <Col xs={24} lg={12}>
-          <Card title={<Space><LineChartOutlined /> DRC Trend</Space>} size="small">
+          <Card title={<Space><LineChartOutlined /> Diễn biến DRC</Space>} size="small">
             {drcTrend.length === 0 ? (
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có dữ liệu" />
             ) : (
@@ -215,7 +217,7 @@ const WMSReportDashboardPage = () => {
                         {item.avg_drc}%
                       </Text>
                       <Text type="secondary" style={{ fontSize: 7 }}>
-                        {item.date.substring(5)}
+                        {fmtDateShort(item.date)}
                       </Text>
                     </div>
                   )
@@ -234,7 +236,7 @@ const WMSReportDashboardPage = () => {
         {[
           { title: 'XNT — Xuất Nhập Tồn', desc: 'Báo cáo xuất nhập tồn theo ngày', icon: <FileTextOutlined />, path: '/wms/reports/stock-movement' },
           { title: 'Chất lượng đại lý', desc: 'Phân tích chất lượng theo đại lý cung cấp', icon: <TeamOutlined />, path: '/wms/reports/supplier-quality' },
-          { title: 'Tồn kho theo vật liệu', desc: 'Giá trị tồn kho, dry weight, DRC', icon: <DatabaseOutlined />, path: '/wms/reports/inventory-value' },
+          { title: 'Tồn kho theo vật liệu', desc: 'Giá trị tồn kho, KL khô, DRC', icon: <DatabaseOutlined />, path: '/wms/reports/inventory-value' },
           { title: 'Chấm điểm NCC', desc: 'Đánh giá chất lượng, độ ổn định của nhà cung cấp', icon: <TeamOutlined />, path: '/wms/reports/supplier-scoring' },
         ].map((item, i) => (
           <Col xs={24} sm={12} lg={8} key={i}>

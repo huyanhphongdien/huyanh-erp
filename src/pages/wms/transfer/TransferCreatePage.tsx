@@ -21,6 +21,9 @@ import { useFacilityFilter } from '../../../stores/facilityFilterStore'
 import transferService, { type CreateTransferInput } from '../../../services/wms/transferService'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import type { RubberGrade } from '../../../services/wms/wms.types'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { useUnsavedWarning } from '../../../hooks/useUnsavedWarning'
+import { fmtKg, fmtNum } from '../../../utils/format'
 
 const { Title, Text } = Typography
 const PRIMARY = '#1B4D3E'
@@ -76,6 +79,9 @@ export default function TransferCreatePage() {
   const [lossThreshold, setLossThreshold] = useState(0.5)
   const [submitting, setSubmitting] = useState(false)
 
+  // Đã chọn lô mà lỡ F5 / đóng tab → trình duyệt hỏi lại (audit 17/11: mất 10–20 phút chọn lô)
+  useUnsavedWarning(pickedBatches.length > 0 && !submitting)
+
   // Mặc định to_facility = PD nếu from khác PD
   useEffect(() => {
     if (!fromFacilityId) return
@@ -124,7 +130,7 @@ export default function TransferCreatePage() {
       setAvailableBatches((data || []).filter((b: any) => !pickedIds.has(b.id)))
       setShowPickModal(true)
     } catch (err: any) {
-      message.error('Lỗi tải batch: ' + (err.message || ''))
+      message.error(dichLoiHeThong(err, 'Lỗi tải danh sách lô'))
     } finally {
       setLoadingBatches(false)
     }
@@ -203,7 +209,7 @@ export default function TransferCreatePage() {
       message.success(`Tạo phiếu chuyển ${transfer.code} thành công`)
       navigate(`/wms/transfer/${transfer.id}`)
     } catch (err: any) {
-      message.error('Lỗi tạo phiếu: ' + (err.message || ''))
+      message.error(dichLoiHeThong(err, 'Lỗi tạo phiếu chuyển'))
     } finally {
       setSubmitting(false)
     }
@@ -355,15 +361,15 @@ export default function TransferCreatePage() {
       <Card
         title={
           <Space>
-            <span>📦 Hàng cần chuyển ({pickedBatches.length} batch)</span>
-            <Tag color="blue">SL: {totalQty.toLocaleString('vi-VN')}</Tag>
-            <Tag color="green">{totalWeight.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg</Tag>
+            <span>📦 Hàng cần chuyển ({pickedBatches.length} lô)</span>
+            <Tag color="blue">SL: {fmtNum(totalQty)}</Tag>
+            <Tag color="green">{fmtKg(totalWeight)} kg</Tag>
           </Space>
         }
         size="small"
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={loadAvailableBatches} loading={loadingBatches}>
-            Thêm batch
+            Thêm lô
           </Button>
         }
         style={{ marginBottom: 16, borderRadius: 10 }}
@@ -371,7 +377,7 @@ export default function TransferCreatePage() {
         {pickedBatches.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="Chưa chọn batch nào — click 'Thêm batch'"
+            description="Chưa chọn lô nào — bấm 'Thêm lô'"
           />
         ) : (
           <Table
@@ -380,7 +386,7 @@ export default function TransferCreatePage() {
             rowKey="batch_id"
             dataSource={pickedBatches}
             columns={[
-              { title: 'Batch', dataIndex: 'batch_no', width: 140, render: (v) => <Text strong>{v}</Text> },
+              { title: 'Mã lô', dataIndex: 'batch_no', width: 140, render: (v) => <Text strong>{v}</Text> },
               { title: 'Vật liệu', dataIndex: 'material_name', ellipsis: true },
               { title: 'Grade', dataIndex: 'rubber_grade', width: 90, render: (g) => <GradeBadge grade={g} size="small" /> },
               {
@@ -391,7 +397,7 @@ export default function TransferCreatePage() {
                 render: (v) => v.toLocaleString('vi-VN'),
               },
               {
-                title: 'Pick',
+                title: 'SL chuyển',
                 dataIndex: 'pick_qty',
                 width: 110,
                 render: (v, _, idx) => (
@@ -415,7 +421,7 @@ export default function TransferCreatePage() {
                 dataIndex: 'pick_weight',
                 width: 110,
                 align: 'right' as const,
-                render: (v) => <Text strong>{v.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}</Text>,
+                render: (v) => <Text strong>{fmtKg(v)}</Text>,
               },
               {
                 title: '',
@@ -430,9 +436,9 @@ export default function TransferCreatePage() {
                 <Table.Summary.Cell index={0} colSpan={4}>
                   <Text strong>Tổng cộng</Text>
                 </Table.Summary.Cell>
-                <Table.Summary.Cell index={1} align="right"><Text strong>{totalQty.toLocaleString('vi-VN')}</Text></Table.Summary.Cell>
+                <Table.Summary.Cell index={1} align="right"><Text strong>{fmtNum(totalQty)}</Text></Table.Summary.Cell>
                 <Table.Summary.Cell index={2} />
-                <Table.Summary.Cell index={3} align="right"><Text strong style={{ color: PRIMARY }}>{totalWeight.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg</Text></Table.Summary.Cell>
+                <Table.Summary.Cell index={3} align="right"><Text strong style={{ color: PRIMARY }}>{fmtKg(totalWeight)} kg</Text></Table.Summary.Cell>
                 <Table.Summary.Cell index={4} />
               </Table.Summary.Row>
             )}
@@ -495,8 +501,8 @@ export default function TransferCreatePage() {
                 : !fromWarehouseId || !toWarehouseId
                 ? '↑ Chọn kho gửi và kho nhận'
                 : pickedBatches.length === 0
-                ? '↑ Thêm ít nhất 1 batch'
-                : '↑ Số lượng pick phải > 0'}
+                ? '↑ Thêm ít nhất 1 lô'
+                : '↑ Số lượng chuyển phải > 0'}
             </Text>
           </div>
         )}
@@ -504,14 +510,14 @@ export default function TransferCreatePage() {
 
       {/* Modal pick batch */}
       <Modal
-        title={`Chọn batch trong kho ${fromWarehouses.find((w) => w.id === fromWarehouseId)?.code || ''}`}
+        title={`Chọn lô trong kho ${fromWarehouses.find((w) => w.id === fromWarehouseId)?.code || ''}`}
         open={showPickModal}
         onCancel={() => setShowPickModal(false)}
         footer={null}
         width={900}
       >
         {availableBatches.length === 0 ? (
-          <Empty description="Không còn batch khả dụng" />
+          <Empty description="Không còn lô khả dụng" />
         ) : (
           <Table
             size="small"
@@ -519,7 +525,7 @@ export default function TransferCreatePage() {
             dataSource={availableBatches}
             pagination={{ pageSize: 10 }}
             columns={[
-              { title: 'Batch', dataIndex: 'batch_no', width: 140, render: (v) => <Text strong>{v}</Text> },
+              { title: 'Mã lô', dataIndex: 'batch_no', width: 140, render: (v) => <Text strong>{v}</Text> },
               {
                 title: 'Vật liệu',
                 key: 'material',
@@ -552,7 +558,7 @@ export default function TransferCreatePage() {
                 dataIndex: 'current_weight',
                 width: 100,
                 align: 'right' as const,
-                render: (v) => v?.toLocaleString('vi-VN', { maximumFractionDigits: 1 }) || '—',
+                render: (v) => fmtKg(v),
               },
               {
                 title: '',

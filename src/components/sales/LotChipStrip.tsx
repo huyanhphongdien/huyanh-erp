@@ -26,6 +26,7 @@
 import { Popover } from 'antd'
 import type { LotProgressRow } from '../../services/logistics/dispatchService'
 import type { LotMoneyRow } from '../../services/sales/salesOrderPaymentService'
+import { fmtUsd } from '../../utils/format'
 
 export type LotChipSize = 'xs' | 's' | 'm'
 
@@ -50,8 +51,8 @@ const PAID = '#166534'
 const OVER = '#c2410c'
 const MISMATCH = '#dc2626'
 
-const fmtUSD = (v: number): string =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v)
+// USD 0 số lẻ cho viên lô — dùng fmtUsd chung (utils/format), không tự dựng Intl riêng
+const fmtUSD = (v: number): string => fmtUsd(v)
 
 export interface LotChipData {
   lotNo: number
@@ -192,7 +193,10 @@ function LotChip({ d, size }: { d: LotChipData; size: LotChipSize }) {
             minWidth: S.w, height: S.h, padding: '0 3px',
             fontFamily: 'JetBrains Mono, monospace', fontSize: S.fs, fontWeight: 700, lineHeight: 1,
             background: c.bg, color: c.fg,
-            border: `1px ${c.dashed ? 'dashed' : 'solid'} ${c.bd}`, borderBottom: 'none',
+            // 3 cạnh viết tách: `border` gọn + borderBottom thì đổi trạng thái viên (nét đứt ↔ liền) làm hiện lại viền đáy
+            borderTop: `1px ${c.dashed ? 'dashed' : 'solid'} ${c.bd}`,
+            borderLeft: `1px ${c.dashed ? 'dashed' : 'solid'} ${c.bd}`,
+            borderRight: `1px ${c.dashed ? 'dashed' : 'solid'} ${c.bd}`,
             borderRadius: `${S.radius}px ${S.radius}px 0 0`,
           }}
         >

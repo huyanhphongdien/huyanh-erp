@@ -28,6 +28,8 @@ import { supplierInvoiceService } from '../../../../../services/supplierInvoiceS
 import type { InvoiceItemFormData } from '../../../../../services/supplierInvoiceService';
 import { purchaseOrderService } from '../../../../../services/purchaseOrderService';
 import { supabase } from '../../../../../lib/supabase';
+import { fmtVnd as formatCurrency, fmtNum } from '../../../../../utils/format';
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -60,12 +62,7 @@ interface OrderItemForInvoice {
 // HELPERS
 // ============================================================================
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-  }).format(amount);
-}
+// formatCurrency = fmtVnd (utils/format) — bản tự viết cũ đã xoá
 
 const INVOICE_IMAGE_BUCKET = 'invoice-images';
 const MAX_IMAGES = 5;
@@ -173,19 +170,22 @@ export function AddInvoiceModal({
     const files = Array.from(e.target.files || []);
     const remaining = MAX_IMAGES - images.length;
 
+    // Báo lỗi file ngay trong form (như PaymentFormModal), không bật hộp thoại trình duyệt
+    let fileError = '';
     const validFiles = files
       .filter((f) => {
         if (f.size > MAX_IMAGE_SIZE) {
-          alert(`File "${f.name}" vượt quá 10MB`);
+          fileError = `File "${f.name}" vượt quá 10MB`;
           return false;
         }
         if (!f.type.startsWith('image/') && f.type !== 'application/pdf') {
-          alert(`File "${f.name}" không phải ảnh hoặc PDF`);
+          fileError = `File "${f.name}" không phải ảnh hoặc PDF`;
           return false;
         }
         return true;
       })
       .slice(0, remaining);
+    if (fileError) setError(fileError);
 
     setImages((prev) => [...prev, ...validFiles]);
 
@@ -327,7 +327,7 @@ export function AddInvoiceModal({
       handleClose();
     } catch (err: any) {
       console.error('Error creating invoice:', err);
-      setError(err.message || 'Lỗi tạo hóa đơn');
+      setError(dichLoiHeThong(err, 'Lỗi tạo hóa đơn'));
     } finally {
       setSaving(false);
     }
@@ -353,8 +353,9 @@ export function AddInvoiceModal({
   // ===== RENDER =====
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
+      {/* Backdrop — đang điền form (bước 2) hoặc đang lưu thì bấm trúng nền KHÔNG đóng:
+          handleClose reset sạch số HĐ, ngày, SL từng dòng, ảnh → lỡ tay là nhập lại từ đầu */}
+      <div className="absolute inset-0 bg-black/50" onClick={!saving && step === 'select_supplier' ? handleClose : undefined} />
 
       {/* Modal */}
       <div className="relative w-full max-w-2xl max-h-[90vh] bg-white rounded-xl shadow-2xl flex flex-col">
@@ -373,7 +374,9 @@ export function AddInvoiceModal({
           </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100"
+            disabled={saving}
+            title="Đóng"
+            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -522,10 +525,10 @@ export function AddInvoiceModal({
                             />
                           </th>
                           <th className="p-2 text-left text-xs font-medium text-gray-500">Vật tư</th>
-                          <th className="p-2 text-center text-xs font-medium text-gray-500 w-20">ĐVT</th>
-                          <th className="p-2 text-right text-xs font-medium text-gray-500 w-20">ĐH</th>
-                          <th className="p-2 text-right text-xs font-medium text-gray-500 w-20">Đã HĐ</th>
-                          <th className="p-2 text-center text-xs font-medium text-gray-500 w-24">SL nhận</th>
+                          <th className="p-2 text-center text-xs font-medium text-gray-500 w-20" title="Đơn vị tính">ĐVT</th>
+                          <th className="p-2 text-right text-xs font-medium text-gray-500 w-20" title="Số lượng đã đặt trong đơn hàng">SL đặt</th>
+                          <th className="p-2 text-right text-xs font-medium text-gray-500 w-20" title="Số lượng đã lên các hóa đơn trước">Đã xuất HĐ</th>
+                          <th className="p-2 text-center text-xs font-medium text-gray-500 w-24" title="Số lượng thực nhận ghi vào hóa đơn này">SL nhận</th>
                           <th className="p-2 text-right text-xs font-medium text-gray-500 w-28">Đơn giá</th>
                           <th className="p-2 text-right text-xs font-medium text-gray-500 w-28">Thành tiền</th>
                         </tr>
@@ -564,9 +567,9 @@ export function AddInvoiceModal({
                                 )}
                               </td>
                               <td className="p-2 text-center text-xs text-gray-500">{item.unit}</td>
-                              <td className="p-2 text-right text-xs">{item.quantity}</td>
+                              <td className="p-2 text-right text-xs">{fmtNum(item.quantity, 3)}</td>
                               <td className="p-2 text-right text-xs text-gray-500">
-                                {item.invoiced_quantity}
+                                {fmtNum(item.invoiced_quantity, 3)}
                               </td>
                               <td className="p-2 text-center">
                                 <input

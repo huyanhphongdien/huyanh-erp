@@ -152,14 +152,15 @@ export const overtimeRequestService = {
 
       const { data, error } = await query.order('request_date', { ascending: false })
 
+      // Lỗi đọc ≠ "chưa có phiếu": ném lên để OvertimeListPage hiện khối lỗi + Thử lại
       if (error) {
         console.error('getByEmployee error:', error)
-        return []
+        throw error
       }
       return data || []
     } catch (error) {
       console.error('getByEmployee exception:', error)
-      return []
+      throw error
     }
   },
 
@@ -193,14 +194,15 @@ export const overtimeRequestService = {
 
       const { data, error } = await query.order('request_date', { ascending: false })
 
+      // Lỗi đọc ≠ "không có phiếu chờ duyệt": ném lên để OvertimeApprovalPage hiện khối lỗi
       if (error) {
         console.error('getPendingApprovals error:', error)
-        return []
+        throw error
       }
       return data || []
     } catch (error) {
       console.error('getPendingApprovals exception:', error)
-      return []
+      throw error
     }
   },
 
@@ -458,10 +460,11 @@ export const overtimeRequestService = {
         .order('approved_at', { ascending: false })
         .limit(limit)
 
-      if (error) return []
+      if (error) throw error
       return data || []
-    } catch {
-      return []
+    } catch (error) {
+      console.error('getApprovalHistory exception:', error)
+      throw error
     }
   },
 }

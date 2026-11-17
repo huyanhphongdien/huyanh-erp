@@ -14,6 +14,7 @@ import {
   MaterialCategory,
   MaterialCategoryFormData,
 } from '../../../../../services/materialCategoryService'
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong'
 
 interface CategoryFormProps {
   category: MaterialCategory | null
@@ -104,7 +105,7 @@ export default function CategoryForm({ category, onClose, onSuccess }: CategoryF
       }
       onSuccess()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Có lỗi xảy ra')
+      setError(dichLoiHeThong(err, 'Có lỗi xảy ra khi lưu nhóm vật tư'))
     } finally {
       setLoading(false)
     }

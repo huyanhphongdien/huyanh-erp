@@ -9,47 +9,41 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Search, Plus, RefreshCw } from 'lucide-react'
+import { Search, RefreshCw } from 'lucide-react'
 
 import {
   businessPartnerService,
   type BpRoleType,
   type BpTypeCode,
   type BpStatus,
+  BP_ROLE_LABELS,
+  BP_ROLE_COLORS,
+  BP_STATUS_LABELS,
 } from '../../services/businessPartnerService'
 import { Hac13CodeDisplay } from '../../components/master-data/Hac13CodeDisplay'
+import { useDebounce } from '../../hooks/useDebounce'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
-const ROLE_LABELS: Record<BpRoleType, string> = {
-  CUSTOMER_INTL: 'KH quốc tế',
-  CUSTOMER_DOM: 'KH nội địa',
-  SUPPLIER_GENERAL: 'NCC',
-  PARTNER_B2B: 'Đại lý B2B',
-  RUBBER_SUPPLIER: 'NCC mủ',
-}
-
-const ROLE_COLORS: Record<BpRoleType, string> = {
-  CUSTOMER_INTL: 'bg-indigo-100 text-indigo-700',
-  CUSTOMER_DOM: 'bg-sky-100 text-sky-700',
-  SUPPLIER_GENERAL: 'bg-amber-100 text-amber-700',
-  PARTNER_B2B: 'bg-pink-100 text-pink-700',
-  RUBBER_SUPPLIER: 'bg-lime-100 text-lime-700',
-}
+// Nhãn/màu vai trò nay sống ở businessPartnerService — giữ tên cũ làm alias cho file khác đang import
+const ROLE_LABELS: Record<BpRoleType, string> = BP_ROLE_LABELS
+const ROLE_COLORS: Record<BpRoleType, string> = BP_ROLE_COLORS
 
 export function BusinessPartnerListPage() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 400) // gõ xong 400ms mới bắn query
   const [typeCode, setTypeCode] = useState<'all' | BpTypeCode>('all')
   const [roleType, setRoleType] = useState<'all' | BpRoleType>('all')
   const [status, setStatus] = useState<'all' | BpStatus>('all')
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['business-partners', { page, search, typeCode, roleType, status }],
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
+    queryKey: ['business-partners', { page, search: debouncedSearch, typeCode, roleType, status }],
     queryFn: () =>
       businessPartnerService.list({
         page,
         pageSize: 20,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         typeCode: typeCode === 'all' ? undefined : typeCode,
         roleType: roleType === 'all' ? undefined : roleType,
         status: status === 'all' ? undefined : status,
@@ -75,13 +69,11 @@ export function BusinessPartnerListPage() {
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
             Tải lại
           </button>
-          <button
-            onClick={() => navigate('/master-data/business-partners/new')}
-            className="px-3 py-2 bg-emerald-700 text-white rounded-md hover:bg-emerald-800 flex items-center gap-1 text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Thêm đối tác
-          </button>
+          {/* Bỏ nút "Thêm đối tác": trỏ tới /business-partners/new nhưng không có màn tạo — route :id coi 'new'
+              là mã đối tác → luôn "Không tìm thấy đối tác" (nút chết). Đối tác sinh khi thêm NCC / KH / đại lý. */}
+          <span className="text-xs text-slate-500 max-w-[220px]">
+            Đối tác được tạo khi thêm Nhà cung cấp, Khách hàng hoặc Đại lý ở các màn tương ứng.
+          </span>
         </div>
       </div>
 
@@ -136,10 +128,11 @@ export function BusinessPartnerListPage() {
           className="px-3 py-2 border rounded-md text-sm bg-white"
         >
           <option value="all">Tất cả trạng thái</option>
-          <option value="active">Hoạt động</option>
-          <option value="inactive">Tạm dừng</option>
-          <option value="blocked">Khóa</option>
-          <option value="pending">Chờ duyệt</option>
+          {Object.entries(BP_STATUS_LABELS).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -163,7 +156,22 @@ export function BusinessPartnerListPage() {
                 </td>
               </tr>
             )}
-            {!isLoading && (data?.data ?? []).length === 0 && (
+            {/* Lỗi xét TRƯỚC trống — trước đây lỗi tải cũng hiện "Không có đối tác nào khớp bộ lọc" */}
+            {!isLoading && isError && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center bg-rose-50">
+                  <div className="font-semibold text-rose-700">Không tải được dữ liệu</div>
+                  <div className="text-xs text-rose-600 mt-1">{dichLoiHeThong(error, 'Có lỗi khi tải danh sách đối tác')}</div>
+                  <button
+                    onClick={() => refetch()}
+                    className="mt-3 px-3 py-1.5 border border-rose-300 text-rose-700 bg-white rounded-md text-sm hover:bg-rose-100"
+                  >
+                    Thử lại
+                  </button>
+                </td>
+              </tr>
+            )}
+            {!isLoading && !isError && (data?.data ?? []).length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                   Không có đối tác nào khớp bộ lọc.
@@ -231,14 +239,8 @@ function StatusBadge({ status }: { status: BpStatus }) {
         : status === 'blocked'
           ? 'bg-rose-100 text-rose-700'
           : 'bg-amber-100 text-amber-700'
-  const label =
-    status === 'active'
-      ? 'Hoạt động'
-      : status === 'inactive'
-        ? 'Tạm dừng'
-        : status === 'blocked'
-          ? 'Khóa'
-          : 'Chờ duyệt'
+  // Nhãn từ BP_STATUS_LABELS (service) — trước đây có bản chép riêng ở đây
+  const label = BP_STATUS_LABELS[status] || status
   return <span className={`px-2 py-0.5 rounded text-xs ${cls}`}>{label}</span>
 }
 

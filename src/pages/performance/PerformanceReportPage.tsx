@@ -13,8 +13,13 @@ import {
   DepartmentPerformance,
   calculateDashboardGrade,
 } from '../../services/performanceService'
+import PageState from '../../components/common/PageState'
+import { LimitNotice } from '../../components/common/tableDefaults'
+import { fmtDate } from '../../utils/format'
 
 const PRIMARY = '#1B4D3E'
+// getEmployeeRanking tải một cục tối đa N nhân viên
+const RANKING_LIMIT = 500
 
 const GRADE_COLORS: Record<string, string> = {
   A: '#16a34a', B: '#2563eb', C: '#f59e0b', D: '#ef4444', F: '#7f1d1d',
@@ -92,6 +97,12 @@ export default function PerformanceReportPage() {
   const [companyRankings, setCompanyRankings] = useState<EmployeePerformance[]>([])
   const [deptComparison, setDeptComparison] = useState<DepartmentPerformance[]>([])
   const [loading, setLoading] = useState(false)
+  // Lỗi tải: trước đây chỉ console.error → "Chưa có dữ liệu cho kỳ này" giả
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const retry = () => setReloadKey(k => k + 1)
+  // Đổi loại báo cáo thì bỏ lỗi của loại cũ (mỗi loại tự đặt lại lỗi khi bắt đầu tải)
+  useEffect(() => { setLoadError(null) }, [reportType])
 
   // Computed period params
   const periodParams = useMemo(() => {
@@ -143,6 +154,7 @@ export default function PerformanceReportPage() {
     }
     async function load() {
       setLoading(true)
+      setLoadError(null)
       try {
         const detail = await performanceDashboardService.getEmployeeDetail(selectedEmployee, periodParams)
         if (detail) {
@@ -157,12 +169,13 @@ export default function PerformanceReportPage() {
         }
       } catch (err) {
         console.error(err)
+        setLoadError(err)
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [reportType, selectedEmployee, periodParams, employees])
+  }, [reportType, selectedEmployee, periodParams, employees, reloadKey])
 
   // Load department report
   useEffect(() => {
@@ -172,22 +185,24 @@ export default function PerformanceReportPage() {
     }
     async function load() {
       setLoading(true)
+      setLoadError(null)
       try {
         const data = await performanceDashboardService.getEmployeeRanking({
           department_id: selectedDept || undefined,
           month: periodParams.month,
           year: periodParams.year,
-          limit: 500,
+          limit: RANKING_LIMIT,
         })
         setDeptReport(data)
       } catch (err) {
         console.error(err)
+        setLoadError(err)
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [reportType, selectedDept, periodParams])
+  }, [reportType, selectedDept, periodParams, reloadKey])
 
   // Load company report
   useEffect(() => {
@@ -198,12 +213,13 @@ export default function PerformanceReportPage() {
     }
     async function load() {
       setLoading(true)
+      setLoadError(null)
       try {
         const [rankings, depts] = await Promise.all([
           performanceDashboardService.getEmployeeRanking({
             month: periodParams.month,
             year: periodParams.year,
-            limit: 500,
+            limit: RANKING_LIMIT,
           }),
           performanceDashboardService.getDepartmentComparison(periodParams),
         ])
@@ -211,12 +227,13 @@ export default function PerformanceReportPage() {
         setDeptComparison(depts)
       } catch (err) {
         console.error(err)
+        setLoadError(err)
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [reportType, periodParams])
+  }, [reportType, periodParams, reloadKey])
 
   // Grade distribution for company report
   const gradeDistribution = useMemo(() => {
@@ -243,7 +260,7 @@ export default function PerformanceReportPage() {
       'Mã CV': t.code,
       'Tên CV': t.name,
       'Điểm': t.score,
-      'Ngày hoàn thành': t.completed_date ? new Date(t.completed_date).toLocaleDateString('vi-VN') : '',
+      'Ngày hoàn thành': t.completed_date ? fmtDate(t.completed_date) : '',
       'Đúng hạn': t.on_time ? 'Có' : 'Không',
     }))
     exportToCSV(data, `hieu-suat-${p.employee_name}-${periodLabel}`)
@@ -255,7 +272,7 @@ export default function PerformanceReportPage() {
       'Nhân viên': emp.employee_name,
       'Phòng ban': emp.department_name,
       'Điểm TB': emp.final_score,
-      'Task hoàn thành': emp.completed_tasks,
+      'Việc hoàn thành': emp.completed_tasks,
       'Đúng hạn (%)': emp.on_time_rate,
       'Hạng': emp.grade,
     }))
@@ -268,7 +285,7 @@ export default function PerformanceReportPage() {
       'Nhân viên': emp.employee_name,
       'Phòng ban': emp.department_name,
       'Điểm TB': emp.final_score,
-      'Task hoàn thành': emp.completed_tasks,
+      'Việc hoàn thành': emp.completed_tasks,
       'Đúng hạn (%)': emp.on_time_rate,
       'Hạng': emp.grade,
     }))
@@ -383,8 +400,9 @@ export default function PerformanceReportPage() {
           </div>
 
           {loading && <LoadingIndicator />}
+          {!loading && !!loadError && <PageState error={loadError} onRetry={retry} />}
 
-          {individualReport && !loading && (
+          {individualReport && !loading && !loadError && (
             <>
               {/* Preview card */}
               <div style={{ ...cardStyle, marginBottom: 20 }}>
@@ -397,7 +415,7 @@ export default function PerformanceReportPage() {
                   <InfoItem label="Kỳ đánh giá" value={periodLabel} />
                   <InfoItem label="Điểm tổng" value={String(individualReport.performance.final_score)} color={GRADE_COLORS[individualReport.performance.grade]} />
                   <InfoItem label="Xếp hạng" value={individualReport.performance.grade} color={GRADE_COLORS[individualReport.performance.grade]} />
-                  <InfoItem label="Task hoàn thành" value={`${individualReport.performance.completed_tasks}/${individualReport.performance.total_tasks}`} />
+                  <InfoItem label="Việc hoàn thành" value={`${individualReport.performance.completed_tasks}/${individualReport.performance.total_tasks}`} />
                   <InfoItem label="Đúng hạn" value={`${individualReport.performance.on_time_rate}%`} color={individualReport.performance.on_time_rate >= 80 ? '#16a34a' : '#f59e0b'} />
                 </div>
               </div>
@@ -428,7 +446,7 @@ export default function PerformanceReportPage() {
                           <td style={tdStyle}>{t.name}</td>
                           <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600 }}>{t.score}</td>
                           <td style={{ ...tdStyle, textAlign: 'center', fontSize: 12 }}>
-                            {t.completed_date ? new Date(t.completed_date).toLocaleDateString('vi-VN') : '—'}
+                            {fmtDate(t.completed_date)}
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'center' }}>
                             <span style={{
@@ -475,9 +493,11 @@ export default function PerformanceReportPage() {
           </div>
 
           {loading && <LoadingIndicator />}
+          {!loading && !!loadError && <PageState error={loadError} onRetry={retry} />}
 
-          {!loading && (
+          {!loading && !loadError && (
             <div style={{ ...cardStyle, marginBottom: 20 }}>
+              <LimitNotice shown={deptReport.length} limit={RANKING_LIMIT} what="nhân viên" />
               <h3 style={sectionTitleStyle}>
                 Báo cáo phòng ban — {periodLabel}
                 {selectedDept && departments.find(d => d.id === selectedDept)
@@ -492,7 +512,7 @@ export default function PerformanceReportPage() {
                       <th style={{ ...thStyle, textAlign: 'left' }}>Nhân viên</th>
                       <th style={{ ...thStyle, textAlign: 'left' }}>Phòng ban</th>
                       <th style={thStyle}>Điểm TB</th>
-                      <th style={thStyle}>Task</th>
+                      <th style={thStyle}>Việc hoàn thành</th>
                       <th style={thStyle}>Đúng hạn</th>
                       <th style={thStyle}>Hạng</th>
                     </tr>
@@ -543,9 +563,11 @@ export default function PerformanceReportPage() {
       {reportType === 'company' && (
         <div>
           {loading && <LoadingIndicator />}
+          {!loading && !!loadError && <PageState error={loadError} onRetry={retry} />}
 
-          {!loading && (
+          {!loading && !loadError && (
             <>
+              <LimitNotice shown={companyRankings.length} limit={RANKING_LIMIT} what="nhân viên" />
               {/* Department summary */}
               <div style={{ ...cardStyle, marginBottom: 20 }}>
                 <h3 style={sectionTitleStyle}>Tổng hợp theo phòng ban — {periodLabel}</h3>
@@ -556,7 +578,7 @@ export default function PerformanceReportPage() {
                         <th style={{ ...thStyle, textAlign: 'left' }}>Phòng ban</th>
                         <th style={thStyle}>Số NV</th>
                         <th style={thStyle}>Điểm TB</th>
-                        <th style={thStyle}>Tổng Task</th>
+                        <th style={thStyle}>Tổng số việc</th>
                         <th style={thStyle}>Đúng hạn</th>
                         <th style={thStyle}>Hạng</th>
                       </tr>
@@ -686,17 +708,9 @@ function InfoItem({ label, value, color }: { label: string; value: string; color
   )
 }
 
+// Đang tải: khối 3 trạng thái dùng chung (thay spinner tự chế inline style + keyframes)
 function LoadingIndicator() {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-      <div style={{
-        width: 36, height: 36, border: '4px solid #e5e7eb',
-        borderTopColor: PRIMARY, borderRadius: '50%',
-        animation: 'spin 1s linear infinite',
-      }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  )
+  return <PageState loading minHeight={200} />
 }
 
 // ============================================================================

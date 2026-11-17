@@ -13,6 +13,8 @@ import {
   FileText, CreditCard, ArrowUpRight, TrendingDown,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { fmtNum, fmtDate as fmtDateStd } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -48,21 +50,17 @@ interface Balance {
 // HELPERS
 // ============================================================================
 
-function fmt(n?: number | null): string {
-  if (n == null || n === 0) return '0'
-  return n.toLocaleString('vi-VN')
-}
+// Tiền KIP/BATH (không phải VND) — số theo vi-VN qua format.ts; thẻ quỹ rút gọn B/M/K
+// (toFixed cũ ra DẤU CHẤM thập phân: "1.5M" dễ đọc nhầm thành 15 triệu).
+const fmt = (n?: number | null): string => fmtNum(n ?? 0, 2)
 function fmtShort(n?: number | null): string {
   if (!n) return '0'
-  if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(1)}B`
-  if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(1)}M`
-  if (Math.abs(n) >= 1e3) return `${(n / 1e3).toFixed(0)}K`
+  if (Math.abs(n) >= 1e9) return `${fmtNum(n / 1e9, 1)}B`
+  if (Math.abs(n) >= 1e6) return `${fmtNum(n / 1e6, 1)}M`
+  if (Math.abs(n) >= 1e3) return `${fmtNum(n / 1e3, 0)}K`
   return fmt(n)
 }
-function fmtDate(s?: string): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
+const fmtDate = (s?: string): string => fmtDateStd(s)
 function getMonthLabel(y: number, m: number) { return `Tháng ${m}/${y}` }
 
 // ============================================================================
@@ -283,7 +281,7 @@ const LaoTransferPage: React.FC = () => {
       })
     } catch (err: unknown) {
       console.error('Lỗi tải chuyển tiền Lào:', err)
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu'))
     } finally {
       setLoading(false)
     }

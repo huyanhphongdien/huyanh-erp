@@ -21,6 +21,7 @@ import {
   formatRelativeTime,
   generateActivityDescription,
 } from '../../../services/taskAuditService';
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -181,7 +182,7 @@ export function ActivityTimeline({
     const { data, total: totalCount, error: fetchError } = await taskActivityService.getActivities(filters);
 
     if (fetchError) {
-      setError(fetchError.message);
+      setError(dichLoiHeThong(fetchError, 'Không tải được lịch sử hoạt động'));
     } else {
       if (reset) {
         setActivities(data);

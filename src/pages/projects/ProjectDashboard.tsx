@@ -30,6 +30,10 @@ import type {
   HealthStatus,
 } from '../../services/project/projectDashboardService'
 import { useAuthStore } from '../../stores/authStore'
+import PageState from '../../components/common/PageState'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate, fmtDateShort, fmtPct } from '../../utils/format'
+import { PROJECT_STATUS_LABELS, MILESTONE_STATUS_LABELS } from '../../services/project/project.types'
 
 // ============================================
 // HEALTH CONFIG
@@ -41,15 +45,8 @@ const HEALTH_LABELS: Record<HealthStatus, { label: string; color: string; bgLigh
   behind_schedule: { label: 'Chậm tiến độ', color: '#EF4444', bgLight: 'bg-red-50', icon: Clock },
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Nháp',
-  planning: 'Lập KH',
-  approved: 'Đã duyệt',
-  in_progress: 'Đang thực hiện',
-  on_hold: 'Tạm dừng',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
-}
+// Nhãn đọc từ project.types (một nguồn — bản chép cũ ghi "Lập KH")
+const STATUS_LABELS: Record<string, string> = PROJECT_STATUS_LABELS
 
 // ============================================
 // MAIN COMPONENT
@@ -65,7 +62,8 @@ const ProjectDashboard: React.FC = () => {
   const [myDashboard, setMyDashboard] = useState<MyDashboardData | null>(null)
   const [healthSummary, setHealthSummary] = useState<ProjectHealthItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Giữ lỗi gốc để dịch; chưa có số liệu lần nào thì hiện khối lỗi + Thử lại (không vẽ thẻ "0 dự án" giả)
+  const [error, setError] = useState<unknown>(null)
 
   const loadDashboard = async () => {
     setLoading(true)
@@ -85,7 +83,7 @@ const ProjectDashboard: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Dashboard error:', err)
-      setError(err.message || 'Không thể tải dashboard')
+      setError(err || 'Không tải được tổng quan dự án')
     } finally {
       setLoading(false)
     }
@@ -99,13 +97,11 @@ const ProjectDashboard: React.FC = () => {
     // ✅ FIX: dependency dùng user?.employee_id
   }, [user?.employee_id])
 
-  if (loading && !overview) {
+  if (!overview && (loading || error)) {
+    // Khối 3 trạng thái dùng chung — lỗi lần tải đầu không được rơi xuống các thẻ số 0 giả
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1B4D3E] mx-auto mb-3" />
-          <p className="text-sm text-gray-500">Đang tải dashboard...</p>
-        </div>
+      <div className="p-4">
+        <PageState loading={loading && !error} error={error} onRetry={loadDashboard} minHeight={320} />
       </div>
     )
   }
@@ -123,7 +119,7 @@ const ProjectDashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <LayoutDashboard className="w-5 h-5 text-[#E8A838]" />
-              <h1 className="text-lg font-bold">Dashboard Dự án</h1>
+              <h1 className="text-lg font-bold">Tổng quan dự án</h1>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -148,9 +144,10 @@ const ProjectDashboard: React.FC = () => {
         </div>
       </div>
 
-      {error && (
+      {!!error && (
         <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-          {error}
+          {/* Lần làm mới lỗi — số liệu bên dưới là của lần tải trước */}
+          {dichLoiHeThong(error, 'Không làm mới được tổng quan')} — đang hiện số liệu của lần tải trước.
         </div>
       )}
 
@@ -249,8 +246,8 @@ const ProjectDashboard: React.FC = () => {
                     <th className="px-4 py-3 text-left font-medium">Tên dự án</th>
                     <th className="px-4 py-3 text-center font-medium">Sức khỏe</th>
                     <th className="px-4 py-3 text-center font-medium">Tiến độ</th>
-                    <th className="px-4 py-3 text-center font-medium">Gap</th>
-                    <th className="px-4 py-3 text-center font-medium">MS trễ</th>
+                    <th className="px-4 py-3 text-center font-medium" title="Tiến độ thực tế − tiến độ kế hoạch">Lệch</th>
+                    <th className="px-4 py-3 text-center font-medium">Mốc trễ</th>
                     <th className="px-4 py-3 text-center font-medium">Rủi ro</th>
                     <th className="px-4 py-3 text-center font-medium">Vấn đề</th>
                   </tr>
@@ -284,7 +281,7 @@ const ProjectDashboard: React.FC = () => {
                           </div>
                         </td>
                         <td className={`px-4 py-3 text-center text-xs font-mono font-semibold ${item.gap >= 0 ? 'text-emerald-600' : item.gap > -15 ? 'text-amber-600' : 'text-red-600'}`}>
-                          {item.gap > 0 ? '+' : ''}{item.gap.toFixed(1)}%
+                          {item.gap > 0 ? '+' : ''}{fmtPct(item.gap, 1)}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className={`text-xs font-mono ${item.overdue_milestones > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
@@ -522,7 +519,7 @@ const HealthCard: React.FC<{ item: ProjectHealthItem; onClick: () => void }> = (
             <span className="text-[10px] font-mono text-gray-500">{item.progress_pct.toFixed(0)}%</span>
           </div>
           <span className={`text-[10px] font-mono font-semibold ${item.gap >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            Gap: {item.gap > 0 ? '+' : ''}{item.gap.toFixed(1)}%
+            Lệch: {item.gap > 0 ? '+' : ''}{fmtPct(item.gap, 1)}
           </span>
         </div>
       </div>
@@ -548,16 +545,16 @@ const MilestoneRow: React.FC<{ milestone: MilestoneDue }> = ({ milestone: ms }) 
         </div>
       </div>
       <div className={`text-xs font-mono flex-shrink-0 ${isOverdue ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-        {new Date(ms.due_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+        {fmtDateShort(ms.due_date)}
       </div>
       {isOverdue && (
         <span className="text-[10px] bg-red-50 text-red-700 px-1.5 py-0.5 rounded font-medium flex-shrink-0">
-          Trễ
+          {MILESTONE_STATUS_LABELS.overdue}
         </span>
       )}
       {isApproaching && (
         <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-medium flex-shrink-0">
-          Sắp tới
+          {MILESTONE_STATUS_LABELS.approaching}
         </span>
       )}
     </div>
@@ -594,7 +591,7 @@ function timeAgo(dateStr: string): string {
   if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`
   if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`
   if (diff < 604800) return `${Math.floor(diff / 86400)} ngày trước`
-  return new Date(dateStr).toLocaleDateString('vi-VN')
+  return fmtDate(dateStr)
 }
 
 export default ProjectDashboard

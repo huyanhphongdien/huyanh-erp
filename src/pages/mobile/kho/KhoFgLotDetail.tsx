@@ -6,9 +6,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { fgLotService, FG_QC_CHIP, FG_QC_LABELS, type FgLot } from '../../../services/wms/fgLotService'
+import { SHIFT_STATUS_LABEL, type ShiftBookStatus } from '../../../services/wms/shiftBookService'
 import { useRawRole } from '../../../hooks/useRawRole'
-import { fmtD, fmtDt, fmtKg } from './khoCommon'
+import { KhoToast, Msg, XacNhanTaiCho, fmtD, fmtDt, fmtKg, teamLabel } from './khoCommon'
 import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtNum } from '../../../utils/format'
 import { I } from './khoMixUtil'
 import './khoMix.css'
 
@@ -26,7 +28,6 @@ export default function KhoFgLotDetail() {
   const [po, setPo] = useState(['', '']); const [mv, setMv] = useState(['', ''])
   const [lyDo, setLyDo] = useState(''); const [qcNote, setQcNote] = useState('')
   const [chenBanh, setChenBanh] = useState(''); const [xuatBanh, setXuatBanh] = useState('')
-  const [huyArm, setHuyArm] = useState(false) // xác nhận hủy lô 2 bước tại chỗ (thay window.confirm)
   const role = useRawRole(l?.facility_id ?? null)
 
   const load = useCallback(async () => {
@@ -44,14 +45,14 @@ export default function KhoFgLotDetail() {
   }
   const n = (s: string) => (s.trim() === '' ? null : Number.isFinite(Number(s)) ? Number(s) : null)
 
-  if (err) return <div className="kmx"><header className="kmx-hd"><button type="button" className="kmx-back" aria-label="Quay lại" onClick={() => nav('/m/kho/tp')}>{I.back}</button><div className="kmx-hd-txt"><span className="kmx-title">Lô thành phẩm</span></div></header><div className="kmx-body"><div className="kmx-msg err">{err}</div></div></div>
+  if (err) return <div className="kmx"><header className="kmx-hd"><button type="button" className="kmx-back" aria-label="Quay lại" onClick={() => nav('/m/kho/tp')}>{I.back}</button><div className="kmx-hd-txt"><span className="kmx-title">Lô thành phẩm</span></div></header><div className="kmx-body"><Msg m={{ ok: false, text: err }} onRetry={() => { setErr(null); load() }} /></div></div>
   if (!l) return <div className="kmx"><header className="kmx-hd"><button type="button" className="kmx-back" aria-label="Quay lại" onClick={() => nav('/m/kho/tp')}>{I.back}</button><div className="kmx-hd-txt"><span className="kmx-title">Lô thành phẩm</span></div></header><div className="kmx-body"><div className="kmx-skel" /></div></div>
 
   const canQc = role.isQC || role.isBGD
   const canKho = role.isKeeper || role.isBGD
   const canChen = role.isKeeper || role.isQC || role.isBGD
   const loi = l.qc_status === 'cxl' || l.qc_status === 'loai' || ['LOI', 'DKL'].includes(l.material_code)
-  const chipCls = FG_QC_CHIP[l.qc_status] === 'ok' ? 'ok' : FG_QC_CHIP[l.qc_status] === 'red' ? 'red' : FG_QC_CHIP[l.qc_status] === 'amb' ? 'amb' : 'mut'
+  const chipCls = FG_QC_CHIP[l.qc_status] ?? 'mut'   // map của service đã là lớp kmx-chip (ok/amb/red/mut)
 
   return (
     <div className="kmx">
@@ -61,17 +62,16 @@ export default function KhoFgLotDetail() {
         <span className={`kmx-chip ${chipCls}`} style={{ flex: '0 0 auto' }}>{FG_QC_LABELS[l.qc_status]}</span>
       </header>
       <div className="kmx-body"><div className="kmx-inner">
-        {msg && <div className={`kmx-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>}
         <section className="kmx-card" style={{ gap: 10 }}>
           <div className="kmx-grid3">
             <div className="kmx-col kmx-center"><span className="kmx-lbl">Ép ra</span><span className="kmx-num md">{l.so_banh}</span><span className="kmx-sm">bành</span></div>
             <div className="kmx-col kmx-center"><span className="kmx-lbl">Đã xuất · chèn</span><span className="kmx-num md">{l.so_banh_da_xuat} · {l.so_banh_chen}</span><span className="kmx-sm">bành</span></div>
             <div className="kmx-col kmx-center kmx-stat ok"><span className="kmx-lbl ok">Còn</span><span className="kmx-num md ok">{l.ton_banh}</span><span className="kmx-sm">{fmtKg(l.ton_kg)} kg</span></div>
           </div>
-          <div className="kmx-kv"><span className="k">Ca · tổ</span><span className="v">{fmtD(l.shift_date)}{l.shift_name ? ` · ${l.shift_name}` : ''}{l.team ? ` · Tổ ${l.team}` : ''}</span></div>
+          <div className="kmx-kv"><span className="k">Ca · tổ</span><span className="v">{fmtD(l.shift_date)}{l.shift_name ? ` · ${l.shift_name}` : ''}{l.team ? ` · ${teamLabel(l.team)}` : ''}</span></div>
           <div className="kmx-kv"><span className="k">Mã nguyên liệu</span><span className="v kmx-mono">{l.ma_nvl || '—'}</span></div>
-          <div className="kmx-kv"><span className="k">Cỡ bành</span><span className="v">{l.kg_per_banh} kg · {fmtKg(l.kg)} kg cả lô{l.co_chen ? ' · có chèn' : ''}{l.tu_so_lo ? ` · chạy lại từ ${l.tu_so_lo}` : ''}</span></div>
-          <div className="kmx-kv"><span className="k">Ghi lúc</span><span className="v">{fmtDt(l.created_at)} · {l.created_name || ''}{l.report_status ? ` · phiếu ca ${l.report_status}` : ''}</span></div>
+          <div className="kmx-kv"><span className="k">Cỡ bành</span><span className="v">{fmtNum(l.kg_per_banh, 2)} kg · {fmtKg(l.kg)} kg cả lô{l.co_chen ? ' · có chèn' : ''}{l.tu_so_lo ? ` · chạy lại từ ${l.tu_so_lo}` : ''}</span></div>
+          <div className="kmx-kv"><span className="k">Ghi lúc</span><span className="v">{fmtDt(l.created_at)} · {l.created_name || ''}{l.report_status ? ` · phiếu ca: ${SHIFT_STATUS_LABEL[l.report_status as ShiftBookStatus] ?? l.report_status}` : ''}</span></div>
           {l.qc_at && <div className="kmx-kv"><span className="k">QC</span><span className="v">{FG_QC_LABELS[l.qc_status]}{l.qc_po_min !== null || l.qc_po_max !== null ? ` · Po ${l.qc_po_min ?? ''}–${l.qc_po_max ?? ''}` : ''}{l.qc_mv_min !== null || l.qc_mv_max !== null ? ` · MV ${l.qc_mv_min ?? ''}–${l.qc_mv_max ?? ''}` : ''}{l.qc_ly_do ? ` · ${l.qc_ly_do}` : ''}<br /><span className="kmx-sm">{fmtDt(l.qc_at)} · {l.qc_name || ''}</span></span></div>}
           {l.note && <span className="kmx-sm">Ghi chú: {l.note}</span>}
         </section>
@@ -84,14 +84,14 @@ export default function KhoFgLotDetail() {
             <>
               <div className="kmx-seg">
                 <button type="button" className={kq === 'dat' ? 'on' : ''} onClick={() => setKq('dat')}>Đạt</button>
-                <button type="button" className={kq === 'cxl' ? 'on' : ''} style={kq === 'cxl' ? { background: '#B45309', borderColor: '#B45309' } : undefined} onClick={() => setKq('cxl')}>Chờ xử lý</button>
-                <button type="button" className={kq === 'loai' ? 'on' : ''} style={kq === 'loai' ? { background: '#B91C1C', borderColor: '#B91C1C' } : undefined} onClick={() => setKq('loai')}>Loại</button>
+                <button type="button" className={kq === 'cxl' ? 'on amb' : ''} onClick={() => setKq('cxl')}>Chờ xử lý</button>
+                <button type="button" className={kq === 'loai' ? 'on red' : ''} onClick={() => setKq('loai')}>Loại</button>
               </div>
               <div className="kmx-grid2">
                 <div className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Po (min – max)</span><div style={{ display: 'flex', gap: 6 }}><input className="kmx-text" type="number" inputMode="decimal" step="0.5" placeholder="min" value={po[0]} onChange={(e) => setPo([e.target.value, po[1]])} aria-label="Po min" /><input className="kmx-text" type="number" inputMode="decimal" step="0.5" placeholder="max" value={po[1]} onChange={(e) => setPo([po[0], e.target.value])} aria-label="Po max" /></div></div>
                 <div className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">MV (min – max)</span><div style={{ display: 'flex', gap: 6 }}><input className="kmx-text" type="number" inputMode="decimal" step="0.1" placeholder="min" value={mv[0]} onChange={(e) => setMv([e.target.value, mv[1]])} aria-label="MV min" /><input className="kmx-text" type="number" inputMode="decimal" step="0.1" placeholder="max" value={mv[1]} onChange={(e) => setMv([mv[0], e.target.value])} aria-label="MV max" /></div></div>
               </div>
-              {kq !== 'dat' && <div className="kmx-col" style={{ gap: 6 }}><span className="kmx-lbl">Lý do · bắt buộc</span><div className="kmx-seg">{LY_DO.map((v) => <button key={v} type="button" className={lyDo === v ? 'on' : ''} style={{ minWidth: 0, height: 40, fontSize: 13 }} onClick={() => setLyDo(v)}>{v}</button>)}</div></div>}
+              {kq !== 'dat' && <div className="kmx-col" style={{ gap: 6 }}><span className="kmx-lbl">Lý do · bắt buộc</span><div className="kmx-seg">{LY_DO.map((v) => <button key={v} type="button" className={lyDo === v ? 'on' : ''} style={{ minWidth: 0, fontSize: 13 }} onClick={() => setLyDo(v)}>{v}</button>)}</div></div>}
               <input className="kmx-text" placeholder="Ghi chú QC" value={qcNote} onChange={(e) => setQcNote(e.target.value)} aria-label="Ghi chú QC" />
               <div className="kmx-grid2">
                 <button type="button" className="kmx-btn md" disabled={busy === 'qc' || (kq !== 'dat' && !lyDo)} onClick={() => run('qc', () => fgLotService.qc(l.id, kq, { poMin: n(po[0]), poMax: n(po[1]), mvMin: n(mv[0]), mvMax: n(mv[1]), lyDo: lyDo || null, note: qcNote.trim() || null }).then(() => setQcOpen(false)), kq === 'dat' ? `✅ ${l.so_lo}: đạt` : `${l.so_lo}: ${FG_QC_LABELS[kq]} — đã ghi vào sổ hàng không đạt`)}>{I.check}Lưu kết quả</button>
@@ -103,9 +103,9 @@ export default function KhoFgLotDetail() {
 
         {/* ── Lô lỗi → kho chèn ── */}
         {loi && l.ton_banh > 0 && (
-          <section className="kmx-card" style={{ gap: 8, borderColor: '#FECACA' }}>
+          <section className="kmx-card red" style={{ gap: 8 }}>
             <h2 className="kmx-h2">Chuyển sang kho chèn</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" style={{ height: 52, fontSize: 24 }} type="number" inputMode="numeric" value={chenBanh} onChange={(e) => setChenBanh(e.target.value)} aria-label="Số bành chuyển chèn" /><span style={{ fontSize: 16, fontWeight: 700, color: '#6B7280' }}>/ {l.ton_banh} bành</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" style={{ height: 52, fontSize: 24 }} type="number" inputMode="numeric" value={chenBanh} onChange={(e) => setChenBanh(e.target.value)} aria-label="Số bành chuyển chèn" /><span className="kmx-unit" style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>/ {l.ton_banh} bành</span></div>
             <button type="button" className="kmx-btn md" disabled={!canChen || busy === 'chen' || !(Number(chenBanh) > 0)} onClick={() => run('chen', () => fgLotService.chuyenChen(l.id, Number(chenBanh), null, l.material_code === 'DKL' ? false : null), `✅ ${chenBanh} bành (${fmtKg(Number(chenBanh) * l.kg_per_banh)} kg) đã vào kho chèn, giữ dây truy ngược lô ${l.so_lo}`)}>{I.next}Chuyển {chenBanh || 0} bành vào kho chèn</button>
           </section>
         )}
@@ -115,26 +115,17 @@ export default function KhoFgLotDetail() {
           <section className="kmx-card" style={{ gap: 8 }}>
             <h2 className="kmx-h2">Xuất kho thành phẩm</h2>
             {l.qc_status === 'chua_kiem' && <div className="kmx-note amb" style={{ padding: '8px 10px' }}>{I.info}<span>Lô chưa có kết quả QC. Xuất được nhưng nên kiểm trước.</span></div>}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" style={{ height: 52, fontSize: 24 }} type="number" inputMode="numeric" value={xuatBanh} onChange={(e) => setXuatBanh(e.target.value)} aria-label="Số bành xuất" /><span style={{ fontSize: 16, fontWeight: 700, color: '#6B7280' }}>/ {l.ton_banh} bành</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" style={{ height: 52, fontSize: 24 }} type="number" inputMode="numeric" value={xuatBanh} onChange={(e) => setXuatBanh(e.target.value)} aria-label="Số bành xuất" /><span className="kmx-unit" style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>/ {l.ton_banh} bành</span></div>
             <button type="button" className="kmx-btn md" disabled={!canKho || busy === 'xuat' || !(Number(xuatBanh) > 0)} onClick={() => run('xuat', () => fgLotService.xuat(l.id, Number(xuatBanh)), `✅ Xuất ${xuatBanh} bành lô ${l.so_lo}`)}>{I.intake}Xuất {xuatBanh || 0} bành</button>
             {!canKho && !role.loading && <span className="kmx-sm">Thủ kho mới được xuất.</span>}
           </section>
         )}
 
         {l.so_banh_da_xuat === 0 && l.so_banh_chen === 0 && l.status !== 'huy' && (role.perms.submit || role.isBGD) && (
-          huyArm ? (
-            <section className="kmx-card" style={{ gap: 8, borderColor: '#FECACA' }}>
-              <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Hủy lô {l.so_lo} vì ghi nhầm? Phiếu ca sẽ bị trừ lại số bành của lô này.</span>
-              <div className="kmx-grid2">
-                <button type="button" className="kmx-btn red" disabled={busy === 'huy'} onClick={() => { setHuyArm(false); run('huy', () => fgLotService.huy(l.id, 'Ghi nhầm'), 'Đã hủy lô, phiếu ca đã trừ lại') }}>Xác nhận hủy lô</button>
-                <button type="button" className="kmx-btn sec" onClick={() => setHuyArm(false)}>Không</button>
-              </div>
-            </section>
-          ) : (
-            <button type="button" className="kmx-btn ghost" style={{ color: '#B91C1C' }} disabled={busy === 'huy'} onClick={() => setHuyArm(true)}>Ghi nhầm? Hủy lô</button>
-          )
+          <XacNhanTaiCho nut="Ghi nhầm? Hủy lô" hoi={<>Hủy lô {l.so_lo} vì ghi nhầm? Phiếu ca sẽ bị trừ lại {l.so_banh} bành của lô này.</>} xacNhan="Xác nhận hủy lô" busy={busy === 'huy'} onOk={() => run('huy', () => fgLotService.huy(l.id, 'Ghi nhầm'), 'Đã hủy lô, phiếu ca đã trừ lại')} />
         )}
       </div></div>
+      <KhoToast m={msg} onClose={() => setMsg(null)} />
     </div>
   )
 }

@@ -15,6 +15,8 @@ import { SaveOutlined } from '@ant-design/icons'
 import customerExportProfileService, {
   EXPORT_DOC_TYPES, type CompanyBank, type DocChecklistItem,
 } from '../../../services/sales/customerExportProfileService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
 
 const { TextArea } = Input
 
@@ -26,11 +28,16 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
   const [checklist, setChecklist] = useState<CellMap>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  // ⚠ Tải lỗi mà vẫn hiện form TRỐNG thì bấm "Lưu" là ghi đè hồ sơ thật bằng ô rỗng (mất dữ liệu)
+  // → lỗi tải thì KHÔNG hiện form, chỉ hiện khối lỗi + Thử lại.
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       setLoading(true)
+      setLoadError(null)
       try {
         const [bankList, profile] = await Promise.all([
           customerExportProfileService.listBanks(),
@@ -66,14 +73,14 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
           }
           setChecklist(cl)
         }
-      } catch (e: any) {
-        message.error(e?.message || 'Lỗi tải hồ sơ chứng từ')
+      } catch (e: unknown) {
+        if (!cancelled) setLoadError(e || true)
       } finally {
         if (!cancelled) setLoading(false)
       }
     })()
     return () => { cancelled = true }
-  }, [customerId, form])
+  }, [customerId, form, reloadKey])
 
   const setCell = (doc: string, field: 'originals' | 'copies', val: number) => {
     setChecklist((prev) => ({
@@ -104,14 +111,15 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
         .filter((x) => x.originals > 0 || x.copies > 0)
       await customerExportProfileService.upsert(customerId, { ...vals, doc_checklist })
       message.success('Đã lưu hồ sơ chứng từ')
-    } catch (e: any) {
-      message.error(e?.message || 'Lỗi lưu hồ sơ')
+    } catch (e: unknown) {
+      message.error(dichLoiHeThong(e, 'Lỗi lưu hồ sơ'))
     } finally {
       setSaving(false)
     }
   }
 
   if (loading) return <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+  if (loadError) return <PageState error={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
 
   const checklistCols = [
     { title: 'Chứng từ', dataIndex: 'label', key: 'label' },

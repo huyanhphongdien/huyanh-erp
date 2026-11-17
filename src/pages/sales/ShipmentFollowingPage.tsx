@@ -24,6 +24,8 @@ import {
   message,
   Tooltip,
   InputNumber,
+  Dropdown,
+  Checkbox,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -33,10 +35,14 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   ContainerOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
 import { supabase } from '../../lib/supabase'
+import { DASH, fmtDate, fmtUsd } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
 import { salesCustomerService } from '../../services/sales/salesCustomerService'
 import {
   type SalesOrder,
@@ -46,6 +52,7 @@ import {
   ORDER_STATUS_COLORS,
   SVR_GRADE_OPTIONS,
   PAYMENT_TERMS_LABELS,
+  polLabel,
 } from '../../services/sales/salesTypes'
 import { useAuthStore } from '../../stores/authStore'
 import {
@@ -114,23 +121,41 @@ const STATUS_FILTER_OPTIONS = [
 const CUSTOMER_JOIN = 'customer:sales_customers!customer_id(id,code,name,short_name,country,tier)'
 
 // ============================================================================
-// HELPER — Format tiền USD
+// HELPER — định dạng: fmtUsd / fmtDate (utils/format). Tiền bảng 0 số lẻ;
+// đơn giá /tấn giữ số lẻ khi có (1.752,5).
 // ============================================================================
 
-const formatUSD = (value?: number | null): string => {
-  if (value == null) return '-'
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value)
-}
+const formatUSD = (value?: number | null): string => fmtUsd(value)
+const formatUnitPrice = (value?: number | null): string =>
+  fmtUsd(value, value != null && !Number.isInteger(Number(value)) ? 2 : 0)
+const formatDate = (value?: string | null): string => fmtDate(value)
 
-const formatDate = (value?: string | null): string => {
-  if (!value) return '-'
-  return dayjs(value).format('DD/MM/YYYY')
-}
+// ============================================================================
+// ẨN / HIỆN CỘT (audit 17/11/2026: 33 cột, scroll 2800px, không ẩn được cột nào)
+// Mặc định vẫn hiện ĐỦ như cũ; chọn nhóm để chỉ xem cột chứng từ / thanh toán / tàu & lịch.
+// ============================================================================
+
+/** Cột luôn hiện (khoá nhận dạng dòng) — không cho ẩn. */
+const ALWAYS_SHOWN = new Set(['no', 'buyer', 'contract_no', 'lot_number', 'grade', 'quantity_tons', 'status'])
+const COLUMN_PRESETS: { key: string; label: string; cols: string[] | null }[] = [
+  { key: 'all', label: 'Tất cả cột', cols: null },
+  {
+    key: 'ship', label: 'Tàu & lịch',
+    cols: ['booking_reference', 'bl_number', 'container_count', 'port_of_loading', 'port_of_destination',
+      'incoterm', 'etd', 'vessel', 'eta', 'bl_type', 'cutoff_date'],
+  },
+  {
+    key: 'docs', label: 'Chứng từ',
+    cols: ['po_lc', 'bl_number', 'bl_type', 'doc_submission_date', 'customs_declaration_no',
+      'customs_clearance_status', 'dhl_number', 'etd'],
+  },
+  {
+    key: 'pay', label: 'Thanh toán',
+    cols: ['payment_terms', 'unit_price', 'total_value_usd', 'discount_amount', 'bank_name', 'discount_date',
+      'discount_bank', 'bank_charges', 'actual_payment_amount', 'payment_date'],
+  },
+]
+const SHIPMENT_HIDDEN_COLS_KEY = 'shipment-following-hidden-cols-v1'
 
 // ============================================================================
 // COMPONENT
@@ -143,7 +168,20 @@ const ShipmentFollowingPage = () => {
 
   // ========== State ==========
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [orders, setOrders] = useState<ShipmentOrder[]>([])
+  // Cột đang ẩn — nhớ theo máy (localStorage); lỗi đọc/ghi thì coi như hiện đủ
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(SHIPMENT_HIDDEN_COLS_KEY)
+      if (saved) return new Set(JSON.parse(saved) as string[])
+    } catch { /* ignore */ }
+    return new Set()
+  })
+  const saveHidden = (next: Set<string>) => {
+    setHiddenCols(next)
+    try { localStorage.setItem(SHIPMENT_HIDDEN_COLS_KEY, JSON.stringify([...next])) } catch { /* ignore */ }
+  }
   const [customers, setCustomers] = useState<SalesCustomer[]>([])
   const [editingKey, setEditingKey] = useState<string>('')
   const [editingField, setEditingField] = useState<string>('')
@@ -159,6 +197,7 @@ const ShipmentFollowingPage = () => {
   // ========== Load Data ==========
   const loadOrders = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       let query = supabase
         .from('sales_orders')
@@ -191,7 +230,8 @@ const ShipmentFollowingPage = () => {
       if (error) throw error
       setOrders((data || []) as ShipmentOrder[])
     } catch (err: any) {
-      message.error(`Lỗi tải dữ liệu: ${err.message}`)
+      // Lỗi tải ≠ "không có lô hàng" — khối lỗi + Thử lại thay cho bảng trống
+      setLoadError(err)
     } finally {
       setLoading(false)
     }
@@ -256,7 +296,12 @@ const ShipmentFollowingPage = () => {
     setEditValue(null)
   }
 
-  const saveEdit = async (recordId: string, field: string) => {
+  const saveEdit = async (recordId: string, field: string, prev?: any) => {
+    // Không đổi gì (bấm vào ô rồi bấm ra) → chỉ đóng ô, không ghi DB + toast + nạp lại
+    if (String(editValue ?? '') === String(prev ?? '')) {
+      cancelEdit()
+      return
+    }
     try {
       const updateData: Record<string, any> = {
         [field]: editValue || null,
@@ -274,7 +319,7 @@ const ShipmentFollowingPage = () => {
       cancelEdit()
       loadOrders()
     } catch (err: any) {
-      message.error(`Lỗi cập nhật: ${err.message}`)
+      message.error(dichLoiHeThong(err, 'Lỗi cập nhật'))
     }
   }
 
@@ -295,7 +340,7 @@ const ShipmentFollowingPage = () => {
             size="small"
             value={editValue ? dayjs(editValue) : null}
             onChange={(d) => setEditValue(d ? d.format('YYYY-MM-DD') : null)}
-            onBlur={() => saveEdit(record.id, field)}
+            onBlur={() => saveEdit(record.id, field, value)}
             autoFocus
             style={{ width: 120 }}
           />
@@ -307,8 +352,8 @@ const ShipmentFollowingPage = () => {
             size="small"
             value={editValue}
             onChange={(v) => setEditValue(v)}
-            onPressEnter={() => saveEdit(record.id, field)}
-            onBlur={() => saveEdit(record.id, field)}
+            onPressEnter={() => saveEdit(record.id, field, value)}
+            onBlur={() => saveEdit(record.id, field, value)}
             autoFocus
             style={{ width: 100 }}
           />
@@ -319,15 +364,15 @@ const ShipmentFollowingPage = () => {
           size="small"
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
-          onPressEnter={() => saveEdit(record.id, field)}
-          onBlur={() => saveEdit(record.id, field)}
+          onPressEnter={() => saveEdit(record.id, field, value)}
+          onBlur={() => saveEdit(record.id, field, value)}
           autoFocus
           style={{ width: 120 }}
         />
       )
     }
 
-    const displayValue = type === 'date' ? formatDate(value) : type === 'number' ? formatUSD(value) : (value || '-')
+    const displayValue = type === 'date' ? formatDate(value) : type === 'number' ? formatUSD(value) : (value || DASH)
 
     if (!editable) {
       return <span>{displayValue}</span>
@@ -378,14 +423,14 @@ const ShipmentFollowingPage = () => {
   // ========== Columns ==========
   const columns: ColumnsType<ShipmentOrder> = [
     {
-      title: 'NO',
+      title: 'STT',
       key: 'no',
       width: 50,
       fixed: 'left',
       render: (_v, _r, idx) => idx + 1,
     },
     {
-      title: 'Buyer',
+      title: 'Khách',
       dataIndex: ['customer', 'short_name'],
       key: 'buyer',
       width: 110,
@@ -393,14 +438,14 @@ const ShipmentFollowingPage = () => {
       render: (_v, record) => record.customer?.short_name || record.customer?.name || '-',
     },
     {
-      title: 'Contract No',
+      title: 'Số HĐ',
       dataIndex: 'contract_no',
       key: 'contract_no',
       width: 120,
       render: (_v, record) => renderEditableCell(record, 'contract_no', record.contract_no),
     },
     {
-      title: 'Lot',
+      title: 'Lô',
       dataIndex: 'lot_number',
       key: 'lot_number',
       width: 80,
@@ -431,7 +476,7 @@ const ShipmentFollowingPage = () => {
       render: (_v, record) => renderEditableCell(record, 'bl_number', record.bl_number),
     },
     {
-      title: 'Commodity',
+      title: 'Loại hàng',
       dataIndex: 'grade',
       key: 'grade',
       width: 100,
@@ -440,7 +485,7 @@ const ShipmentFollowingPage = () => {
       ),
     },
     {
-      title: 'QTY (MT)',
+      title: 'SL (tấn)',
       dataIndex: 'quantity_tons',
       key: 'quantity_tons',
       width: 90,
@@ -448,7 +493,7 @@ const ShipmentFollowingPage = () => {
       render: (v: number) => v?.toFixed(1) || '-',
     },
     {
-      title: 'VOL',
+      title: 'Số cont',
       dataIndex: 'container_count',
       key: 'container_count',
       width: 60,
@@ -461,6 +506,7 @@ const ShipmentFollowingPage = () => {
       key: 'port_of_loading',
       width: 110,
       ellipsis: true,
+      render: (v: string | null) => polLabel(v),   // không in thẳng mã 'HCM_CAT_LAI'
     },
     {
       title: 'POD',
@@ -477,7 +523,7 @@ const ShipmentFollowingPage = () => {
       align: 'center',
     },
     {
-      title: 'Payment Term',
+      title: 'Điều kiện TT',
       dataIndex: 'payment_terms',
       key: 'payment_terms',
       width: 130,
@@ -488,15 +534,15 @@ const ShipmentFollowingPage = () => {
       },
     },
     {
-      title: 'Unit Price',
+      title: 'Đơn giá',
       dataIndex: 'unit_price',
       key: 'unit_price',
       width: 100,
       align: 'right',
-      render: (v: number) => formatUSD(v),
+      render: (v: number) => formatUnitPrice(v),
     },
     {
-      title: 'Amount',
+      title: 'Thành tiền',
       dataIndex: 'total_value_usd',
       key: 'total_value_usd',
       width: 110,
@@ -508,7 +554,7 @@ const ShipmentFollowingPage = () => {
       ),
     },
     {
-      title: 'Discount',
+      title: 'Chiết khấu',
       dataIndex: 'discount_amount',
       key: 'discount_amount',
       width: 100,
@@ -517,7 +563,7 @@ const ShipmentFollowingPage = () => {
         renderEditableCell(record, 'discount_amount', record.discount_amount, 'number'),
     },
     {
-      title: 'Bank',
+      title: 'Ngân hàng',
       dataIndex: 'bank_name',
       key: 'bank_name',
       width: 100,
@@ -563,7 +609,7 @@ const ShipmentFollowingPage = () => {
       render: (_v, record) => renderEditableCell(record, 'eta', record.eta, 'date'),
     },
     {
-      title: 'B/L Type',
+      title: 'Loại B/L',
       dataIndex: 'bl_type',
       key: 'bl_type',
       width: 100,
@@ -595,7 +641,7 @@ const ShipmentFollowingPage = () => {
       },
     },
     {
-      title: 'DHL No',
+      title: 'Số DHL',
       dataIndex: 'dhl_number',
       key: 'dhl_number',
       width: 110,
@@ -642,7 +688,7 @@ const ShipmentFollowingPage = () => {
       ),
     },
     {
-      title: 'Payment Date',
+      title: 'Ngày thanh toán',
       dataIndex: 'payment_date',
       key: 'payment_date',
       width: 120,
@@ -650,7 +696,7 @@ const ShipmentFollowingPage = () => {
         renderEditableCell(record, 'payment_date', record.payment_date, 'date'),
     },
     {
-      title: 'Status',
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       width: 110,
@@ -662,6 +708,11 @@ const ShipmentFollowingPage = () => {
       ),
     },
   ]
+
+  // Cột cho ẩn được + cột đang hiện (cột khoá nhận dạng dòng luôn hiện)
+  const hideableCols = columns.filter((c) => !ALWAYS_SHOWN.has(String(c.key)))
+  const hideableKeys = hideableCols.map((c) => String(c.key))
+  const visibleColumns = columns.filter((c) => ALWAYS_SHOWN.has(String(c.key)) || !hiddenCols.has(String(c.key)))
 
   // ========== Export CSV ==========
   const exportToCSV = () => {
@@ -684,7 +735,7 @@ const ShipmentFollowingPage = () => {
       o.grade?.replace('_', ' ') || '',
       o.quantity_tons?.toFixed(1) || '',
       o.container_count || '',
-      o.port_of_loading || '',
+      o.port_of_loading ? polLabel(o.port_of_loading) : '',
       o.port_of_destination || '',
       o.incoterm || '',
       o.payment_terms ? ((PAYMENT_TERMS_LABELS as Record<string, string>)[o.payment_terms] || o.payment_terms) : '',
@@ -763,14 +814,55 @@ const ShipmentFollowingPage = () => {
           </Text>
         </Col>
         <Col>
-          <Button
-            type="primary"
-            icon={<DownloadOutlined />}
-            onClick={exportToCSV}
-            style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
-          >
-            Xuất Excel
-          </Button>
+          <Space wrap>
+            {/* Ẩn/hiện cột theo nhóm — mặc định hiện đủ như cũ */}
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  ...COLUMN_PRESETS.map((p) => ({
+                    key: `preset-${p.key}`,
+                    label: <span style={{ color: '#1B4D3E' }}>▸ {p.label}</span>,
+                    onClick: () => {
+                      if (!p.cols) { saveHidden(new Set()); return }
+                      const keep = new Set(p.cols)
+                      saveHidden(new Set(hideableKeys.filter((k) => !keep.has(k))))
+                    },
+                  })),
+                  { type: 'divider' as const },
+                  ...hideableCols.map((c) => ({
+                    key: String(c.key),
+                    label: (
+                      <Checkbox
+                        checked={!hiddenCols.has(String(c.key))}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => {
+                          const next = new Set(hiddenCols)
+                          const k = String(c.key)
+                          if (next.has(k)) next.delete(k); else next.add(k)
+                          saveHidden(next)
+                        }}
+                      >
+                        {typeof c.title === 'string' ? c.title : String(c.key)}
+                      </Checkbox>
+                    ),
+                  })),
+                ],
+              }}
+            >
+              <Button icon={<SettingOutlined />}>
+                Cột ({visibleColumns.length}/{columns.length})
+              </Button>
+            </Dropdown>
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              onClick={exportToCSV}
+              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
+            >
+              Xuất Excel
+            </Button>
+          </Space>
         </Col>
       </Row>
 
@@ -887,14 +979,17 @@ const ShipmentFollowingPage = () => {
 
       {/* ===== TABLE ===== */}
       <Card size="small" bordered={false} bodyStyle={{ padding: 0 }}>
+        {loadError && !loading ? (
+          <PageState error={loadError} onRetry={loadOrders} />
+        ) : (
         <Table<ShipmentOrder>
           className="shipment-table"
-          columns={columns}
+          columns={visibleColumns}
           dataSource={orders}
           rowKey="id"
           loading={loading}
           size="small"
-          scroll={{ x: 2800 }}
+          scroll={{ x: Math.max(1000, visibleColumns.reduce((s, c) => s + (Number(c.width) || 100), 0)) }}
           pagination={{
             pageSize: 50,
             showTotal: (total) => `Tổng ${total} lô hàng`,
@@ -911,26 +1006,27 @@ const ShipmentFollowingPage = () => {
             },
           })}
           summary={() => (
+            // MỘT ô cho mỗi cột ĐANG HIỆN (không gộp colSpan theo chỉ số cứng) — ẩn cột không làm lệch dòng tổng
             <Table.Summary fixed>
               <Table.Summary.Row>
-                <Table.Summary.Cell index={0} colSpan={8} align="right">
-                  <Text strong style={{ color: '#1B4D3E' }}>TỔNG CỘNG:</Text>
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={8} align="right">
-                  <Text strong>{summary.totalQty.toFixed(1)} MT</Text>
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={9} colSpan={6} />
-                <Table.Summary.Cell index={15} align="right">
-                  <Text strong style={{ color: '#1B4D3E' }}>{formatUSD(summary.totalAmount)}</Text>
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={16} align="right">
-                  <Text strong style={{ color: '#cf1322' }}>{formatUSD(summary.totalDiscount)}</Text>
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={17} colSpan={7} />
+                {visibleColumns.map((c, i) => {
+                  const k = String(c.key)
+                  let content: React.ReactNode = null
+                  if (k === 'buyer') content = <Text strong style={{ color: '#1B4D3E' }}>TỔNG CỘNG:</Text>
+                  else if (k === 'quantity_tons') content = <Text strong>{summary.totalQty.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tấn</Text>
+                  else if (k === 'total_value_usd') content = <Text strong style={{ color: '#1B4D3E' }}>{formatUSD(summary.totalAmount)}</Text>
+                  else if (k === 'discount_amount') content = <Text strong style={{ color: '#cf1322' }}>{formatUSD(summary.totalDiscount)}</Text>
+                  return (
+                    <Table.Summary.Cell key={k} index={i} align={k === 'buyer' ? 'left' : 'right'}>
+                      {content}
+                    </Table.Summary.Cell>
+                  )
+                })}
               </Table.Summary.Row>
             </Table.Summary>
           )}
         />
+        )}
       </Card>
 
       {/* ===== LEGEND ===== */}

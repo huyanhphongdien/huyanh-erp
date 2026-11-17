@@ -15,10 +15,12 @@ import { RAW_RUBBER_TYPE_LABELS, RAW_SETTINGS_DEFAULT, type RawRubberType, type 
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import { useRawRole } from '../../../hooks/useRawRole'
 import { rawLotService, type RawLotBalance } from '../../../services/wms/rawLotService'
+import { PRODUCTION_STATUS_LABELS } from '../../../services/wms/wms.types'
+import { enumLabel } from '../../../components/common/EnumTag'
+import { fmtKg, fmtPct } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
-const fmtKg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
-const fmtPct = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' %')
 
 const RAW_TYPES_FOR_PRODUCTION: RawRubberType[] = ['mu_dong', 'mu_tap', 'mu_chen', 'mu_to', 'mu_nuoc', 'svr_10', 'svr_20', 'svr_3l', 'svr_l', 'svr_5', 'svr_cv50', 'svr_cv60', 'rss_1', 'rss_3', 'latex_60', 'sbr_1502']
 
@@ -50,16 +52,18 @@ export default function RawIssueCreatePage() {
   const maChon = rawLots.find((l) => l.raw_lot_id === maId)
   const handleXuatMa = async () => {
     if (!facilityId || !maChon || !tongKg || tongKg <= 0) { message.warning('Chọn mã và nhập tổng kg cân'); return }
-    if (tongKg > maChon.wet_kg + 0.01) { message.warning(`Mã ${maChon.ma} chỉ còn ${maChon.wet_kg.toLocaleString('vi-VN')} kg ướt`); return }
+    if (tongKg > maChon.wet_kg + 0.01) { message.warning(`Mã ${maChon.ma} chỉ còn ${fmtKg(maChon.wet_kg)} kg ướt`); return }
     setSavingMa(true)
     try {
       const id = await rawLotService.taoLenhXuatTheoMa({ facilityId, rawLotId: maChon.raw_lot_id, mucDich, productionOrderId: productionOrderId ?? null, note: note.trim() || null })
       const r = await rawLotService.ghiCanTheoMa(id, tongKg, null)
-      message.success(`${r.code}: xuất mã ${maChon.ma}, ${r.so_dong} xe, đã chia ${tongKg.toLocaleString('vi-VN')} kg · tiếp theo: ký 3 bước`)
+      message.success(`${r.code}: xuất mã ${maChon.ma}, ${r.so_dong} xe, đã chia ${fmtKg(tongKg)} kg · tiếp theo: ký 3 bước`)
       navigate(`/wms/nvl/xuat/${id}`)
-    } catch (e: any) { message.error(e?.message || 'Không tạo được lệnh') }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Không tạo được lệnh')) }
     finally { setSavingMa(false) }
   }
+  // Xuất sản xuất mà chưa gắn lệnh SX → mất truy xuất lô nguồn vào lệnh SX (finding #8): cảnh báo ngay cạnh nút
+  const thieuLenhSx = mucDich === 'production' && !productionOrderId
 
   useEffect(() => {
     if (facilityId || !facilities?.length) return
@@ -96,7 +100,7 @@ export default function RawIssueCreatePage() {
     if (!facilityId) return
     setLoading(true)
     try { setPicks(await rawIssueService.goiYFifo({ facilityId, rubberTypes: types, needDryKg: needDry, maxTapPct: mucDich === 'production' ? maxTap : null })) }
-    catch (e: any) { message.error(e?.message || 'Không tải được lô') }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Không tải được lô')) }
     finally { setLoading(false) }
   }, [facilityId, types, needDry, maxTap, mucDich])
 
@@ -120,7 +124,7 @@ export default function RawIssueCreatePage() {
       })
       message.success('Đã tạo lệnh xuất · tiếp theo: cân thực tế từng lô rồi ký')
       navigate(`/wms/nvl/xuat/${id}`)
-    } catch (e: any) { message.error(e?.message || 'Không tạo được lệnh') }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Không tạo được lệnh')) }
     finally { setSaving(false) }
   }
 
@@ -155,26 +159,36 @@ export default function RawIssueCreatePage() {
 
         {!rawRole.loading && !rawRole.perms.submit && <Alert type="warning" showIcon message="Tài khoản chưa gắn hồ sơ nhân viên, không lập được lệnh." />}
 
-        <Card size="small" title="Xuất cả một mã nguyên liệu (cách nhà máy đang làm)" extra={<Text type="secondary">một số cân cho cả mã · máy chia về từng xe theo tỷ lệ ướt còn lại</Text>}>
-          <Row gutter={[12, 8]} align="bottom">
-            <Col xs={24} md={10}><Text>Mã nguyên liệu</Text><Select style={{ width: '100%' }} showSearch optionFilterProp="label" value={maId} onChange={setMaId} placeholder="TMHG-40…" options={rawLots.map((l) => ({ value: l.raw_lot_id, label: `${l.ma} · ${l.rubber_type_name} · ${l.so_xe_con_hang} xe · ${l.wet_kg.toLocaleString('vi-VN')} kg ướt / ${l.dry_kg.toLocaleString('vi-VN')} khô` }))} /></Col>
-            <Col xs={12} md={6}><Text>Tổng kg ướt cân được</Text><InputNumber style={{ width: '100%' }} min={1} step={100} value={tongKg} max={maChon?.wet_kg} onChange={(v) => setTongKg(v === null || v === undefined ? null : Number(v))} /></Col>
-            <Col xs={12} md={4}><Button block onClick={() => maChon && setTongKg(Math.round(maChon.wet_kg))} disabled={!maChon}>Lấy hết mã</Button></Col>
-            <Col xs={24} md={4}><Button type="primary" block loading={savingMa} disabled={!maChon || !tongKg} onClick={handleXuatMa}>Tạo lệnh theo mã</Button></Col>
-          </Row>
-          {maChon && <Text type="secondary">Lệnh sẽ gồm {maChon.so_xe_con_hang} lô xe của {maChon.ma}; mục đích và lệnh sản xuất lấy ở phần dưới.</Text>}
-        </Card>
-
+        {/* Thông tin chung của lệnh — dùng cho CẢ HAI cách xuất, nên đứng trước (finding #8: trước đây nằm
+            ở thẻ dưới, bấm "Tạo lệnh theo mã" ngay thẻ đầu là tạo lệnh sản xuất không gắn lệnh SX mà không hay) */}
         <Card size="small" title="Lệnh">
           <Row gutter={[12, 12]}>
             <Col xs={24} md={5}><Text type="secondary" style={{ fontSize: 12 }}>Nhà máy</Text>
               <Select value={facilityId} onChange={setFacilityId} style={{ width: '100%' }} options={(facilities ?? []).map((f) => ({ value: f.id, label: `${f.code} · ${f.name}` }))} /></Col>
             <Col xs={24} md={5}><Text type="secondary" style={{ fontSize: 12 }}>Mục đích</Text>
               <Select<RawIssuePurpose> value={mucDich} onChange={setMucDich} style={{ width: '100%' }} options={(Object.keys(RAW_ISSUE_PURPOSE_LABELS) as RawIssuePurpose[]).map((k) => ({ value: k, label: RAW_ISSUE_PURPOSE_LABELS[k] }))} /></Col>
-            <Col xs={24} md={7}><Text type="secondary" style={{ fontSize: 12 }}>Lệnh sản xuất (nếu có)</Text>
-              <Select allowClear showSearch optionFilterProp="label" value={productionOrderId} onChange={setProductionOrderId} style={{ width: '100%' }} placeholder="Chọn lệnh SX đang mở"
-                options={productionOrders.map((p) => ({ value: p.id, label: `${p.code}${p.target_grade ? ' · ' + p.target_grade : ''}${p.target_quantity ? ' · ' + fmtKg(p.target_quantity) + ' kg' : ''} · ${p.status}` }))} /></Col>
-            <Col xs={12} md={3}><Text type="secondary" style={{ fontSize: 12 }}>Grade đích</Text>
+            <Col xs={24} md={7}><Text type="secondary" style={{ fontSize: 12 }}>Lệnh sản xuất {mucDich === 'production' ? '(nên chọn — để truy xuất lô nguồn)' : '(nếu có)'}</Text>
+              <Select allowClear showSearch optionFilterProp="label" value={productionOrderId} onChange={setProductionOrderId} style={{ width: '100%' }} placeholder="Chọn lệnh SX đang mở" status={thieuLenhSx ? 'warning' : undefined}
+                options={productionOrders.map((p) => ({ value: p.id, label: `${p.code}${p.target_grade ? ' · ' + p.target_grade : ''}${p.target_quantity ? ' · ' + fmtKg(p.target_quantity) + ' kg' : ''} · ${enumLabel(PRODUCTION_STATUS_LABELS, p.status)}` }))} /></Col>
+            <Col xs={24} md={7}><Text type="secondary" style={{ fontSize: 12 }}>Ghi chú</Text>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ca, dây chuyền, người nhận…" /></Col>
+          </Row>
+        </Card>
+
+        <Card size="small" title="Xuất cả một mã nguyên liệu (cách nhà máy đang làm)" extra={<Text type="secondary">một số cân cho cả mã · máy chia về từng xe theo tỷ lệ ướt còn lại</Text>}>
+          <Row gutter={[12, 8]} align="bottom">
+            <Col xs={24} md={10}><Text>Mã nguyên liệu</Text><Select style={{ width: '100%' }} showSearch optionFilterProp="label" value={maId} onChange={setMaId} placeholder="TMHG-40…" options={rawLots.map((l) => ({ value: l.raw_lot_id, label: `${l.ma} · ${l.rubber_type_name} · ${l.so_xe_con_hang} xe · ${fmtKg(l.wet_kg)} kg ướt / ${fmtKg(l.dry_kg)} khô` }))} /></Col>
+            <Col xs={12} md={6}><Text>Tổng kg ướt cân được</Text><InputNumber style={{ width: '100%' }} min={1} step={100} value={tongKg} max={maChon?.wet_kg} onChange={(v) => setTongKg(v === null || v === undefined ? null : Number(v))} /></Col>
+            <Col xs={12} md={4}><Button block onClick={() => maChon && setTongKg(Math.round(maChon.wet_kg))} disabled={!maChon}>Lấy hết mã</Button></Col>
+            <Col xs={24} md={4}><Button type="primary" block loading={savingMa} disabled={!maChon || !tongKg} onClick={handleXuatMa}>Tạo lệnh theo mã</Button></Col>
+          </Row>
+          {maChon && <Text type="secondary">Lệnh sẽ gồm {maChon.so_xe_con_hang} lô xe của {maChon.ma} · {RAW_ISSUE_PURPOSE_LABELS[mucDich]}{productionOrderId ? ` · LSX ${productionOrders.find((p) => p.id === productionOrderId)?.code ?? ''}` : ''}.</Text>}
+          {thieuLenhSx && <div style={{ marginTop: 6 }}><Text type="warning">⚠ Chưa chọn lệnh sản xuất ở thẻ Lệnh — lệnh xuất sẽ KHÔNG gắn lệnh SX (mất truy xuất lô nguồn vào lệnh SX).</Text></div>}
+        </Card>
+
+        <Card size="small" title="Xuất theo lô (gợi ý FIFO)">
+          <Row gutter={[12, 12]}>
+            <Col xs={12} md={4}><Text type="secondary" style={{ fontSize: 12 }}>Grade đích</Text>
               <Select allowClear value={targetGrade} onChange={setTargetGrade} style={{ width: '100%' }} options={Object.keys(settings.gioi_han_chen_pct).map((g) => ({ value: g, label: g.replace('_', ' ') }))} /></Col>
             <Col xs={12} md={4}><Text type="secondary" style={{ fontSize: 12 }}>Nhu cầu kg khô</Text>
               <InputNumber value={needDry} min={1} step={500} onChange={(v) => setNeedDry(Number(v ?? 0))} style={{ width: '100%' }} /></Col>
@@ -190,8 +204,6 @@ export default function RawIssueCreatePage() {
               </div></Col>
             <Col xs={12} md={4}><Text type="secondary" style={{ fontSize: 12 }}>Mủ tạp tối đa (% khô)</Text>
               <InputNumber value={maxTap} min={0} max={100} onChange={(v) => setMaxTap(v === null ? null : Number(v))} style={{ width: '100%' }} disabled={mucDich !== 'production'} /></Col>
-            <Col xs={24} md={8}><Text type="secondary" style={{ fontSize: 12 }}>Ghi chú</Text>
-              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ca, dây chuyền, người nhận…" /></Col>
           </Row>
         </Card>
 
@@ -219,6 +231,7 @@ export default function RawIssueCreatePage() {
                   <Row justify="space-between"><Text type="secondary">Tuổi lô lâu nhất</Text><Text strong>{th.tuoiMax} ngày</Text></Row>
                 </div>
                 {tapWarn && <Alert type="warning" showIcon message={`Mủ tạp vượt ${maxTap} % · bỏ bớt lô tạp hoặc thêm mủ đông`} />}
+                {thieuLenhSx && <Text type="warning" style={{ fontSize: 12 }}>⚠ Chưa chọn lệnh sản xuất (thẻ Lệnh phía trên).</Text>}
                 <Button type="primary" block size="large" icon={<CheckCircleOutlined />} loading={saving} disabled={th.soLo === 0 || !rawRole.perms.submit} onClick={handleCreate}>Tạo lệnh xuất</Button>
                 <Text type="secondary" style={{ fontSize: 12 }}>Tạo xong chưa trừ sổ. Thủ kho cân từng lô khi lấy, ghi kg thực, rồi ký ba bước.</Text>
               </Space>

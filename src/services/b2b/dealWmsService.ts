@@ -92,6 +92,25 @@ export interface ActiveDealForStockIn {
 }
 
 // ============================================
+// CONSTANTS — kết luận QC (stock_batches.qc_status & b2b_deals.qc_status dùng chung bộ mã)
+// MỘT nguồn nhãn/màu: DealQcTab + tin nhắn chat QC đọc từ đây (Đợt 3 audit UI 17/11/2026).
+// ============================================
+
+export const QC_STATUS_LABELS: Record<string, string> = {
+  passed: 'Đạt',
+  warning: 'Cảnh báo',
+  failed: 'Không đạt',
+  pending: 'Chờ kiểm tra',
+}
+
+export const QC_STATUS_COLORS: Record<string, string> = {
+  passed: 'green',
+  warning: 'orange',
+  failed: 'red',
+  pending: 'default',
+}
+
+// ============================================
 // SERVICE
 // ============================================
 
@@ -670,13 +689,6 @@ export const dealWmsService = {
 
     if (!room) { console.warn('[dealWms] notifyQc: no chat room for partner:', deal.partner_id); return }
 
-    const statusLabels: Record<string, string> = {
-      passed: 'Đạt',
-      warning: 'Cảnh báo',
-      failed: 'Không đạt',
-      pending: 'Chờ kiểm tra',
-    }
-
     await supabase
       .from('b2b_chat_messages')
       .insert({
@@ -684,7 +696,7 @@ export const dealWmsService = {
         sender_type: 'system',
         sender_id: null,
         message_type: 'system',
-        content: `QC hoàn thành — Deal ${deal.deal_number}: DRC thực tế = ${actualDrc}%, Trạng thái: ${statusLabels[qcStatus] || qcStatus}`,
+        content: `QC hoàn thành — Deal ${deal.deal_number}: DRC thực tế = ${actualDrc}%, Trạng thái: ${QC_STATUS_LABELS[qcStatus] || qcStatus}`,
         metadata: {
           notification_type: 'qc_completed',
           deal_id: dealId,
@@ -743,11 +755,11 @@ export const dealWmsService = {
 
     let content = ''
     if (status === 'draft') {
-      content = `Đã tạo phiếu quyết toán ${settlementCode} cho Deal ${deal.deal_number}, giá trị: ${formattedAmount} VNĐ`
+      content = `Đã tạo phiếu quyết toán ${settlementCode} cho Deal ${deal.deal_number}, giá trị: ${formattedAmount} ₫`
     } else if (status === 'approved') {
       content = `Phiếu quyết toán ${settlementCode} đã được duyệt`
     } else if (status === 'paid') {
-      content = `Đã thanh toán quyết toán ${settlementCode}, số tiền: ${formattedAmount} VNĐ`
+      content = `Đã thanh toán quyết toán ${settlementCode}, số tiền: ${formattedAmount} ₫`
     } else {
       content = `Cập nhật quyết toán ${settlementCode}: ${status}`
     }
@@ -822,7 +834,7 @@ export const dealWmsService = {
         sender_type: 'system',
         sender_id: null,
         message_type: 'system',
-        content: `Đã chi tạm ứng ${advanceNumber} số tiền ${formattedAmount} VNĐ cho Deal ${deal.deal_number}`,
+        content: `Đã chi tạm ứng ${advanceNumber} số tiền ${formattedAmount} ₫ cho Deal ${deal.deal_number}`,
         metadata: {
           notification_type: 'advance_paid',
           deal_id: dealId,

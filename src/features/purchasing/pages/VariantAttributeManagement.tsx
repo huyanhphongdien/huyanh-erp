@@ -29,6 +29,7 @@ import {
   Search
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import {
   variantAttributeService,
   variantAttributeValueService,
@@ -84,7 +85,9 @@ const VariantAttributeManagement: React.FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'attribute' | 'value'; id: string; name: string } | null>(null)
 
   // Error/success
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null) // lỗi THAO TÁC (tự ẩn sau 5s)
+  // Lỗi TẢI — không tự ẩn; danh sách hiện lỗi + Thử lại thay vì "Chưa có thuộc tính nào"
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
   // ============================================================================
@@ -94,6 +97,7 @@ const VariantAttributeManagement: React.FC = () => {
   const fetchAttributes = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const data = await variantAttributeService.getWithValues()
       // Sort values by sort_order
       const sorted = data.map(attr => ({
@@ -102,7 +106,7 @@ const VariantAttributeManagement: React.FC = () => {
       }))
       setAttributes(sorted)
     } catch (err: any) {
-      setError(err.message || 'Lỗi tải dữ liệu')
+      setLoadError(dichLoiHeThong(err, 'Lỗi tải dữ liệu'))
     } finally {
       setLoading(false)
     }
@@ -175,7 +179,7 @@ const VariantAttributeManagement: React.FC = () => {
       setEditingAttr(null)
       fetchAttributes()
     } catch (err: any) {
-      setError(err.message || 'Lỗi lưu thuộc tính')
+      setError(dichLoiHeThong(err, 'Lỗi lưu thuộc tính'))
     }
   }
 
@@ -186,7 +190,7 @@ const VariantAttributeManagement: React.FC = () => {
       setDeleteConfirm(null)
       fetchAttributes()
     } catch (err: any) {
-      setError(err.message || 'Không thể xóa thuộc tính đang được sử dụng')
+      setError(dichLoiHeThong(err, 'Không thể xóa thuộc tính đang được sử dụng'))
       setDeleteConfirm(null)
     }
   }
@@ -243,7 +247,7 @@ const VariantAttributeManagement: React.FC = () => {
       setEditingValue(null)
       fetchAttributes()
     } catch (err: any) {
-      setError(err.message || 'Lỗi lưu giá trị')
+      setError(dichLoiHeThong(err, 'Lỗi lưu giá trị'))
     }
   }
 
@@ -254,7 +258,7 @@ const VariantAttributeManagement: React.FC = () => {
       setDeleteConfirm(null)
       fetchAttributes()
     } catch (err: any) {
-      setError(err.message || 'Không thể xóa giá trị đang được sử dụng')
+      setError(dichLoiHeThong(err, 'Không thể xóa giá trị đang được sử dụng'))
       setDeleteConfirm(null)
     }
   }
@@ -418,6 +422,19 @@ const VariantAttributeManagement: React.FC = () => {
         {loading ? (
           <div className="flex justify-center py-12">
             <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+          </div>
+        ) : loadError ? (
+          // Lỗi tải xét TRƯỚC trống
+          <div className="text-center py-12 bg-red-50 border border-red-200 rounded-lg">
+            <AlertTriangle className="w-10 h-10 text-red-400 mx-auto" />
+            <p className="mt-2 font-semibold text-red-700">Không tải được dữ liệu</p>
+            <p className="text-sm text-red-600">{loadError}</p>
+            <button
+              onClick={fetchAttributes}
+              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-100"
+            >
+              <RefreshCw className="w-4 h-4" /> Thử lại
+            </button>
           </div>
         ) : filteredAttributes.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow">

@@ -40,8 +40,11 @@ import {
   TIER_COLORS,
 } from '../../services/b2b/chatRoomService'
 import { partnerAssignmentService } from '../../services/b2b/partnerAssignmentService'
-import { partnerService, type Partner } from '../../services/b2b/partnerService'
+import { partnerService, type Partner, TIER_ICONS } from '../../services/b2b/partnerService'
 import { useAuthStore } from '../../stores/authStore'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
+import { LimitNotice } from '../../components/common/tableDefaults'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
 
@@ -69,21 +72,12 @@ const FILTER_OPTIONS = [
 // HELPER COMPONENTS
 // ============================================
 
-/** Tier Badge Component */
+/** Tier Badge — nhãn/màu/biểu tượng lấy từ map chung của service (không chép bảng màu riêng) */
 const TierBadge = ({ tier }: { tier: PartnerTier }) => {
-  const tierConfig: Record<PartnerTier, { color: string; icon: string }> = {
-    diamond: { color: 'purple', icon: '💎' },
-    gold: { color: 'gold', icon: '🥇' },
-    silver: { color: 'default', icon: '🥈' },
-    bronze: { color: 'orange', icon: '🥉' },
-    new: { color: 'cyan', icon: '🆕' },
-  }
-
-  const config = tierConfig[tier] || tierConfig.new
-
+  const t: PartnerTier = TIER_LABELS[tier] ? tier : 'new'
   return (
-    <Tag color={config.color} style={{ marginRight: 0 }}>
-      {config.icon} {TIER_LABELS[tier]}
+    <Tag color={TIER_COLORS[t]} style={{ marginRight: 0 }}>
+      {TIER_ICONS[t]} {TIER_LABELS[t]}
     </Tag>
   )
 }
@@ -243,6 +237,10 @@ const B2BChatListPage = () => {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [searchText, setSearchText] = useState('')
+  // Từ khoá SAU debounce 300ms — fetchRooms chỉ phụ thuộc giá trị này. Trước đây fetchRooms phụ thuộc
+  // searchText nên mỗi phím gõ bắn 2 lượt query (ngay lập tức + 300ms sau) (audit 17/11/2026).
+  const [searchDebounced, setSearchDebounced] = useState('')
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [filter, setFilter] = useState<FilterType>('all')
   const [totalUnread, setTotalUnread] = useState(0)
   /** sprint1_08: admin/manager bật để xem rooms của TẤT CẢ NV; mặc định chỉ rooms của mình */
@@ -266,21 +264,25 @@ const B2BChatListPage = () => {
       const assignedFilter = (!viewAll && user?.id) ? user.id : undefined
 
       const response = await chatRoomService.getRooms({
-        search: searchText || undefined,
+        search: searchDebounced || undefined,
         filter: filter,
         assigned_user_id: assignedFilter,
         pageSize: 50,
       })
 
       setRooms(response.data)
+      setLoadError(null)
     } catch (error) {
       console.error('Error fetching rooms:', error)
-      message.error('Không thể tải danh sách chat')
+      // Lần tải có spinner lỗi → hiện khối lỗi + Thử lại thay vì "Chưa có cuộc trò chuyện" giả;
+      // lượt làm mới nền (realtime) lỗi thì giữ danh sách đang có, chỉ báo toast.
+      if (showLoading) setLoadError(error)
+      message.error(dichLoiHeThong(error, 'Không thể tải danh sách chat'))
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [searchText, filter, viewAll, user?.id])
+  }, [searchDebounced, filter, viewAll, user?.id])
 
   const fetchTotalUnread = useCallback(async () => {
     try {
@@ -297,11 +299,14 @@ const B2BChatListPage = () => {
   // EFFECTS
   // ============================================
 
-  // Initial load
+  // Initial load + mỗi khi từ khoá (đã debounce) / bộ lọc đổi → đúng MỘT lượt tải
   useEffect(() => {
     fetchRooms()
+  }, [fetchRooms])
+
+  useEffect(() => {
     fetchTotalUnread()
-  }, [fetchRooms, fetchTotalUnread])
+  }, [fetchTotalUnread])
 
   // Realtime subscription (E1.1.6)
   useEffect(() => {
@@ -324,14 +329,14 @@ const B2BChatListPage = () => {
     }
   }, [fetchRooms, fetchTotalUnread])
 
-  // Debounce search
+  // Debounce search — chỉ cập nhật từ khoá; việc tải do effect fetchRooms ở trên lo
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchRooms()
+      setSearchDebounced(searchText)
     }, 300)
 
     return () => clearTimeout(timer)
-  }, [searchText, filter, fetchRooms])
+  }, [searchText])
 
   // ============================================
   // HANDLERS
@@ -366,7 +371,7 @@ const B2BChatListPage = () => {
         setCreatePartners(all.filter(p => allowed.has(p.id)).map(p => ({ id: p.id, name: p.name, code: p.code })))
       }
     } catch (e: any) {
-      message.error('Không tải được danh sách đại lý: ' + (e?.message || ''))
+      message.error(dichLoiHeThong(e, 'Không tải được danh sách đại lý'))
     }
   }
 
@@ -386,7 +391,7 @@ const B2BChatListPage = () => {
       openChatTab({ id: room.id, partner_name: partner?.name })
       fetchRooms(false)
     } catch (e: any) {
-      message.error('Không thể tạo cuộc trò chuyện: ' + (e?.message || ''))
+      message.error(dichLoiHeThong(e, 'Không thể tạo cuộc trò chuyện'))
     } finally {
       setCreating(false)
     }
@@ -416,7 +421,7 @@ const B2BChatListPage = () => {
           </Space>
           <Space>
             {isManager && (
-              <Tooltip title={viewAll ? 'Đang xem rooms của TẤT CẢ NV' : 'Chỉ xem rooms của tôi'}>
+              <Tooltip title={viewAll ? 'Đang xem phòng chat của TẤT CẢ NV' : 'Chỉ xem phòng chat của tôi'}>
                 <Space size={6}>
                   <Text type="secondary" style={{ fontSize: 12 }}>Xem tất cả NV</Text>
                   <Switch size="small" checked={viewAll} onChange={setViewAll} />
@@ -474,10 +479,19 @@ const B2BChatListPage = () => {
           </Space>
         </div>
 
+        {/* Tải tối đa 50 phòng (pageSize ở fetchRooms) — chạm trần thì báo thay vì im lặng mất phòng cũ */}
+        {!loading && !loadError && (
+          <div style={{ padding: '0 16px' }}>
+            <LimitNotice shown={rooms.length} limit={50} what="cuộc trò chuyện" />
+          </div>
+        )}
+
         {/* Room List */}
         <div style={{ maxHeight: 'calc(100vh - 350px)', overflowY: 'auto' }}>
           {loading ? (
             <ChatRoomSkeleton />
+          ) : loadError ? (
+            <PageState error={loadError} onRetry={() => fetchRooms()} />
           ) : rooms.length === 0 ? (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}

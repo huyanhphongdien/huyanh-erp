@@ -42,6 +42,8 @@ import {
 import blendingService from '../../../services/wms/blendingService'
 import { rubberGradeService } from '../../../services/wms/rubberGradeService'
 import GradeBadge from '../../../components/wms/GradeBadge'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import type { StockBatch, RubberGradeStandard } from '../../../services/wms/wms.types'
 import { RUBBER_GRADE_LABELS } from '../../../services/wms/wms.types'
 
@@ -94,6 +96,9 @@ const BlendCreatePage = () => {
   const [availableBatches, setAvailableBatches] = useState<AvailableBatch[]>([])
   const [gradeStandards, setGradeStandards] = useState<RubberGradeStandard[]>([])
   const [loadingBatches, setLoadingBatches] = useState(false)
+  // Lỗi tải lô ≠ "không có lô khả dụng" — hiện lỗi + Thử lại
+  const [batchErr, setBatchErr] = useState<unknown>(null)
+  const [batchReload, setBatchReload] = useState(0)
   const [loadingGrades, setLoadingGrades] = useState(true)
   const [batchSearch, setBatchSearch] = useState('')
 
@@ -129,6 +134,7 @@ const BlendCreatePage = () => {
     if (step !== 1) return
     const load = async () => {
       setLoadingBatches(true)
+      setBatchErr(null)
       try {
         const batches = await blendingService.getBatchesNeedingBlend()
         setAvailableBatches(batches.map((b: StockBatch) => ({
@@ -141,11 +147,11 @@ const BlendCreatePage = () => {
           rubber_grade: b.rubber_grade || null,
           material_name: (b.material as any)?.name || '',
         })))
-      } catch (err) { console.error(err) }
+      } catch (err) { console.error(err); setBatchErr(err) }
       setLoadingBatches(false)
     }
     load()
-  }, [step])
+  }, [step, batchReload])
 
   // Auto-advance wizard to step 2 khi URL có batch_id (deep link từ BlendSuggestPage)
   // Step 1 vẫn chạy bình thường nếu user vào không qua link
@@ -252,6 +258,8 @@ const BlendCreatePage = () => {
   const handleSubmit = async (approve: boolean) => {
     setSaving(true)
     setError(null)
+    // Mã lệnh đã tạo — để báo đúng khi bước SAU (thêm lô / mô phỏng / duyệt) lỗi: lệnh đã nằm trong sổ rồi
+    let maDaTao: string | null = null
     try {
       if (!targetGrade || !targetDrc || !targetQuantity) {
         throw new Error('Vui lòng nhập đầy đủ thông tin')
@@ -263,6 +271,7 @@ const BlendCreatePage = () => {
         target_quantity_kg: targetQuantity,
         notes: notes || undefined,
       })
+      maDaTao = order.code
 
       // Add items
       for (const item of selectedItems) {
@@ -279,7 +288,11 @@ const BlendCreatePage = () => {
 
       setSuccessCode(order.code)
     } catch (err: any) {
-      setError(err.message || 'Không thể tạo lệnh phối trộn')
+      const loi = dichLoiHeThong(err, 'Không tạo được lệnh phối trộn')
+      // Lệnh đã tạo mà bước sau lỗi → nói rõ, kẻo người dùng bấm lại và sinh lệnh TRÙNG
+      setError(maDaTao
+        ? `Đã tạo lệnh ${maDaTao} nhưng bước sau bị lỗi: ${loi}. Mở lệnh này trong danh sách Lệnh phối trộn để kiểm tra — đừng bấm tạo lại (sẽ ra lệnh trùng).`
+        : loi)
     } finally {
       setSaving(false)
     }
@@ -295,8 +308,7 @@ const BlendCreatePage = () => {
           subTitle={<Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18 }}>{successCode}</Text>}
           extra={[
             <Button key="list" onClick={() => navigate('/wms/blending')}>Về danh sách</Button>,
-            <Button key="new" type="primary" onClick={() => window.location.reload()}
-              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
+            <Button key="new" type="primary" onClick={() => window.location.reload()}>
               Tạo lệnh mới
             </Button>,
           ]}
@@ -538,7 +550,7 @@ const BlendCreatePage = () => {
 
           <div style={{ textAlign: 'right' }}>
             <Button type="primary" size="large" onClick={() => setStep(1)} disabled={!canStep1}
-              icon={<ArrowRightOutlined />} style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
+              icon={<ArrowRightOutlined />}>
               Tiếp theo
             </Button>
           </div>
@@ -570,6 +582,8 @@ const BlendCreatePage = () => {
               >
                 {loadingBatches ? (
                   <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+                ) : batchErr ? (
+                  <PageState error={batchErr} onRetry={() => setBatchReload((n) => n + 1)} />
                 ) : filteredBatches.length === 0 ? (
                   <Empty description="Không có lô khả dụng" style={{ padding: 40 }} />
                 ) : (
@@ -676,7 +690,7 @@ const BlendCreatePage = () => {
             <Space>
               <Button size="large" onClick={() => setStep(0)} icon={<ArrowLeftOutlined />}>Quay lại</Button>
               <Button type="primary" size="large" onClick={() => setStep(2)} disabled={!canStep2}
-                icon={<ArrowRightOutlined />} style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
+                icon={<ArrowRightOutlined />}>
                 Tiếp theo
               </Button>
             </Space>
@@ -696,7 +710,7 @@ const BlendCreatePage = () => {
                 <Descriptions size="small" column={2} style={{ marginBottom: 16 }}>
                   <Descriptions.Item label="Lô">{selectedRawBatch.batch_no}</Descriptions.Item>
                   <Descriptions.Item label="Grade"><GradeBadge grade={selectedRawBatch.rubber_grade} size="small" /></Descriptions.Item>
-                  <Descriptions.Item label="DRC">{selectedRawBatch.latest_drc || selectedRawBatch.initial_drc || '—'}%</Descriptions.Item>
+                  <Descriptions.Item label="DRC">{(selectedRawBatch.latest_drc || selectedRawBatch.initial_drc) ? `${selectedRawBatch.latest_drc || selectedRawBatch.initial_drc}%` : '—'}</Descriptions.Item>
                   <Descriptions.Item label="Còn lại">{selectedRawBatch.quantity_remaining.toLocaleString('vi-VN')} kg</Descriptions.Item>
                 </Descriptions>
                 <Text strong style={{ display: 'block', marginBottom: 4 }}>Số lượng phối trộn (kg) *</Text>
@@ -793,8 +807,7 @@ const BlendCreatePage = () => {
             </Button>
             <Button type="primary" size="large" onClick={() => handleSubmit(true)} loading={saving}
               disabled={!canConfirm}
-              icon={<CheckCircleOutlined />}
-              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
+              icon={<CheckCircleOutlined />}>
               Lưu & Duyệt
             </Button>
           </Space>

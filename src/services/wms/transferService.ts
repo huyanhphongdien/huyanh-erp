@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { vnDayStartTs, vnDayEndTs } from '../../utils/dateVN'
 import type { Material, StockBatch } from './wms.types'
 
 // ============================================================================
@@ -23,6 +24,31 @@ export type TransferStatus =
   | 'received'
   | 'cancelled'
   | 'rejected'
+
+/** Nhãn + màu trạng thái phiếu chuyển kho — MỘT bản (Đợt 3 audit UI 17/11/2026), đúng bản
+ *  pages/wms/transfer/transferLabels.ts (file đó chỉ cần re-export, giữ tên). 'arrived' = 'Đã đến'
+ *  trung tính: gồm cả "chưa cân nhận" lẫn "đã cân, hao hụt vượt ngưỡng chờ BGĐ duyệt". */
+export const TRANSFER_STATUS_LABELS: Record<TransferStatus, string> = {
+  draft: 'Nháp',
+  picking: 'Đang lấy hàng',
+  picked: 'Đã lấy hàng',
+  in_transit: 'Đang vận chuyển',
+  arrived: 'Đã đến',
+  received: 'Hoàn tất',
+  cancelled: 'Đã hủy',
+  rejected: 'Từ chối (hao hụt cao)',
+}
+
+export const TRANSFER_STATUS_COLORS: Record<TransferStatus, string> = {
+  draft: 'default',
+  picking: 'blue',
+  picked: 'cyan',
+  in_transit: 'gold',
+  arrived: 'orange',
+  received: 'green',
+  cancelled: 'red',
+  rejected: 'red',
+}
 
 export interface TransferFacility {
   id: string
@@ -296,8 +322,8 @@ async function getAll(params?: {
   }
   if (params?.from_facility_id) q = q.eq('from_facility_id', params.from_facility_id)
   if (params?.to_facility_id) q = q.eq('to_facility_id', params.to_facility_id)
-  if (params?.from_date) q = q.gte('created_at', params.from_date)
-  if (params?.to_date) q = q.lte('created_at', params.to_date + 'T23:59:59.999Z')
+  if (params?.from_date) q = q.gte('created_at', vnDayStartTs(params.from_date))
+  if (params?.to_date) q = q.lte('created_at', vnDayEndTs(params.to_date))
   if (params?.search) {
     q = q.or(`code.ilike.%${params.search}%,vehicle_plate.ilike.%${params.search}%,driver_name.ilike.%${params.search}%`)
   }
@@ -382,12 +408,12 @@ async function confirmShipped(input: {
   user_id?: string
 }): Promise<void> {
   const t = await getById(input.transfer_id)
-  if (!t) throw new Error('Phiếu transfer không tồn tại')
+  if (!t) throw new Error('Phiếu chuyển kho không tồn tại')
   if (!['draft', 'picking', 'picked'].includes(t.status)) {
-    throw new Error(`Không thể cân xuất ở trạng thái ${t.status}`)
+    throw new Error(`Không thể cân xuất khi phiếu đang ở trạng thái "${TRANSFER_STATUS_LABELS[t.status] ?? t.status}"`)
   }
   if (!t.items || t.items.length === 0) {
-    throw new Error('Phiếu transfer không có items')
+    throw new Error('Phiếu chuyển kho chưa có mặt hàng nào')
   }
 
   // 1. Tạo stock_out_order ở NM gửi (reason='transfer', auto-confirm)
@@ -408,7 +434,7 @@ async function confirmShipped(input: {
       type: 'finished',
       warehouse_id: t.from_warehouse_id,
       reason: 'transfer',
-      customer_name: `Transfer to ${t.to_facility?.name || t.to_facility_id.slice(0, 8)}`,
+      customer_name: `Chuyển kho đến ${t.to_facility?.name || t.to_facility_id.slice(0, 8)}`,
       customer_order_ref: t.code,
       total_quantity: totalQty,
       total_weight: measuredTotal,
@@ -531,9 +557,9 @@ async function confirmReceived(input: {
   user_id?: string
 }): Promise<{ needs_approval: boolean; loss_pct: number }> {
   const t = await getById(input.transfer_id)
-  if (!t) throw new Error('Phiếu transfer không tồn tại')
+  if (!t) throw new Error('Phiếu chuyển kho không tồn tại')
   if (!['in_transit', 'arrived'].includes(t.status)) {
-    throw new Error(`Không thể cân nhận ở trạng thái ${t.status}`)
+    throw new Error(`Không thể cân nhận khi phiếu đang ở trạng thái "${TRANSFER_STATUS_LABELS[t.status] ?? t.status}"`)
   }
   if (!t.weight_out_kg) throw new Error('Phiếu chưa có cân xuất')
 
@@ -572,7 +598,7 @@ async function approveReceived(input: {
   approval_note?: string
 }): Promise<void> {
   const t = await getById(input.transfer_id)
-  if (!t) throw new Error('Phiếu transfer không tồn tại')
+  if (!t) throw new Error('Phiếu chuyển kho không tồn tại')
   if (t.status !== 'arrived' || !t.needs_approval) {
     throw new Error('Phiếu này không cần duyệt')
   }
@@ -603,7 +629,7 @@ async function rejectReceived(input: {
     .from('inter_facility_transfers')
     .update({
       status: 'rejected' as TransferStatus,
-      approval_note: `[REJECTED] ${input.reason}`,
+      approval_note: `[TỪ CHỐI] ${input.reason}`,
       approved_by: input.rejected_by,
       approved_at: new Date().toISOString(),
     })
@@ -618,7 +644,7 @@ async function cancel(id: string, _userId?: string, reason?: string): Promise<vo
     .update({
       status: 'cancelled' as TransferStatus,
       cancelled_at: new Date().toISOString(),
-      notes: reason ? `[CANCELLED] ${reason}` : '[CANCELLED]',
+      notes: reason ? `[ĐÃ HỦY] ${reason}` : '[ĐÃ HỦY]',
     })
     .eq('id', id)
     .in('status', ['draft', 'picking', 'picked'])

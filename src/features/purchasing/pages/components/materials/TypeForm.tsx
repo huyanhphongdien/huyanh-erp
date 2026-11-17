@@ -14,6 +14,7 @@ import {
   MaterialTypeFormData
 } from '../../../../../services/materialTypeService'
 import { MaterialCategory } from '../../../../../services/materialCategoryService'
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong'
 
 interface TypeFormProps {
   type: MaterialType | null
@@ -156,7 +157,7 @@ export default function TypeForm({
       }
       onSuccess()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Có lỗi xảy ra')
+      setError(dichLoiHeThong(err, 'Có lỗi xảy ra khi lưu loại vật tư'))
     } finally {
       setLoading(false)
     }

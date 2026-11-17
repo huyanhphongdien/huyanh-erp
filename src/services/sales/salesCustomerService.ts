@@ -28,6 +28,52 @@ export const SORTABLE_CUSTOMER_COLUMNS: ReadonlySet<string> = new Set([
   'created_at', 'updated_at', 'contact_person', 'email',
 ])
 
+// ============================================================================
+// custom_specs (jsonb) — "Yêu cầu kỹ thuật riêng" của khách
+// Audit 17/11/2026: form cũ là ô TextArea bắt gõ JSON tay → CHUỖI được đẩy thẳng vào jsonb (lưu thành
+// jsonb string), trang chi tiết Object.entries() trên chuỗi → vỡ thành từng ký tự, mở sửa lại hiện
+// "[object Object]". Nay form là danh sách dòng "Thông số / Giá trị"; 2 hàm dưới đổi qua lại và
+// đọc được cả bản cũ lỡ lưu thành chuỗi JSON.
+// ============================================================================
+
+export interface CustomSpecRow { key?: string; value?: string }
+
+/** jsonb (object | chuỗi JSON cũ | chuỗi thường) → các dòng { key, value } cho Form.List / bảng hiển thị. */
+export function customSpecsToRows(v: unknown): { key: string; value: string }[] {
+  let obj: unknown = v
+  if (typeof v === 'string') {
+    const s = v.trim()
+    if (!s) return []
+    try { obj = JSON.parse(s) } catch { return [{ key: 'Yêu cầu', value: s }] }
+    if (typeof obj === 'string') return obj.trim() ? [{ key: 'Yêu cầu', value: obj }] : []
+  }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return []
+  return Object.entries(obj as Record<string, unknown>).map(([key, val]) => ({
+    key,
+    value: val === null || val === undefined ? '' : typeof val === 'object' ? JSON.stringify(val) : String(val),
+  }))
+}
+
+/** Các dòng form → object lưu jsonb. Bỏ dòng không có tên thông số; số thuần ("60", "0.03") lưu thành số. */
+export function rowsToCustomSpecs(rows?: CustomSpecRow[] | null): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const r of rows || []) {
+    const key = (r?.key || '').trim()
+    if (!key) continue
+    const raw = (r?.value ?? '').toString().trim()
+    out[key] = /^-?\d+(\.\d+)?$/.test(raw) ? Number(raw) : raw
+  }
+  return out
+}
+
+/** Chặn ở tầng service: ai lỡ gửi CHUỖI cũng không lưu thành jsonb string nữa. */
+function normalizeCustomSpecs(v: unknown): Record<string, unknown> | undefined {
+  if (v === undefined) return undefined
+  if (Array.isArray(v)) return rowsToCustomSpecs(v as CustomSpecRow[])
+  if (v === null || typeof v === 'string') return rowsToCustomSpecs(customSpecsToRows(v))
+  return typeof v === 'object' ? (v as Record<string, unknown>) : {}
+}
+
 export const salesCustomerService = {
   // ==========================================================================
   // LIST & QUERY
@@ -206,7 +252,7 @@ export const salesCustomerService = {
             payment_terms: input.payment_terms,
             region: input.region,
             contact_person: input.contact_person,
-            custom_specs: input.custom_specs,
+            custom_specs: normalizeCustomSpecs(input.custom_specs),
           },
         },
       ],
@@ -230,7 +276,7 @@ export const salesCustomerService = {
         default_currency: input.default_currency || 'USD',
         credit_limit: input.credit_limit || null,
         quality_standard: input.quality_standard || 'TCVN_3769',
-        custom_specs: input.custom_specs || {},
+        custom_specs: normalizeCustomSpecs(input.custom_specs) ?? {},
         preferred_grades: input.preferred_grades || [],
         requires_pre_shipment_sample: input.requires_pre_shipment_sample ?? false,
         status: input.status || 'active',
@@ -290,6 +336,7 @@ export const salesCustomerService = {
       .from('sales_customers')
       .update({
         ...input,
+        ...(input.custom_specs !== undefined ? { custom_specs: normalizeCustomSpecs(input.custom_specs) } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)

@@ -2,8 +2,10 @@
 // SALES COMMAND PALETTE (Cmd+K)
 // File: src/pages/sales/components/SalesCommandPalette.tsx
 //
-// Mount trong SalesOrderListPage. Bắt phím Ctrl+K (Cmd+K trên Mac) →
+// Mount trong SalesOrderListPage + SalesDashboardPage. Bắt phím Ctrl+K (Cmd+K trên Mac) →
 // mở modal search/action. Filter orders + customers + global actions.
+// ⚠ Tab ERP giữ sống bằng display:none (không unmount) → nhiều bản palette cùng nghe window.
+//   Chỉ bản có khối NEO đang hiện (nằm trong tab đang mở) mới phản ứng — xem isOnScreen().
 //
 // Keyboard: ↑↓ chuyển, Enter mở, Esc đóng.
 // ============================================================================
@@ -11,15 +13,14 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
+import { countryFlag, soDisplayCode } from '../../../services/sales/salesTypes'
+import { fmtMoney, orderTotalInCurrency } from '../../../services/sales/salesMoney'
+import { fmtNum } from '../../../utils/format'
 
 const PRIMARY = '#1B4D3E'
 const PRIMARY_BG = '#f0f9f4'
 
-const COUNTRY_FLAGS: Record<string, string> = {
-  IN: '🇮🇳', PH: '🇵🇭', ID: '🇮🇩', KR: '🇰🇷', SG: '🇸🇬', FR: '🇫🇷',
-  AE: '🇦🇪', TW: '🇹🇼', TR: '🇹🇷', ES: '🇪🇸', BD: '🇧🇩', CN: '🇨🇳',
-  LK: '🇱🇰', JP: '🇯🇵', MY: '🇲🇾', VN: '🇻🇳',
-}
+// (Bảng COUNTRY_FLAGS 16 nước cũ đã gỡ — countryFlag() sinh cờ từ mọi mã ISO-2, audit 17/11/2026)
 
 interface PaletteItem {
   id: string
@@ -43,6 +44,9 @@ export default function SalesCommandPalette({ orders, onOpenOrder }: Props) {
   const [activeIdx, setActiveIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  // Khối neo 0×0 luôn render: tab chứa nó đang display:none → không có hộp layout (offsetParent null,
+  // getClientRects rỗng) → palette của tab ẩn đứng im, không mở chồng lên palette của tab đang xem.
+  const anchorRef = useRef<HTMLSpanElement>(null)
 
   // Build items based on query
   const items = useMemo<PaletteItem[]>(() => {
@@ -56,24 +60,24 @@ export default function SalesCommandPalette({ orders, onOpenOrder }: Props) {
         group: 'Hành động',
         icon: '+',
         title: 'Tạo đơn hàng mới',
-        meta: 'Mở form Compose Studio',
-        shortcut: 'Ctrl+N',
+        meta: 'Mở form tạo đơn',
+        // (bỏ gợi ý phím "Ctrl+N": không có phím tắt nào gắn — trình duyệt dùng Ctrl+N mở cửa sổ mới)
         action: () => navigate('/sales/orders/new'),
       },
       {
         id: 'act-dashboard',
         group: 'Hành động',
         icon: '📊',
-        title: 'Mở Bento Dashboard',
-        meta: 'Tổng quan đơn hàng',
+        title: 'Mở Tổng quan bán hàng',
+        meta: 'Bảng tổng quan đơn hàng',
         action: () => navigate('/sales/dashboard'),
       },
       {
         id: 'act-kanban',
         group: 'Hành động',
         icon: '▦',
-        title: 'Xem Kanban',
-        meta: 'Pipeline theo công đoạn',
+        title: 'Xem bảng tiến độ (Kanban)',
+        meta: 'Đơn theo bộ phận / công đoạn',
         action: () => navigate('/sales/kanban'),
       },
       {
@@ -107,9 +111,10 @@ export default function SalesCommandPalette({ orders, onOpenOrder }: Props) {
       ...filteredOrders.map<PaletteItem>((o) => ({
         id: `ord-${o.id}`,
         group: 'Đơn hàng',
-        icon: COUNTRY_FLAGS[o.customer?.country || ''] || '📦',
-        title: `${o.contract_no || o.code || o.id.slice(0, 8)} · ${o.customer?.name || '—'}`,
-        meta: `${o.grade || '—'} · ${(o.quantity_tons || 0).toFixed(2)}MT · $${Math.round((o.total_value_usd || 0) / 1000)}K`,
+        icon: countryFlag(o.customer?.country) || '📦',
+        title: `${soDisplayCode(o)} · ${o.customer?.name || '—'}`,
+        // Tiền theo ĐÚNG đồng tiền của đơn (đơn VNĐ không gắn "$" cho số quy đổi)
+        meta: `${o.grade || '—'} · ${fmtNum(o.quantity_tons || 0, 2)} tấn · ${fmtMoney(orderTotalInCurrency(o), o.currency, { compact: true })}`,
         action: () => {
           if (onOpenOrder) onOpenOrder(o.id)
           else navigate(`/sales/orders/${o.id}`)
@@ -134,10 +139,15 @@ export default function SalesCommandPalette({ orders, onOpenOrder }: Props) {
     }
   }, [open])
 
-  // Global Ctrl+K / Cmd+K handler
+  // Global Ctrl+K / Cmd+K handler — chỉ bản palette đang HIỆN phản ứng (cả phím tắt lẫn sự kiện mở)
   useEffect(() => {
+    const isOnScreen = () => {
+      const el = anchorRef.current
+      return !!el && (el.offsetParent !== null || el.getClientRects().length > 0)
+    }
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        if (!isOnScreen()) return   // tab đang ẩn: để bản đang hiện (hoặc trình duyệt) xử lý
         e.preventDefault()
         setOpen((o) => !o)
       }
@@ -146,7 +156,9 @@ export default function SalesCommandPalette({ orders, onOpenOrder }: Props) {
       }
     }
     // Cũng listen custom event để Cmd+K trigger button (visible) có thể mở
-    const openHandler = () => setOpen(true)
+    const openHandler = () => {
+      if (isOnScreen()) setOpen(true)
+    }
     window.addEventListener('keydown', handler)
     window.addEventListener('sales-cmdk-open', openHandler)
     return () => {
@@ -180,7 +192,10 @@ export default function SalesCommandPalette({ orders, onOpenOrder }: Props) {
     el?.scrollIntoView({ block: 'nearest' })
   }, [activeIdx, open])
 
-  if (!open) return null
+  // Neo luôn là con ĐẦU của fragment ở cả 2 nhánh → React giữ nguyên node, ref không nhảy
+  const anchor = <span ref={anchorRef} aria-hidden="true" style={anchorStyle} />
+
+  if (!open) return <>{anchor}</>
 
   // Group items
   const grouped: Record<string, PaletteItem[]> = {}
@@ -192,6 +207,8 @@ export default function SalesCommandPalette({ orders, onOpenOrder }: Props) {
   let runningIdx = 0
 
   return (
+    <>
+    {anchor}
     <div style={overlay} onClick={() => setOpen(false)}>
       <div style={box} onClick={(e) => e.stopPropagation()} onKeyDown={onKeyDown}>
         <div style={inputWrap}>
@@ -199,7 +216,7 @@ export default function SalesCommandPalette({ orders, onOpenOrder }: Props) {
           <input
             ref={inputRef}
             style={input}
-            placeholder="Gõ số HĐ, KH, lệnh hoặc câu hỏi..."
+            placeholder="Gõ số HĐ, mã đơn, khách hàng hoặc grade..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -266,10 +283,16 @@ export default function SalesCommandPalette({ orders, onOpenOrder }: Props) {
         </div>
       </div>
     </div>
+    </>
   )
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────
+
+// Neo 0×0 ra khỏi dòng chảy (absolute) → không đẩy layout / gap của trang chứa nó
+const anchorStyle: React.CSSProperties = {
+  position: 'absolute', width: 0, height: 0, overflow: 'hidden', pointerEvents: 'none',
+}
 
 const overlay: React.CSSProperties = {
   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',

@@ -86,7 +86,7 @@ function handleDealChange(
       notification.success({
         key,
         message: `Deal ${newRow.deal_number} đã được duyệt`,
-        description: 'Click để xem chi tiết',
+        description: 'Bấm để xem chi tiết',
         placement: 'bottomRight',
         duration: 4,
         onClick: goToDeal,
@@ -95,7 +95,7 @@ function handleDealChange(
       notification.success({
         key,
         message: `Deal ${newRow.deal_number} đã quyết toán`,
-        description: 'Click để xem phiếu',
+        description: 'Bấm để xem phiếu',
         placement: 'bottomRight',
         duration: 4,
         onClick: goToDeal,
@@ -129,7 +129,7 @@ function handleDealChange(
     if (newRow.qc_status === 'failed') {
       notification.error({
         key: `qc-${newRow.id}`,
-        message: `QC FAIL — Deal ${newRow.deal_number}`,
+        message: `QC không đạt — Deal ${newRow.deal_number}`,
         description: `DRC thực tế = ${newRow.actual_drc}%`,
         placement: 'bottomRight',
         duration: 6,
@@ -183,7 +183,7 @@ function handleDealChange(
       notification.success({
         key: `ready-${newRow.id}`,
         message: `✅ Deal ${newRow.deal_number} đủ điều kiện duyệt`,
-        description: `DRC ${newRow.actual_drc}% · QC passed · đã nhập ${newRow.stock_in_count} phiếu. Mở Deal và bấm "Duyệt Deal".`,
+        description: `DRC ${newRow.actual_drc}% · QC đạt · đã nhập ${newRow.stock_in_count} phiếu. Mở Deal và bấm "Duyệt Deal".`,
         placement: 'bottomRight',
         duration: 8,
         onClick: goToDeal,

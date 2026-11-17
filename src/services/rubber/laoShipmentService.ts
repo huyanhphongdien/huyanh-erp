@@ -10,6 +10,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { todayVN } from '../../utils/dateVN'
 import type {
   LaoShipment,
   LaoShipmentFormData,
@@ -236,7 +237,8 @@ export const laoShipmentService = {
     if (existing.status !== 'in_transit') throw new Error('Chỉ đánh dấu đến NM khi đang vận chuyển')
 
     const now = new Date().toISOString()
-    const arrDate = arrivedDate || now.split('T')[0]
+    // Ngày đến theo GIỜ VN — now.split('T')[0] là ngày UTC, lùi 1 ngày nếu bấm trước 7 giờ sáng
+    const arrDate = arrivedDate || todayVN()
 
     const { data, error } = await supabase
       .from('lao_shipments')

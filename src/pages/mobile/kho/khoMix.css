@@ -186,3 +186,24 @@
 .kmx-big2 > button { min-height: 64px; border-radius: 12px; border: 1px solid #E5E7EB; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; font-weight: 700; font-size: 14px; color: #1B4D3E; text-align: center; padding: 6px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .kmx-big2 > button.on { background: #1B4D3E; color: #fff; border-color: #1B4D3E; }
 .kmx-big2 > button small { font-size: 11px; font-weight: 500; opacity: .85; }
+
+/* ---- Đợt 3 audit UI (17/11/2026): Lô NVL / Nhập / Thành phẩm / chi tiết lô chuyển hẳn sang kmx-* (hệ DUY NHẤT của /m/kho).
+   Lớp BỔ SUNG thay màu gõ cứng trong TSX — không sửa lớp nào phía trên (hàng chèn dùng chung). ---- */
+/* Kết quả thao tác GHIM ĐÁY màn, ngay trên thanh tab — trước nằm đầu danh sách: đếm tới lô thứ 30 bấm Ghi bị từ chối mà chữ báo ở 2 màn phía trên */
+.kmx-toast { position: fixed; left: 12px; right: 12px; bottom: calc(72px + max(env(safe-area-inset-bottom), 16px)); z-index: 22; max-width: 536px; margin: 0 auto; display: flex; align-items: center; gap: 10px; border-radius: 14px; padding: 8px 8px 8px 14px; font-size: 14px; font-weight: 700; line-height: 1.4; box-shadow: 0 8px 28px rgba(11,26,19,.22); box-sizing: border-box; }
+.kmx-toast.ok { background: #DCFCE7; color: #15803D; } .kmx-toast.err { background: #FEE2E2; color: #B91C1C; }
+.kmx-toast.inline { position: static; max-width: none; box-shadow: none; }   /* vẽ tại chỗ, vd trong kmx-foot cạnh nút chính */
+/* /m/kho có FAB quẹt QR (.ops-fab: right 16, bottom 74 + max(safe,16), cao 56, z 21) — KhoShell gắn .kho-fab khi nút hiện
+   → toast nhấc lên TRÊN nút (74 + 56 + 8 = 138), trước nằm 72→~132 đè đúng chỗ nút (z 22 > 21). */
+.kho-fab .kmx-toast:not(.inline) { bottom: calc(138px + max(env(safe-area-inset-bottom), 16px)); }
+/* Màn sâu (không thanh tab): toast thành một khối TRONG luồng flex ở chân màn (không fixed) → thân màn co lại, không đè
+   nút cuối (Xuất / Hủy lô / Thủ kho nhận…). Trước ghim fixed 12px đáy, che nút trong khi thân chỉ chừa 16px cuộn. */
+.kho-deep .kmx-toast:not(.inline) { position: static; flex: 0 0 auto; width: calc(100% - 24px); margin: 8px auto calc(12px + max(env(safe-area-inset-bottom), 12px)); }
+.kmx-toast-x { flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 12px; background: rgba(255,255,255,.6); color: inherit; font: inherit; font-size: 17px; cursor: pointer; }
+.kmx-card.red { border-color: #FECACA; }
+.kmx-card.hi { box-shadow: 0 0 0 2px #E8A838; }   /* lô vừa quét tem */
+.kmx-pill.on { background: #1B4D3E; color: #fff; border-color: #1B4D3E; }
+.kmx-seg button.on.amb { background: #B45309; border-color: #B45309; }   /* kết quả QC "Chờ xử lý" */
+.kmx-seg button.on.red { background: #B91C1C; border-color: #B91C1C; }   /* kết quả QC "Loại" */
+.kmx-tint.red { background: #FEE2E2; color: #B91C1C; } .kmx-tint.red .kmx-num { color: #B91C1C; }
+.kmx-num.red { color: #B91C1C; }

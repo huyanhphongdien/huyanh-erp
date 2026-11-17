@@ -37,6 +37,10 @@ import {
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import GradeBadge from '../../../components/wms/GradeBadge'
+import { inventoryService } from '../../../services/wms/inventoryService'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtNum } from '../../../utils/format'
 
 const { Title, Text } = Typography
 const MONO_FONT = "'JetBrains Mono', monospace"
@@ -68,6 +72,7 @@ interface Material {
   is_active: boolean
   created_at: string
   updated_at: string
+  /** Tồn thật cộng mọi kho (stock_levels). undefined = KHÔNG đọc được tồn → hiện '—' trung tính */
   current_stock?: number
   rubber_grade?: string
 }
@@ -84,11 +89,6 @@ const PRODUCT_FILTERS = [
   { key: 'SVR20', label: 'SVR 20', search: 'SVR 20' },
   { key: 'LATEX', label: 'Latex', search: 'Latex' },
 ] as const
-
-const TYPE_CONFIG: Record<string, { label: string; color: string }> = {
-  finished: { label: 'Thành phẩm', color: 'green' },
-  raw: { label: 'Nguyên liệu', color: 'orange' },
-}
 
 const PAGE_SIZE = 20
 
@@ -153,10 +153,12 @@ const MaterialFormModal: React.FC<{
           supabase.from('material_categories').select('id, name').eq('is_active', true).order('name'),
           supabase.from('units').select('id, name, symbol').eq('is_active', true).order('name'),
         ])
+        if (catsRes.error || unitsRes.error) throw catsRes.error || unitsRes.error
         if (catsRes.data) setCategories(catsRes.data)
         if (unitsRes.data) setUnits(unitsRes.data)
       } catch (err) {
-        console.error('Loi tai danh muc:', err)
+        console.error('Lỗi tải danh mục:', err)
+        message.error(dichLoiHeThong(err, 'Không tải được nhóm sản phẩm / đơn vị tính'))
       }
     }
     loadLookups()
@@ -196,8 +198,8 @@ const MaterialFormModal: React.FC<{
           })
         }
       } catch (err) {
-        console.error('Loi tai thanh pham:', err)
-        message.error('Không thể tải thông tin sản phẩm')
+        console.error('Lỗi tải thành phẩm:', err)
+        message.error(dichLoiHeThong(err, 'Không thể tải thông tin sản phẩm'))
       } finally {
         setLoadingForm(false)
       }
@@ -257,8 +259,8 @@ const MaterialFormModal: React.FC<{
       setTimeout(() => onSaved(), 300)
     } catch (err: any) {
       if (err.errorFields) return // validation error
-      console.error('Loi luu:', err)
-      message.error(err.message || 'Không thể lưu sản phẩm')
+      console.error('Lỗi lưu sản phẩm:', err)
+      message.error(dichLoiHeThong(err, 'Không thể lưu sản phẩm'))
     } finally {
       setSaving(false)
     }
@@ -365,6 +367,8 @@ const MaterialFormModal: React.FC<{
 const MaterialListPage: React.FC = () => {
   const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có sản phẩm nào"
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [searchText, setSearchText] = useState('')
   const [productFilter, setProductFilter] = useState<string>('all')
   const [total, setTotal] = useState(0)
@@ -384,6 +388,7 @@ const MaterialListPage: React.FC = () => {
   // Fetch data
   const fetchMaterials = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       let query = supabase
         .from('materials')
@@ -404,18 +409,27 @@ const MaterialListPage: React.FC = () => {
         }
       }
 
-      const { data, count, error } = await query
+      // Tồn THẬT từ stock_levels (cộng mọi kho) — trước đây gán cứng current_stock = 0 nên
+      // mọi vật liệu có "tồn tối thiểu" đều hiện 0 đỏ + cảnh báo như kho cạn hàng.
+      // Đọc tồn lỗi → không chặn danh mục, cột Tồn kho hiện '—' trung tính.
+      const [{ data, count, error }, stockMap] = await Promise.all([
+        query,
+        inventoryService.getStockSummary({ type: 'finished' })
+          .then(rows => new Map(rows.map(r => [r.material_id, r.total_quantity] as [string, number])))
+          .catch((e) => { console.error('Lỗi tải tồn kho vật liệu:', e); return null }),
+      ])
       if (error) throw error
 
       const materialsWithStock: Material[] = (data || []).map(m => ({
         ...m,
-        current_stock: 0,
+        current_stock: stockMap ? (stockMap.get(m.id) ?? 0) : undefined,
       }))
 
       setMaterials(materialsWithStock)
       setTotal(count || 0)
     } catch (err) {
-      console.error('Loi tai danh sach:', err)
+      console.error('Lỗi tải danh sách thành phẩm:', err)
+      setLoadError(err)
     } finally {
       setLoading(false)
     }
@@ -458,16 +472,7 @@ const MaterialListPage: React.FC = () => {
         </div>
       ),
     },
-    {
-      title: 'Loại',
-      dataIndex: 'type',
-      key: 'type',
-      width: 100,
-      render: (val: string) => {
-        const conf = TYPE_CONFIG[val] || TYPE_CONFIG.finished
-        return <Tag color={conf.color}>{conf.label}</Tag>
-      },
-    },
+    // (Đã bỏ cột "Loại": query lọc cứng type='finished' nên cả bảng chỉ một giá trị "Thành phẩm")
     {
       title: 'Grade',
       dataIndex: 'rubber_grade',
@@ -481,7 +486,7 @@ const MaterialListPage: React.FC = () => {
       width: 100,
       render: (_: any, r: Material) => (
         <Text type="secondary" style={{ fontSize: 12 }}>
-          {r.weight_per_unit ? `${r.weight_per_unit} kg/${r.unit}` : r.unit}
+          {r.weight_per_unit ? `${fmtNum(r.weight_per_unit, 2)} kg/${r.unit}` : r.unit}
         </Text>
       ),
     },
@@ -502,7 +507,15 @@ const MaterialListPage: React.FC = () => {
       key: 'stock',
       width: 150,
       render: (_: any, r: Material) => {
-        const current = r.current_stock || 0
+        // Không đọc được tồn → '—' trung tính (KHÔNG vẽ 0 đỏ như kho cạn)
+        if (r.current_stock === undefined) {
+          return (
+            <Tooltip title="Không đọc được tồn kho — xem tab Tồn kho">
+              <Text type="secondary">—</Text>
+            </Tooltip>
+          )
+        }
+        const current = r.current_stock
         const isLow = r.min_stock > 0 && current < r.min_stock
         const ratio = r.max_stock && r.max_stock > 0 ? current / r.max_stock : r.min_stock > 0 ? current / (r.min_stock * 3) : 0.5
         const capped = Math.min(ratio, 1)
@@ -517,7 +530,7 @@ const MaterialListPage: React.FC = () => {
               style={{ width: 60 }}
             />
             <Text strong style={{ fontFamily: MONO_FONT, color: isLow ? '#ff4d4f' : '#333', fontSize: 13 }}>
-              {current.toLocaleString('vi-VN')}
+              {fmtNum(current)}
             </Text>
             <Text type="secondary" style={{ fontSize: 11 }}>{r.unit}</Text>
             {isLow && <WarningOutlined style={{ color: '#ff4d4f', fontSize: 12 }} />}
@@ -594,6 +607,7 @@ const MaterialListPage: React.FC = () => {
       {/* Content */}
       <div style={{ padding: 16 }}>
         <Card size="small" bodyStyle={{ padding: 0 }}>
+          <PageState error={loadError} onRetry={fetchMaterials}>
           <Table
             dataSource={materials}
             columns={columns}
@@ -631,6 +645,7 @@ const MaterialListPage: React.FC = () => {
               ),
             }}
           />
+          </PageState>
         </Card>
       </div>
 

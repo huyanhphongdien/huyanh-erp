@@ -4,7 +4,7 @@
 // Module: Kho Thành Phẩm (WMS) - Huy Anh Rubber ERP
 // ============================================================================
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
@@ -19,7 +19,6 @@ import {
   Statistic,
   Progress,
   Spin,
-  Alert,
 } from 'antd'
 import {
   PlusOutlined,
@@ -30,6 +29,9 @@ import {
 } from '@ant-design/icons'
 import productionService from '../../../services/wms/productionService'
 import GradeBadge from '../../../components/wms/GradeBadge'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtKg } from '../../../utils/format'
 import type { ProductionOrder, ProductionStatus } from '../../../services/wms/wms.types'
 import {
   PRODUCTION_STATUS_LABELS,
@@ -60,33 +62,38 @@ const ProductionDashboardPage = () => {
   }
 
   const [allOrders, setAllOrders] = useState<ProductionOrder[]>([])
+  const [allTotal, setAllTotal] = useState(0) // tổng số lệnh trên server (allOrders chỉ là 100 lệnh gần nhất)
   const [inProgressOrders, setInProgressOrders] = useState<ProductionOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const [allResult, inProgress] = await Promise.all([
-          productionService.getAll({ page: 1, pageSize: 100 }),
-          productionService.getInProgress(),
-        ])
-        setAllOrders(allResult.data)
-        setInProgressOrders(inProgress)
-      } catch (err: any) {
-        setError(err.message || 'Không thể tải du lieu')
-      } finally {
-        setLoading(false)
-      }
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [allResult, inProgress] = await Promise.all([
+        productionService.getAll({ page: 1, pageSize: 100 }),
+        productionService.getInProgress(),
+      ])
+      setAllOrders(allResult.data)
+      setAllTotal(allResult.total)
+      setInProgressOrders(inProgress)
+    } catch (err: any) {
+      setError(dichLoiHeThong(err, 'Không tải được số liệu sản xuất'))
+    } finally {
+      setLoading(false)
     }
-    load()
   }, [])
 
-  // KPIs
-  const totalPOs = allOrders.length
-  const inProgressCount = allOrders.filter(o => o.status === 'in_progress').length
+  useEffect(() => {
+    load()
+  }, [load])
+
+  // KPIs — "Tổng" và "Đang SX" lấy số server (count + getInProgress đủ mọi lệnh đang chạy);
+  // "Hoàn thành tháng này", "Hiệu suất TB", "theo Grade" tính trên 100 lệnh gần nhất → ghi rõ phạm vi khi bị cắt.
+  const totalPOs = allTotal
+  const inProgressCount = inProgressOrders.length
+  const biCat = allTotal > allOrders.length
   const now = new Date()
   const completedThisMonth = allOrders.filter(o => {
     if (o.status !== 'completed' || !o.actual_end_date) return false
@@ -130,7 +137,7 @@ const ProductionDashboardPage = () => {
       key: 'target_quantity',
       align: 'right' as const,
       render: (v: number) => (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v?.toLocaleString('vi-VN')}</Text>
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmtKg(v, 2)}</Text>
       ),
     },
     {
@@ -146,7 +153,7 @@ const ProductionDashboardPage = () => {
       },
     },
     {
-      title: 'Nhà máy',
+      title: 'Dây chuyền',
       key: 'facility',
       render: (_: any, r: ProductionOrder) => r.facility?.name || '—',
     },
@@ -168,7 +175,7 @@ const ProductionDashboardPage = () => {
         <Col>
           <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
             <DashboardOutlined style={{ marginRight: 8 }} />
-            Dashboard San xuat
+            Tổng quan sản xuất
           </Title>
         </Col>
         <Col>
@@ -177,29 +184,27 @@ const ProductionDashboardPage = () => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => navigate('/wms/production/new')}
-              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
             >
               Tạo lệnh SX
             </Button>
             <Button icon={<UnorderedListOutlined />} onClick={() => navigate('/wms/production')}>
               Xem tất cả
             </Button>
+            {/* Cùng tên với menu "Dây chuyền" và tiêu đề trang Dây chuyền sản xuất */}
             <Button icon={<SettingOutlined />} onClick={() => navigate('/wms/production/facilities')}>
-              Nha may
+              Dây chuyền
             </Button>
           </Space>
         </Col>
       </Row>
 
-      {error && (
-        <Alert type="error" message={error} closable onClose={() => setError(null)} style={{ marginBottom: 16, borderRadius: 8 }} showIcon />
-      )}
-
+      {/* Lỗi tải → khối lỗi + Thử lại thay cho dãy thẻ KPI toàn số 0 giả */}
+      {error ? <PageState error={error} onRetry={load} /> : (<>
       {/* KPI Cards */}
-      <Row gutter={16} style={{ marginBottom: 24 }}>
+      <Row gutter={16} style={{ marginBottom: biCat ? 8 : 24 }}>
         <Col xs={6}>
           <Card bodyStyle={{ padding: 16 }}>
-            <Statistic title="Tong lenh SX" value={totalPOs}
+            <Statistic title="Tổng lệnh SX" value={totalPOs}
               valueStyle={{ fontSize: 28, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
@@ -211,22 +216,28 @@ const ProductionDashboardPage = () => {
         </Col>
         <Col xs={6}>
           <Card bodyStyle={{ padding: 16 }}>
-            <Statistic title="Hoàn thành thang nay" value={completedThisMonth}
+            <Statistic title="Hoàn thành tháng này" value={completedThisMonth}
               valueStyle={{ fontSize: 28, color: '#16A34A', fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
         <Col xs={6}>
           <Card bodyStyle={{ padding: 16 }}>
-            <Statistic title="Yield TB" value={avgYield} suffix="%"
+            <Statistic title="Hiệu suất TB" value={avgYield} suffix="%"
               valueStyle={{ fontSize: 28, color: '#E8A838', fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
       </Row>
+      {biCat && (
+        <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 24 }}>
+          “Hoàn thành tháng này”, “Hiệu suất TB” và “Sản xuất theo Grade” tính trên {allOrders.length} lệnh tạo gần nhất
+          (tổng {totalPOs} lệnh).
+        </Text>
+      )}
 
       <Row gutter={16} style={{ marginBottom: 24 }}>
         {/* Grade breakdown */}
         <Col xs={24} lg={8}>
-          <Card title="San xuat theo Grade" style={{ borderRadius: 12, height: '100%' }}>
+          <Card title="Sản xuất theo Grade" style={{ borderRadius: 12, height: '100%' }}>
             {Object.entries(gradeBreakdown).map(([grade, count]) => (
               <div key={grade} style={{ marginBottom: 12 }}>
                 <Row justify="space-between" align="middle" style={{ marginBottom: 4 }}>
@@ -246,7 +257,7 @@ const ProductionDashboardPage = () => {
               </div>
             ))}
             {Object.keys(gradeBreakdown).length === 0 && (
-              <Text type="secondary">Chưa có du lieu</Text>
+              <Text type="secondary">Chưa có dữ liệu</Text>
             )}
           </Card>
         </Col>
@@ -254,7 +265,7 @@ const ProductionDashboardPage = () => {
         {/* Active productions */}
         <Col xs={24} lg={16}>
           <Card
-            title={`Dang san xuat (${inProgressOrders.length})`}
+            title={`Đang sản xuất (${inProgressOrders.length})`}
             style={{ borderRadius: 12 }}
             bodyStyle={{ padding: 0 }}
           >
@@ -273,6 +284,7 @@ const ProductionDashboardPage = () => {
           </Card>
         </Col>
       </Row>
+      </>)}
     </div>
   )
 }

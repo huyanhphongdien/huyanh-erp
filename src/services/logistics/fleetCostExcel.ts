@@ -10,7 +10,9 @@
 
 import type ExcelJSType from 'exceljs'
 import { DISPATCH_STATUS_LABELS } from './dispatchService'
-import { EXPENSE_KIND_LABELS, type ExpenseKind, type TripCostRow } from './fleetCostService'
+import {
+  COUNTED_LABEL, EXPENSE_KIND_LABELS, TRIP_COST_STATE_LABELS, UNCOUNTED_LABEL, type ExpenseKind, type TripCostRow,
+} from './fleetCostService'
 
 const BRAND = 'FF1B4D3E'
 const HEAD_BG = 'FFECFDF5'
@@ -42,7 +44,7 @@ const kindsText = (kinds: string | null): string =>
 const toDate = (iso: string | null): Date | null => (iso ? new Date(iso + 'T00:00:00') : null)
 
 const sheetName = (name: string, used: Set<string>): string => {
-  let base = name.replace(/[\\/?*[\]:]/g, ' ').trim().slice(0, 28) || 'Tai xe'
+  let base = name.replace(/[\\/?*[\]:]/g, ' ').trim().slice(0, 28) || 'Tài xế'
   let n = base; let i = 2
   while (used.has(n)) { n = `${base} (${i++})` }
   used.add(n)
@@ -76,7 +78,9 @@ export async function exportFleetCostMonth(opts: FleetCostExportOpts): Promise<v
       ['C3', 'E4', 'Ngày công tác'], ['F3', 'G4', 'XE'], ['H3', 'I4', 'Km'], ['J3', 'J5', 'HÀNH TRÌNH'],
       ['K3', 'L4', 'Ngày hành trình'], ['M3', 'M5', 'Nội dung công việc'], ['N3', 'N5', 'Nội dung chi phí'],
       ['O3', 'P4', 'Tạm ứng'], ['Q3', 'T3', 'Chi phí phát sinh'], ['U3', 'Y4', 'Lương'], ['Z3', 'Z5', 'Ghi chú'],
-      ['Q4', 'R4', 'Được tính'], ['S4', 'T4', 'Không được tính'],
+      // Nhãn cờ `counted` lấy MỘT nguồn (owner 10/11/2026): false = "Chưa thông qua" — chờ quyết định,
+      // KHÔNG phải "không được tính / tài xế chịu". Cột S–T vẫn đúng vị trí của form.
+      ['Q4', 'R4', COUNTED_LABEL], ['S4', 'T4', UNCOUNTED_LABEL],
     ]
     for (const [a, b, text] of groups) { ws.mergeCells(`${a}:${b}`); ws.getCell(a).value = text }
     const sub: Record<string, string> = {
@@ -116,7 +120,7 @@ export async function exportFleetCostMonth(opts: FleetCostExportOpts): Promise<v
         t.counted_lak || null, t.counted_vnd || null,
         t.uncounted_lak || null, t.uncounted_vnd || null,
         null, null, null, null, null,
-        [t.cost_status === 'reviewed' ? 'đã duyệt' : null, t.n_missing_receipt ? `${t.n_missing_receipt} khoản thiếu chứng từ` : null, t.cost_note].filter(Boolean).join(' · ') || null,
+        [t.cost_status === 'reviewed' ? TRIP_COST_STATE_LABELS.reviewed : null, t.n_missing_receipt ? `${t.n_missing_receipt} khoản thiếu chứng từ` : null, t.cost_note].filter(Boolean).join(' · ') || null,
       ]
       vals.forEach((v, i) => { row.getCell(i + 1).value = v })
       for (let c = 1; c <= 26; c++) {
@@ -173,7 +177,7 @@ export async function exportFleetCostMonth(opts: FleetCostExportOpts): Promise<v
   }
 
   if (!opts.sheets.length) {
-    const ws = wb.addWorksheet('Trong')
+    const ws = wb.addWorksheet('Trống')
     ws.getCell('A1').value = `Tháng ${m}/${y}: không có chuyến nào`
   }
 

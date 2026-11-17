@@ -1,7 +1,10 @@
 // ============================================================================
 // SHIPPING TAB — Tab Vận chuyển trong Detail Panel v4
 // File: src/pages/sales/components/ShippingTab.tsx
-// BP Logistics nhập: Booking, B/L, ETD/ETA, L/C, Chiết khấu, DHL
+// BP Logistics nhập: Booking, B/L, ETD/ETA, L/C, DHL, Cước/BH, Hải quan
+// ⚠ Đặt cọc / Chiết khấu NH / Phí NH: CHỈ nhập ở tab Tài chính (audit 17/11/2026 — trước đây
+//   sửa được ở cả 2 tab, 2 bộ phận ghi đè cùng cột sales_orders + cùng tự tính remaining_amount).
+//   Tab này chỉ hiện chỉ-đọc.
 // ============================================================================
 
 import { useState } from 'react'
@@ -17,6 +20,7 @@ import {
   Button,
   Space,
   Divider,
+  Alert,
   message,
 } from 'antd'
 import {
@@ -29,8 +33,12 @@ import {
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
+import { PORT_OF_LOADING_OPTIONS, polLabel } from '../../../services/sales/salesTypes'
+import { toUsdEquivalent } from '../../../services/sales/salesMoney'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
-import { isFieldEditableV4 } from '../../../services/sales/salesPermissionService'
+import { getVisibleTabs, isFieldEditableV4 } from '../../../services/sales/salesPermissionService'
+import { fmtDate, fmtUsd, usdInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import OrderActionButtons from './OrderActionButtons'
 import ShippingDocsSection from './ShippingDocsSection'
 import BookingTableSection from './BookingTableSection'
@@ -39,14 +47,19 @@ import BookingTableSection from './BookingTableSection'
 // HELPERS
 // ============================================================================
 
-const fmtDate = (d: string | undefined | null) => {
-  if (!d) return '—'
-  return dayjs(d).format('DD/MM/YYYY')
-}
+/** Tiền USD của tab (cước, BH, L/C, cọc, CK, số dư) — giữ cent: số này đối chiếu chứng từ/ngân hàng. */
+const fmtCurrency = (v: number | undefined | null) => fmtUsd(v, 2)
 
-const fmtCurrency = (v: number | undefined | null) => {
-  if (!v) return '—'
-  return `$${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+// Trạng thái thông quan — MỘT map cho cả ô chọn lẫn Tag hiển thị (trước đây 2 bộ nhãn khác nhau)
+const CUSTOMS_STATUS_LABELS: Record<string, string> = {
+  pending: 'Chờ thông quan',
+  cleared: 'Đã thông quan',
+  rejected: 'Bị từ chối',
+}
+const CUSTOMS_STATUS_COLORS: Record<string, string> = {
+  pending: 'orange',
+  cleared: 'green',
+  rejected: 'red',
 }
 
 // L/C expiry warning
@@ -68,6 +81,8 @@ interface Props {
   salesRole: SalesRole | null
   editable: boolean
   onSaved: () => void
+  /** Nhảy sang tab khác của chi tiết đơn (vd 'finance' để sửa Đặt cọc/Chiết khấu). Tuỳ chọn. */
+  onNavigateTab?: (tabKey: string) => void
 }
 
 const BL_TYPE_OPTIONS = [
@@ -76,29 +91,25 @@ const BL_TYPE_OPTIONS = [
   { value: 'surrendered', label: 'Surrendered' },
 ]
 
-// Cảng xếp hàng VN — key khớp PORT_LABELS trong documentService để chứng từ map ra tên đầy đủ
-const PORT_OF_LOADING_OPTIONS = [
-  { value: 'HCM_CAT_LAI', label: 'Cat Lai Port, Ho Chi Minh City' },
-  { value: 'HCM_HIEP_PHUOC', label: 'Hiep Phuoc Port, Ho Chi Minh City' },
-  { value: 'VUNG_TAU', label: 'Cai Mep Port, Vung Tau' },
-  { value: 'QUY_NHON', label: 'Quy Nhon Port' },
-  { value: 'DA_NANG', label: 'Da Nang Port' },
-  { value: 'HAI_PHONG', label: 'Hai Phong Port' },
-]
-const portLoadingLabel = (v: string | undefined | null) =>
-  PORT_OF_LOADING_OPTIONS.find(o => o.value === v)?.label || v || '—'
+// Cảng xếp hàng: dùng CHUNG PORT_OF_LOADING_OPTIONS (salesTypes) với tab Hợp đồng — trước đây tab này
+// khai danh mục riêng 6 mục, thiếu ANY_PORT_VN → đơn chọn "Any port" ở Hợp đồng hiện nguyên mã ở đây.
+// Value (mã) khớp PORT_LABELS trong documentService để chứng từ map ra tên tiếng Anh đầy đủ.
+const POL_SELECT_OPTIONS = PORT_OF_LOADING_OPTIONS.map((o) => ({ value: o.value, label: o.label }))
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
-export default function ShippingTab({ order, salesRole, editable, onSaved }: Props) {
+export default function ShippingTab({ order, salesRole, editable, onSaved, onNavigateTab }: Props) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
   const canEditLogistics = editable && (salesRole === 'logistics' || salesRole === 'admin')
   const canEditFinanceFields = isFieldEditableV4(salesRole, 'discount_exchange_rate') || salesRole === 'admin'
+  // Link "Sửa ở tab Tài chính →" chỉ khi vai trò CÓ tab đó — cùng nguồn getVisibleTabs mà chi tiết đơn
+  // dùng để dựng tab (vd sale không có tab Tài chính: bấm là không đi đâu)
+  const canOpenFinanceTab = !!onNavigateTab && getVisibleTabs(salesRole).includes('finance')
 
   const startEdit = () => {
     form.setFieldsValue({
@@ -129,15 +140,7 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
       lc_bank: order.lc_bank,
       lc_expiry_date: order.lc_expiry_date ? dayjs(order.lc_expiry_date) : null,
       lc_amount: order.lc_amount,
-      // Đặt cọc
-      deposit_amount: order.deposit_amount,
-      deposit_date: order.deposit_date ? dayjs(order.deposit_date) : null,
-      deposit_note: order.deposit_note,
-      // Chiết khấu
-      discount_bank: order.discount_bank,
-      discount_date: order.discount_date ? dayjs(order.discount_date) : null,
-      discount_amount: order.discount_amount,
-      bank_charges: order.bank_charges,
+      // (Đặt cọc / Chiết khấu / Phí NH: nhập ở tab Tài chính — không nạp vào form này)
       // Hải quan (gộp từ bản full-page)
       customs_declaration_no: order.customs_declaration_no,
       customs_declaration_date: order.customs_declaration_date ? dayjs(order.customs_declaration_date) : null,
@@ -185,13 +188,8 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         lc_bank: vals.lc_bank || null,
         lc_expiry_date: vals.lc_expiry_date?.format('YYYY-MM-DD') || null,
         lc_amount: vals.lc_amount || null,
-        deposit_amount: vals.deposit_amount || null,
-        deposit_date: vals.deposit_date?.format('YYYY-MM-DD') || null,
-        deposit_note: vals.deposit_note || null,
-        discount_bank: vals.discount_bank || null,
-        discount_date: vals.discount_date?.format('YYYY-MM-DD') || null,
-        discount_amount: vals.discount_amount || null,
-        bank_charges: vals.bank_charges || null,
+        // ⚠ KHÔNG gửi deposit_* / discount_* / bank_charges / remaining_amount: các cột này do tab
+        // Tài chính giữ (một cửa nhập). Gửi kèm từ snapshot form cũ là đè mất số kế toán vừa sửa.
         // Hải quan
         customs_declaration_no: vals.customs_declaration_no || null,
         customs_declaration_date: vals.customs_declaration_date?.format('YYYY-MM-DD') || null,
@@ -202,28 +200,24 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         packing_desc: vals.packing_desc || null,
         invoice_extra_lines: vals.invoice_extra_lines || null,
       }
-
-      // Auto calc: Còn lại = Thành tiền - Đặt cọc - Chiết khấu - Phí NH
-      const totalUSD = order.total_value_usd || (order.quantity_tons * order.unit_price)
-      const deposit = vals.deposit_amount || 0
-      const discount = vals.discount_amount || 0
-      const bankCharges = vals.bank_charges || 0
-      updateData.remaining_amount = totalUSD - deposit - discount - bankCharges
+      // (remaining_amount = Tổng − Cọc − CK − Phí NH: chỉ tab Tài chính tính lại khi lưu — không
+      //  ô nào ở form này đổi các số đó.)
 
       await salesOrderService.updateFields(order.id, updateData)
       message.success('Đã cập nhật vận chuyển')
       setEditing(false)
       onSaved()
     } catch (e: any) {
-      if (e.errorFields) return
-      message.error(e.message || 'Lỗi cập nhật')
+      if (e?.errorFields) return
+      message.error(dichLoiHeThong(e, 'Lỗi cập nhật'))
     } finally {
       setSaving(false)
     }
   }
 
   // ── Computed ──
-  const totalUSD = order.total_value_usd || (order.quantity_tons * order.unit_price)
+  // Cùng cách tính với tab Tài chính: đơn VNĐ dùng số quy đổi USD (không lấy tấn × giá VNĐ gắn "$")
+  const totalUSD = order.total_value_usd || toUsdEquivalent(order.quantity_tons * order.unit_price, order.currency, order.exchange_rate)
   // Còn lại = Tổng HĐ - Đặt cọc - Chiết khấu - Phí NH
   const remainingAmount = (order.remaining_amount != null)
     ? order.remaining_amount
@@ -255,8 +249,8 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
           <Form.Item label="Hãng tàu" name="shipping_line">
             <Input placeholder="Maersk, MSC..." />
           </Form.Item>
-          <Form.Item label="Booking Ref" name="booking_reference">
-            <Input placeholder="Booking number" />
+          <Form.Item label="Số booking" name="booking_reference">
+            <Input placeholder="Số booking hãng tàu" />
           </Form.Item>
           <Form.Item label="Tàu / Chuyến" name="vessel_name">
             <Input placeholder="VD: MSC ANNA / VY2604E" />
@@ -267,7 +261,7 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         <SectionHeader title="Cảng (dùng cho chứng từ)" color="#1257a8" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
           <Form.Item label="Cảng xếp (POL)" name="port_of_loading">
-            <Select allowClear showSearch optionFilterProp="label" options={PORT_OF_LOADING_OPTIONS} placeholder="Chọn cảng VN" />
+            <Select allowClear showSearch optionFilterProp="label" options={POL_SELECT_OPTIONS} placeholder="Chọn cảng VN" />
           </Form.Item>
           <Form.Item label="Cảng đến (POD)" name="port_of_destination">
             <Input placeholder="VD: Nhava Sheva, India" />
@@ -283,10 +277,10 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         {/* B/L */}
         <SectionHeader title="Vận đơn (B/L)" color="#d48806" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
-          <Form.Item label="B/L Number" name="bl_number">
-            <Input placeholder="B/L number" />
+          <Form.Item label="Số B/L" name="bl_number">
+            <Input placeholder="Số vận đơn" />
           </Form.Item>
-          <Form.Item label="B/L Type" name="bl_type">
+          <Form.Item label="Loại B/L" name="bl_type">
             <Select allowClear options={BL_TYPE_OPTIONS} placeholder="Chọn..." />
           </Form.Item>
           <Form.Item label="Ngày B/L" name="bl_date">
@@ -310,23 +304,23 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
 
         {/* DHL */}
         <Form.Item label="DHL Tracking" name="dhl_number">
-          <Input placeholder="DHL tracking number" />
+          <Input placeholder="Mã vận đơn DHL" />
         </Form.Item>
 
         {/* L/C */}
         <SectionHeader title="L/C (Thư tín dụng)" color="#d48806" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
           <Form.Item label="Số L/C" name="lc_number">
-            <Input placeholder="L/C number" />
+            <Input placeholder="Số L/C" />
           </Form.Item>
           <Form.Item label="Ngân hàng phát hành" name="lc_bank">
-            <Input placeholder="Issuing bank" />
+            <Input placeholder="Ngân hàng phát hành L/C" />
           </Form.Item>
           <Form.Item label="Hạn L/C" name="lc_expiry_date">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
           <Form.Item label="Số tiền L/C (USD)" name="lc_amount">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" {...usdInputProps} />
           </Form.Item>
         </div>
 
@@ -348,11 +342,11 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
           <Form.Item label="Cước vận chuyển (USD)" name="freight_amount"
             tooltip="CIF/CFR: nhập cước — sẽ TRỪ khỏi trị giá CIF để ra 'THE COST' (số Hối phiếu draw)">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" {...usdInputProps} />
           </Form.Item>
           <Form.Item label="Phí bảo hiểm (USD)" name="insurance_amount"
             tooltip="Tự tính: trị giá CIF × 1,1 × 0,04% × 1,1 (giá trị BH 110% × phí 0,04% × VAT 10%). Bấm 'Tính tự động' hoặc nhập tay.">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" {...usdInputProps} />
           </Form.Item>
           <Form.Item label="Số hóa đơn (Invoice No.)" name="invoice_no"
             tooltip="Để trống → hệ tự dùng INV-<mã đơn>">
@@ -391,40 +385,16 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
           <Form.Item label="Thông quan" name="customs_clearance_status">
-            <Select options={[{ value: 'pending', label: '⏳ Chờ thông quan' }, { value: 'cleared', label: '✅ Đã thông quan' }, { value: 'rejected', label: '❌ Từ chối' }]} />
+            <Select options={Object.entries(CUSTOMS_STATUS_LABELS).map(([value, label]) => ({ value, label }))} />
           </Form.Item>
         </div>
 
-        {/* Đặt cọc */}
-        <SectionHeader title="Đặt cọc" color="#722ed1" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
-          <Form.Item label="Số tiền đặt cọc (USD)" name="deposit_amount">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
-          </Form.Item>
-          <Form.Item label="Ngày đặt cọc" name="deposit_date">
-            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-          </Form.Item>
-          <Form.Item label="Ghi chú" name="deposit_note">
-            <Input placeholder="VD: T/T 30% trước giao hàng" />
-          </Form.Item>
-        </div>
-
-        {/* Chiết khấu */}
-        <SectionHeader title="Chiết khấu Ngân hàng" color="#d48806" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-          <Form.Item label="NH chiết khấu" name="discount_bank">
-            <Input placeholder="Ngân hàng" />
-          </Form.Item>
-          <Form.Item label="Ngày CK" name="discount_date">
-            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-          </Form.Item>
-          <Form.Item label="Số tiền CK (USD)" name="discount_amount">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
-          </Form.Item>
-          <Form.Item label="Phí NH (USD)" name="bank_charges">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
-          </Form.Item>
-        </div>
+        {/* Đặt cọc / Chiết khấu NH / Phí NH — một cửa nhập ở tab Tài chính */}
+        <Alert
+          type="info" showIcon style={{ marginTop: 4 }}
+          message="Đặt cọc, Chiết khấu ngân hàng và Phí NH nhập ở tab Tài chính"
+          description="Một chỗ nhập duy nhất để hai bộ phận không ghi đè số của nhau."
+        />
       </Form>
     )
   }
@@ -462,7 +432,7 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
       <SectionHeader title="Booking & Tàu (chính)" color="#d48806" />
       <Descriptions column={2} size="small" bordered>
         <Descriptions.Item label="Hãng tàu">{order.shipping_line || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Booking Ref">{order.booking_reference || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Số booking">{order.booking_reference || '—'}</Descriptions.Item>
         <Descriptions.Item label="Tàu / Chuyến">{order.vessel_name || '—'}</Descriptions.Item>
       </Descriptions>
 
@@ -474,7 +444,7 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
       {/* Cảng */}
       <SectionHeader title="Cảng (chứng từ)" color="#1257a8" />
       <Descriptions column={3} size="small" bordered>
-        <Descriptions.Item label="Cảng xếp (POL)">{portLoadingLabel(order.port_of_loading)}</Descriptions.Item>
+        <Descriptions.Item label="Cảng xếp (POL)">{polLabel(order.port_of_loading)}</Descriptions.Item>
         <Descriptions.Item label="Cảng đến (POD)">{order.port_of_destination || '—'}</Descriptions.Item>
         <Descriptions.Item label="Cảng dỡ">{order.port_of_discharge || '—'}</Descriptions.Item>
         <Descriptions.Item label="Shipping mark (đơn)" span={3}>
@@ -489,10 +459,10 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
       {/* B/L */}
       <SectionHeader title="Vận đơn (B/L)" color="#d48806" />
       <Descriptions column={3} size="small" bordered>
-        <Descriptions.Item label="B/L Number">
+        <Descriptions.Item label="Số B/L">
           {order.bl_number ? <Tag color="blue">{order.bl_number}</Tag> : '—'}
         </Descriptions.Item>
-        <Descriptions.Item label="B/L Type">
+        <Descriptions.Item label="Loại B/L">
           {BL_TYPE_OPTIONS.find(o => o.value === order.bl_type)?.label || order.bl_type || '—'}
         </Descriptions.Item>
         <Descriptions.Item label="Ngày B/L">{fmtDate(order.bl_date)}</Descriptions.Item>
@@ -528,9 +498,10 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         <Descriptions.Item label="Số tờ khai">{order.customs_declaration_no || '—'}</Descriptions.Item>
         <Descriptions.Item label="Ngày đăng ký">{fmtDate(order.customs_declaration_date)}</Descriptions.Item>
         <Descriptions.Item label="Thông quan">
-          <Tag color={order.customs_clearance_status === 'cleared' ? 'green' : order.customs_clearance_status === 'rejected' ? 'red' : 'orange'}>
-            {order.customs_clearance_status === 'cleared' ? 'Đã TQ' : order.customs_clearance_status === 'rejected' ? 'Từ chối' : 'Chờ TQ'}
-          </Tag>
+          {(() => {
+            const cs = order.customs_clearance_status || 'pending'
+            return <Tag color={CUSTOMS_STATUS_COLORS[cs] || 'default'}>{CUSTOMS_STATUS_LABELS[cs] || cs}</Tag>
+          })()}
         </Descriptions.Item>
       </Descriptions>
 
@@ -572,7 +543,17 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
 
       <Divider style={{ margin: '12px 0' }} />
 
-      {/* Đặt cọc */}
+      {/* Đặt cọc + Chiết khấu NH: CHỈ ĐỌC ở đây — kế toán nhập ở tab Tài chính (một cửa nhập) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+        <span style={{ fontSize: 12, color: '#6b7280' }}>
+          Đặt cọc · Chiết khấu NH · Phí NH do kế toán nhập ở tab Tài chính.
+        </span>
+        {canOpenFinanceTab && (
+          <Button size="small" type="link" style={{ padding: 0 }} onClick={() => onNavigateTab?.('finance')}>
+            Sửa ở tab Tài chính →
+          </Button>
+        )}
+      </div>
       <SectionHeader title="Đặt cọc" color="#722ed1" />
       <Descriptions column={3} size="small" bordered>
         <Descriptions.Item label="Số tiền">{fmtCurrency(order.deposit_amount)}</Descriptions.Item>

@@ -14,6 +14,11 @@ import {
   type PriceLockStatus,
 } from '../../../services/b2b/priceLockService'
 import { useAuthStore } from '../../../stores/authStore'
+import { Modal, message } from 'antd'
+import { fmtDate, fmtNum } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
+import { LimitNotice } from '../../../components/common/tableDefaults'
 
 const STATUS_CLASS: Record<PriceLockStatus, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -22,7 +27,10 @@ const STATUS_CLASS: Record<PriceLockStatus, string> = {
   cancelled: 'bg-red-100 text-red-600',
 }
 
-const fmt = (n: number | null | undefined) => (n != null ? n.toLocaleString('vi-VN') : '—')
+// Sổ tải một cục tối đa N phiếu — chạm trần thì báo (LimitNotice)
+const LOAD_LIMIT = 200
+
+const fmt = (n: number | null | undefined) => fmtNum(n, 3)
 
 export default function PriceLockListPage() {
   const navigate = useNavigate()
@@ -32,28 +40,58 @@ export default function PriceLockListPage() {
   const canDeleteDraft = (r: PriceLockTicket) => canManage || (!!user?.id && r.created_by === user.id)
   const [rows, setRows] = useState<PriceLockTicket[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có phiếu" — trước đây lỗi mạng bị nuốt rồi hiện màn trống giả (audit 17/11/2026)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<PriceLockStatus | ''>('')
 
-  async function handleDelete(e: MouseEvent, r: PriceLockTicket) {
+  // Xác nhận bằng Modal antd (nút đỏ, nêu hệ quả) thay confirm()/alert() của trình duyệt (audit 17/11/2026)
+  function handleDelete(e: MouseEvent, r: PriceLockTicket) {
     e.stopPropagation()
-    if (!confirm(`Xóa HẲN phiếu nháp ${r.code || ''}? Không khôi phục được.`)) return
-    try { await priceLockService.remove(r.id); load() }
-    catch (err: any) { alert('Xóa thất bại: ' + (err?.message || err)) }
+    Modal.confirm({
+      title: `Xoá hẳn phiếu nháp ${r.code || ''}?`,
+      content: 'Phiếu nháp bị xoá vĩnh viễn, không khôi phục được.',
+      okText: 'Xoá phiếu',
+      cancelText: 'Không',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await priceLockService.remove(r.id)
+          message.success(`Đã xoá phiếu nháp ${r.code || ''}`)
+          load()
+        } catch (err) {
+          message.error(dichLoiHeThong(err, 'Xoá thất bại'))
+        }
+      },
+    })
   }
-  async function handleCancel(e: MouseEvent, r: PriceLockTicket) {
+  function handleCancel(e: MouseEvent, r: PriceLockTicket) {
     e.stopPropagation()
-    if (!confirm(`Huỷ phiếu chốt giá ${r.code || ''}? Phiếu sẽ không dùng được nữa (giữ lịch sử).`)) return
-    try { await priceLockService.cancel(r.id); load() }
-    catch (err: any) { alert('Huỷ thất bại: ' + (err?.message || err)) }
+    Modal.confirm({
+      title: `Huỷ phiếu chốt giá ${r.code || ''}?`,
+      content: 'Phiếu sẽ không dùng được nữa để áp giá cho phiếu cân (vẫn giữ lịch sử).',
+      okText: 'Huỷ phiếu',
+      cancelText: 'Không',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await priceLockService.cancel(r.id)
+          message.success(`Đã huỷ phiếu chốt giá ${r.code || ''}`)
+          load()
+        } catch (err) {
+          message.error(dichLoiHeThong(err, 'Huỷ thất bại'))
+        }
+      },
+    })
   }
 
   const load = useCallback(() => {
     setLoading(true)
+    setLoadError(null)
     priceLockService
-      .list({ search: search || undefined, status: status || undefined, limit: 200 })
+      .list({ search: search || undefined, status: status || undefined, limit: LOAD_LIMIT })
       .then(setRows)
-      .catch((e) => { console.error(e); setRows([]) })
+      .catch((e) => { console.error(e); setRows([]); setLoadError(e) })
       .finally(() => setLoading(false))
   }, [search, status])
 
@@ -109,6 +147,8 @@ export default function PriceLockListPage() {
           <div className="flex items-center justify-center py-20 text-gray-400">
             <Loader2 className="animate-spin mr-2" size={20} /> Đang tải…
           </div>
+        ) : loadError ? (
+          <PageState error={loadError} onRetry={load} />
         ) : rows.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
             <FileSignature size={40} className="mx-auto mb-3 opacity-40" />
@@ -118,6 +158,8 @@ export default function PriceLockListPage() {
             </button>
           </div>
         ) : (
+          <>
+          <LimitNotice shown={rows.length} limit={LOAD_LIMIT} what="phiếu" />
           <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -128,7 +170,7 @@ export default function PriceLockListPage() {
                   <th className="px-3 py-2.5 font-medium">Hình thức</th>
                   <th className="px-3 py-2.5 font-medium text-center">Số đại lý</th>
                   <th className="px-3 py-2.5 font-medium text-right">Tổng KL dự kiến (kg)</th>
-                  <th className="px-3 py-2.5 font-medium text-right">Giá áp (đ/kg)</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Giá áp (₫/kg)</th>
                   <th className="px-3 py-2.5 font-medium text-center">Trạng thái</th>
                   <th className="px-3 py-2.5 font-medium text-center">Thao tác</th>
                 </tr>
@@ -148,7 +190,7 @@ export default function PriceLockListPage() {
                       className="border-t border-gray-100 hover:bg-emerald-50/40 cursor-pointer"
                     >
                       <td className="px-3 py-2.5 font-semibold text-emerald-700">{r.code || '—'}</td>
-                      <td className="px-3 py-2.5">{new Date(r.lock_date).toLocaleDateString('vi-VN')}</td>
+                      <td className="px-3 py-2.5">{fmtDate(r.lock_date)}</td>
                       <td className="px-3 py-2.5">{r.facility_label || '—'}</td>
                       <td className="px-3 py-2.5">{r.purchase_method ? PURCHASE_METHOD_LABELS[r.purchase_method] : '—'}</td>
                       <td className="px-3 py-2.5 text-center">{lines.length || '—'}</td>
@@ -194,6 +236,7 @@ export default function PriceLockListPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </div>

@@ -1,5 +1,33 @@
 import { supabase } from '../lib/supabase'
 
+/** Trạng thái kỳ lương — MỘT nguồn nhãn + màu (antd) cho Sổ kỳ lương và bộ lọc.
+ *  Màu theo quy ước: nháp default · đang xử lý (đã tạo phiếu, chờ xác nhận) gold ·
+ *  đã xác nhận (chờ trả) blue · đã trả green. (Bản cũ: confirmed xanh lá, paid xanh dương — ngược quy ước.) */
+export const PAYROLL_PERIOD_STATUS_LABELS: Record<string, string> = {
+  draft: 'Nháp',
+  processing: 'Đang xử lý',
+  confirmed: 'Đã xác nhận',
+  paid: 'Đã trả',
+}
+export const PAYROLL_PERIOD_STATUS_COLORS: Record<string, string> = {
+  draft: 'default',
+  processing: 'gold',
+  confirmed: 'blue',
+  paid: 'green',
+}
+
+/** Trạng thái phiếu lương — cùng quy ước màu (đã xác nhận = chờ trả, đã trả = xong). */
+export const PAYSLIP_STATUS_LABELS: Record<string, string> = {
+  draft: 'Nháp',
+  confirmed: 'Đã xác nhận',
+  paid: 'Đã trả',
+}
+export const PAYSLIP_STATUS_COLORS: Record<string, string> = {
+  draft: 'default',
+  confirmed: 'blue',
+  paid: 'green',
+}
+
 // Define types inline
 interface PayrollPeriod {
   id: string

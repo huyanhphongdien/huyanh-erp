@@ -33,8 +33,11 @@ import { salesOrderService } from '../../../services/sales/salesOrderService'
 import { salesContractWorkflowService } from '../../../services/sales/salesContractWorkflowService'
 import { supabase } from '../../../lib/supabase'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../../services/sales/salesTypes'
-import { isVnd, fmtMoney, orderTotalInCurrency } from '../../../services/sales/salesMoney'
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode, countryFlag } from '../../../services/sales/salesTypes'
+import { fmtMoney, orderTotalInCurrency } from '../../../services/sales/salesMoney'
+import { fmtDate } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
 import {
   getSalesRole,
   getVisibleTabs,
@@ -50,7 +53,7 @@ import ProductionTab from './ProductionTab'
 import QualityTab from './QualityTab'
 import ShippingTab from './ShippingTab'
 import FinanceTabV4 from './FinanceTabV4'
-import DocumentChecklistTab from './DocumentChecklistTab'
+import DocumentsTabPanel from './DocumentsTabPanel'
 import StageOwnershipCard from './StageOwnershipCard'
 import HandoffTimeline from './HandoffTimeline'
 import OrderProgressDashboard from './OrderProgressDashboard'
@@ -110,6 +113,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(false)
+  // Lỗi tải lần đầu ≠ "Không tìm thấy đơn hàng" (trước đây chỉ toast rồi hiện chữ không tìm thấy)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [activeTab, setActiveTab] = useState(() => {
     try { return localStorage.getItem('sales-order-panel-tab') || 'info' } catch { return 'info' }
   })
@@ -124,9 +129,14 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
   const [cancelling, setCancelling] = useState(false)
 
   // ── Load order ──
-  const loadOrder = useCallback(async () => {
+  // silent = làm mới do REALTIME (người khác sửa đơn): không bật vòng tải → bộ tab không bị gỡ
+  // ra gắn lại, form đang sửa dở (Vận chuyển, Tài chính…) không mất. Lưu của chính mình
+  // (handleSaved) vẫn tải có vòng quay như cũ để các khối con tự nạp lại.
+  const loadOrder = useCallback(async (opts?: { silent?: boolean }) => {
     if (!orderId) return
-    setLoading(true)
+    const silent = !!opts?.silent
+    if (!silent) setLoading(true)
+    setLoadError(null)
     try {
       const data = await salesOrderService.getById(orderId)
       setOrder(data)
@@ -139,10 +149,11 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       }
       // Tiến độ theo lô KHÔNG nạp ở đây: <LotProgressTable> tự nạp bằng useOrderLotAxes,
       // khoá theo order.updated_at nên lưu xong / realtime bắn về là nó tự làm mới.
-    } catch {
-      message.error('Không thể tải thông tin đơn hàng')
+    } catch (e) {
+      setLoadError(e || true)
+      message.error(dichLoiHeThong(e, 'Không thể tải thông tin đơn hàng'))
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [orderId])
 
@@ -166,7 +177,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
         'postgres_changes' as never,
         { event: 'UPDATE', schema: 'public', table: 'sales_orders', filter: `id=eq.${orderId}` },
         () => {
-          loadOrder()
+          loadOrder({ silent: true })
         },
       )
       .subscribe()
@@ -182,8 +193,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       message.success('Đã khóa đơn hàng')
       await loadOrder()
       onOrderUpdated?.()
-    } catch (e: any) {
-      message.error(e.message)
+    } catch (e: unknown) {
+      message.error(dichLoiHeThong(e, 'Khóa đơn thất bại'))
     } finally {
       setLockLoading(false)
     }
@@ -197,8 +208,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       message.success('Đã mở khóa đơn hàng')
       await loadOrder()
       onOrderUpdated?.()
-    } catch (e: any) {
-      message.error(e.message)
+    } catch (e: unknown) {
+      message.error(dichLoiHeThong(e, 'Mở khóa đơn thất bại'))
     } finally {
       setLockLoading(false)
     }
@@ -338,13 +349,13 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
         try {
           await salesOrderService.updateFields(order.id, {
             status: 'cancelled',
-            notes: `${order.notes || ''}\n[HỦY ĐƠN ${new Date().toLocaleDateString('vi-VN')}] ${reason.trim()}`.trim(),
+            notes: `${order.notes || ''}\n[HỦY ĐƠN ${fmtDate(new Date())}] ${reason.trim()}`.trim(),
           })
-          message.success(`Đã hủy đơn ${order.code}`)
+          message.success(`Đã hủy đơn ${soDisplayCode(order)}`)
           await loadOrder()
           onOrderUpdated?.()
-        } catch (e: any) {
-          message.error(`Hủy đơn thất bại: ${e.message}`)
+        } catch (e: unknown) {
+          message.error(dichLoiHeThong(e, 'Hủy đơn thất bại'))
         } finally {
           setCancelling(false)
         }
@@ -373,8 +384,10 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       onClick: handleOpenFiles,
     },
     // Divider trước hành động nguy hiểm
+    // Đơn đã xuất/giao/lập HĐ/thanh toán không cho huỷ (khớp luật salesOrderService.cancelOrder:
+    // paid/shipped/delivered) — trước đây menu vẫn hiện "Hủy đơn" cho đơn đã xuất / đã lập HĐ.
     ...((salesRole === 'sale' || salesRole === 'admin') &&
-        !['cancelled', 'delivered', 'paid'].includes(order.status)
+        !['cancelled', 'shipped', 'delivered', 'invoiced', 'paid'].includes(order.status)
       ? [
           { type: 'divider' as const },
           {
@@ -530,26 +543,12 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
             salesRole={salesRole}
             editable={isEditable('shipping')}
             onSaved={handleSaved}
+            onNavigateTab={(k) => handleNavigateTab(k)}
           />
         )
       case 'documents':
-        return (
-          <div>
-            <Button
-              type="primary"
-              icon={<FolderOpenOutlined />}
-              style={{ marginBottom: 12, background: '#1B4D3E', borderColor: '#1B4D3E' }}
-              onClick={() => navigate(`/sales/orders/${order.id}/documents`)}
-            >
-              Mở trang Sinh chứng từ (Invoice · Packing List · Weight List · COA · Hối phiếu · Đơn chiết khấu)
-            </Button>
-            <DocumentChecklistTab
-              orderId={order.id}
-              orderCode={soDisplayCode(order)}
-              readonly={['draft', 'cancelled'].includes(order.status)}
-            />
-          </div>
-        )
+        // Dùng chung DocumentsTabPanel với trang chi tiết (audit 17/11/2026)
+        return <DocumentsTabPanel order={order} />
       case 'finance':
         return (
           <FinanceTabV4
@@ -585,6 +584,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     </div>
   ) : null
 
+  // (Làm mới do realtime đi đường silent ở loadOrder → không qua nhánh vòng tải này.)
   const bodyContent = loading ? (
     <div style={{ textAlign: 'center', padding: 80 }}>
       <Spin size="large" />
@@ -597,6 +597,10 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       style={{ padding: '0 16px' }}
       size="small"
     />
+  ) : loadError ? (
+    <div style={{ padding: 24 }}>
+      <PageState error={loadError} onRetry={() => { void loadOrder() }} />
+    </div>
   ) : (
     <div style={{ textAlign: 'center', padding: 80, color: '#999' }}>
       Không tìm thấy đơn hàng
@@ -606,18 +610,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
   // INLINE MODE — Split View (rich header giống mock)
   if (inline) {
     if (!open) return null
-    const fmtUSD = (v: number | undefined | null) => {
-      if (!v) return '—'
-      if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-      if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-      return `$${Math.round(v)}`
-    }
-    const COUNTRY_FLAGS: Record<string, string> = {
-      IN: '🇮🇳', PH: '🇵🇭', ID: '🇮🇩', KR: '🇰🇷', SG: '🇸🇬', FR: '🇫🇷',
-      AE: '🇦🇪', TW: '🇹🇼', TR: '🇹🇷', ES: '🇪🇸', BD: '🇧🇩', CN: '🇨🇳',
-      LK: '🇱🇰', JP: '🇯🇵', MY: '🇲🇾', VN: '🇻🇳',
-    }
-    const flag = order?.customer?.country ? COUNTRY_FLAGS[order.customer.country] || '🌐' : '🌐'
+    // Cờ sinh từ mã ISO-2 (countryFlag dùng chung) — bảng tra 16 nước cũ thiếu nhiều nước
+    const flag = countryFlag(order?.customer?.country) || '🌐'
 
     return (
       <div className="so-detail-print-root" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
@@ -733,14 +727,14 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
                 {orderTotalInCurrency(order) ? (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     💰 <b style={{ color: '#1B4D3E', fontWeight: 700 }}>
-                      {isVnd(order.currency) ? fmtMoney(orderTotalInCurrency(order), 'VND', { compact: true }) : fmtUSD(order.total_value_usd)}
+                      {fmtMoney(orderTotalInCurrency(order), order.currency, { compact: true })}
                     </b>
                   </span>
                 ) : null}
                 {(order as { etd?: string }).etd && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     📅 ETD <b style={{ color: '#262626', fontWeight: 600 }}>
-                      {new Date((order as { etd?: string }).etd!).toLocaleDateString('vi-VN')}
+                      {fmtDate((order as { etd?: string }).etd)}
                     </b>
                   </span>
                 )}
@@ -897,23 +891,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
         )
       }
     >
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 80 }}>
-          <Spin size="large" />
-        </div>
-      ) : order ? (
-        <Tabs
-          activeKey={safeActiveTab}
-          onChange={setActiveTab}
-          items={tabItems}
-          style={{ padding: '0 16px' }}
-          size="small"
-        />
-      ) : (
-        <div style={{ textAlign: 'center', padding: 80, color: '#999' }}>
-          Không tìm thấy đơn hàng
-        </div>
-      )}
+      {bodyContent}
     </Drawer>
   )
 }
@@ -948,15 +926,15 @@ function PipelineHero({ order }: { order: SalesOrder }) {
     const daysElapsed = Math.floor(elapsedH / 24)
     if (elapsedH > order.stage_sla_hours) {
       const overD = Math.ceil((elapsedH - order.stage_sla_hours) / 24)
-      slaText = `+${overD}d quá hạn`
+      slaText = `Quá hạn ${overD} ngày`
       slaColor = '#cf1322'
     } else {
       const leftH = order.stage_sla_hours - elapsedH
       if (leftH < 24) {
-        slaText = `Còn ${Math.round(leftH)}h`
+        slaText = `Còn ${Math.round(leftH)} giờ`
         slaColor = '#d46b08'
       } else {
-        slaText = `${daysElapsed}d đã giữ`
+        slaText = `Đã giữ ${daysElapsed} ngày`
       }
     }
   }
@@ -964,7 +942,7 @@ function PipelineHero({ order }: { order: SalesOrder }) {
   return (
     <div style={{ padding: '12px 24px 16px', background: '#fafafa', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
       <div style={{ fontSize: 11, color: '#8c8c8c', fontWeight: 600, marginBottom: 8, letterSpacing: 0.5 }}>
-        📍 PIPELINE
+        📍 TIẾN TRÌNH ĐƠN
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, position: 'relative' }}>
         {PIPELINE_STAGES.map((s, idx) => {

@@ -24,6 +24,7 @@ import {
   downloadContract,
   amountToWords,
 } from '../../../services/sales/contractGeneratorService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mapper: SalesOrder (saved record) → Partial<ContractFormData>
@@ -265,8 +266,7 @@ export default function DraftContractPreview({ order }: Props) {
         message.success(`Đã tải ${type} mock`)
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      message.error(`Tải thất bại: ${msg}`)
+      message.error(dichLoiHeThong(e, 'Tải file hợp đồng thất bại'))
     } finally {
       setDocLoading(null)
     }

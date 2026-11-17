@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { getTodayTasks, taskDone } from '../../services/opsService'
 import OpsQrScanner from './OpsQrScanner'
+import OpsLoadError from './OpsLoadError'
 
 export default function OpsPatrol() {
   const nav = useNavigate()
@@ -35,6 +36,8 @@ export default function OpsPatrol() {
         <div className="ops-inner" style={{ gap: 8 }}>
           {q.isLoading ? (
             <>{[0, 1, 2, 3].map(i => <div key={i} className="ops-skel" />)}</>
+          ) : q.isError && !q.data ? (
+            <OpsLoadError error={q.error} onRetry={() => q.refetch()} title="Không tải được việc hôm nay" />
           ) : list.length === 0 ? (
             <div className="ops-empty">
               <div className="em">☑️</div>

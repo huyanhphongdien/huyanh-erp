@@ -10,8 +10,9 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { todayVN, vnDayStartTs, vnDayEndTs } from '../../utils/dateVN'
 import { rubberGradeService } from './rubberGradeService'
-import { STAGE_NAMES } from './wms.types'
+import { STAGE_NAMES, PRODUCTION_STATUS_LABELS, STAGE_STATUS_LABELS } from './wms.types'
 import { adjustLevelsAndLocation } from './inventorySync'
 import type {
   ProductionOrder,
@@ -194,8 +195,8 @@ export const productionService = {
     if (status) query = query.eq('status', status)
     if (facility_id) query = query.eq('facility_id', facility_id)
     if (target_grade) query = query.eq('target_grade', target_grade)
-    if (from_date) query = query.gte('created_at', `${from_date}T00:00:00`)
-    if (to_date) query = query.lte('created_at', `${to_date}T23:59:59`)
+    if (from_date) query = query.gte('created_at', vnDayStartTs(from_date))
+    if (to_date) query = query.lte('created_at', vnDayEndTs(to_date))
 
     if (search && search.trim()) {
       query = query.ilike('code', `%${search.trim()}%`)
@@ -282,7 +283,8 @@ export const productionService = {
     if (fetchErr) throw fetchErr
     if (!order) throw new Error('Không tìm thấy lệnh sản xuất')
     if (order.status !== 'draft' && order.status !== 'scheduled') {
-      throw new Error('Chỉ có thể bắt đầu khi lệnh ở trạng thái Nhập hoặc Đã lên lịch')
+      // Nhãn lấy từ PRODUCTION_STATUS_LABELS — bản cũ gõ tay "Nhập" (nhầm với "Nháp")
+      throw new Error(`Chỉ có thể bắt đầu khi lệnh ở trạng thái "${PRODUCTION_STATUS_LABELS.draft}" hoặc "${PRODUCTION_STATUS_LABELS.scheduled}"`)
     }
 
     // ★ Idempotency: nếu đã có stages rồi → từ chối (startProduction chỉ chạy 1 lần)
@@ -291,7 +293,7 @@ export const productionService = {
       .select('id', { count: 'exact', head: true })
       .eq('production_order_id', poId)
     if (existingStages && existingStages > 0) {
-      throw new Error('Lệnh sản xuất đã được bắt đầu trước đó — không thể start lần 2')
+      throw new Error('Lệnh sản xuất đã được bắt đầu trước đó — không thể bắt đầu lần 2')
     }
 
     const now = new Date().toISOString()
@@ -396,7 +398,7 @@ export const productionService = {
         status: 'in_progress' as ProductionStatus,
         stage_current: 1,
         stage_status: 'in_progress',
-        actual_start_date: now,
+        actual_start_date: todayVN(),   // cột DATE: ngày VN, không phải ISO UTC (trước 7h sáng lùi 1 ngày)
         updated_at: now,
       })
       .eq('id', poId)
@@ -435,7 +437,7 @@ export const productionService = {
       }
       if (prevStage.status !== 'completed') {
         throw new Error(
-          `Không thể hoàn tất công đoạn ${stageNumber} khi công đoạn ${stageNumber - 1} chưa hoàn tất (hiện trạng: ${prevStage.status})`,
+          `Không thể hoàn tất công đoạn ${stageNumber} khi công đoạn ${stageNumber - 1} chưa hoàn tất (hiện trạng: ${STAGE_STATUS_LABELS[prevStage.status as StageStatus] ?? prevStage.status})`,
         )
       }
     }
@@ -578,7 +580,7 @@ export const productionService = {
         final_grade: data.final_grade,
         final_drc: data.final_drc,
         yield_percent,
-        actual_end_date: now,
+        actual_end_date: todayVN(),     // cột DATE: ngày VN, không phải ISO UTC
         updated_at: now,
       })
       .eq('id', poId)
@@ -619,7 +621,9 @@ export const productionService = {
       }
 
       if (materialId) {
-        const batchNo = `TP-PR-${now.slice(2, 10).replace(/-/g, '')}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`
+        // Ngày VN cho mã lô + ngày nhập — `now` là ISO UTC, cắt ra là ngày HÔM QUA nếu hoàn tất trước 7h sáng
+        const todayStr = todayVN()
+        const batchNo = `TP-PR-${todayStr.slice(2).replace(/-/g, '')}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`
         const warehouseId = data.warehouse_id || sourceWarehouseId || null
 
         const { data: newBatch, error: batchErr } = await supabase
@@ -637,7 +641,7 @@ export const productionService = {
             qc_status: 'pending',
             batch_type: 'production',
             production_order_id: poId,
-            received_date: now.split('T')[0],
+            received_date: todayStr,
             status: 'active',
             rubber_grade: data.final_grade,
             initial_weight: data.actual_quantity,

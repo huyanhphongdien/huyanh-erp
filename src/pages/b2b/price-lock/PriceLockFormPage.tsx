@@ -6,6 +6,8 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, Printer, Plus, Trash2, Loader2 } from 'lucide-react'
+import { message } from 'antd'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { supabase } from '../../../lib/supabase'
 import { partnerService, type Partner } from '../../../services/b2b/partnerService'
 import {
@@ -80,7 +82,11 @@ export default function PriceLockFormPage() {
       .then(({ data }) => setFacilities((data as FacilityOpt[]) || []))
     partnerService.getPartners({ pageSize: 1000 })
       .then((r) => setPartners(r.data || []))
-      .catch(() => setPartners([]))
+      .catch((e) => {
+        setPartners([])
+        // Ô chọn đại lý trống vì LỖI chứ không phải không có đại lý — báo rõ
+        message.error(dichLoiHeThong(e, 'Không tải được danh sách đại lý'))
+      })
   }, [])
 
   useEffect(() => {
@@ -154,7 +160,8 @@ export default function PriceLockFormPage() {
         : await priceLockService.create({ ...payload, created_by: user?.id || null })
       navigate(thenPrint ? `/b2b/price-lock/${row.id}/print` : `/b2b/price-lock/${row.id}`)
     } catch (e: any) {
-      alert('Lưu thất bại: ' + (e?.message || e))
+      // message.error + dịch lỗi hệ thống thay alert() thô của trình duyệt (audit 17/11/2026)
+      message.error(dichLoiHeThong(e, 'Lưu thất bại'))
     } finally {
       setSaving(false)
     }
@@ -212,7 +219,7 @@ export default function PriceLockFormPage() {
                   <th className="px-2 py-2 font-medium">Đại lý</th>
                   <th className="px-2 py-2 font-medium w-32">KL dự kiến (kg)</th>
                   <th className="px-2 py-2 font-medium w-28">DRC dự kiến (%)</th>
-                  <th className="px-2 py-2 font-medium w-40">Giá áp (đ/kg)</th>
+                  <th className="px-2 py-2 font-medium w-40">Giá áp (₫/kg)</th>
                   <th className="px-2 py-2 font-medium">Ghi chú</th>
                   <th className="px-2 py-2 w-8" />
                 </tr>
@@ -250,9 +257,9 @@ export default function PriceLockFormPage() {
         {/* Bảng giá tham chiếu & tiền tệ */}
         <Card title="Bảng giá cao su tham chiếu & loại tiền">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Field label="Giá cao su SÀN (đ/kg)"><NumInput value={form.price_floor_per_ton} onChange={(v) => set('price_floor_per_ton', v)} className={inputCls} /></Field>
-            <Field label="Giá cao su TRUNG (đ/kg)"><NumInput value={form.price_mid_per_ton} onChange={(v) => set('price_mid_per_ton', v)} className={inputCls} /></Field>
-            <Field label="Giá cao su CAO (đ/kg)"><NumInput value={form.price_high_per_ton} onChange={(v) => set('price_high_per_ton', v)} className={inputCls} /></Field>
+            <Field label="Giá cao su SÀN (₫/kg)"><NumInput value={form.price_floor_per_ton} onChange={(v) => set('price_floor_per_ton', v)} className={inputCls} /></Field>
+            <Field label="Giá cao su TRUNG (₫/kg)"><NumInput value={form.price_mid_per_ton} onChange={(v) => set('price_mid_per_ton', v)} className={inputCls} /></Field>
+            <Field label="Giá cao su CAO (₫/kg)"><NumInput value={form.price_high_per_ton} onChange={(v) => set('price_high_per_ton', v)} className={inputCls} /></Field>
             <Field label="Loại tiền">
               <select value={form.currency} onChange={(e) => set('currency', e.target.value as PriceLockCurrency)} className={inputCls}>
                 <option value="VND">VNĐ</option><option value="KIP">KIP</option><option value="THB">THB</option><option value="OTHER">Khác</option>

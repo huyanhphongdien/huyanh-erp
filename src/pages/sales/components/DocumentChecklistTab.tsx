@@ -23,6 +23,8 @@ import {
 } from '../../../services/sales/salesDocumentUploadService'
 import { useAuthStore } from '../../../stores/authStore'
 import { getSalesRole } from '../../../services/sales/salesPermissionService'
+import { fmtDate } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Text, Title } = Typography
 
@@ -116,14 +118,20 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
 
   // Toggle received
   const handleToggleReceived = async (doc: SalesDocument) => {
-    await salesDocumentUploadService.markReceived(doc.id, !doc.is_received)
+    try {
+      await salesDocumentUploadService.markReceived(doc.id, !doc.is_received)
+    } catch (e) {
+      message.error(dichLoiHeThong(e, 'Không cập nhật được trạng thái đã nhận'))
+    }
     await load()
   }
 
   // Add custom
   const handleAddCustom = async () => {
     if (!customName.trim()) return
-    await salesDocumentUploadService.addCustomDocument(orderId, customName.trim())
+    const added = await salesDocumentUploadService.addCustomDocument(orderId, customName.trim())
+    // Service trả null khi lỗi — trước đây im lặng đóng ô nhập như đã thêm được
+    if (!added) { message.error('Không thêm được chứng từ — thử lại'); return }
     setCustomName('')
     setShowAddCustom(false)
     await load()
@@ -131,7 +139,9 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
 
   // Delete
   const handleDelete = async (docId: string) => {
-    await salesDocumentUploadService.deleteDocument(docId)
+    const ok = await salesDocumentUploadService.deleteDocument(docId)
+    if (!ok) { message.error('Xóa chứng từ thất bại — thử lại'); return }
+    message.success('Đã xóa chứng từ')
     await load()
   }
 
@@ -146,7 +156,7 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
               {received}/{total} <span style={{ fontSize: 14, fontWeight: 400, opacity: 0.7 }}>đã nhận</span>
             </div>
             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 2 }}>
-              {uploaded} file đã upload
+              {uploaded} file đã tải lên
             </div>
           </div>
           <div style={{ width: 80 }}>
@@ -192,6 +202,8 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {docs.filter(doc => doc.doc_type !== 'contract' && canViewDocument(doc.doc_type, salesRole)).map((doc) => (
               <div key={doc.id}
+                // Neo để DocumentsTabPanel cuộn thẳng tới dòng COA / B/L ("Đính kèm ↓")
+                data-doc-type={doc.doc_type}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
                   borderRadius: 8, border: '1px solid #f0f0f0',
@@ -223,10 +235,10 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
                   {doc.file_url ? (
                     <Text type="secondary" style={{ fontSize: 11 }}>
                       {doc.file_name} ({formatFileSize(doc.file_size)})
-                      {doc.received_at && ` • ${new Date(doc.received_at).toLocaleDateString('vi-VN')}`}
+                      {doc.received_at && ` • ${fmtDate(doc.received_at)}`}
                     </Text>
                   ) : (
-                    <Text type="secondary" style={{ fontSize: 11 }}>Chưa upload file</Text>
+                    <Text type="secondary" style={{ fontSize: 11 }}>Chưa có file</Text>
                   )}
                 </div>
 
@@ -259,7 +271,7 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
                       {/* Upload/Tick/Xóa — chỉ role owner */}
                       {canEdit ? (
                         <>
-                          <Tooltip title={doc.file_url ? 'Upload lại' : 'Upload file'}>
+                          <Tooltip title={doc.file_url ? 'Tải file khác thay thế' : 'Tải file lên'}>
                             <Button size="small" type={doc.file_url ? 'link' : 'primary'}
                               icon={<UploadOutlined />}
                               loading={uploading === doc.id}
@@ -268,7 +280,7 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
                                 fileInputRef.current?.click()
                               }}
                             >
-                              {!doc.file_url && 'Upload'}
+                              {!doc.file_url && 'Tải lên'}
                             </Button>
                           </Tooltip>
 
@@ -280,7 +292,12 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
                           </Tooltip>
 
                           {doc.doc_type === 'other' && (
-                            <Popconfirm title="Xóa chứng từ này?" onConfirm={() => handleDelete(doc.id)}>
+                            <Popconfirm
+                              title="Xóa chứng từ này?"
+                              description="Dòng chứng từ và file đính kèm (nếu có) bị gỡ khỏi đơn."
+                              okText="Xóa" cancelText="Không" okButtonProps={{ danger: true }}
+                              onConfirm={() => handleDelete(doc.id)}
+                            >
                               <Button size="small" type="link" danger icon={<DeleteOutlined />} />
                             </Popconfirm>
                           )}
@@ -288,7 +305,7 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
                       ) : (
                         !doc.file_url && ownerLabel && ownerLabel !== 'all' && (
                           <Tag style={{ fontSize: 10, margin: 0 }}>
-                            {ownerLabel === 'sale' ? 'Sale' : ownerLabel === 'production' ? 'SX' : ownerLabel === 'logistics' ? 'LOG' : ownerLabel === 'accounting' ? 'KT' : ownerLabel}
+                            {ownerLabel === 'sale' ? 'Sale' : ownerLabel === 'production' ? 'SX' : ownerLabel === 'logistics' ? 'XNK' : ownerLabel === 'accounting' ? 'KT' : ownerLabel}
                           </Tag>
                         )
                       )}

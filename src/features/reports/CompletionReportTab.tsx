@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { App } from 'antd'
 import {
   BarChart,
   Bar,
@@ -41,6 +42,10 @@ import {
   exportEmployeeReportToExcel,
   exportDepartmentReportToPDF
 } from '../../utils/reportExportUtils'
+import { addDaysStr, todayVN } from '../../utils/dateVN'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { DASH, fmtNum, fmtPct } from '../../utils/format'
+import PageState from '../../components/common/PageState'
 
 // ============================================================================
 // TYPES
@@ -71,37 +76,39 @@ const VIEW_MODES = [
 // ============================================================================
 
 export default function CompletionReportTab() {
+  const { message } = App.useApp()
   const [viewMode, setViewMode] = useState<ViewMode>('department')
   const [dateRange, setDateRange] = useState<DateRange>({
-    start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end_date: new Date().toLocaleDateString('sv-SE')
+    // 30 ngày theo LỊCH VN (toISOString() trước 7h sáng ra ngày hôm trước)
+    start_date: addDaysStr(todayVN(), -30),
+    end_date: todayVN()
   })
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
 
   // ============================================================================
-  // DATA FETCHING
+  // DATA FETCHING — mỗi chế độ xem đọc cả error/refetch: lỗi tải ≠ "Chưa có dữ liệu"
   // ============================================================================
 
-  const { data: departmentData, isLoading: loadingDept } = useQuery({
+  const { data: departmentData, isLoading: loadingDept, error: errDept, refetch: refetchDept } = useQuery({
     queryKey: ['completion-by-department', dateRange],
     queryFn: () => taskReportService.getCompletionByDepartment(dateRange),
     enabled: viewMode === 'department'
   })
 
-  const { data: positionData, isLoading: loadingPos } = useQuery({
+  const { data: positionData, isLoading: loadingPos, error: errPos, refetch: refetchPos } = useQuery({
     queryKey: ['completion-by-position', dateRange],
     queryFn: () => taskReportService.getCompletionByPosition(dateRange),
     enabled: viewMode === 'position'
   })
 
-  const { data: employeeData, isLoading: loadingEmp } = useQuery({
+  const { data: employeeData, isLoading: loadingEmp, error: errEmp, refetch: refetchEmp } = useQuery({
     queryKey: ['completion-by-employee', dateRange],
     queryFn: () => taskReportService.getCompletionByEmployee(dateRange),
     enabled: viewMode === 'employee'
   })
 
-  const { data: timelineData, isLoading: loadingTime } = useQuery({
+  const { data: timelineData, isLoading: loadingTime, error: errTime, refetch: refetchTime } = useQuery({
     queryKey: ['completion-timeline', dateRange],
     queryFn: () => taskReportService.getTimeSeriesData({
       start_date: dateRange.start_date,
@@ -163,11 +170,11 @@ export default function CompletionReportTab() {
           }
           break
         default:
-          alert('Chế độ xem này chưa hỗ trợ xuất Excel')
+          message.info('Chế độ xem này chưa hỗ trợ xuất Excel')
       }
     } catch (error) {
       console.error('Export Excel error:', error)
-      alert('Có lỗi khi xuất Excel. Vui lòng thử lại.')
+      message.error(dichLoiHeThong(error, 'Có lỗi khi xuất Excel. Vui lòng thử lại.'))
     } finally {
       setExporting(false)
     }
@@ -214,11 +221,11 @@ export default function CompletionReportTab() {
           }
           break
         default:
-          alert('Chế độ xem này chưa hỗ trợ xuất PDF')
+          message.info('Chế độ xem này chưa hỗ trợ xuất PDF')
       }
     } catch (error) {
       console.error('Export PDF error:', error)
-      alert('Có lỗi khi xuất PDF. Vui lòng thử lại.')
+      message.error(dichLoiHeThong(error, 'Có lỗi khi xuất PDF. Vui lòng thử lại.'))
     } finally {
       setExporting(false)
     }
@@ -230,6 +237,7 @@ export default function CompletionReportTab() {
 
   const renderDepartmentView = () => {
     if (loadingDept) return <LoadingSpinner />
+    if (errDept) return <PageState error={errDept} onRetry={() => refetchDept()} />
     if (!departmentData || departmentData.length === 0) return <EmptyState />
 
     const chartData = departmentData.map(d => ({
@@ -252,7 +260,7 @@ export default function CompletionReportTab() {
             <StatCard
               key={dept.department_id}
               title={dept.department_name}
-              value={`${dept.completion_rate}%`}
+              value={fmtPct(dept.completion_rate)}
               subtitle={`${dept.finished_tasks}/${dept.total_tasks} công việc`}
               color="blue"
             />
@@ -309,6 +317,7 @@ export default function CompletionReportTab() {
 
   const renderPositionView = () => {
     if (loadingPos) return <LoadingSpinner />
+    if (errPos) return <PageState error={errPos} onRetry={() => refetchPos()} />
     if (!positionData || positionData.length === 0) return <EmptyState />
 
     const chartData = positionData.map(p => ({
@@ -326,7 +335,7 @@ export default function CompletionReportTab() {
             <StatCard
               key={pos.position_id}
               title={pos.position_name}
-              value={`${pos.completion_rate}%`}
+              value={fmtPct(pos.completion_rate)}
               subtitle={`${pos.finished_tasks} công việc`}
               color="green"
             />
@@ -356,6 +365,7 @@ export default function CompletionReportTab() {
 
   const renderEmployeeView = () => {
     if (loadingEmp) return <LoadingSpinner />
+    if (errEmp) return <PageState error={errEmp} onRetry={() => refetchEmp()} />
     if (!employeeData || employeeData.length === 0) return <EmptyState />
 
     return (
@@ -366,7 +376,7 @@ export default function CompletionReportTab() {
             <StatCard
               key={emp.employee_id}
               title={emp.employee_name}
-              value={`${emp.completion_rate}%`}
+              value={fmtPct(emp.completion_rate)}
               subtitle={`${emp.department_name} - ${emp.position_name}`}
               badge={idx === 0 ? '🏆 Top 1' : idx === 1 ? '🥈 Top 2' : '🥉 Top 3'}
               color={idx === 0 ? 'yellow' : idx === 1 ? 'gray' : 'orange'}
@@ -382,6 +392,7 @@ export default function CompletionReportTab() {
 
   const renderTimelineView = () => {
     if (loadingTime) return <LoadingSpinner />
+    if (errTime) return <PageState error={errTime} onRetry={() => refetchTime()} />
     if (!timelineData || timelineData.length === 0) return <EmptyState />
 
     const chartData = timelineData.map(t => ({
@@ -413,7 +424,7 @@ export default function CompletionReportTab() {
           />
           <StatCard
             title="Trung bình"
-            value={`${(timelineData.reduce((sum, t) => sum + t.completion_rate, 0) / timelineData.length).toFixed(1)}%`}
+            value={fmtPct(timelineData.reduce((sum, t) => sum + t.completion_rate, 0) / timelineData.length)}
             color="purple"
           />
         </div>
@@ -633,11 +644,11 @@ function DepartmentTable({ data }: DepartmentTableProps) {
                       style={{ width: `${dept.completion_rate}%` }}
                     />
                   </div>
-                  <span className="text-sm font-medium text-gray-900">{dept.completion_rate}%</span>
+                  <span className="text-sm font-medium text-gray-900">{fmtPct(dept.completion_rate)}</span>
                 </div>
               </td>
               <td className="px-4 py-3 text-center text-sm text-gray-900">
-                {dept.avg_score ? dept.avg_score.toFixed(1) : 'N/A'}
+                {dept.avg_score ? fmtNum(dept.avg_score, 1) : DASH}
               </td>
             </tr>
           ))}
@@ -669,7 +680,7 @@ function PositionTable({ data }: PositionTableProps) {
               <td className="px-4 py-3 font-medium text-gray-900">{pos.position_name}</td>
               <td className="px-4 py-3 text-center text-sm">{pos.total_tasks}</td>
               <td className="px-4 py-3 text-center text-sm text-green-600">{pos.finished_tasks}</td>
-              <td className="px-4 py-3 text-center text-sm font-medium">{pos.completion_rate}%</td>
+              <td className="px-4 py-3 text-center text-sm font-medium">{fmtPct(pos.completion_rate)}</td>
             </tr>
           ))}
         </tbody>
@@ -705,7 +716,7 @@ function EmployeeTable({ data }: EmployeeTableProps) {
               <td className="px-4 py-3 text-sm text-gray-600">{emp.department_name}</td>
               <td className="px-4 py-3 text-center text-sm">{emp.finished_tasks}/{emp.total_tasks}</td>
               <td className="px-4 py-3 text-center text-sm text-green-600">{emp.on_time_count}</td>
-              <td className="px-4 py-3 text-center text-sm font-medium">{emp.completion_rate}%</td>
+              <td className="px-4 py-3 text-center text-sm font-medium">{fmtPct(emp.completion_rate)}</td>
             </tr>
           ))}
         </tbody>

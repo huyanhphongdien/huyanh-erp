@@ -569,17 +569,21 @@ export const INVOICE_STATUS_COLORS: Record<InvoiceStatus, string> = {
   cancelled: 'error',
 }
 
-// -- Trạng thái thanh toán --
+// -- Trạng thái thanh toán (thu tiền của đơn) --
+// MỘT bộ nhãn cho mọi màn bán hàng (audit 17/11/2026: Dòng tiền 'Đã TT/Một phần/Chưa TT', Sổ lô
+// 'Đã thu đủ/Thu 1 phần/Chưa thu', Kanban 'Đã thu tiền/…' — 3 bộ cho cùng một trạng thái).
+// Dùng chữ "thu" — đúng góc nhìn người bán, khớp "Công nợ khách · Thu tiền", "Lô đã giao chưa thu".
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-  unpaid: 'Chưa thanh toán',
-  partial: 'Thanh toán một phần',
-  paid: 'Đã thanh toán đủ',
+  unpaid: 'Chưa thu',
+  partial: 'Thu một phần',
+  paid: 'Đã thu đủ',
 }
 
+// Quy ước màu dòng tiền (CLAUDE.md): vàng = chờ · xanh dương = đang làm · xanh lá = xong · đỏ chỉ cho huỷ/từ chối
 export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
-  unpaid: 'error',
-  partial: 'warning',
-  paid: 'success',
+  unpaid: 'gold',
+  partial: 'blue',
+  paid: 'green',
 }
 
 // -- Tiêu chuẩn chất lượng --
@@ -642,6 +646,21 @@ export const COUNTRY_OPTIONS = [
   { value: 'OTHER', label: 'Khác' },
 ] as const
 
+/**
+ * Cờ quốc gia từ mã ISO-2 (regional indicator) — sinh được MỌI nước, không cần bảng tra.
+ * Audit 17/11/2026: 4 bảng COUNTRY_FLAGS chép tay lệch nhau (khách Nhật/Mỹ/Đức ra 🌐 ở Dashboard).
+ * Mã không hợp lệ ('OTHER', rỗng) → ''.
+ */
+export const countryFlag = (cc?: string | null): string => {
+  const c = (cc || '').trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(c)) return ''
+  return String.fromCodePoint(...[...c].map((ch) => 127397 + ch.charCodeAt(0)))
+}
+
+/** Tên nước tiếng Việt theo COUNTRY_OPTIONS; mã lạ → trả nguyên mã; rỗng → '—'. */
+export const countryLabel = (cc?: string | null): string =>
+  cc ? (COUNTRY_OPTIONS.find((c) => c.value === cc)?.label ?? cc) : '—'
+
 // Ngân hàng nhận tiền
 export const BANK_OPTIONS = [
   { value: 'VTB', label: 'Viettin Bank — Hue Branch' },
@@ -675,6 +694,13 @@ export const PORT_OF_LOADING_OPTIONS = [
   { value: 'DA_NANG', label: 'Đà Nẵng' },
   { value: 'HAI_PHONG', label: 'Hải Phòng' },
 ] as const
+
+/**
+ * Nhãn cảng xếp hàng cho MÀN HÌNH (đừng in thẳng mã 'HCM_CAT_LAI'). Giá trị tự gõ / mã lạ → trả nguyên văn.
+ * Nhãn tiếng Anh in trên chứng từ cho khách vẫn ở PORT_LABELS (documentService) — không dùng hàm này.
+ */
+export const polLabel = (v?: string | null): string =>
+  v ? (PORT_OF_LOADING_OPTIONS.find((o) => o.value === v)?.label ?? v) : '—'
 
 // (BANK_OPTIONS đã khai báo ở trên)
 

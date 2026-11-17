@@ -7,6 +7,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { Button, Card } from '../../components/ui';
+import { dichLoiAuth } from '../../utils/dichLoiAuth';
+import logoImg from '../../assets/logo.png';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -22,6 +24,13 @@ export function LoginPage() {
   useEffect(() => {
     clearError();
   }, [clearError]);
+
+  // Tiêu đề tab trình duyệt — rời trang thì TRẢ tiêu đề cũ (trước: vào /m/app sau đăng nhập tab vẫn ghi "Đăng nhập")
+  useEffect(() => {
+    const truoc = document.title;
+    document.title = 'Đăng nhập · Huy Anh ERP';
+    return () => { document.title = truoc; };
+  }, []);
 
   // Tự động chuyển trang khi đã đăng nhập — về đúng trang đích (vd app Ops /m/app)
   useEffect(() => {
@@ -43,8 +52,8 @@ export function LoginPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-primary flex items-center justify-center gap-2">
-            <span>🏭</span>
-            <span className="text-[#2d7a9c]">Huy Anh ERP</span>
+            <img src={logoImg} alt="Cao su Huy Anh" className="h-10 w-auto object-contain" />
+            <span>Huy Anh ERP</span>
           </h1>
           <p className="text-gray-600 mt-2">Đăng nhập vào hệ thống</p>
         </div>
@@ -64,7 +73,7 @@ export function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
 
@@ -81,14 +90,14 @@ export function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
 
-          {/* Hiển thị lỗi */}
+          {/* Hiển thị lỗi — Supabase trả tiếng Anh ('Invalid login credentials') → dịch trước khi hiện */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">{error}</p>
+              <p className="text-sm text-red-600">{dichLoiAuth(error)}</p>
             </div>
           )}
 
@@ -97,16 +106,16 @@ export function LoginPage() {
             <button
               type="button"
               onClick={() => setShowForgotPassword(true)}
-              className="text-sm text-[#2d7a9c] hover:underline"
+              className="text-sm text-primary hover:underline"
             >
               Quên mật khẩu?
             </button>
           </div>
 
-          {/* Nút đăng nhập */}
+          {/* Nút đăng nhập — màu thương hiệu (variant primary của ui/Button: bg-primary, hover đậm hơn) */}
           <Button
             type="submit"
-            className="w-full bg-[#2d7a9c] hover:bg-[#246a89] text-white py-2 rounded-lg font-medium transition-colors"
+            className="w-full text-white py-2 rounded-lg font-medium transition-colors"
             disabled={isLoading}
           >
             {isLoading ? (
@@ -129,7 +138,7 @@ export function LoginPage() {
           <button
             type="button"
             onClick={() => setShowRegisterInfo(true)}
-            className="text-[#2d7a9c] hover:underline font-medium"
+            className="text-primary hover:underline font-medium"
           >
             Đăng ký ngay
           </button>
@@ -181,9 +190,9 @@ export function LoginPage() {
                 Hệ thống <strong>Huy Anh ERP</strong> chỉ dành cho nhân viên công ty.
                 Tài khoản sẽ được tạo bởi bộ phận Nhân sự khi bạn chính thức nhận việc.
               </p>
-              <div className="bg-blue-50 p-3 rounded-lg text-sm">
-                <p className="font-medium text-blue-800 mb-1">Nhân viên mới:</p>
-                <p className="text-blue-700">
+              <div className="bg-primary/5 p-3 rounded-lg text-sm">
+                <p className="font-medium text-primary mb-1">Nhân viên mới:</p>
+                <p className="text-gray-700">
                   Vui lòng liên hệ phòng Hành chính - Nhân sự để được cấp tài khoản.
                 </p>
               </div>

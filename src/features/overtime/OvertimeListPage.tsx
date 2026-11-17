@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
+import { App } from 'antd'
 import {
   Plus, Clock, SlidersHorizontal, Trash2, Eye, Search,
   Calendar, ChevronDown, ChevronUp, AlertCircle, Loader2,
@@ -19,31 +20,31 @@ import {
   type OvertimeRequest
 } from '../../services/overtimeRequestService'
 import OvertimeRequestForm from './OvertimeRequestForm'
+import { approvalStatus, APPROVAL_STATUS_LABELS } from '../attendance/labels'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate } from '../../utils/format'
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: typeof Clock }> = {
-  pending:   { label: 'Chờ duyệt',  color: 'text-yellow-700', bg: 'bg-yellow-50',  icon: Clock },
-  approved:  { label: 'Đã duyệt',   color: 'text-green-700',  bg: 'bg-green-50',   icon: CheckCircle },
-  rejected:  { label: 'Từ chối',     color: 'text-red-700',    bg: 'bg-red-50',     icon: XCircle },
-  completed: { label: 'Hoàn thành',  color: 'text-blue-700',   bg: 'bg-blue-50',    icon: CheckCircle },
+// Icon theo trạng thái — NHÃN + MÀU lấy từ attendance/labels (một nguồn; bản cũ "Chờ duyệt"
+// tông yellow, lệch amber của mọi màn duyệt khác)
+const STATUS_ICON: Record<string, typeof Clock> = {
+  pending: Clock,
+  approved: CheckCircle,
+  rejected: XCircle,
+  completed: CheckCircle,
 }
 
 const STATUS_TABS = [
   { key: 'all',       label: 'Tất cả' },
-  { key: 'pending',   label: 'Chờ duyệt' },
-  { key: 'approved',  label: 'Đã duyệt' },
-  { key: 'rejected',  label: 'Từ chối' },
+  { key: 'pending',   label: APPROVAL_STATUS_LABELS.pending },
+  { key: 'approved',  label: APPROVAL_STATUS_LABELS.approved },
+  { key: 'rejected',  label: APPROVAL_STATUS_LABELS.rejected },
 ]
 
-function formatDate(dateStr: string): string {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
+// Có thứ trong tuần ("T2, 17/11") — cố ý giữ riêng, không phải fmtDate
 function formatDateShort(dateStr: string): string {
   if (!dateStr) return '—'
   const d = new Date(dateStr + 'T00:00:00')
@@ -84,6 +85,7 @@ function getRelativeDate(dateStr: string): string {
 
 export default function OvertimeListPage() {
   const { user } = useAuthStore()
+  const { message } = App.useApp()
   const employeeId = user?.employee_id
 
   // ── State ──
@@ -131,7 +133,7 @@ export default function OvertimeListPage() {
       }
     } catch (err: any) {
       console.error('Load requests error:', err)
-      setLoadError(err?.message || 'Không tải được danh sách')
+      setLoadError(dichLoiHeThong(err, 'Không tải được danh sách'))
     } finally {
       setLoading(false)
     }
@@ -170,7 +172,7 @@ export default function OvertimeListPage() {
       setShowDeleteConfirm(null)
     } catch (err) {
       console.error('Delete error:', err)
-      alert('Không thể hủy phiếu. Vui lòng thử lại.')
+      message.error(dichLoiHeThong(err, 'Không thể hủy phiếu'))
     } finally {
       setDeletingId(null)
     }
@@ -252,7 +254,7 @@ export default function OvertimeListPage() {
                         inline-flex items-center justify-center min-w-[20px] h-5
                         px-1.5 rounded-full text-xs font-semibold
                         ${isActive
-                          ? tab.key === 'pending' ? 'bg-yellow-100 text-yellow-700'
+                          ? tab.key === 'pending' ? 'bg-amber-100 text-amber-700'
                           : tab.key === 'rejected' ? 'bg-red-100 text-red-700'
                           : 'bg-blue-100 text-blue-700'
                           : 'bg-gray-200 text-gray-600'
@@ -369,7 +371,7 @@ export default function OvertimeListPage() {
             <div className="text-center">
               <p className="text-base font-medium text-gray-700">
                 {statusFilter !== 'all'
-                  ? `Không có phiếu ${STATUS_CONFIG[statusFilter]?.label.toLowerCase() || ''}`
+                  ? `Không có phiếu ${approvalStatus(statusFilter).label.toLowerCase()}`
                   : 'Chưa có phiếu tăng ca nào'
                 }
               </p>
@@ -396,8 +398,8 @@ export default function OvertimeListPage() {
           /* Request list - Card layout */
           <div className="space-y-3">
             {requests.map(req => {
-              const status = STATUS_CONFIG[req.status] || STATUS_CONFIG.pending
-              const StatusIcon = status.icon
+              const status = approvalStatus(req.status)
+              const StatusIcon = STATUS_ICON[req.status] || Clock
               const isExpanded = expandedId === req.id
               const isPending = req.status === 'pending'
               const relative = getRelativeDate(req.request_date)
@@ -408,7 +410,7 @@ export default function OvertimeListPage() {
                   key={req.id}
                   className={`
                     bg-white rounded-2xl border-2 transition-all
-                    ${isPending ? 'border-yellow-200' : 'border-gray-100'}
+                    ${isPending ? 'border-amber-200' : 'border-gray-100'}
                   `}
                 >
                   {/* Card header - always visible */}
@@ -422,7 +424,7 @@ export default function OvertimeListPage() {
                         flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center mt-0.5
                         ${status.bg}
                       `}>
-                        <StatusIcon className={`w-5 h-5 ${status.color}`} />
+                        <StatusIcon className={`w-5 h-5 ${status.text}`} />
                       </div>
 
                       {/* Main info */}
@@ -441,7 +443,7 @@ export default function OvertimeListPage() {
                           <span className={`
                             flex-shrink-0 inline-flex items-center gap-1 px-2 py-1
                             rounded-lg text-xs font-medium
-                            ${status.bg} ${status.color}
+                            ${status.bg} ${status.text}
                           `}>
                             {status.label}
                           </span>
@@ -524,11 +526,11 @@ export default function OvertimeListPage() {
 
                       {/* Timestamps */}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 pt-1">
-                        <span>Tạo: {req.created_at ? new Date(req.created_at).toLocaleDateString('vi-VN') : '—'}</span>
+                        <span>Tạo: {fmtDate(req.created_at)}</span>
                         {req.approved_at && (
                           <span>
                             {req.status === 'approved' ? 'Duyệt' : 'Xử lý'}:{' '}
-                            {new Date(req.approved_at).toLocaleDateString('vi-VN')}
+                            {fmtDate(req.approved_at)}
                           </span>
                         )}
                       </div>

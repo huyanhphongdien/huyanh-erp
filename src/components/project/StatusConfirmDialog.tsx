@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import type { ProjectStatus } from '../../utils/projectPermissions'
 import { getTransitionConfig, TRANSITION_LABELS } from '../../utils/projectPermissions'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -89,7 +90,7 @@ const StatusConfirmDialog: React.FC<StatusConfirmDialogProps> = ({
       setError('')
       setStartImmediately(true)
     } catch (err: any) {
-      setError(err?.message || 'Có lỗi xảy ra')
+      setError(dichLoiHeThong(err, 'Có lỗi xảy ra'))
     } finally {
       setSubmitting(false)
     }

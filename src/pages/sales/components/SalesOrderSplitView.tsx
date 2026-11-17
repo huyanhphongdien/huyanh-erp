@@ -10,7 +10,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Tag, Empty } from 'antd'
 import type { SalesOrder, SalesOrderStatus } from '../../../services/sales/salesTypes'
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '../../../services/sales/salesTypes'
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../../services/sales/salesTypes'
+import { fmtMoney, orderTotalInCurrency } from '../../../services/sales/salesMoney'
 import SalesOrderDetailPanel from './SalesOrderDetailPanel'
 import { getSLAStatus } from '../../../services/sales/salesStages'
 import type { SalesStage } from '../../../services/sales/salesStages'
@@ -47,11 +48,17 @@ function countryColor(code?: string | null): string {
   return COUNTRY_GRADIENT[code.toUpperCase()] || 'linear-gradient(135deg, #8c8c8c 0%, #595959 100%)'
 }
 
-const fmtUSD = (v: number | undefined | null) => {
-  if (!v) return '—'
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v)}`
+/** Giá trị đơn rút gọn theo ĐÚNG đồng tiền của đơn ($1.2M / 1,5 tỷ) — salesMoney.fmtMoney compact. */
+const fmtOrderValue = (o: SalesOrder) => {
+  const v = orderTotalInCurrency(o)
+  return v ? fmtMoney(v, o.currency, { compact: true }) : '—'
+}
+
+// Nhãn tiếng Việt cho chấm SLA (trước đây tooltip in mã thô 'at_risk' / 'overdue')
+const SLA_TIP: Record<string, string> = {
+  overdue: 'Quá hạn xử lý ở bộ phận hiện tại',
+  at_risk: 'Sắp quá hạn xử lý',
+  on_track: 'Đúng hạn',
 }
 
 interface Props {
@@ -178,11 +185,11 @@ export default function SalesOrderSplitView({ orders, loading, onOrderUpdated, l
     <div style={hintsFooter}>
       <span><strong style={{ color: '#595959' }}>Phím tắt:</strong></span>
       <span><span style={kbd}>J</span><span style={kbd}>K</span> chuyển đơn</span>
-      <span><span style={kbd}>/</span> focus search</span>
-      <span><span style={kbd}>Ctrl</span><span style={kbd}>K</span> command palette</span>
-      <span><span style={kbd}>Click</span> mở chi tiết</span>
+      {/* (bỏ gợi ý phím "/" — không có phím nào gắn; bỏ chữ "Auto-save · giờ" — không có gì tự lưu) */}
+      <span><span style={kbd}>Ctrl</span><span style={kbd}>K</span> tìm nhanh</span>
+      <span><span style={kbd}>Bấm</span> mở chi tiết</span>
       <span style={{ marginLeft: 'auto', color: '#bfbfbf' }}>
-        {orders.length} đơn · Auto-save · {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+        {orders.length} đơn
       </span>
     </div>
     </div>
@@ -251,11 +258,11 @@ function OrderItem({ order, selected, onClick, lp }: {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={itemCode}>
-            {order.contract_no || order.code || order.id.slice(0, 8)}
+            {soDisplayCode(order)}
           </span>
           {slaStatus !== 'pending' && slaStatus !== 'done' && (
             <span
-              title={`SLA: ${slaStatus}`}
+              title={SLA_TIP[slaStatus] || slaStatus}
               style={{
                 width: 8, height: 8, borderRadius: 4,
                 background: slaColor, flexShrink: 0,
@@ -309,10 +316,10 @@ function OrderItem({ order, selected, onClick, lp }: {
                 borderRadius: 10, lineHeight: '16px',
               }}
             >
-              ⚠ +{daysOver}d SLA
+              ⚠ Quá hạn {daysOver} ngày
             </Tag>
           )}
-          <span style={itemValue}>{fmtUSD(order.total_value_usd)}</span>
+          <span style={itemValue}>{fmtOrderValue(order)}</span>
         </div>
       </div>
     </div>

@@ -13,7 +13,43 @@ import {
   CreditCard,
   Receipt,
 } from 'lucide-react'
-import { type PurchaseOrderHistory } from '../../../../../services/purchaseOrderService'
+import { type PurchaseOrderHistory, PO_STATUS_LABELS } from '../../../../../services/purchaseOrderService'
+import { fmtDate, fmtDateTime } from '../../../../../utils/format'
+
+// ===== NHÃN TIẾNG VIỆT (trước đây thiếu mô tả thì in thẳng mã 'status_changed', và in JSON {"status":"draft"}) =====
+
+const HISTORY_LABELS: Record<string, string> = {
+  created: 'Tạo đơn hàng',
+  updated: 'Cập nhật đơn hàng',
+  confirmed: 'Xác nhận đơn hàng',
+  status_changed: 'Đổi trạng thái',
+  items_updated: 'Cập nhật vật tư',
+  cancelled: 'Hủy đơn hàng',
+  invoice_added: 'Thêm hóa đơn',
+  payment_added: 'Ghi nhận thanh toán',
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  status: 'Trạng thái',
+  project_name: 'Dự án',
+  expected_delivery_date: 'Ngày giao dự kiến',
+  confirmation_files: 'File xác nhận',
+}
+
+/** Giá trị cũ/mới của lịch sử → chữ đọc được (trạng thái theo PO_STATUS_LABELS, ngày DD/MM/YYYY) */
+function describeHistoryValue(v: unknown): string {
+  if (v === null || v === undefined) return '—'
+  if (typeof v !== 'object') return String(v)
+  return Object.entries(v as Record<string, unknown>)
+    .map(([k, val]) => {
+      const label = FIELD_LABELS[k] || k
+      if (k === 'status') return `${label}: ${PO_STATUS_LABELS[val as keyof typeof PO_STATUS_LABELS] || String(val)}`
+      if (k === 'confirmation_files') return `${label}: ${Array.isArray(val) ? val.length : 0} file`
+      if (k.endsWith('_date')) return `${label}: ${fmtDate(val as string)}`
+      return `${label}: ${val === null || val === undefined || val === '' ? '—' : String(val)}`
+    })
+    .join(' · ')
+}
 
 // ===== HISTORY ICONS =====
 
@@ -76,7 +112,7 @@ export function OrderHistoryTab({ history }: OrderHistoryTabProps) {
             {/* Content */}
             <div className="pb-4 flex-1">
               <p className="text-sm text-gray-900">
-                {entry.description || entry.action}
+                {entry.description || HISTORY_LABELS[entry.action] || entry.action}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 {entry.performer && (
@@ -85,7 +121,7 @@ export function OrderHistoryTab({ history }: OrderHistoryTabProps) {
                   </span>
                 )}
                 <span className="text-xs text-gray-400">
-                  {new Date(entry.performed_at).toLocaleString('vi-VN')}
+                  {fmtDateTime(entry.performed_at)}
                 </span>
               </div>
 
@@ -99,9 +135,9 @@ export function OrderHistoryTab({ history }: OrderHistoryTabProps) {
               {/* Hiển thị old_value → new_value nếu có */}
               {entry.old_value && entry.new_value && (
                 <p className="text-xs text-gray-400 mt-1">
-                  {typeof entry.old_value === 'string' ? entry.old_value : JSON.stringify(entry.old_value)}
+                  {describeHistoryValue(entry.old_value)}
                   {' → '}
-                  {typeof entry.new_value === 'string' ? entry.new_value : JSON.stringify(entry.new_value)}
+                  {describeHistoryValue(entry.new_value)}
                 </p>
               )}
             </div>

@@ -14,34 +14,31 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Tag, Spin, Modal, message } from 'antd'
-import type { SalesOrder } from '../../../services/sales/salesTypes'
-import { soDisplayCode } from '../../../services/sales/salesTypes'
+import type { SalesOrder, PackingType } from '../../../services/sales/salesTypes'
+import {
+  soDisplayCode, polLabel, PACKING_TYPE_LABELS, PAYMENT_TERMS_LABELS, PAYMENT_TERMS_EXTENDED_LABELS,
+} from '../../../services/sales/salesTypes'
 import { fmtMoney, priceUnitLabel, orderTotalInCurrency } from '../../../services/sales/salesMoney'
+import { outstandingUsd } from '../../../services/sales/salesStages'
 import { balesFromTons } from '../../../services/sales/baleMath'
 import {
   salesContractWorkflowService,
   type SalesOrderContract,
 } from '../../../services/sales/salesContractWorkflowService'
 import { DEFAULT_BANK, amountToWords, type ContractFormData } from '../../../services/sales/contractGeneratorService'
+import { fmtDate, fmtDateTime } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import OrderFilesWidget from './OrderFilesWidget'
+import { CONTRACT_STATUS_LABELS } from './ContractWorkflowSection'
 import LotProgressTable from '../../../components/sales/LotProgressTable'
-
-
 
 const PRIMARY = '#1B4D3E'
 
-const fmtUSD = (v: number | undefined | null) => {
-  if (!v) return '—'
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v)}`
-}
-const fmtFull = (v: number | undefined | null) =>
-  v ? '$' + Math.round(v).toLocaleString('en-US') : '—'
-const fmtDate = (d?: string | null) =>
-  d ? new Date(d).toLocaleDateString('vi-VN') : '—'
-const fmtDateTime = (d?: string | null) =>
-  d ? new Date(d).toLocaleString('vi-VN') : '—'
+/** USD 0 số lẻ cho thẻ tổng quan (luôn có "$"). */
+const fmtFull = (v: number | undefined | null) => fmtMoney(v, 'USD', { decimals: 0 })
+
+// Trạng thái đơn mà hàng CHƯA rời nhà máy — chỉ những đơn này mới "quá hạn giao" được
+const NOT_YET_SHIPPED = ['draft', 'confirmed', 'producing', 'ready', 'packing']
 
 interface Props {
   order: SalesOrder
@@ -164,8 +161,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
           setContracts(rows)
           onChanged?.()
         } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e)
-          message.error(`Tạo HĐ thất bại: ${msg}`)
+          message.error(dichLoiHeThong(e, 'Tạo HĐ thất bại'))
         } finally {
           setCreatingContract(false)
         }
@@ -173,14 +169,15 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
     })
   }
 
-  // Tính SLA + overdue
+  // Tính SLA + overdue — chỉ với đơn hàng CHƯA xuất (đơn đã xuất/giao/thu tiền mà ngày giao đã
+  // qua thì không phải "quá hạn giao"; trước đây banner đỏ hiện mãi cho cả đơn đã giao xong).
   let slaOver: number | null = null
   let slaTitle: string | null = null
-  if (order.delivery_date) {
+  if (order.delivery_date && NOT_YET_SHIPPED.includes(order.status)) {
     const days = Math.floor((Date.now() - new Date(order.delivery_date).getTime()) / 86400000)
     if (days > 0) {
       slaOver = days
-      slaTitle = `Đơn này quá hạn giao (delivery_date ${fmtDate(order.delivery_date)})`
+      slaTitle = `Đơn này quá hạn giao (ngày giao ${fmtDate(order.delivery_date)})`
     }
   }
 
@@ -214,7 +211,12 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
               Đã quá <strong>{slaOver} ngày</strong>. Đề xuất: liên hệ Logistics + KH để dời ETD; cập nhật shipment plan.
             </div>
           </div>
-          <Button size="small" type="primary" danger>→ Xử lý ngay</Button>
+          {/* Trước đây nút "→ Xử lý ngay" không có onClick (nút chết) — nay mở tab Vận chuyển để dời ETD */}
+          {onNavigateTab && (
+            <Button size="small" type="primary" danger onClick={() => onNavigateTab('shipping')}>
+              → Mở tab Vận chuyển
+            </Button>
+          )}
         </div>
       )}
 
@@ -227,7 +229,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
           background: 'linear-gradient(135deg, #fff 0%, #f0f9f4 100%)',
           border: '1px solid #d9f4e3',
         }}>
-          <div style={cardTitle}>📋 Workflow HĐ</div>
+          <div style={cardTitle}>📋 Quy trình HĐ</div>
           {loadingContracts ? (
             <Spin size="small" />
           ) : !latest ? (
@@ -248,7 +250,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
                 title={`Sale${latest.created_by_employee ? ` (${latest.created_by_employee.full_name})` : ''} ${latest.submitted_at ? 'đã lên HĐ' : 'tạo HĐ'}`}
                 meta={latest.submitted_at
                   ? `${fmtDateTime(latest.submitted_at)} · rev #${latest.revision_no}`
-                  : 'Chưa submit'}
+                  : 'Chưa trình'}
               />
 
               {latest.status === 'reviewing' && (
@@ -362,8 +364,11 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
                       <td style={td}>{(item.quantity_tons || 0).toFixed(2)}</td>
                       <td style={td}>{fmtMoney(item.unit_price || 0, order.currency, { decimals: 0 })}</td>
                       <td style={td}>{bales.toLocaleString('vi-VN')}</td>
-                      <td style={td}>{(item.packing_type || '—').replace(/_/g, ' ')}</td>
-                      <td style={td}>{item.payment_terms || '—'}</td>
+                      {/* Nhãn đóng gói / điều khoản từ map chung — không in mã thô 'sw_plastic_pallet', 'LC_30' */}
+                      <td style={td}>{item.packing_type ? (PACKING_TYPE_LABELS[item.packing_type as PackingType] || item.packing_type.replace(/_/g, ' ')) : '—'}</td>
+                      <td style={td}>{item.payment_terms
+                        ? ((PAYMENT_TERMS_LABELS as Record<string, string>)[item.payment_terms] || PAYMENT_TERMS_EXTENDED_LABELS[item.payment_terms] || item.payment_terms)
+                        : '—'}</td>
                       <td style={{ ...td, textAlign: 'right', paddingRight: 16 }}>
                         <strong>{fmtMoney(total, order.currency, { decimals: 0 })}</strong>
                       </td>
@@ -396,14 +401,14 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
               ? fmtFull((order as { commission_amount?: number }).commission_amount)
               : '—'
           } />
-          <FieldRow label="Đã TT" value={
-            (order as { paid_amount?: number }).paid_amount
-              ? fmtFull((order as { paid_amount?: number }).paid_amount)
-              : '$0'
-          } />
+          {/* ⚠ Trước đây đọc cột `paid_amount` KHÔNG tồn tại trên sales_orders → "Đã TT" luôn $0 và
+              "Còn lại" luôn = cả hợp đồng. Số đã thu thật = actual_payment_amount (trigger
+              trg_sop_sync_order cộng từ sales_order_payments); còn lại dùng outstandingUsd chung
+              với Kanban. Đơn VNĐ: hai dòng này là USD quy đổi. */}
+          <FieldRow label="Đã thu" value={fmtFull(order.actual_payment_amount || 0)} />
           <FieldRow
-            label="Còn lại"
-            value={fmtFull((order.total_value_usd || 0) - ((order as { paid_amount?: number }).paid_amount || 0))}
+            label="Còn phải thu"
+            value={fmtFull(outstandingUsd(order))}
             highlight
           />
         </div>
@@ -411,7 +416,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
         <div style={card}>
           <div style={cardTitle}>🚢 Vận chuyển</div>
           <FieldRow label="Incoterm" value={(order as { incoterm?: string }).incoterm || '—'} />
-          <FieldRow label="POL" value={(order as { port_of_loading?: string }).port_of_loading || '—'} />
+          <FieldRow label="POL" value={polLabel(order.port_of_loading)} />
           <FieldRow label="POD" value={(order as { port_of_destination?: string }).port_of_destination || '—'} />
           <FieldRow
             label="Container"
@@ -430,14 +435,20 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
         <div style={card}>
           <div style={cardTitle}>🔗 Liên kết</div>
           <LinkRow icon="📋" label={`HĐ${latest ? ` rev #${latest.revision_no}` : ''}`}
-                   value={latest ? `Status: ${latest.status}` : 'Chưa có'}
+                   value={latest ? `Trạng thái: ${CONTRACT_STATUS_LABELS[latest.status] || latest.status}` : 'Chưa có'}
                    onClick={latest ? () => navigate('/sales/contracts/review') : undefined} />
+          {/* 3 dòng dưới trước đây in chữ CỐ ĐỊNH sai sự thật: Lệnh SX đọc cột không tồn tại (luôn
+              "chưa lập"), "COA + PL — chưa lập" gõ cứng, "Phiếu cân: Đã cân" suy từ số booking.
+              Nay đọc cờ thật trên đơn + mở đúng tab để xem. */}
           <LinkRow icon="🏭" label="Lệnh SX"
-                   value={(order as { production_order_code?: string }).production_order_code || '— chưa lập'} />
-          <LinkRow icon="📑" label="COA + PL"
-                   value="— chưa lập" />
-          <LinkRow icon="🚛" label="Phiếu cân"
-                   value={(order as { booking_reference?: string }).booking_reference ? 'Đã cân' : '— chưa cân'} />
+                   value={order.production_order_id ? 'Đã lập — xem tab Sản xuất' : '— chưa lập'}
+                   onClick={order.production_order_id && onNavigateTab ? () => onNavigateTab('production') : undefined} />
+          <LinkRow icon="📑" label="Invoice + PL"
+                   value={`Invoice ${order.invoice_generated ? '✓' : '—'} · PL ${order.packing_list_generated ? '✓' : '—'}`}
+                   onClick={onNavigateTab ? () => onNavigateTab('documents') : undefined} />
+          <LinkRow icon="🚛" label="Giao hàng"
+                   value="Xem tiến độ lô / tab Đóng gói"
+                   onClick={onNavigateTab ? () => onNavigateTab('packing') : undefined} />
         </div>
       </div>
     </div>
@@ -522,40 +533,41 @@ function humanDuration(s?: string | null): string {
   const ms = Date.now() - new Date(s).getTime()
   const h = ms / 3600000
   if (h < 1) return `${Math.round(ms / 60000)} phút`
-  if (h < 24) return `${Math.round(h)}h`
-  return `${Math.round(h / 24)}d`
+  if (h < 24) return `${Math.round(h)} giờ`
+  return `${Math.round(h / 24)} ngày`
 }
 
 function buildTimelineItems(c: SalesOrderContract): Array<{
-  title: string; meta: string; color: string;
+  title: string; meta: string; color: string; at: string;
 }> {
-  const items: Array<{ title: string; meta: string; color: string }> = []
+  // `at` = mốc ISO gốc để SẮP XẾP — trước đây sort theo chuỗi ngày đã định dạng (sai thứ tự)
+  const items: Array<{ title: string; meta: string; color: string; at: string }> = []
   if (c.signed_at) {
     items.push({
       title: `${c.signer_employee?.full_name || 'Trình ký'} ký HĐ rev #${c.revision_no}`,
-      meta: fmtDateTime(c.signed_at), color: '#389e0d',
+      meta: fmtDateTime(c.signed_at), color: '#389e0d', at: c.signed_at,
     })
   }
   if (c.rejected_at) {
     items.push({
       title: `${c.reviewer_employee?.full_name || 'Kiểm tra'} trả lại rev #${c.revision_no}`,
       meta: `${fmtDateTime(c.rejected_at)}${c.rejected_reason ? ` — "${c.rejected_reason}"` : ''}`,
-      color: '#cf1322',
+      color: '#cf1322', at: c.rejected_at,
     })
   }
   if (c.reviewed_at && !c.rejected_at) {
     items.push({
       title: `${c.reviewer_employee?.full_name || 'Kiểm tra'} duyệt rev #${c.revision_no}`,
-      meta: fmtDateTime(c.reviewed_at), color: '#fa8c16',
+      meta: fmtDateTime(c.reviewed_at), color: '#fa8c16', at: c.reviewed_at,
     })
   }
   if (c.submitted_at) {
     items.push({
       title: `${c.created_by_employee?.full_name || 'Sale'} trình rev #${c.revision_no}`,
-      meta: fmtDateTime(c.submitted_at), color: '#1677ff',
+      meta: fmtDateTime(c.submitted_at), color: '#1677ff', at: c.submitted_at,
     })
   }
-  return items.sort((a, b) => b.meta.localeCompare(a.meta))
+  return items.sort((a, b) => (b.at || '').localeCompare(a.at || ''))
 }
 
 // ─── Inline styles ───────────────────────────────────────────────────

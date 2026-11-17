@@ -17,6 +17,7 @@ import {
   formatRelativeTime,
 } from '../../services/taskCommentService'
 import { useAuthStore } from '../../stores/authStore'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text } = Typography
 const { TextArea } = Input
@@ -85,7 +86,7 @@ export default function TaskComments({ taskId }: TaskCommentsProps) {
       }
       setNewContent('')
     } catch (err: any) {
-      message.error(err.message || 'Không thể gửi bình luận')
+      message.error(dichLoiHeThong(err, 'Không thể gửi bình luận'))
     }
     setSending(false)
   }
@@ -105,7 +106,7 @@ export default function TaskComments({ taskId }: TaskCommentsProps) {
       setEditContent('')
       message.success('Đã cập nhật')
     } catch (err: any) {
-      message.error(err.message || 'Không thể cập nhật')
+      message.error(dichLoiHeThong(err, 'Không thể cập nhật'))
     }
   }
 
@@ -117,7 +118,7 @@ export default function TaskComments({ taskId }: TaskCommentsProps) {
       setComments(prev => prev.filter(c => c.id !== commentId))
       message.success('Đã xóa bình luận')
     } catch (err: any) {
-      message.error(err.message || 'Không thể xóa')
+      message.error(dichLoiHeThong(err, 'Không thể xóa'))
     }
   }
 

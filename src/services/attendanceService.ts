@@ -13,6 +13,28 @@
 
 import { supabase } from '../lib/supabase'
 import { autoCheckoutService } from './autoCheckoutService'
+import { toDateStrVN } from '../utils/dateVN'
+
+// ============================================================================
+// NHÃN TRẠNG THÁI (một nguồn — Bảng chấm công, bộ lọc, tooltip)
+// ============================================================================
+
+/** Nhãn trạng thái chấm công — ĐÚNG 6 giá trị của CHECK attendance_status_check
+ *  (sprint5_r3_tighten_attendance_security.sql). "Vắng" KHÔNG phải trạng thái lưu trong DB:
+ *  vắng = ngày có ca mà không có dòng chấm công → xem ở Bảng chấm công tháng (ký hiệu X). */
+export const ATTENDANCE_STATUS_LABELS: Record<string, string> = {
+  present: 'Đúng giờ',
+  late: 'Đi trễ',
+  early_leave: 'Về sớm',
+  late_and_early: 'Trễ & về sớm',
+  business_trip: 'Công tác',
+  leave: 'Nghỉ phép',
+}
+
+/** Giá trị lọc riêng của getAll: dòng có cột auto_checkout = true (KHÔNG phải một status). */
+export const ATTENDANCE_FILTER_AUTO_CHECKOUT = 'auto_checkout'
+/** Hệ thống tự ghi giờ ra theo giờ kết thúc ca (cron auto_checkout) — nhãn hiện cho người dùng. */
+export const AUTO_CHECKOUT_LABEL = 'Tự chốt giờ ra'
 
 // ============================================================================
 // TYPES
@@ -498,7 +520,10 @@ export const attendanceService = {
 
     if (from_date) query = query.gte('date', from_date)
     if (to_date) query = query.lte('date', to_date)
-    if (status && status !== 'all') query = query.eq('status', status)
+    // "Tự chốt giờ ra" là cột boolean auto_checkout, không phải giá trị status — bản cũ
+    // .eq('status','auto_checkout') luôn ra 0 dòng (bộ lọc chết)
+    if (status === ATTENDANCE_FILTER_AUTO_CHECKOUT) query = query.eq('auto_checkout', true)
+    else if (status && status !== 'all') query = query.eq('status', status)
     if (shift_id && shift_id !== 'all') query = query.eq('shift_id', shift_id)
 
     const { data, error, count } = await query
@@ -620,14 +645,14 @@ export const attendanceService = {
         const stillOpen = await this.getOpenAttendance(employeeId)
         if (stillOpen) {
           throw new Error(
-            `Bạn chưa check-out ca ${stillOpen.shift?.name || 'trước đó'}. Vui lòng check-out trước.`
+            `Bạn chưa ra ca ${stillOpen.shift?.name || 'trước đó'}. Vui lòng bấm Ra ca trước.`
           )
         }
         console.log(`[CheckIn V6] Auto-closed expired record for ${employeeId}`)
       } else {
         // Chưa đủ điều kiện → NV phải tự checkout
         throw new Error(
-          `Bạn chưa check-out ca ${openRecord.shift?.name || 'trước đó'}. Vui lòng check-out trước.`
+          `Bạn chưa ra ca ${openRecord.shift?.name || 'trước đó'}. Vui lòng bấm Ra ca trước.`
         )
       }
     }
@@ -708,7 +733,7 @@ export const attendanceService = {
         .limit(1)
 
       if (dup && dup.length > 0) {
-        throw new Error(`Bạn đã check-in ca ${selectedShift.shift.name} ngày ${attendanceDate} rồi`)
+        throw new Error(`Bạn đã vào ca ${selectedShift.shift.name} ngày ${attendanceDate} rồi`)
       }
     } else {
       const { data: dup } = await supabase
@@ -719,7 +744,7 @@ export const attendanceService = {
         .limit(1)
 
       if (dup && dup.length > 0) {
-        throw new Error('Bạn đã check-in hôm nay rồi')
+        throw new Error('Bạn đã vào ca hôm nay rồi')
       }
     }
 
@@ -805,7 +830,7 @@ export const attendanceService = {
     const nowISO = now.toISOString()
 
     const openRecord = await this.getOpenAttendance(employeeId)
-    if (!openRecord) throw new Error('Không tìm thấy ca đang mở. Bạn chưa check-in.')
+    if (!openRecord) throw new Error('Không tìm thấy ca đang mở — bạn chưa vào ca.')
 
     const checkOutLat = gps?.latitude || null
     const checkOutLng = gps?.longitude || null
@@ -943,7 +968,8 @@ export const attendanceService = {
 
   async getMonthlyReport(year: number, month: number, departmentId?: string): Promise<AttendanceRecord[]> {
     const startDate = `${year}-${month.toString().padStart(2, '0')}-01`
-    const endDate = new Date(year, month, 0).toISOString().split('T')[0]
+    // Ngày cuối tháng theo LỊCH — toISOString (UTC) biến nửa đêm giờ VN thành ngày hôm trước → sót ngày cuối tháng
+    const endDate = toDateStrVN(new Date(year, month, 0))
 
     let query = supabase
       .from('attendance').select(ATTENDANCE_SELECT)

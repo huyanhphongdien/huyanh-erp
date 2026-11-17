@@ -41,6 +41,10 @@ import {
   StatsFilter,
 } from '../../../services/taskAnalyticsService';
 import { departmentService } from '../../../services/departmentService';
+import { RATING_LABELS, calculateRating } from '../../../types/evaluation.types';
+import PageState from '../../../components/common/PageState';
+import { fmtDate } from '../../../utils/format';
+import { toDateStrVN } from '../../../utils/dateVN';
 
 // ============================================================================
 // TYPES
@@ -83,10 +87,12 @@ function getMonthRange(monthsAgo: number = 0): { from: string; to: string } {
   
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
-  
+
+  // Ngày theo giờ VN — toISOString() của nửa đêm địa phương ra ngày HÔM TRƯỚC (UTC):
+  // "Tháng này" từng thành 31/10 → 29/11 (lấn 1 ngày tháng trước, mất ngày cuối tháng)
   return {
-    from: firstDay.toISOString().split('T')[0],
-    to: lastDay.toISOString().split('T')[0],
+    from: toDateStrVN(firstDay),
+    to: toDateStrVN(lastDay),
   };
 }
 
@@ -100,8 +106,8 @@ function getQuarterRange(): { from: string; to: string } {
   const lastDay = new Date(year, firstMonth + 3, 0);
   
   return {
-    from: firstDay.toISOString().split('T')[0],
-    to: lastDay.toISOString().split('T')[0],
+    from: toDateStrVN(firstDay),
+    to: toDateStrVN(lastDay),
   };
 }
 
@@ -113,15 +119,20 @@ function getYearRange(): { from: string; to: string } {
   };
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('vi-VN');
-}
+const formatDate = fmtDate;
+
+// Nhãn xếp loại lấy MỘT nguồn calculateRating + RATING_LABELS (evaluation.types.ts) — bản chép cũ
+// gọi mức 50–69 là "Khá" trong khi mọi nơi khác "Trung bình". Màu chữ là của riêng trang.
+const RATING_TEXT_COLOR: Record<string, string> = {
+  excellent: 'text-emerald-600',
+  good: 'text-blue-600',
+  average: 'text-yellow-600',
+  below_average: 'text-red-600',
+};
 
 function getRatingLabel(score: number): { label: string; color: string } {
-  if (score >= 90) return { label: 'Xuất sắc', color: 'text-emerald-600' };
-  if (score >= 70) return { label: 'Tốt', color: 'text-blue-600' };
-  if (score >= 50) return { label: 'Khá', color: 'text-yellow-600' };
-  return { label: 'Cần cải thiện', color: 'text-red-600' };
+  const r = calculateRating(score);
+  return { label: RATING_LABELS[r], color: RATING_TEXT_COLOR[r] };
 }
 
 // ============================================================================
@@ -357,6 +368,8 @@ export const TaskOverviewTab: React.FC<TaskOverviewTabProps> = ({
 }) => {
   // State
   const [loading, setLoading] = useState(true);
+  // Lỗi tải: trước đây chỉ console.error → thẻ số hiện 0 như thật
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [stats, setStats] = useState<OverviewStats | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [activeQuickFilter, setActiveQuickFilter] = useState('this_month');
@@ -394,8 +407,10 @@ export const TaskOverviewTab: React.FC<TaskOverviewTabProps> = ({
         const { data, error } = await taskStatsService.getOverviewStats(filter);
         if (error) throw error;
         setStats(data);
+        setLoadError(null);
       } catch (error) {
         console.error('Error loading stats:', error);
+        setLoadError(error);
       } finally {
         setLoading(false);
       }
@@ -518,8 +533,10 @@ export const TaskOverviewTab: React.FC<TaskOverviewTabProps> = ({
         <QuickDateFilter active={activeQuickFilter} onSelect={handleQuickFilter} />
       </div>
 
-      {/* ========== STATS CARDS ========== */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      {!!loadError && <PageState error={loadError} onRetry={handleRefresh} minHeight={0} />}
+
+      {/* ========== STATS CARDS ========== (lỗi mà chưa có số → giấu, đừng hiện 0 như thật) */}
+      <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 ${loadError && !stats ? 'hidden' : ''}`}>
         <StatsCard
           icon={<FileText className="w-5 h-5" />}
           label="Tổng công việc"

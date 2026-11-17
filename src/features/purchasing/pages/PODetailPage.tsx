@@ -40,6 +40,7 @@ import {
   Eye,
   Info,
 } from 'lucide-react';
+import { App as AntdApp } from 'antd';
 import {
   purchaseOrderService,
   type PurchaseOrder,
@@ -48,6 +49,8 @@ import {
 } from '../../../services/purchaseOrderService';
 import { supabase } from '../../../lib/supabase';
 import { useAuthStore } from '../../../stores/authStore';
+import { fmtVnd as formatCurrency, fmtDate, fmtNum } from '../../../utils/format';
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong';
 
 // Components
 import { OrderStatusBadge } from './components/orders/OrderStatusBadge';
@@ -62,36 +65,26 @@ import PaymentFormModal from './components/payments/PaymentFormModal';
 // CONSTANTS
 // ============================================================================
 
+// Nhãn trạng thái: OrderStatusBadge đọc PO_STATUS_LABELS của service (bản chép cũ ở đây đã xoá)
 type OrderStatus = 'draft' | 'confirmed' | 'partial' | 'completed' | 'cancelled';
-
-const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-  draft: 'Nháp',
-  confirmed: 'Đã xác nhận',
-  partial: 'Đang giao',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
-};
 
 const MAX_CONFIRM_FILES = 5;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-  }).format(amount);
-}
+// formatCurrency = fmtVnd (utils/format) — bản tự viết cũ đã xoá
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024) return `${fmtNum(bytes / 1024, 1)} KB`;
+  return `${fmtNum(bytes / (1024 * 1024), 1)} MB`;
 }
 
 // ============================================================================
 // HELPERS: Auto-generate approval number & default approver
 // ============================================================================
 
+/** Số đề xuất kế tiếp. Không đếm được (lỗi mạng/quyền) → trả '' để người dùng GÕ TAY số trên phiếu,
+ *  không chế số giả theo giờ máy như trước. */
 async function generateApprovalNumber(): Promise<string> {
   const year = new Date().getFullYear();
   const prefix = `DX-${year}-`;
@@ -104,33 +97,41 @@ async function generateApprovalNumber(): Promise<string> {
     const next = ((count || 0) + 1).toString().padStart(6, '0');
     return `${prefix}${next}`;
   } catch {
-    const ts = Date.now().toString().slice(-6);
-    return `${prefix}${ts}`;
+    return '';
   }
 }
 
+/**
+ * Người duyệt MẶC ĐỊNH = Giám đốc đang làm việc, tra theo chức danh (bảng positions — employees không có
+ * cột `position` text, bản cũ query cột đó nên luôn rơi về tên gõ cứng). Chỉ là gợi ý: ô vẫn sửa được
+ * khi Phó GĐ/người khác ký. Không tìm được → '' để người dùng nhập. KHÔNG gõ cứng tên riêng trong code.
+ */
 async function fetchDefaultApprover(): Promise<string> {
   try {
-    const { data } = await supabase
-      .from('employees')
-      .select('full_name, position')
-      .or('position.ilike.%giám đốc%,position.ilike.%giam doc%,position.ilike.%director%')
-      .eq('status', 'active')
-      .limit(1)
-      .single();
-    if (data) return `${data.full_name} - ${data.position || 'Giám đốc'}`;
+    const { data: positions } = await supabase
+      .from('positions')
+      .select('id, name, level')
+      .or('name.ilike.%giám đốc%,name.ilike.%giam doc%,name.ilike.%director%')
+      .not('name', 'ilike', '%phó%')
+      .order('level', { ascending: true })
+      .limit(5);
+    const ids = (positions || []).map((p: any) => p.id);
+    if (ids.length === 0) return '';
 
-    // Fallback: tìm theo tên
-    const { data: byName } = await supabase
+    const { data: emps } = await supabase
       .from('employees')
-      .select('full_name, position')
-      .ilike('full_name', '%Lê Văn Huy%')
-      .limit(1)
-      .single();
-    if (byName) return `${byName.full_name} - ${byName.position || 'Giám đốc'}`;
-    return 'Lê Văn Huy - Giám đốc';
+      .select('full_name, position_id')
+      .in('position_id', ids)
+      .eq('status', 'active')
+      .limit(20);
+    // Chọn theo thứ tự cấp chức danh (level nhỏ = cấp cao)
+    for (const p of positions || []) {
+      const e = (emps || []).find((x: any) => x.position_id === (p as any).id);
+      if (e) return `${e.full_name} - ${(p as any).name || 'Giám đốc'}`;
+    }
+    return '';
   } catch {
-    return 'Lê Văn Huy - Giám đốc';
+    return '';
   }
 }
 
@@ -161,6 +162,7 @@ function ConfirmOrderModal({
   const [approvalNumber, setApprovalNumber] = useState('');
   const [approvalDate, setApprovalDate] = useState('');
   const [approvedByName, setApprovedByName] = useState('');
+  const [autoNumberFailed, setAutoNumberFailed] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -180,6 +182,7 @@ function ConfirmOrderModal({
       setApprovalNumber('');
       setApprovalDate('');
       setApprovedByName('');
+      setAutoNumberFailed(false);
       return;
     }
     if (initialized.current) return;
@@ -193,12 +196,15 @@ function ConfirmOrderModal({
           fetchDefaultApprover(),
         ]);
         setApprovalNumber(autoNumber);
+        setAutoNumberFailed(!autoNumber);
         setApprovalDate(new Date().toLocaleDateString('sv-SE'));
         setApprovedByName(defaultApprover);
       } catch {
-        setApprovalNumber(`DX-${new Date().getFullYear()}-000001`);
+        // Không tự điền được → để trống cho người dùng nhập (không đoán số/tên)
+        setApprovalNumber('');
+        setAutoNumberFailed(true);
         setApprovalDate(new Date().toLocaleDateString('sv-SE'));
-        setApprovedByName('Lê Văn Huy - Giám đốc');
+        setApprovedByName('');
       } finally {
         setInitLoading(false);
       }
@@ -260,11 +266,15 @@ function ConfirmOrderModal({
 
   const handleSubmit = () => {
     if (!approvalNumber.trim()) {
-      setError('Vui lòng nhập số đề xuất');
+      setError('Vui lòng nhập số đề xuất (số trên phiếu đề xuất đã duyệt)');
       return;
     }
     if (!approvalDate) {
       setError('Vui lòng chọn ngày duyệt');
+      return;
+    }
+    if (!approvedByName.trim()) {
+      setError('Vui lòng nhập tên người duyệt (người đã ký phiếu đề xuất)');
       return;
     }
     if (files.length === 0) {
@@ -283,7 +293,8 @@ function ConfirmOrderModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={!loading ? onClose : undefined} />
+      {/* Form dài + file đính kèm: bấm trúng nền KHÔNG đóng (mất file đã chọn) — đóng bằng nút X / Hủy */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl z-10">
@@ -328,15 +339,28 @@ function ConfirmOrderModal({
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
                   <Hash className="w-4 h-4 text-gray-400" />
-                  Số đề xuất / Số phiếu duyệt
+                  Số đề xuất / Số phiếu duyệt <span className="text-red-500">*</span>
                 </label>
+                {/* Số tự sinh = KHOÁ (như bản gốc): số kế tiếp = đếm số 'DX-năm-%' đã có + 1, gõ đè số khác dãy thì lần
+                    sau sinh TRÙNG/nhảy số. Chỉ mở gõ tay khi không tự sinh được (lỗi mạng/quyền → ô trống). */}
                 <input
                   type="text"
                   value={approvalNumber}
-                  readOnly
-                  className="w-full px-4 py-2.5 text-[15px] border border-gray-300 rounded-xl bg-gray-50 text-gray-600 cursor-not-allowed"
+                  onChange={(e) => setApprovalNumber(e.target.value)}
+                  readOnly={!autoNumberFailed}
+                  disabled={loading}
+                  placeholder="VD: DX-2026-000123"
+                  className={`w-full px-4 py-2.5 text-[15px] border border-gray-300 rounded-xl disabled:opacity-50 ${
+                    autoNumberFailed
+                      ? 'focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      : 'bg-gray-50 text-gray-600 cursor-not-allowed focus:outline-none'
+                  }`}
                 />
-                <p className="text-xs text-gray-400 mt-1">Hệ thống tự tạo, tự động tăng</p>
+                <p className={`text-xs mt-1 ${autoNumberFailed ? 'text-amber-600' : 'text-gray-400'}`}>
+                  {autoNumberFailed
+                    ? 'Không tự tạo được số — gõ số trên phiếu đề xuất đã duyệt (theo dãy DX-năm-số thứ tự)'
+                    : 'Hệ thống tự tạo theo dãy DX-năm-số thứ tự, tự động tăng — không sửa tay'}
+                </p>
               </div>
 
               {/* Ngày duyệt */}
@@ -358,15 +382,17 @@ function ConfirmOrderModal({
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
                   <User className="w-4 h-4 text-gray-400" />
-                  Người duyệt
+                  Người duyệt <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={approvedByName}
-                  readOnly
-                  className="w-full px-4 py-2.5 text-[15px] border border-gray-300 rounded-xl bg-gray-50 text-gray-600 cursor-not-allowed"
+                  onChange={(e) => setApprovedByName(e.target.value)}
+                  disabled={loading}
+                  placeholder="Họ tên - chức danh người ký duyệt"
+                  className="w-full px-4 py-2.5 text-[15px] border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
                 />
-                <p className="text-xs text-gray-400 mt-1">Mặc định: Giám đốc</p>
+                <p className="text-xs text-gray-400 mt-1">Mặc định: Giám đốc — sửa nếu người khác duyệt (Phó GĐ, người được ủy quyền…)</p>
               </div>
 
               {/* Upload file */}
@@ -485,7 +511,7 @@ function ConfirmOrderModal({
             disabled={loading}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-50"
           >
-            Hủy
+            Đóng
           </button>
           <button
             onClick={handleSubmit}
@@ -537,9 +563,7 @@ function ApprovalEvidenceSection({ order }: { order: PurchaseOrder }) {
         <div>
           <p className="text-xs text-gray-500 mb-1">Ngày duyệt</p>
           <p className="text-sm font-medium text-gray-700">
-            {(order as any).approval_date
-              ? new Date((order as any).approval_date).toLocaleDateString('vi-VN')
-              : '—'}
+            {fmtDate((order as any).approval_date)}
           </p>
         </div>
         <div>
@@ -655,7 +679,7 @@ function DeleteModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={!loading ? onClose : undefined} />
       <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Xóa đơn hàng?</h3>
         <p className="text-sm text-gray-600 mb-4">
@@ -706,16 +730,18 @@ function CancelModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      {/* Đã gõ lý do thì bấm trúng nền không đóng (mất chữ) */}
+      <div className="absolute inset-0 bg-black/50" onClick={!loading && !reason.trim() ? onClose : undefined} />
       <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Hủy đơn hàng?</h3>
         <p className="text-sm text-gray-600 mb-3">
-          Đơn <strong>{orderCode}</strong> sẽ bị hủy.
+          Đơn <strong>{orderCode}</strong> sẽ bị hủy, không chuyển lại được trạng thái cũ.
         </p>
+        {/* Lý do BẮT BUỘC — service cancel() từ chối nếu trống (nhãn cũ ghi "tùy chọn" là sai) */}
         <textarea
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Lý do hủy (tùy chọn)..."
+          placeholder="Lý do hủy (bắt buộc) — vd: NCC hết hàng, đổi nhà cung cấp..."
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-4"
         />
@@ -729,7 +755,7 @@ function CancelModal({
           </button>
           <button
             onClick={() => onConfirm(reason)}
-            disabled={loading}
+            disabled={loading || !reason.trim()}
             className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
@@ -752,6 +778,7 @@ function PODetailPage() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const { user } = useAuthStore();
+  const { message } = AntdApp.useApp();
 
   // ===== STATE =====
   const [order, setOrder] = useState<PurchaseOrder | null>(null);
@@ -782,9 +809,14 @@ function PODetailPage() {
   const [paymentInvoiceNumber, setPaymentInvoiceNumber] = useState<string>('');
 
   // ===== LOAD DATA =====
+  // Lỗi tải (mạng/quyền) ≠ đơn không tồn tại: lỗi tải mới có nút "Thử lại"
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const loadOrder = useCallback(async () => {
     if (!id) return;
     setLoading(true);
+    setError(null);
+    setLoadFailed(false);
     try {
       const [orderData, itemsData, historyData] = await Promise.all([
         purchaseOrderService.getById(id),
@@ -802,7 +834,8 @@ function PODetailPage() {
       setHistory(historyData);
     } catch (err: any) {
       console.error('Error loading order:', err);
-      setError(err.message || 'Lỗi tải đơn hàng');
+      setError(dichLoiHeThong(err, 'Lỗi tải đơn hàng'));
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -888,7 +921,8 @@ function PODetailPage() {
 
       if (updateError) {
         console.error('Error saving approval data:', updateError);
-        // Không throw — vẫn tiếp tục confirm
+        // Không throw — vẫn tiếp tục confirm, nhưng PHẢI báo người dùng (trước đây nuốt im → hồ sơ duyệt thiếu mà không ai biết)
+        message.warning(dichLoiHeThong(updateError, 'Chưa lưu được thông tin phê duyệt (số đề xuất/người duyệt) — kiểm tra lại tab Thông tin'), 8);
       }
 
       // 3. Confirm đơn hàng
@@ -921,7 +955,7 @@ function PODetailPage() {
       loadOrder();
     } catch (err: any) {
       console.error('Error confirming order:', err);
-      alert(err.message || 'Lỗi xác nhận đơn hàng');
+      message.error(dichLoiHeThong(err, 'Lỗi xác nhận đơn hàng'));
     } finally {
       setActionLoading(false);
     }
@@ -938,7 +972,7 @@ function PODetailPage() {
       setShowCancelModal(false);
       loadOrder();
     } catch (err: any) {
-      alert(err.message || 'Lỗi hủy đơn hàng');
+      message.error(dichLoiHeThong(err, 'Lỗi hủy đơn hàng'));
     } finally {
       setActionLoading(false);
     }
@@ -954,7 +988,7 @@ function PODetailPage() {
         state: { message: `Đã xóa đơn hàng ${order.order_code}` },
       });
     } catch (err: any) {
-      alert(err.message || 'Lỗi xóa đơn hàng');
+      message.error(dichLoiHeThong(err, 'Lỗi xóa đơn hàng'));
     } finally {
       setActionLoading(false);
     }
@@ -1009,6 +1043,14 @@ function PODetailPage() {
           <p className="text-lg font-medium text-gray-900 mb-1">
             {error || 'Đơn hàng không tồn tại'}
           </p>
+          {loadFailed && (
+            <button
+              onClick={loadOrder}
+              className="mt-3 mr-4 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+            >
+              Thử lại
+            </button>
+          )}
           <button
             onClick={() => navigate('/purchasing/orders')}
             className="mt-3 text-sm text-blue-600 hover:underline"
@@ -1041,7 +1083,7 @@ function PODetailPage() {
   const TABS: { key: TabKey; label: string; icon: React.ElementType; count?: number }[] = [
     { key: 'info', label: 'Thông tin', icon: Info },
     { key: 'items', label: 'Vật tư', icon: Package, count: items.length },
-    { key: 'invoices', label: 'Hóa đơn & TT', icon: Receipt },
+    { key: 'invoices', label: 'Hóa đơn & Thanh toán', icon: Receipt },
     { key: 'history', label: 'Lịch sử', icon: History, count: history.length },
   ];
 
@@ -1108,7 +1150,7 @@ function PODetailPage() {
               className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg"
             >
               <Receipt className="w-4 h-4" />
-              Thêm HĐ
+              Thêm hóa đơn
             </button>
           )}
 
@@ -1160,7 +1202,7 @@ function PODetailPage() {
             Ngày tạo
           </p>
           <p className="text-sm font-medium text-gray-900 mt-0.5">
-            {new Date(order.order_date || order.created_at).toLocaleDateString('vi-VN')}
+            {fmtDate(order.order_date || order.created_at)}
           </p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-3">

@@ -24,12 +24,19 @@ import { BonusTierBadge } from '../../../components/b2b/BonusTierBadge'
 import { Hac13CodeDisplay } from '../../../components/master-data/Hac13CodeDisplay'
 import { QuarterlyBatchModal } from './QuarterlyBatchModal'
 import { B2BSectionTabs, PARTNER_TABS } from '../../../components/b2b/B2BSectionTabs'
-import { Typography, message } from 'antd'
+import { Typography, message, Button } from 'antd'
+import EnumTag from '../../../components/common/EnumTag'
+import { LimitNotice } from '../../../components/common/tableDefaults'
+import { fmtNum, fmtVnd } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 
 const CURRENT_YEAR = new Date().getFullYear()
 const CURRENT_QUARTER = Math.ceil((new Date().getMonth() + 1) / 3) as 1 | 2 | 3 | 4
+
+// Sổ thưởng tải tối đa N dòng — chạm trần thì báo
+const LOAD_LIMIT = 200
 
 const STATUS_LABELS: Record<MonthlyBonusStatus, string> = {
   draft: 'Nháp',
@@ -39,12 +46,14 @@ const STATUS_LABELS: Record<MonthlyBonusStatus, string> = {
   cancelled: 'Đã huỷ',
 }
 
+// Màu tên antd theo quy ước chung (nháp default · chờ gold · đã duyệt chờ chi blue · đã chi green · huỷ red)
+// — cùng hệ Tag với các tab Đại lý / Quyết toán, thay class Tailwind riêng (audit 17/11/2026)
 const STATUS_COLORS: Record<MonthlyBonusStatus, string> = {
-  draft: 'bg-slate-100 text-slate-700',
-  pending_approval: 'bg-amber-100 text-amber-700',
-  approved: 'bg-blue-100 text-blue-700',
-  paid: 'bg-emerald-100 text-emerald-700',
-  cancelled: 'bg-rose-100 text-rose-700',
+  draft: 'default',
+  pending_approval: 'gold',
+  approved: 'blue',
+  paid: 'green',
+  cancelled: 'red',
 }
 
 interface PartnerLite {
@@ -95,12 +104,12 @@ export function BonusListPage() {
       quarter: quarter === 'all' ? undefined : quarter,
       rubber_type: rubberType === 'all' ? undefined : rubberType,
       status: status === 'all' ? undefined : status,
-      pageSize: 200,
+      pageSize: LOAD_LIMIT,
     }),
     [year, quarter, rubberType, status],
   )
 
-  const { data: listResult, isLoading, refetch } = useQuery({
+  const { data: listResult, isLoading, error: listError, refetch } = useQuery({
     queryKey: ['b2b-bonus-list', params],
     queryFn: () => monthlyBonusService.list(params),
     staleTime: 30_000,
@@ -132,32 +141,32 @@ export function BonusListPage() {
   const recomputeMutation = useMutation({
     mutationFn: () => monthlyBonusService.recomputeQuarter(year, quarter === 'all' ? CURRENT_QUARTER : quarter),
     onSuccess: (r) => {
-      message.success(`Đã tính lại ${r.row_count} dòng bonus cho Q${quarter === 'all' ? CURRENT_QUARTER : quarter}/${year}.`)
+      message.success(`Đã tính lại ${r.row_count} dòng thưởng cho Q${quarter === 'all' ? CURRENT_QUARTER : quarter}/${year}.`)
       qc.invalidateQueries({ queryKey: ['b2b-bonus-list'] })
       qc.invalidateQueries({ queryKey: ['b2b-bonus-dashboard'] })
     },
-    onError: (e: Error) => message.error(`Lỗi: ${e.message}`),
+    onError: (e: Error) => message.error(dichLoiHeThong(e, 'Tính lại thưởng thất bại')),
   })
 
   const submitMutation = useMutation({
     mutationFn: (ids: string[]) => monthlyBonusService.submitForApproval(ids),
     onSuccess: (count) => {
-      message.success(`Đã submit ${count} bonus → chờ duyệt.`)
+      message.success(`Đã gửi duyệt ${count} dòng thưởng.`)
       setSelected(new Set())
       qc.invalidateQueries({ queryKey: ['b2b-bonus-list'] })
     },
-    onError: (e: Error) => message.error(`Lỗi: ${e.message}`),
+    onError: (e: Error) => message.error(dichLoiHeThong(e, 'Gửi duyệt thất bại')),
   })
 
   const approveMutation = useMutation({
     mutationFn: (ids: string[]) => monthlyBonusService.approve(ids),
     onSuccess: (count) => {
-      message.success(`Đã duyệt ${count} bonus.`)
+      message.success(`Đã duyệt ${count} dòng thưởng.`)
       setSelected(new Set())
       qc.invalidateQueries({ queryKey: ['b2b-bonus-list'] })
       qc.invalidateQueries({ queryKey: ['b2b-bonus-pending-actions'] })
     },
-    onError: (e: Error) => message.error(`Lỗi: ${e.message}`),
+    onError: (e: Error) => message.error(dichLoiHeThong(e, 'Duyệt thưởng thất bại')),
   })
 
   // ─── Selection helpers ──────────────────────────────────────────────────
@@ -213,7 +222,7 @@ export function BonusListPage() {
           <button
             onClick={() => navigate('/b2b/intake-manual')}
             className="px-3 py-2 border rounded-md text-sm hover:bg-slate-50 flex items-center gap-1"
-            title="Nhập tay phiếu cân (single + CSV bulk import)"
+            title="Nhập tay phiếu cân (1 phiếu hoặc nhập từ file CSV)"
           >
             <FileText className="w-4 h-4" />
             Nhập phiếu cân
@@ -239,17 +248,17 @@ export function BonusListPage() {
       {dashboard != null && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <SummaryCard
-            label={`Bonus tháng ${dashboard.month}/${dashboard.year}`}
+            label={`Thưởng tháng ${dashboard.month}/${dashboard.year}`}
             value={formatVnd(dashboard.month_total_bonus_vnd)}
             sub={`${dashboard.month_bonus_count} dòng · ${formatNum(dashboard.month_total_volume_tons)} T`}
           />
           <SummaryCard
-            label={`Bonus Q${dashboard.quarter}/${dashboard.year}`}
+            label={`Thưởng Q${dashboard.quarter}/${dashboard.year}`}
             value={formatVnd(dashboard.quarter_total_bonus_vnd)}
             sub={`Đã chi: ${formatVnd(dashboard.quarter_paid_bonus_vnd)}`}
           />
           <SummaryCard
-            label={`Bonus năm ${dashboard.year}`}
+            label={`Thưởng năm ${dashboard.year}`}
             value={formatVnd(dashboard.year_total_bonus_vnd)}
             sub={`Tạp: ${formatVnd(dashboard.year_tap_bonus_vnd)} · Nước: ${formatVnd(dashboard.year_nuoc_bonus_vnd)}`}
           />
@@ -319,7 +328,7 @@ export function BonusListPage() {
           onChange={(e) => setStatus((e.target.value === 'all' ? 'all' : e.target.value) as 'all' | MonthlyBonusStatus)}
           className="px-3 py-1.5 border rounded-md text-sm bg-white"
         >
-          <option value="all">Tất cả status</option>
+          <option value="all">Tất cả trạng thái</option>
           {Object.entries(STATUS_LABELS).map(([k, v]) => (
             <option key={k} value={k}>
               {v}
@@ -359,7 +368,7 @@ export function BonusListPage() {
               className="px-2 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700 flex items-center gap-1"
             >
               <Send className="w-3 h-3" />
-              Submit duyệt ({selectedDraftIds.length})
+              Gửi duyệt ({selectedDraftIds.length})
             </button>
           )}
           {selectedPendingIds.length > 0 && (
@@ -382,6 +391,8 @@ export function BonusListPage() {
         </div>
       )}
 
+      <LimitNotice shown={rows.length} limit={LOAD_LIMIT} />
+
       {/* Table */}
       <div className="bg-white border rounded-md overflow-x-auto">
         <table className="w-full text-sm">
@@ -394,10 +405,10 @@ export function BonusListPage() {
               <th className="px-3 py-2 text-center">Tháng</th>
               <th className="px-3 py-2 text-center">Loại mủ</th>
               <th className="px-3 py-2 text-right">SL (T)</th>
-              <th className="px-3 py-2 text-center">Tier</th>
+              <th className="px-3 py-2 text-center">Bậc thưởng</th>
               <th className="px-3 py-2 text-right">Đơn thưởng</th>
               <th className="px-3 py-2 text-right">Tổng thưởng</th>
-              <th className="px-3 py-2 text-center">Status</th>
+              <th className="px-3 py-2 text-center">Trạng thái</th>
             </tr>
           </thead>
           <tbody>
@@ -408,10 +419,19 @@ export function BonusListPage() {
                 </td>
               </tr>
             )}
-            {!isLoading && rows.length === 0 && (
+            {/* Lỗi tải ≠ "không có dòng thưởng" — báo lỗi + Thử lại (audit 17/11/2026) */}
+            {!isLoading && listError && (
+              <tr>
+                <td colSpan={9} className="px-3 py-6 text-center text-rose-700">
+                  {dichLoiHeThong(listError, 'Không tải được danh sách thưởng')}{' '}
+                  <Button size="small" onClick={() => refetch()}>Thử lại</Button>
+                </td>
+              </tr>
+            )}
+            {!isLoading && !listError && rows.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-3 py-6 text-center text-slate-500">
-                  Không có bonus nào khớp bộ lọc. Bấm "Tính lại Q{quarter}/{year}" để tạo.
+                  Không có dòng thưởng nào khớp bộ lọc. Bấm "Tính lại Q{quarter}/{year}" để tạo.
                 </td>
               </tr>
             )}
@@ -508,7 +528,7 @@ function BonusRow({
         />
       </td>
       <td className="px-3 py-2">
-        <div className="font-medium text-slate-900">{partner?.name ?? 'N/A'}</div>
+        <div className="font-medium text-slate-900">{partner?.name ?? '—'}</div>
         {partner?.code && partner.code.length === 13 && partner.code.startsWith('8999') ? (
           <Hac13CodeDisplay code={partner.code} variant="badge" showCopy={false} />
         ) : (
@@ -530,23 +550,21 @@ function BonusRow({
       </td>
       <td className="px-3 py-2 text-right font-mono font-medium">{formatVnd(bonus.total_bonus_vnd)}</td>
       <td className="px-3 py-2 text-center">
-        <span className={`px-2 py-0.5 rounded text-xs ${STATUS_COLORS[bonus.status]}`}>
-          {STATUS_LABELS[bonus.status]}
-        </span>
+        <EnumTag value={bonus.status} labels={STATUS_LABELS} colors={STATUS_COLORS} />
       </td>
     </tr>
   )
 }
 
 // ─── Format helpers ──────────────────────────────────────────────────────────
+// Dùng chung src/utils/format.ts: VND ' ₫' (trước hậu tố 'đ'), số vi-VN 2 lẻ. Giữ cách cũ coi rỗng = 0
+// (thẻ tổng/thưởng tháng chưa có dòng nào vẫn in "0 ₫" như trước).
 
 function formatVnd(n: number | string | null | undefined): string {
-  const num = Number(n || 0)
-  return num.toLocaleString('vi-VN') + 'đ'
+  return fmtVnd(Number(n || 0))
 }
 function formatNum(n: number | string | null | undefined): string {
-  const num = Number(n || 0)
-  return num.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
+  return fmtNum(Number(n || 0), 2)
 }
 
 export default BonusListPage

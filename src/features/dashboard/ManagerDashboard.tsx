@@ -1027,7 +1027,7 @@ export function ManagerDashboard() {
             {[
               { label: 'Tạo CV', icon: <ClipboardList className="w-5 h-5" />, path: '/tasks/create', bg: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
               { label: 'CV của tôi', icon: <CheckCircle2 className="w-5 h-5" />, path: '/my-tasks', bg: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' },
-              { label: 'Phê duyệt', icon: <Clock className="w-5 h-5" />, path: '/approvals', bg: 'bg-amber-50 text-amber-600 hover:bg-amber-100' },
+              { label: 'Phê duyệt', icon: <Clock className="w-5 h-5" />, path: '/tasks/approve-batch', bg: 'bg-amber-50 text-amber-600 hover:bg-amber-100' },
               { label: 'Chấm công', icon: <UserCheck className="w-5 h-5" />, path: '/attendance', bg: 'bg-teal-50 text-teal-600 hover:bg-teal-100' },
               { label: 'Phân ca', icon: <Calendar className="w-5 h-5" />, path: '/shift-assignments', bg: 'bg-violet-50 text-violet-600 hover:bg-violet-100' },
               { label: 'Bảng công', icon: <BarChart3 className="w-5 h-5" />, path: '/attendance/monthly', bg: 'bg-pink-50 text-pink-600 hover:bg-pink-100' },

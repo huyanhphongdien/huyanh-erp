@@ -15,10 +15,10 @@ import { rawRecheckService, type DryVariance } from '../../../services/wms/rawRe
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_RUBBER_GROUP_LABELS, RAW_RUBBER_TYPE_LABELS, RAW_SETTINGS_DEFAULT, type RawRubberType, type RawSettings } from '../../../services/wms/raw.types'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { fmtKg, fmtSigned, fmtDateShort } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
-const fmtKg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
-const fmtSigned = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : (n > 0 ? '+' : '') + fmtKg(n, d))
 
 export default function RawBalanceReportPage() {
   const navigate = useNavigate()
@@ -53,7 +53,7 @@ export default function RawBalanceReportPage() {
         rawReportService.canDoiNvlTp(facilityId, month.format('YYYY-MM-01'), month.endOf('month').format('YYYY-MM-DD')).catch(() => [] as CanDoiNvlTp[]),
       ])
       setRows(b); setLoss(l); setVariance(v); setSettings(s); setCanDoi(cd)
-    } catch (e: any) { setError(e?.message || 'Không tải được báo cáo') }
+    } catch (e: any) { setError(dichLoiHeThong(e, 'Không tải được báo cáo')) }
     finally { setLoading(false) }
   }, [facilityId, month])
 
@@ -103,7 +103,7 @@ export default function RawBalanceReportPage() {
   ]
 
   const varColumns: ColumnsType<DryVariance> = [
-    { title: 'Ngày', dataIndex: 'txn_date', key: 'txn_date', render: (v) => dayjs(v).format('DD/MM') },
+    { title: 'Ngày', dataIndex: 'txn_date', key: 'txn_date', render: (v) => fmtDateShort(v) },
     { title: 'Lô', dataIndex: 'batch_no', key: 'batch_no', render: (v, r) => <a onClick={() => navigate(`/wms/nvl/lo/${r.batch_id}`)}><Text code>{v}</Text></a> },
     { title: 'Loại', dataIndex: 'rubber_type_name', key: 'rubber_type_name' },
     { title: 'Chênh khô', dataIndex: 'chenh_kho_kg', key: 'chenh_kho_kg', align: 'right', render: (v) => <Text strong type="danger">{fmtSigned(v)}</Text> },
@@ -134,7 +134,8 @@ export default function RawBalanceReportPage() {
             </Space>
           </Col>
         </Row>
-        {error && <Alert type="error" showIcon message={error} description="Kiểm tra đã chạy migration wms_nvl_p3_kiem_ke_can_doi.sql chưa." />}
+        {error && <Alert type="error" showIcon message={error} description="Nếu vẫn lỗi sau khi thử lại, chụp màn hình gửi quản trị."
+          action={<Button size="small" onClick={load}>Thử lại</Button>} />}
 
         <Row gutter={[12, 12]}>
           <Col xs={12} md={6}><Card size="small"><Statistic title="Nhập khô trong tháng" value={fmtKg(sum('nhap_kho') + sum('mo_so_kho'))} suffix="kg" valueStyle={{ fontSize: 20, fontWeight: 700 }} /><Text type="secondary" style={{ fontSize: 12 }}>mở sổ {fmtKg(sum('mo_so_kho'))} · phiếu cân {fmtKg(sum('nhap_kho'))}</Text></Card></Col>
@@ -164,7 +165,7 @@ export default function RawBalanceReportPage() {
           <Table<CanDoiNvlTp> rowKey="ngay" size="small" loading={loading} pagination={{ pageSize: 10, showSizeChanger: false }} scroll={{ x: 760 }} dataSource={canDoi}
             locale={{ emptyText: 'Chưa có ngày nào có cả xuất NVL và sổ ca đã nhận' }}
             columns={[
-              { title: 'Ngày', dataIndex: 'ngay', key: 'ngay', render: (v) => dayjs(v).format('DD/MM') },
+              { title: 'Ngày', dataIndex: 'ngay', key: 'ngay', render: (v) => fmtDateShort(v) },
               { title: 'NVL khô xuất SX', dataIndex: 'nvl_kho_xuat_sx_kg', key: 'a', align: 'right', render: (v) => fmtKg(v) },
               { title: 'Chèn tiêu hao', dataIndex: 'chen_tieu_hao_kg', key: 'b', align: 'right', render: (v) => fmtKg(v) },
               { title: 'TP đạt (kg)', dataIndex: 'tp_dat_kg', key: 'c', align: 'right', render: (v) => <Text strong>{fmtKg(v)}</Text> },

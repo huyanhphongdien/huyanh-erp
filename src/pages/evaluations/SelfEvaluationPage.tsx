@@ -33,7 +33,10 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
-import { RATING_LABELS, calculateRating } from '../../types/evaluation.types';
+import { RATING_LABELS, calculateRating, SELF_EVALUATION_STATUS_LABELS } from '../../types/evaluation.types';
+import { Modal } from 'antd';
+import { fmtDateTime } from '../../utils/format';
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -88,11 +91,13 @@ interface FormData {
 // CONSTANTS
 // ============================================================================
 
+// Nhãn trạng thái tự đánh giá lấy MỘT nguồn SELF_EVALUATION_STATUS_LABELS (evaluation.types.ts)
+// — bản chép cũ ghi "Cần sửa" trong khi mọi nơi khác "Yêu cầu sửa". Màu + icon là của riêng trang.
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  pending: { label: 'Chờ duyệt', color: 'text-yellow-700', bg: 'bg-yellow-100', icon: <Clock className="w-4 h-4" /> },
-  approved: { label: 'Đã duyệt', color: 'text-green-700', bg: 'bg-green-100', icon: <CheckCircle className="w-4 h-4" /> },
-  rejected: { label: 'Từ chối', color: 'text-red-700', bg: 'bg-red-100', icon: <XCircle className="w-4 h-4" /> },
-  revision_requested: { label: 'Cần sửa', color: 'text-orange-700', bg: 'bg-orange-100', icon: <AlertCircle className="w-4 h-4" /> },
+  pending: { label: SELF_EVALUATION_STATUS_LABELS.pending, color: 'text-yellow-700', bg: 'bg-yellow-100', icon: <Clock className="w-4 h-4" /> },
+  approved: { label: SELF_EVALUATION_STATUS_LABELS.approved, color: 'text-green-700', bg: 'bg-green-100', icon: <CheckCircle className="w-4 h-4" /> },
+  rejected: { label: SELF_EVALUATION_STATUS_LABELS.rejected, color: 'text-red-700', bg: 'bg-red-100', icon: <XCircle className="w-4 h-4" /> },
+  revision_requested: { label: SELF_EVALUATION_STATUS_LABELS.revision_requested, color: 'text-orange-700', bg: 'bg-orange-100', icon: <AlertCircle className="w-4 h-4" /> },
 };
 
 // Nhãn xếp loại lấy MỘT nguồn từ RATING_LABELS (evaluation.types.ts) — màu là của riêng trang
@@ -114,16 +119,8 @@ const QUALITY_CONFIG: Record<string, { label: string; color: string; bg: string 
 // HELPER FUNCTIONS
 // ============================================================================
 
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+// Ngày-giờ gửi đánh giá: chuẩn 'DD/MM HH:mm' (+/YYYY khi khác năm) của utils/format
+const formatDate = fmtDateTime;
 
 function getScoreColor(score: number): string {
   if (score >= 90) return 'text-emerald-600';
@@ -265,7 +262,7 @@ export const SelfEvaluationPage: React.FC = () => {
       setMode('create');
       resetForm();
     } catch (err: any) {
-      setError(err.message || 'Không thể tải thông tin công việc');
+      setError(dichLoiHeThong(err, 'Không thể tải thông tin công việc'));
       setMode('list');
     } finally {
       setIsLoading(false);
@@ -301,7 +298,7 @@ export const SelfEvaluationPage: React.FC = () => {
 
       setEvaluations(mappedData);
     } catch (err: any) {
-      setError(err.message || 'Không thể tải danh sách tự đánh giá');
+      setError(dichLoiHeThong(err, 'Không thể tải danh sách tự đánh giá'));
     } finally {
       setIsLoading(false);
     }
@@ -341,7 +338,7 @@ export const SelfEvaluationPage: React.FC = () => {
 
       setCompletedTasks(availableTasks);
     } catch (err: any) {
-      setError(err.message || 'Không thể tải danh sách công việc');
+      setError(dichLoiHeThong(err, 'Không thể tải danh sách công việc'));
     } finally {
       setTasksLoading(false);
     }
@@ -446,7 +443,7 @@ export const SelfEvaluationPage: React.FC = () => {
       await loadEvaluations();
     } catch (err: any) {
       console.error('❌ Error:', err);
-      setError(err.message || 'Không thể tạo tự đánh giá');
+      setError(dichLoiHeThong(err, 'Không thể tạo tự đánh giá'));
     } finally {
       setIsSubmitting(false);
     }
@@ -491,14 +488,26 @@ export const SelfEvaluationPage: React.FC = () => {
       await loadEvaluations();
     } catch (err: any) {
       console.error('❌ Error:', err);
-      setError(err.message || 'Không thể cập nhật tự đánh giá');
+      setError(dichLoiHeThong(err, 'Không thể cập nhật tự đánh giá'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (evaluation: SelfEvaluationData) => {
-    if (!confirm('Bạn có chắc muốn xóa tự đánh giá này?')) return;
+    // Modal antd thay confirm() hệ thống — nêu hệ quả, nút đỏ tiếng Việt
+    const ok = await new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: 'Xóa tự đánh giá?',
+        content: 'Bản tự đánh giá này sẽ bị xóa hẳn, không khôi phục được.',
+        okText: 'Xóa',
+        cancelText: 'Không',
+        okButtonProps: { danger: true },
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+    if (!ok) return;
 
     try {
       const { error: deleteError } = await supabase
@@ -511,7 +520,7 @@ export const SelfEvaluationPage: React.FC = () => {
       setSuccessMessage('Đã xóa tự đánh giá');
       await loadEvaluations();
     } catch (err: any) {
-      setError(err.message || 'Không thể xóa tự đánh giá');
+      setError(dichLoiHeThong(err, 'Không thể xóa tự đánh giá'));
     }
   };
 

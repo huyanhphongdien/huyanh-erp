@@ -16,6 +16,8 @@ import {
   type TaskForPermission,
   type UserRole,
 } from './utils/taskPermissions'
+import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, type TaskPriority } from '../../types'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -66,20 +68,18 @@ interface Employee {
 // STATUS & PRIORITY CONFIG
 // ============================================================================
 
-const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Bản nháp' },
-  { value: 'in_progress', label: 'Đang thực hiện' },
-  { value: 'paused', label: 'Tạm dừng' },
-  { value: 'completed', label: 'Hoàn thành' },
-  { value: 'cancelled', label: 'Đã hủy' },
-]
+// Trạng thái khớp tasks_status_check (draft, in_progress, paused, finished, cancelled); nhãn từ TASK_STATUS_LABELS.
+// Bản cũ có value 'completed' (DB không nhận → lưu "Hoàn thành" luôn lỗi) và thiếu 'finished' → việc đã xong
+// mở form sửa lại hiện "Bản nháp" trong ô Trạng thái.
+const STATUS_OPTIONS = ['draft', 'in_progress', 'paused', 'finished', 'cancelled'].map(value => ({
+  value,
+  label: TASK_STATUS_LABELS[value],
+}))
 
-const PRIORITY_OPTIONS = [
-  { value: 'low', label: 'Thấp' },
-  { value: 'medium', label: 'Trung bình' },
-  { value: 'high', label: 'Cao' },
-  { value: 'urgent', label: 'Khẩn cấp' },
-]
+const PRIORITY_OPTIONS = (Object.keys(TASK_PRIORITY_LABELS) as TaskPriority[]).map(value => ({
+  value,
+  label: TASK_PRIORITY_LABELS[value],
+}))
 
 // ============================================================================
 // MAIN COMPONENT
@@ -233,7 +233,7 @@ export function TaskEditPage() {
         })
 
       } catch (err: any) {
-        setError(err.message || 'Có lỗi xảy ra')
+        setError(dichLoiHeThong(err, 'Có lỗi xảy ra khi tải công việc'))
       } finally {
         setLoading(false)
       }
@@ -319,7 +319,10 @@ export function TaskEditPage() {
       if (!statusChanged || !isParentTask) {
         updateData.status = formData.status
         
-        if (formData.status === 'completed' && formData.progress >= 100) {
+        // Chỉ ghi ngày xong khi VỪA chuyển sang hoàn thành — sửa lại một việc đã xong (đổi mô tả…) mà ghi đè
+        // completed_date là đẩy ngày xong tới hôm nay → bị trừ điểm trễ oan, nhảy tháng chấm điểm.
+        const DONE = ['finished', 'completed']
+        if (DONE.includes(formData.status) && !DONE.includes(originalStatus) && formData.progress >= 100) {
           updateData.completed_date = new Date().toISOString()
         }
       }
@@ -333,7 +336,7 @@ export function TaskEditPage() {
 
       navigate('/tasks')
     } catch (err: any) {
-      setError(err.message || 'Không thể cập nhật công việc')
+      setError(dichLoiHeThong(err, 'Không thể cập nhật công việc'))
     } finally {
       setSaving(false)
     }
@@ -344,7 +347,7 @@ export function TaskEditPage() {
   // ============================================================================
 
   const userGroup = getPermissionGroup(userPositionLevel)
-  const permissionLabel = user?.role === 'admin' ? 'Admin' 
+  const permissionLabel = user?.role === 'admin' ? 'Quản trị' 
     : userGroup === 'executive' ? 'Ban Giám đốc'
     : userGroup === 'manager' ? 'Quản lý'
     : 'Nhân viên'
@@ -690,7 +693,11 @@ export function TaskEditPage() {
                   onChange={(e) => handleStatusChange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
                 >
-                  {STATUS_OPTIONS.map((opt) => (
+                  {/* Trạng thái lạ (dữ liệu cũ) vẫn hiện đúng tên thay vì ô chọn nhảy về dòng đầu */}
+                  {(STATUS_OPTIONS.some(o => o.value === originalStatus) || !originalStatus
+                    ? STATUS_OPTIONS
+                    : [...STATUS_OPTIONS, { value: originalStatus, label: TASK_STATUS_LABELS[originalStatus] ?? originalStatus }]
+                  ).map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>

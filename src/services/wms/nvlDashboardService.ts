@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
 
 // ============================================================================
 // TYPES
@@ -182,7 +183,7 @@ export const nvlDashboardService = {
     let totalWeight = 0
 
     for (const b of batches) {
-      const grade = b.rubber_grade || 'unknown'
+      const grade = b.rubber_grade || 'Chưa phân hạng'   // trang hiện thẳng khoá khi không có nhãn grade → đừng để 'unknown'
       const w = b.current_weight || b.quantity_remaining || 0
       if (!gradeMap[grade]) gradeMap[grade] = { count: 0, weight_kg: 0 }
       gradeMap[grade].count++
@@ -209,7 +210,10 @@ export const nvlDashboardService = {
     const now = new Date()
     const fromDate = new Date(now)
     fromDate.setDate(now.getDate() - days + 1)
-    const fromStr = fromDate.toISOString().split('T')[0]
+    // received_date KHÔNG cùng một lịch: client ghi ngày VN (stockIn/batch/transfer), còn fn_nvl_tao_lo ghi
+    // completed_at::date (ngày UTC, DB chạy UTC). Cửa sổ theo ngày VN (luôn ≥ ngày DB) bao được cả hai; mỗi lô
+    // gom thẳng theo received_date DB trả về (không suy lại) → đúng ngày các màn khác hiện cho lô đó.
+    const fromStr = toDateStrVN(fromDate)
 
     const { data, error } = await supabase
       .from('stock_batches')
@@ -230,7 +234,7 @@ export const nvlDashboardService = {
     for (let i = 0; i < days; i++) {
       const d = new Date(fromDate)
       d.setDate(fromDate.getDate() + i)
-      const key = d.toISOString().split('T')[0]
+      const key = toDateStrVN(d)   // ngày VN: lô client ghi "hôm nay VN" (0h–7h sáng) vẫn có cột, không thành cột thừa
       dateMap[key] = { weight_kg: 0, batch_count: 0 }
     }
 

@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Table, Empty, Card, Input, Space, Button, Dropdown } from 'antd';
+import { Table, Empty, Card, Input, Space, Button, Dropdown, Alert } from 'antd';
 import type { TableProps, TablePaginationConfig } from 'antd';
 import type { FilterValue, SorterResult } from 'antd/es/table/interface';
 import {
@@ -16,6 +16,7 @@ import {
   FilterOutlined,
 } from '@ant-design/icons';
 import { colors } from '../../config/antdTheme';
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong';
 
 // ==========================================
 // TYPES
@@ -67,6 +68,13 @@ export interface DataTableProps<T> extends Omit<TableProps<T>, 'title'> {
   data?: T[];
   /** Alias for loading */
   isLoading?: boolean;
+  /**
+   * Lỗi của lần tải (Error | object Supabase — vd `error` của useQuery). Có lỗi thì KHÔNG hiện chữ "trống"
+   * (emptyText) mà hiện khối "Không tải được dữ liệu" + Thử lại — mất mạng/RLS không bị đọc thành "chưa có ai".
+   */
+  error?: unknown;
+  /** Nút "Thử lại" trong khối lỗi (vd `refetch` của useQuery) */
+  onRetry?: () => void;
 }
 
 // ==========================================
@@ -102,6 +110,8 @@ function DataTable<T extends object>({
   dataSource: dataSourceProp,
   locale,
   scroll,
+  error,
+  onRetry,
   ...tableProps
 }: DataTableProps<T>) {
   const emptyText = emptyTextProp || emptyMessage || 'Không có dữ liệu';
@@ -132,14 +142,36 @@ function DataTable<T extends object>({
     ...scroll,
   };
   
-  // Empty state
-  const emptyState = emptyComponent || (
+  // Empty state — lỗi xét TRƯỚC trống: lỗi tải thì không bao giờ hiện "Chưa có …"
+  const emptyState = error ? (
+    <Empty
+      image={Empty.PRESENTED_IMAGE_SIMPLE}
+      description="Không tải được dữ liệu"
+      style={{ padding: '40px 0' }}
+    />
+  ) : emptyComponent || (
     <Empty
       image={Empty.PRESENTED_IMAGE_SIMPLE}
       description={emptyText}
       style={{ padding: '40px 0' }}
     />
   );
+
+  // Khối lỗi phía trên bảng (vẫn giữ dữ liệu cũ nếu lần tải trước đã có)
+  const errorBlock = error ? (
+    <Alert
+      type="error"
+      showIcon
+      style={{ marginBottom: 12 }}
+      title="Không tải được dữ liệu"
+      description={dichLoiHeThong(error, 'Có lỗi khi tải')}
+      action={onRetry ? (
+        <Button size="small" icon={<ReloadOutlined />} onClick={onRetry}>
+          Thử lại
+        </Button>
+      ) : undefined}
+    />
+  ) : null;
   
   // Toolbar
   const renderToolbar = () => {
@@ -232,6 +264,7 @@ function DataTable<T extends object>({
     <>
       {renderHeader()}
       {renderToolbar()}
+      {errorBlock}
       <Table<T>
         columns={columns}
         dataSource={dataSource}
@@ -276,35 +309,9 @@ function DataTable<T extends object>({
 
 // ==========================================
 // TABLE UTILITIES
+// (formatNumber / formatCurrency 'VNĐ' / formatDate cũ đã gỡ 17/11/2026 — 0 nơi import, lại cạnh tranh với
+//  nguồn định dạng chung src/utils/format.ts: fmtNum / fmtVnd / fmtVndCompact / fmtDate / fmtDateTime)
 // ==========================================
-
-/** Format number column */
-export const formatNumber = (value: number, suffix?: string) => {
-  const formatted = value.toLocaleString('vi-VN');
-  return suffix ? `${formatted} ${suffix}` : formatted;
-};
-
-/** Format currency column */
-export const formatCurrency = (value: number, currency = 'VNĐ') => {
-  if (value >= 1000000000) {
-    return `${(value / 1000000000).toFixed(2)} tỷ ${currency}`;
-  }
-  if (value >= 1000000) {
-    return `${(value / 1000000).toFixed(1)} triệu ${currency}`;
-  }
-  return `${value.toLocaleString('vi-VN')} ${currency}`;
-};
-
-/** Format date column */
-export const formatDate = (date: string | Date, format: 'date' | 'datetime' | 'time' = 'date') => {
-  const d = new Date(date);
-  const options: Intl.DateTimeFormatOptions = 
-    format === 'datetime' ? { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' } :
-    format === 'time' ? { hour: '2-digit', minute: '2-digit' } :
-    { day: '2-digit', month: '2-digit', year: 'numeric' };
-  
-  return d.toLocaleDateString('vi-VN', options);
-};
 
 /** Create sorter for column */
 export const createSorter = <T,>(key: keyof T) => (a: T, b: T) => {

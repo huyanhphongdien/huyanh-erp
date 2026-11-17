@@ -1,3 +1,5 @@
+import { palette } from './src/theme/palette.js'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -6,12 +8,14 @@ export default {
   ],
   theme: {
     extend: {
+      // Màu đọc từ src/theme/palette.js — CÙNG nguồn với antd (antdTheme.ts). Trước 17/11/2026 primary là
+      // xanh dương #2E86AB lạc tông cả hệ.
       colors: {
-        primary: '#2E86AB',
-        secondary: '#1A5276',
-        success: '#27AE60',
-        warning: '#F39C12',
-        danger: '#E74C3C',
+        primary: palette.brand,
+        secondary: palette.brandActive,
+        success: palette.success,
+        warning: palette.warning,
+        danger: palette.danger,
       },
       spacing: {
         'safe-top': 'env(safe-area-inset-top, 0px)',

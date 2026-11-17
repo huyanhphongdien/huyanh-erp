@@ -4,9 +4,10 @@
 // ============================================================
 
 import { Suspense } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import TabbedWorkspace from './TabbedWorkspace'
+import { ErrorBoundary } from './ErrorBoundary'
 import { useB2BDealToasts } from '../../hooks/useB2BDealToasts'
 import { useMachineIssueAlerts } from '../../hooks/useMachineIssueAlerts'
 // Side-effect import: đăng ký tất cả tab components vào registry
@@ -26,6 +27,7 @@ export function MainLayout() {
   useB2BDealToasts(true)
   // Cảnh báo MÁY HỎNG ở mọi trang ERP (chuông + rung + toast), không chỉ /m/yeu-cau
   useMachineIssueAlerts(true)
+  const { pathname } = useLocation()
 
   return (
     <div className="flex min-h-screen" style={{ background: '#F0EDE8' }}>
@@ -34,9 +36,12 @@ export function MainLayout() {
         {/* TabbedWorkspace: khi có tabs → hiện tab bar + keep-alive content,
             khi không có tabs → chỉ render Outlet như layout thường */}
         <TabbedWorkspace>
-          <Suspense fallback={<PageLoader />}>
-            <Outlet />
-          </Suspense>
+          {/* Lỗi render của 1 trang → màn lỗi tiếng Việt + Tải lại; menu vẫn dùng được, đổi trang là tự gỡ */}
+          <ErrorBoundary resetKey={pathname}>
+            <Suspense fallback={<PageLoader />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </TabbedWorkspace>
       </main>
     </div>

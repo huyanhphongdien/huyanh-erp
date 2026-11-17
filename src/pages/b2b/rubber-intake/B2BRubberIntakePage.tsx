@@ -14,7 +14,7 @@ import {
   ReloadOutlined, SearchOutlined, FileSearchOutlined, FireOutlined,
   ApartmentOutlined, FilterOutlined,
 } from '@ant-design/icons'
-import { Factory, Layers, Truck } from 'lucide-react'
+import { Layers, Truck } from 'lucide-react'
 import {
   rubberIntakeB2BService,
   type B2BRubberIntake,
@@ -22,12 +22,22 @@ import {
   type RubberIntakeStats,
   SOURCE_LABELS, STATUS_LABELS,
 } from '../../../services/b2b/rubberIntakeB2BService'
-import { facilityService, type Facility } from '../../../services/wms/facilityService'
 import { RAW_RUBBER_TYPE_LABELS, type RawRubberType } from '../../../services/b2b/intakeManualEntryService'
 import { B2BSectionTabs, INTAKE_TABS } from '../../../components/b2b/B2BSectionTabs'
+import FacilityPicker from '../../../components/wms/FacilityPicker'
+import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { useFacilityFilter } from '../../../stores/facilityFilterStore'
+import { TIER_LABELS, TIER_COLORS, TIER_ICONS } from '../../../services/b2b/partnerService'
+import { fmtDate, fmtVndCompact, fmtVndNum, vndInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { stdPagination, LimitNotice } from '../../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
 
+// Sổ tải một cục tối đa N phiếu (pageSize gửi service) — chạm trần thì báo
+const LOAD_LIMIT = 200
+
+// Màu Tag antd theo trạng thái (STATUS_COLORS của service là class Tailwind, không dùng cho Tag được)
 const STATUS_TAG_COLOR: Record<string, string> = {
   draft: 'default',
   confirmed: 'success',
@@ -40,6 +50,10 @@ const FACILITY_COLOR: Record<string, string> = {
   TL: 'blue',
   LAO: 'volcano',
 }
+
+// Tấn 3 số lẻ CỐ ĐỊNH (cột monospace thẳng hàng) theo vi-VN — "12,345" chứ không "12.345" (dấu chấm
+// ở VN là ngăn nghìn → đọc nhầm 12 nghìn tấn). format.ts chưa có tuỳ chọn số lẻ cố định nên giữ cục bộ.
+const fmtTan = (kg: number) => (kg / 1000).toLocaleString('vi-VN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 
 const RAW_ICON: Record<string, string> = {
   mu_nuoc: '💧',
@@ -63,13 +77,19 @@ export default function B2BRubberIntakePage() {
 
   // Filters
   const [search, setSearch] = useState('')
+  // Từ khoá sau debounce 300ms — fetchData chỉ phụ thuộc giá trị này (trước đây phụ thuộc `search`
+  // nên mỗi phím gõ tải 2 lần: ngay lập tức + 300ms sau)
+  const [searchDebounced, setSearchDebounced] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
   const [dealFilter, setDealFilter] = useState<'all' | 'linked' | 'standalone'>('all')
   const [priceFilter, setPriceFilter] = useState<'all' | 'unpriced'>('all')
-  const [facilityFilter, setFacilityFilter] = useState<string>('')
+  // Nhà máy: FacilityPicker persist — nhớ lựa chọn qua các sổ (store 'wms-facility-filter'), khởi tạo
+  // từ store để lần tải đầu đã đúng nhà máy (audit 17/11/2026: thủ kho TL phải chọn lại mỗi màn)
+  const { currentFacilityId } = useFacilityFilter()
+  const [facilityFilter, setFacilityFilter] = useState<string>(currentFacilityId ?? '')
   const [rawTypeFilter, setRawTypeFilter] = useState<RawRubberType | ''>('')
-  const [facilities, setFacilities] = useState<Facility[]>([])
+  const { data: facilities = [] } = useActiveFacilities()
   // View mode
   const [viewMode, setViewMode] = useState<'list' | 'llm'>('list')
   const [llmExpanded, setLlmExpanded] = useState<Record<string, boolean>>({})
@@ -79,22 +99,18 @@ export default function B2BRubberIntakePage() {
   const [applyPriceVal, setApplyPriceVal] = useState<number | null>(null)
   const [applying, setApplying] = useState(false)
 
-  useEffect(() => {
-    facilityService.getAllActive().then(setFacilities).catch(() => setFacilities([]))
-  }, [])
-
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
     const filter: RubberIntakeFilter = {
-      search: search || undefined,
+      search: searchDebounced || undefined,
       status: statusFilter || undefined,
       source_type: sourceFilter || undefined,
       facility_id: facilityFilter || undefined,
       raw_rubber_type: rawTypeFilter || undefined,
       has_deal: dealFilter === 'linked' ? true : dealFilter === 'standalone' ? false : undefined,
       unpriced: priceFilter === 'unpriced' ? true : undefined,
-      pageSize: 200,
+      pageSize: LOAD_LIMIT,
     }
     try {
       const [result, statsResult] = await Promise.all([
@@ -108,19 +124,19 @@ export default function B2BRubberIntakePage() {
       setTotal(result.total)
       setStats(statsResult)
     } catch (e: any) {
-      setError(e?.message || 'Lỗi không xác định khi tải lý lịch mủ')
+      setError(dichLoiHeThong(e, 'Lỗi không xác định khi tải lý lịch mủ'))
       setItems([])
       setTotal(0)
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, sourceFilter, dealFilter, priceFilter, facilityFilter, rawTypeFilter])
+  }, [searchDebounced, statusFilter, sourceFilter, dealFilter, priceFilter, facilityFilter, rawTypeFilter])
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // Debounce search
+  // Debounce search — chỉ cập nhật từ khoá; việc tải do effect fetchData ở trên lo (một lượt)
   useEffect(() => {
-    const t = setTimeout(fetchData, 300)
+    const t = setTimeout(() => setSearchDebounced(search), 300)
     return () => clearTimeout(t)
   }, [search])
 
@@ -136,7 +152,7 @@ export default function B2BRubberIntakePage() {
       setSelectedRowKeys([])
       fetchData()
     } catch (e: any) {
-      message.error('Áp giá từ PCG thất bại: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Áp giá từ PCG thất bại'))
     } finally {
       setApplying(false)
     }
@@ -153,7 +169,7 @@ export default function B2BRubberIntakePage() {
       setApplyPriceVal(null)
       fetchData()
     } catch (e: any) {
-      message.error('Chốt giá thất bại: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Chốt giá thất bại'))
     } finally {
       setApplying(false)
     }
@@ -167,7 +183,7 @@ export default function B2BRubberIntakePage() {
       width: 100,
       render: (d: string) => (
         <span style={{ fontFamily: 'monospace' }}>
-          {new Date(d).toLocaleDateString('vi-VN')}
+          {fmtDate(d)}
         </span>
       ),
       sorter: (a, b) => new Date(a.intake_date).getTime() - new Date(b.intake_date).getTime(),
@@ -196,11 +212,15 @@ export default function B2BRubberIntakePage() {
             <div>
               <div style={{ fontWeight: 600 }}>{r.partner.name}</div>
               <Text type="secondary" style={{ fontSize: 11 }}>{r.partner.code}</Text>
-              {r.partner.tier && (
-                <Tag style={{ marginLeft: 6, fontSize: 10 }} color="purple">
-                  {r.partner.tier === 'diamond' ? '💎' : r.partner.tier === 'gold' ? '🥇' : r.partner.tier === 'silver' ? '🥈' : '🆕'} {r.partner.tier}
-                </Tag>
-              )}
+              {r.partner.tier && (() => {
+                // Hạng đại lý: nhãn tiếng Việt + màu từ map chung (trước in mã thô 'diamond')
+                const t = r.partner.tier as keyof typeof TIER_LABELS
+                return (
+                  <Tag style={{ marginLeft: 6, fontSize: 10 }} color={TIER_COLORS[t] || 'default'}>
+                    {TIER_ICONS[t] || ''} {TIER_LABELS[t] || r.partner.tier}
+                  </Tag>
+                )
+              })()}
             </div>
           )
         }
@@ -265,7 +285,7 @@ export default function B2BRubberIntakePage() {
       width: 90,
       align: 'right',
       render: (v) => v ? (
-        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{(v / 1000).toFixed(3)}</span>
+        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{fmtTan(v)}</span>
       ) : <Text type="secondary">—</Text>,
       sorter: (a, b) => (a.net_weight_kg || 0) - (b.net_weight_kg || 0),
     },
@@ -277,7 +297,7 @@ export default function B2BRubberIntakePage() {
       render: (v, r) => {
         const dry = v ?? (r.drc_percent != null && r.net_weight_kg ? r.net_weight_kg * r.drc_percent / 100 : null)
         if (dry == null) return <Text type="secondary">—</Text>
-        return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0F766E' }}>{(dry / 1000).toFixed(3)}</span>
+        return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0F766E' }}>{fmtTan(dry)}</span>
       },
       sorter: (a, b) => (a.dry_weight_kg || 0) - (b.dry_weight_kg || 0),
     },
@@ -292,12 +312,13 @@ export default function B2BRubberIntakePage() {
       ) : <Text type="secondary">—</Text>,
     },
     {
-      title: 'Giá trị (đ)',
+      title: 'Giá trị (₫)',
       dataIndex: 'total_amount',
       width: 120,
       align: 'right',
       render: (v, r) => {
-        if (v) return <span style={{ fontFamily: 'monospace', color: '#92400E' }}>{(v / 1_000_000).toFixed(1)}M</span>
+        // Số ĐẦY ĐỦ (trước "12.3M" — chấm thập phân kiểu Mỹ + chữ M tiếng Anh)
+        if (v) return <span style={{ fontFamily: 'monospace', color: '#92400E' }}>{fmtVndNum(v)}</span>
         if (!r.deal_id) return <Tag color="warning" style={{ margin: 0 }}>⏳ Chưa chốt giá</Tag>
         return <Text type="secondary">—</Text>
       },
@@ -350,18 +371,20 @@ export default function B2BRubberIntakePage() {
           <Col xs={12} sm={8} md={5}>
             <Card size="small" style={{ borderRadius: 12 }}>
               <Statistic title="KL tươi" value={stats.total_weight_kg / 1000} precision={1} suffix="T"
+                groupSeparator="." decimalSeparator=","
                 valueStyle={{ color: '#15803D', fontSize: 22 }} />
             </Card>
           </Col>
           <Col xs={12} sm={8} md={5}>
             <Card size="small" style={{ borderRadius: 12 }}>
               <Statistic title="KL khô" value={stats.total_dry_weight_kg / 1000} precision={1} suffix="T"
+                groupSeparator="." decimalSeparator=","
                 valueStyle={{ color: '#0F766E', fontSize: 22 }} />
             </Card>
           </Col>
           <Col xs={24} sm={16} md={6}>
             <Card size="small" style={{ borderRadius: 12 }}>
-              <Statistic title="Giá trị" value={stats.total_amount / 1_000_000} precision={0} suffix=" tr đ"
+              <Statistic title="Giá trị" value={stats.total_amount} formatter={(v) => fmtVndCompact(Number(v))}
                 valueStyle={{ color: '#D97706', fontSize: 22 }} />
             </Card>
           </Col>
@@ -400,18 +423,13 @@ export default function B2BRubberIntakePage() {
               <Col flex="auto">
                 <Space size={4} wrap>
                   <Text type="secondary" style={{ fontSize: 11 }}>NHÀ MÁY:</Text>
-                  <Tag.CheckableTag checked={facilityFilter === ''} onChange={() => setFacilityFilter('')}>
-                    Tất cả
-                  </Tag.CheckableTag>
-                  {facilities.map(f => (
-                    <Tag.CheckableTag
-                      key={f.id}
-                      checked={facilityFilter === f.id}
-                      onChange={() => setFacilityFilter(facilityFilter === f.id ? '' : f.id)}
-                    >
-                      <Factory size={10} style={{ display: 'inline', marginRight: 3 }} /> {f.code}
-                    </Tag.CheckableTag>
-                  ))}
+                  {/* FacilityPicker dùng chung: cache danh sách nhà máy + nhớ lựa chọn qua các sổ */}
+                  <FacilityPicker
+                    persist
+                    size="small"
+                    style={{ minWidth: 200 }}
+                    onChange={(id) => setFacilityFilter(id ?? '')}
+                  />
                 </Space>
               </Col>
             )}
@@ -494,8 +512,11 @@ export default function B2BRubberIntakePage() {
         <Card style={{ marginBottom: 12, background: '#FEF2F2', borderColor: '#FECACA' }}>
           <Text type="danger" strong>Không tải được danh sách: </Text>
           <Text type="danger">{error}</Text>
+          <Button size="small" icon={<ReloadOutlined />} onClick={fetchData} style={{ marginLeft: 8 }}>Thử lại</Button>
         </Card>
       )}
+
+      <LimitNotice shown={items.length} limit={LOAD_LIMIT} what="phiếu" />
 
       {/* Body: list (Table) or grouped by LLM */}
       {viewMode === 'list' ? (
@@ -522,11 +543,7 @@ export default function B2BRubberIntakePage() {
                 onChange: (keys) => setSelectedRowKeys(keys as string[]),
                 getCheckboxProps: (r) => ({ disabled: !!r.deal_id }), // chỉ chốt giá phiếu bộc phát (không thuộc deal)
               }}
-              pagination={{
-                pageSize: 30,
-                showSizeChanger: false,
-                showTotal: (t) => `${t} phiếu`,
-              }}
+              pagination={stdPagination(20)}
               scroll={{ x: 1500 }}
               onRow={(record) => ({
                 onClick: () => navigate(`/b2b/rubber-intake/${record.id}`),
@@ -536,7 +553,8 @@ export default function B2BRubberIntakePage() {
                 emptyText: (
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="Chưa có lý lịch mủ — tự tạo khi chấp nhận báo giá lô hoặc khi cân xong"
+                    // Lỗi tải ≠ trống: khi lỗi, khối đỏ phía trên đã báo — ở đây không nói "chưa có"
+                    description={error ? 'Không tải được danh sách — xem thông báo lỗi phía trên' : 'Chưa có lý lịch mủ — tự tạo khi chấp nhận báo giá lô hoặc khi cân xong'}
                   />
                 ),
               }}
@@ -567,7 +585,7 @@ export default function B2BRubberIntakePage() {
           Thành tiền = KL khô × đơn giá (làm tròn nghìn). Phiếu draft sẽ chuyển sang <strong>Đã xác nhận</strong> và được cấp số PNK.
         </p>
         <Space align="center">
-          <Text>Đơn giá (đ/kg khô):</Text>
+          <Text>Đơn giá (₫/kg khô):</Text>
           <InputNumber
             autoFocus
             value={applyPriceVal}
@@ -575,8 +593,7 @@ export default function B2BRubberIntakePage() {
             min={0}
             step={500}
             style={{ width: 200 }}
-            formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-            parser={(v) => Number((v || '').replace(/,/g, ''))}
+            {...vndInputProps}
           />
         </Space>
       </Modal>
@@ -663,13 +680,15 @@ function LlmGroupView({
               </div>
               <Space size={16}>
                 <Statistic title="Tươi" value={totalNet / 1000} precision={3} suffix="T"
+                  groupSeparator="." decimalSeparator=","
                   valueStyle={{ fontSize: 14, color: '#15803D' }} />
                 {totalDry > 0 && (
                   <Statistic title="Khô" value={totalDry / 1000} precision={3} suffix="T"
+                    groupSeparator="." decimalSeparator=","
                     valueStyle={{ fontSize: 14, color: '#0F766E' }} />
                 )}
                 {totalAmount > 0 && (
-                  <Statistic title="Giá trị" value={totalAmount / 1_000_000} precision={1} suffix="M"
+                  <Statistic title="Giá trị" value={totalAmount} formatter={(v) => fmtVndCompact(Number(v))}
                     valueStyle={{ fontSize: 14, color: '#D97706' }} />
                 )}
               </Space>
@@ -694,13 +713,13 @@ function LlmGroupView({
                         </span>
                       )}
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        {new Date(item.intake_date).toLocaleDateString('vi-VN')}
+                        {fmtDate(item.intake_date)}
                       </Text>
                       {item.partner && <Text style={{ fontSize: 12, fontWeight: 600 }}>{item.partner.name}</Text>}
                     </Space>
                     <Space size={12}>
                       <span style={{ fontSize: 12, fontFamily: 'monospace' }}>
-                        <strong>{((item.net_weight_kg || 0) / 1000).toFixed(3)}</strong> T
+                        <strong>{fmtTan(item.net_weight_kg || 0)}</strong> T
                       </span>
                       {item.drc_percent != null && (
                         <span style={{ fontSize: 12, color: '#15803D', fontWeight: 600 }}>{item.drc_percent}%</span>

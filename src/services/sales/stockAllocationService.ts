@@ -15,6 +15,7 @@
 
 import { supabase } from '../../lib/supabase'
 import { adjustLevelsAndLocation } from '../wms/inventorySync'
+import { ORDER_STATUS_LABELS, type SalesOrderStatus } from './salesTypes'
 
 export type AllocationStatus = 'reserved' | 'packed' | 'shipped' | 'released'
 
@@ -193,7 +194,7 @@ export const stockAllocationService = {
     if (orderErr || !order) throw new Error('Không tìm thấy đơn hàng')
 
     if (!['confirmed', 'producing', 'ready'].includes(order.status)) {
-      throw new Error(`Không thể cấp phát khi đơn ở trạng thái "${order.status}"`)
+      throw new Error(`Không thể cấp phát khi đơn ở trạng thái "${ORDER_STATUS_LABELS[order.status as SalesOrderStatus] ?? order.status}"`)
     }
 
     const targetKg = Number(order.quantity_kg || (order.quantity_tons || 0) * 1000)

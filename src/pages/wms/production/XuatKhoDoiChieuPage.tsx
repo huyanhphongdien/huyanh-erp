@@ -27,23 +27,30 @@ import dayjs from 'dayjs'
 import {
   xuatKhoDoiChieuService, type DoiChieuNgay, type XuatTheoLoai,
 } from '../../../services/wms/xuatKhoDoiChieuService'
+import PageState from '../../../components/common/PageState'
+import { stdPagination, LimitNotice } from '../../../components/common/tableDefaults'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtNum, fmtKg } from '../../../utils/format'
 
 const { Title, Text } = Typography
 
-const fmt = (n: number, d = 0) =>
-  n.toLocaleString('vi-VN', { minimumFractionDigits: d, maximumFractionDigits: d })
+/** Nạp N ngày gần nhất — chạm trần thì báo (LimitNotice), đừng im lặng mất ngày cũ. */
+const GIOI_HAN_NGAY = 120
 
 export default function XuatKhoDoiChieuPage() {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<DoiChieuNgay[]>([])
   const [chiTiet, setChiTiet] = useState<Record<string, XuatTheoLoai[]>>({})
+  // Lỗi đọc → khối lỗi + Thử lại; "Chưa có lệnh điều xe" chỉ khi đọc được mà rỗng
+  const [loiNap, setLoiNap] = useState<unknown>(null)
 
   const nap = async () => {
     setLoading(true)
+    setLoiNap(null)
     try {
-      setRows(await xuatKhoDoiChieuService.getDoiChieu({ limit: 120 }))
+      setRows(await xuatKhoDoiChieuService.getDoiChieu({ limit: GIOI_HAN_NGAY }))
     } catch (e) {
-      message.error('Không đọc được số liệu: ' + (e as Error).message)
+      setLoiNap(e)
     } finally {
       setLoading(false)
     }
@@ -69,7 +76,7 @@ export default function XuatKhoDoiChieuPage() {
       const ct = await xuatKhoDoiChieuService.getChiTietNgay(ngay)
       setChiTiet((c) => ({ ...c, [ngay]: ct }))
     } catch (e) {
-      message.error((e as Error).message)
+      message.error(dichLoiHeThong(e, 'Không đọc được chi tiết ngày'))
     }
   }
 
@@ -87,8 +94,8 @@ export default function XuatKhoDoiChieuPage() {
       dataIndex: 'banhTheoLenh', width: 130, align: 'right' as const,
       render: (v: number, r: DoiChieuNgay) => (
         <Space direction="vertical" size={0} style={{ alignItems: 'flex-end' }}>
-          <Text strong>{fmt(v)} bành</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>{fmt(r.kgTheoLenh, 2)} kg</Text>
+          <Text strong>{fmtNum(v)} bành</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>{fmtKg(r.kgTheoLenh, 2)} kg</Text>
         </Space>
       ),
     },
@@ -99,9 +106,9 @@ export default function XuatKhoDoiChieuPage() {
         ? <Text type="secondary">chưa có phiếu</Text>
         : (
           <Space direction="vertical" size={0} style={{ alignItems: 'flex-end' }}>
-            <Text strong>{fmt(v)} bành</Text>
+            <Text strong>{fmtNum(v)} bành</Text>
             {/* kg của sổ ca: trước đây nạp lên rồi không bao giờ hiện. */}
-            <Text type="secondary" style={{ fontSize: 12 }}>{fmt(r.kgTheoSoCa, 2)} kg</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>{fmtKg(r.kgTheoSoCa, 2)} kg</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
               {r.soPhieuCa} phiếu{r.soPhieuDaNhan < r.soPhieuCa ? ` · ${r.soPhieuDaNhan} đã nhận` : ''}
             </Text>
@@ -113,7 +120,7 @@ export default function XuatKhoDoiChieuPage() {
       render: (v: number, r: DoiChieuNgay) => {
         if (r.soPhieuCa === 0) return <Text type="secondary">—</Text>
         if (v === 0) return <Tag color="green">khớp</Tag>
-        return <Tag color={Math.abs(v) > 0 ? 'red' : 'default'}>{v > 0 ? '+' : ''}{fmt(v)} bành</Tag>
+        return <Tag color={Math.abs(v) > 0 ? 'red' : 'default'}>{v > 0 ? '+' : ''}{fmtNum(v)} bành</Tag>
       },
     },
     {
@@ -152,7 +159,7 @@ export default function XuatKhoDoiChieuPage() {
       {chuaGhi > 0 && (
         <Alert
           type="warning" showIcon style={{ marginBottom: 12 }}
-          message={`${fmt(chuaGhi)} bành đã rời nhà máy nhưng chưa được ghi xuất ở sổ ca`}
+          message={`${fmtNum(chuaGhi)} bành đã rời nhà máy nhưng chưa được ghi xuất ở sổ ca`}
           description={
             'Sổ ca chỉ cộng hàng vào kho; chừng nào cột XUẤT chưa được ghi thì tồn kho chỉ '
             + 'tăng, không bao giờ giảm. Con số bên trái lấy từ lệnh điều xe đã phát hành — '
@@ -161,18 +168,20 @@ export default function XuatKhoDoiChieuPage() {
         />
       )}
 
+      {/* Đọc lỗi thì ẩn dãy thẻ — "0 bành" lúc lỗi là con số giả */}
+      {!loiNap && (
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         <Col xs={12} md={6}>
           <Card size="small">
             <Text type="secondary" style={{ fontSize: 12 }}>ĐÃ RỜI NHÀ MÁY</Text>
-            <div><Text strong style={{ fontSize: 22 }}>{fmt(tong.banhLenh)}</Text> <Text type="secondary">bành</Text></div>
-            <Text type="secondary">{fmt(tong.kgLenh / 1000, 1)} tấn · {tong.cont} container</Text>
+            <div><Text strong style={{ fontSize: 22 }}>{fmtNum(tong.banhLenh)}</Text> <Text type="secondary">bành</Text></div>
+            <Text type="secondary">{fmtNum(tong.kgLenh / 1000, 1)} tấn · {tong.cont} container</Text>
           </Card>
         </Col>
         <Col xs={12} md={6}>
           <Card size="small">
             <Text type="secondary" style={{ fontSize: 12 }}>SỔ CA GHI XUẤT</Text>
-            <div><Text strong style={{ fontSize: 22 }}>{fmt(tong.banhSoCa)}</Text> <Text type="secondary">bành</Text></div>
+            <div><Text strong style={{ fontSize: 22 }}>{fmtNum(tong.banhSoCa)}</Text> <Text type="secondary">bành</Text></div>
             <Text type="secondary">{tong.banhSoCa === 0 ? 'sổ ca chưa có dữ liệu' : 'cộng mọi ca, mọi nhà máy'}</Text>
           </Card>
         </Col>
@@ -197,16 +206,21 @@ export default function XuatKhoDoiChieuPage() {
           </Card>
         </Col>
       </Row>
+      )}
 
       <Card size="small">
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center' }}><Spin /></div>
+        ) : loiNap ? (
+          <PageState error={dichLoiHeThong(loiNap, 'Không đọc được số liệu đối chiếu')} onRetry={() => void nap()} />
         ) : rows.length === 0 ? (
           <Empty description="Chưa có lệnh điều xe nào" />
         ) : (
+          <>
+          <LimitNotice shown={rows.length} limit={GIOI_HAN_NGAY} what="ngày" />
           <Table<DoiChieuNgay>
             rowKey="ngay" dataSource={rows} columns={cols}
-            size="small" pagination={{ pageSize: 30, showSizeChanger: false }}
+            size="small" pagination={stdPagination(20)}
             scroll={{ x: 900 }}
             expandable={{
               onExpand: (mo, r) => { if (mo) void moChiTiet(r.ngay) },
@@ -225,15 +239,15 @@ export default function XuatKhoDoiChieuPage() {
                         render: (v: string) => <Text code>{v}</Text>,
                       },
                       { title: 'Container', dataIndex: 'soContainer', width: 95, align: 'right' as const },
-                      { title: 'Bành', dataIndex: 'soBanh', width: 90, align: 'right' as const, render: (v: number) => fmt(v) },
-                      { title: 'Kg định mức', dataIndex: 'kgDinhMuc', width: 120, align: 'right' as const, render: (v: number) => fmt(v, 2) },
+                      { title: 'Bành', dataIndex: 'soBanh', width: 90, align: 'right' as const, render: (v: number) => fmtNum(v) },
+                      { title: 'Kg định mức', dataIndex: 'kgDinhMuc', width: 120, align: 'right' as const, render: (v: number) => fmtKg(v, 2) },
                       {
                         // Số cân thật: trước đây nạp lên rồi không hiện. Nó KHÁC định mức
                         // (27/8: định mức 45.360, cân thật 45.180) nên đáng để nhìn.
                         title: 'Kg cân thật', dataIndex: 'kgCanThat', width: 120, align: 'right' as const,
                         render: (v: number | null) => v === null || v === 0
                           ? <Text type="secondary">—</Text>
-                          : <Text>{fmt(v, 2)}</Text>,
+                          : <Text>{fmtKg(v, 2)}</Text>,
                       },
                       {
                         title: 'Kg/bành', dataIndex: 'kgMoiBanh', width: 110, align: 'right' as const,
@@ -249,6 +263,7 @@ export default function XuatKhoDoiChieuPage() {
               },
             }}
           />
+          </>
         )}
       </Card>
 

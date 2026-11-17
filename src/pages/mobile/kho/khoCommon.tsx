@@ -1,11 +1,12 @@
 // ============================================================================
-// Kho NVL mobile — phần dùng chung: nhà máy đang chọn (nhớ máy), app bar,
-// ô nhập kiểu Ops, định dạng số, đọc mã quét (tem lô / mã lô chèn / mã phiếu chèn)
+// Kho NVL mobile — phần dùng chung: nhà máy đang chọn (nhớ máy), tổ (theo tổ trưởng), định dạng số,
+// thông báo (tại chỗ / ghim đáy), xác nhận 2 bước, đọc mã quét (tem lô / mã lô chèn / mã phiếu chèn).
+// Mọi màn /m/kho dựng bằng hệ kmx-* (khoMix.css) — Đợt 3 audit UI 17/11/2026 bỏ app bar / ô nhập kiểu ops-*.
 // File: src/pages/mobile/kho/khoCommon.tsx
 // ============================================================================
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { fmtDateTime, fmtDateShort } from '../../../utils/format'
 
 const KEY = 'kho_mobile_facility'
 
@@ -23,29 +24,33 @@ export function useKhoFacility() {
   return { facilities: facilities ?? [], facilityId, facility, setFacilityId }
 }
 
-export const fmtKg = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: Math.max(d, 1), minimumFractionDigits: 0 }))   // không làm tròn kg (chủ DN 31/10): giữ số lẻ khi có
-export const fmtSigned = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : (n > 0 ? '+' : '') + fmtKg(n, d))
-export const fmtDt = (v: string | null | undefined) => (v ? new Date(v).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '—')
-export const fmtD = (v: string | null | undefined) => (v ? new Date(v).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }) : '—')
-export const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+// Định dạng dùng chung toàn ERP (src/utils/format.ts — Đợt 3 audit UI): fmtKg/fmtSigned giữ nguyên luật
+// "không làm tròn kg" (chủ DN 31/10); fmtDt/fmtD theo chuẩn ngày-trước 'DD/MM HH:mm' / 'DD/MM'.
+export { fmtKg, fmtSigned, todayLocal } from '../../../utils/format'
+export const fmtDt = (v: string | null | undefined) => fmtDateTime(v)
+export const fmtD = (v: string | null | undefined) => fmtDateShort(v)
 
-export const inp: CSSProperties = { width: '100%', padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', background: 'var(--surf)', color: 'var(--ink)', fontSize: 16, fontFamily: 'inherit', outline: 'none' }
-export const inpBig: CSSProperties = { ...inp, fontSize: 28, fontWeight: 800, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
-export const lbl: CSSProperties = { display: 'block', fontSize: 11.5, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.06em' }
+// Tổ sản xuất gọi theo tên TỔ TRƯỞNG — MỘT danh sách cho mọi màn kho (trước gõ tay ở 5 file). Đổi tổ trưởng = sửa đúng
+// hằng này. Hiển thị "Tổ Vang" (không "Ca Vang": chữ "Ca" đã là ca làm việc). Lựa chọn nhớ theo máy ở key 'kmx_team'
+// — CHUNG với màn Lấy / Trả hàng chèn (KhoMixOut / KhoMixIssue) để chọn một lần cho cả ca.
+export const KHO_TEAMS: readonly string[] = ['Vang', 'Hiền']
+export const KHO_TEAM_KEY = 'kmx_team'
+export const teamLabel = (t: string | null | undefined) => (t ? `Tổ ${t}` : '')
+export function useKhoTeam(): [string, (t: string) => void] {
+  const [team, setState] = useState<string>(() => { try { const v = localStorage.getItem(KHO_TEAM_KEY) || ''; return KHO_TEAMS.includes(v) ? v : '' } catch { return '' } })
+  const setTeam = (t: string) => { setState(t); try { localStorage.setItem(KHO_TEAM_KEY, t) } catch { /* bỏ qua */ } }
+  return [team, setTeam]
+}
 
-export function KhoAppBar({ title, sub, back, right, red }: { title: string; sub?: ReactNode; back?: string | true; right?: ReactNode; red?: boolean }) {
-  const nav = useNavigate()
-  return (
-    <div className={`ops-appbar${red ? ' red' : ''}`}>
-      {back && <button onClick={() => (back === true ? nav(-1) : nav(back))} aria-label="Quay lại" style={{ background: 'rgba(255,255,255,.16)', border: 0, color: '#fff', width: 40, height: 40, borderRadius: 12, fontSize: 20, cursor: 'pointer' }}>‹</button>}
-      {!back && <div className="ops-av" aria-hidden="true">🏭</div>}
-      <div style={{ minWidth: 0 }}>
-        <div className="ops-tt" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</div>
-        {sub && <div className="ops-su">{sub}</div>}
-      </div>
-      {right && <div className="ops-r">{right}</div>}
-    </div>
-  )
+/** Màu trạng thái kiểu antd của map `XXX_STATUS_COLORS` ở service → lớp `kmx-chip` (một nguồn màu cho máy tính + điện thoại) */
+export function kmxChip(antdColor: string | null | undefined): string {
+  switch (antdColor) {
+    case 'green': case 'success': return 'ok'
+    case 'gold': case 'orange': case 'warning': return 'amb'
+    case 'blue': case 'processing': case 'cyan': return 'blue'
+    case 'red': case 'error': case 'volcano': return 'red'
+    default: return 'mut'
+  }
 }
 
 export function FacilitySelect({ value, onChange, facilities }: { value: string | null; onChange: (id: string) => void; facilities: { id: string; code: string; name?: string }[] }) {
@@ -57,12 +62,54 @@ export function FacilitySelect({ value, onChange, facilities }: { value: string 
   )
 }
 
+/** Thông báo TẠI CHỖ (lỗi tải danh sách ở đầu trang, kèm "Thử lại"). Kết quả thao tác dùng KhoToast. */
 export function Msg({ m, onRetry }: { m: { ok: boolean; text: string } | null; onRetry?: () => void }) {
   if (!m) return null
   return (
-    <div className="ops-card" role="status" style={{ background: m.ok ? 'var(--ok-bg)' : 'var(--red-bg)', color: m.ok ? 'var(--ok)' : 'var(--red)', fontWeight: 700, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div className={`kmx-msg ${m.ok ? 'ok' : 'err'}`} role={m.ok ? 'status' : 'alert'} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <span style={{ flex: 1, minWidth: 0 }}>{m.text}</span>
-      {!m.ok && onRetry && <button type="button" onClick={onRetry} style={{ flex: '0 0 auto', background: 'transparent', border: '1.5px solid currentColor', color: 'inherit', borderRadius: 999, padding: '6px 12px', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>Thử lại</button>}
+      {!m.ok && onRetry && <button type="button" className="kmx-pill sm" onClick={onRetry}>Thử lại</button>}
+    </div>
+  )
+}
+
+/** Kết quả thao tác — GHIM ĐÁY màn hình, ngay trên thanh tab (trước nằm đầu danh sách: tay đang ở lô thứ 30, chữ báo ở
+ *  2 màn phía trên → tưởng máy không phản ứng). Thành công tự ẩn sau 6 s; lỗi giữ tới khi đóng / thao tác mới.
+ *  `inline`: vẽ tại chỗ (vd trong kmx-foot ngay trên nút chính) thay vì ghim đáy. */
+export function KhoToast({ m, onClose, inline }: { m: { ok: boolean; text: string } | null; onClose: () => void; inline?: boolean }) {
+  useEffect(() => {
+    if (!m?.ok) return
+    const t = window.setTimeout(onClose, 6000)
+    return () => window.clearTimeout(t)
+  }, [m]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!m) return null
+  return (
+    <div className={`kmx-toast ${m.ok ? 'ok' : 'err'}${inline ? ' inline' : ''}`} role={m.ok ? 'status' : 'alert'}>
+      <span style={{ flex: 1, minWidth: 0 }}>{m.text}</span>
+      <button type="button" className="kmx-toast-x" aria-label="Đóng thông báo" onClick={onClose}>✕</button>
+    </div>
+  )
+}
+
+/** Danh sách tải một lần có trần (`.limit(N)`): chạm trần thì NÓI RA, không cắt im lặng. Câu hướng dẫn do nơi gọi truyền
+ *  (thứ tự cũ-trước / mới-trước và chỗ xem đủ mỗi màn một khác — câu chung "gần nhất, lọc theo ngày" sẽ sai). */
+export function KhoLimitNote({ shown, limit, children }: { shown: number; limit: number; children: ReactNode }) {
+  if (shown < limit) return null
+  return <div className="kmx-note amb" role="note" style={{ padding: '8px 12px' }}><span>{children}</span></div>
+}
+
+/** Hành động phá huỷ trên điện thoại (hủy phiếu / lệnh / lô): xác nhận 2 bước TẠI CHỖ thay window.confirm (hộp hệ điều
+ *  hành nút OK/Cancel tiếng Anh, chữ nhỏ, không nói hệ quả). Chạm nút → hiện câu HỆ QUẢ + nút đỏ `xacNhan` / "Không". */
+export function XacNhanTaiCho({ nut, hoi, xacNhan, onOk, busy = false, disabled = false }: { nut: ReactNode; hoi: ReactNode; xacNhan: string; onOk: () => void; busy?: boolean; disabled?: boolean }) {
+  const [arm, setArm] = useState(false)
+  if (!arm) return <button type="button" className="kmx-btn danger" disabled={disabled || busy} onClick={() => setArm(true)}>{nut}</button>
+  return (
+    <div className="kmx-note red" role="group" aria-label={xacNhan} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+      <span style={{ fontWeight: 600 }}>{hoi}</span>
+      <div className="kmx-grid2">
+        <button type="button" className="kmx-btn red" disabled={busy} onClick={() => { setArm(false); onOk() }}>{xacNhan}</button>
+        <button type="button" className="kmx-btn sec" onClick={() => setArm(false)}>Không</button>
+      </div>
     </div>
   )
 }

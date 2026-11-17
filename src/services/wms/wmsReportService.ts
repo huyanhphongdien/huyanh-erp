@@ -7,6 +7,8 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { vnDayStartTs, vnDayEndTs } from '../../utils/dateVN'
+
 import type {
   StockMovementReport,
   GradeProductionReport,
@@ -14,6 +16,14 @@ import type {
   DRCTrendReport,
   InventoryValueReport,
 } from './wms.types'
+
+// Ngày VN của một timestamptz (chuỗi UTC) — cắt 10 ký tự là ngày UTC, bản ghi 0h–7h sáng dồn sang hôm trước
+const vnDateOf = (iso?: string | null): string =>
+  iso ? new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }) : ''
+
+// Khoá nhóm khi thiếu grade / kho — trang báo cáo hiện thẳng khoá này (trước là 'unknown' / 'Unknown').
+const NO_GRADE = 'Chưa phân hạng'
+const NO_WAREHOUSE = 'Chưa rõ kho'
 
 // ============================================================================
 // SERVICE
@@ -30,8 +40,8 @@ export const wmsReportService = {
     let query = supabase
       .from('inventory_transactions')
       .select('type, quantity, created_at')
-      .gte('created_at', params.from_date)
-      .lte('created_at', params.to_date + 'T23:59:59')
+      .gte('created_at', vnDayStartTs(params.from_date))
+      .lte('created_at', vnDayEndTs(params.to_date))
       .order('created_at', { ascending: true })
 
     if (params.material_id) query = query.eq('material_id', params.material_id)
@@ -48,7 +58,7 @@ export const wmsReportService = {
     //   adjust → kiểm kê
     const dayMap: Record<string, StockMovementReport> = {}
     for (const row of data || []) {
-      const date = (row as any).created_at?.substring(0, 10) || ''
+      const date = vnDateOf((row as any).created_at)
       if (!dayMap[date]) {
         dayMap[date] = { date, in_quantity: 0, out_quantity: 0, adjust_quantity: 0, blend_in_quantity: 0, blend_out_quantity: 0, balance: 0 }
       }
@@ -87,8 +97,8 @@ export const wmsReportService = {
       .from('production_orders')
       .select('id, target_grade, target_quantity, actual_quantity, yield_percent, final_drc')
       .eq('status', 'completed')
-      .gte('created_at', params.from_date)
-      .lte('created_at', params.to_date + 'T23:59:59')
+      .gte('created_at', vnDayStartTs(params.from_date))
+      .lte('created_at', vnDayEndTs(params.to_date))
 
     if (prodErr) throw prodErr
 
@@ -97,8 +107,8 @@ export const wmsReportService = {
       .from('blend_orders')
       .select('id, target_grade, target_quantity_kg, actual_quantity_kg, actual_drc')
       .eq('status', 'completed')
-      .gte('created_at', params.from_date)
-      .lte('created_at', params.to_date + 'T23:59:59')
+      .gte('created_at', vnDayStartTs(params.from_date))
+      .lte('created_at', vnDayEndTs(params.to_date))
 
     if (blendErr) throw blendErr
 
@@ -114,7 +124,7 @@ export const wmsReportService = {
     }> = {}
 
     for (const p of prodData || []) {
-      const grade = (p as any).target_grade || 'unknown'
+      const grade = (p as any).target_grade || NO_GRADE
       if (!gradeMap[grade]) gradeMap[grade] = { production_count: 0, total_input_kg: 0, total_output_kg: 0, yield_sum: 0, drc_sum: 0, drc_count: 0, blend_count: 0 }
       gradeMap[grade].production_count++
       gradeMap[grade].total_input_kg += Number((p as any).target_quantity) || 0
@@ -124,7 +134,7 @@ export const wmsReportService = {
     }
 
     for (const b of blendData || []) {
-      const grade = (b as any).target_grade || 'unknown'
+      const grade = (b as any).target_grade || NO_GRADE
       if (!gradeMap[grade]) gradeMap[grade] = { production_count: 0, total_input_kg: 0, total_output_kg: 0, yield_sum: 0, drc_sum: 0, drc_count: 0, blend_count: 0 }
       gradeMap[grade].blend_count++
       gradeMap[grade].total_output_kg += Number((b as any).actual_quantity_kg) || 0
@@ -151,8 +161,8 @@ export const wmsReportService = {
       .select('supplier_name, supplier_region, quantity_remaining, initial_drc, latest_drc, qc_status')
       .not('supplier_name', 'is', null)
 
-    if (params.from_date) query = query.gte('created_at', params.from_date)
-    if (params.to_date) query = query.lte('created_at', params.to_date + 'T23:59:59')
+    if (params.from_date) query = query.gte('created_at', vnDayStartTs(params.from_date))
+    if (params.to_date) query = query.lte('created_at', vnDayEndTs(params.to_date))
 
     const { data, error } = await query
     if (error) throw error
@@ -213,8 +223,8 @@ export const wmsReportService = {
     let query = supabase
       .from('batch_qc_results')
       .select('drc_value, tested_at, grade_tested')
-      .gte('tested_at', params.from_date)
-      .lte('tested_at', params.to_date + 'T23:59:59')
+      .gte('tested_at', vnDayStartTs(params.from_date))
+      .lte('tested_at', vnDayEndTs(params.to_date))
       .not('drc_value', 'is', null)
       .order('tested_at', { ascending: true })
 
@@ -224,12 +234,12 @@ export const wmsReportService = {
     // Group by date
     const dayMap: Record<string, { drc_sum: number; count: number; grades: Record<string, number> }> = {}
     for (const row of data || []) {
-      const date = ((row as any).tested_at as string)?.substring(0, 10) || ''
+      const date = vnDateOf((row as any).tested_at)
       if (!dayMap[date]) dayMap[date] = { drc_sum: 0, count: 0, grades: {} }
       const drc = Number((row as any).drc_value) || 0
       dayMap[date].drc_sum += drc
       dayMap[date].count++
-      const grade = (row as any).grade_tested || 'unknown'
+      const grade = (row as any).grade_tested || NO_GRADE
       dayMap[date].grades[grade] = (dayMap[date].grades[grade] || 0) + 1
     }
 
@@ -295,7 +305,7 @@ export const wmsReportService = {
       m.total_dry_weight_kg += Number(r.dry_weight) || 0
       const drc = Number(r.latest_drc || r.initial_drc)
       if (drc) { m.drc_sum += drc; m.drc_count++ }
-      const whName = r.warehouse?.name || 'Unknown'
+      const whName = r.warehouse?.name || NO_WAREHOUSE
       m.warehouses[whName] = (m.warehouses[whName] || 0) + qty
     }
 
@@ -327,26 +337,26 @@ export const wmsReportService = {
     total_alerts: number
     grade_distribution: Record<string, number>
   }> {
-    const toEnd = params.to_date + 'T23:59:59'
+    const toEnd = vnDayEndTs(params.to_date)
 
     // Parallel queries
     const [txRes, prodRes, blendRes, batchRes] = await Promise.all([
       // Inventory transactions in range
       supabase.from('inventory_transactions')
         .select('type, quantity')
-        .gte('created_at', params.from_date)
+        .gte('created_at', vnDayStartTs(params.from_date))
         .lte('created_at', toEnd),
       // Production orders completed in range
       supabase.from('production_orders')
         .select('actual_quantity, yield_percent')
         .eq('status', 'completed')
-        .gte('created_at', params.from_date)
+        .gte('created_at', vnDayStartTs(params.from_date))
         .lte('created_at', toEnd),
       // Blend orders completed in range
       supabase.from('blend_orders')
         .select('actual_quantity_kg')
         .eq('status', 'completed')
-        .gte('created_at', params.from_date)
+        .gte('created_at', vnDayStartTs(params.from_date))
         .lte('created_at', toEnd),
       // Active batches
       supabase.from('stock_batches')
@@ -393,7 +403,7 @@ export const wmsReportService = {
       const r = row as any
       const drc = Number(r.latest_drc || r.initial_drc)
       if (drc) { drc_sum += drc; drc_count++ }
-      const grade = r.rubber_grade || 'unknown'
+      const grade = r.rubber_grade || NO_GRADE
       grade_distribution[grade] = (grade_distribution[grade] || 0) + (Number(r.quantity_remaining) || 0)
     }
 

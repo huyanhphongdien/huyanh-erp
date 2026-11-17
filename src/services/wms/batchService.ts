@@ -10,6 +10,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
 import type {
   StockBatch,
   QCStatus,
@@ -824,8 +825,10 @@ export const batchService = {
     }
     const avgDRC = totalWeight > 0 ? Math.round((totalWeightedDRC / totalWeight) * 100) / 100 : null
 
-    // 4. Create new batch: LOT-MERGE-{timestamp}
-    const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
+    // 4. Create new batch: LOT-MERGE-{timestamp} — giờ VN (YYYYMMDDHHmmss); toISOString() cho giờ UTC (lệch 7 tiếng, trước 7h sáng lệch cả ngày)
+    const nowLocal = new Date()
+    const p2 = (n: number) => String(n).padStart(2, '0')
+    const timestamp = `${toDateStrVN(nowLocal).replace(/-/g, '')}${p2(nowLocal.getHours())}${p2(nowLocal.getMinutes())}${p2(nowLocal.getSeconds())}`
     const mergeBatchNo = `MERGE-${timestamp}`
     const firstBatch = batches[0]
 

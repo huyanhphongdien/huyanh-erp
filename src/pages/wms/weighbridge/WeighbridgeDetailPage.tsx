@@ -5,7 +5,7 @@
 // Rewrite: Tailwind -> Ant Design v6
 // ============================================================================
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   Card,
   Button,
@@ -42,6 +42,10 @@ import weighbridgeService from '../../../services/wms/weighbridgeService'
 import weighbridgeImageService from '../../../services/wms/weighbridgeImageService'
 import type { WeighbridgeTicket, WeighbridgeImage, WeighbridgeStatus } from '../../../services/wms/wms.types'
 import { ticketTypeLabel } from '../../../services/wms/wms.types'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtDateTime } from '../../../utils/format'
+import { WEIGHBRIDGE_STATUS_LABELS, WEIGHBRIDGE_STATUS_COLORS } from './weighbridgeLabels'
+import PhieuKhoPrintPortal from '../PhieuKhoPrintPortal'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -49,12 +53,10 @@ const { Title, Text, Paragraph } = Typography
 // CONSTANTS
 // ============================================================================
 
-const STATUS_TAG_CONFIG: Record<WeighbridgeStatus, { label: string; color: string }> = {
-  weighing_gross: { label: 'Chờ cân lần 1', color: 'processing' },
-  weighing_tare: { label: 'Chờ cân lần 2', color: 'warning' },
-  completed: { label: 'Hoàn tất', color: 'success' },
-  cancelled: { label: 'Đã hủy', color: 'error' },
-}
+// Một nguồn nhãn với Lịch sử cân (weighbridgeLabels) — trước 2 bản chép tay đã trôi chữ
+const STATUS_TAG_CONFIG: Record<WeighbridgeStatus, { label: string; color: string }> = Object.fromEntries(
+  (Object.keys(WEIGHBRIDGE_STATUS_LABELS) as WeighbridgeStatus[]).map(s => [s, { label: WEIGHBRIDGE_STATUS_LABELS[s], color: WEIGHBRIDGE_STATUS_COLORS[s] }]),
+) as Record<WeighbridgeStatus, { label: string; color: string }>
 
 const REFERENCE_LABELS: Record<string, string> = {
   stock_in: 'Phiếu nhập TP',
@@ -85,6 +87,7 @@ interface WeighbridgeDetailPageProps {
 
 export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailPageProps = {}) {
   const navigate = useNavigate()
+  const rootRef = useRef<HTMLDivElement>(null)
   const { id: paramId } = useParams<{ id: string }>()
   const id = propId || paramId
 
@@ -113,7 +116,7 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
       }
       setTicket(data)
     } catch (err: any) {
-      setError(err?.message || 'Không thể tải phiếu cân')
+      setError(dichLoiHeThong(err, 'Không thể tải phiếu cân'))
     } finally {
       setLoading(false)
     }
@@ -124,6 +127,12 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
   // ============================================================================
 
   function handlePrint() {
+    // Khổ A4 lề 0 (trình duyệt không in ngày giờ/URL) chỉ gắn trong lúc in phiếu này — @page để sẵn trong
+    // trang sẽ ép khổ cả bản in của tab khác đang mở (vd nhãn lô A5), vì tab ẩn vẫn mounted.
+    const st = document.createElement('style')
+    st.textContent = '@page { size: A4; margin: 0; }'
+    document.head.appendChild(st)
+    window.addEventListener('afterprint', () => st.remove(), { once: true })
     window.print()
   }
 
@@ -144,8 +153,9 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
   // ============================================================================
 
   if (loading) {
+    // Không dùng minHeight 100vh — trang nằm trong MainLayout (header + thanh tab) → lệch tâm, sinh cuộn thừa
     return (
-      <div style={{ minHeight: '100vh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: 240, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Spin indicator={<LoadingOutlined style={{ fontSize: 32 }} />} />
       </div>
     )
@@ -179,10 +189,10 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
     )
   }
 
-  const sc = STATUS_TAG_CONFIG[ticket.status]
+  const sc = STATUS_TAG_CONFIG[ticket.status] || { label: ticket.status, color: 'default' }
   const images = ticket.images || []
 
-  // Build timeline items
+  // Build timeline items — mốc giờ theo chuẩn toàn hệ 'DD/MM HH:mm' (trước: kèm giây, giờ đứng trước)
   const timelineItems: {
     color: string
     children: React.ReactNode
@@ -194,7 +204,7 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
           <Text strong>Tạo phiếu</Text>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>
-            {new Date(ticket.created_at).toLocaleString('vi-VN')}
+            {fmtDateTime(ticket.created_at)}
           </Text>
         </div>
       ),
@@ -204,13 +214,13 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
       children: (
         <div>
           <Text strong={ticket.gross_weight != null} type={ticket.gross_weight == null ? 'secondary' : undefined}>
-            Cân Gross{ticket.gross_weight != null ? ` — ${ticket.gross_weight.toLocaleString('vi-VN')} kg` : ''}
+            Cân xe + hàng{ticket.gross_weight != null ? ` — ${ticket.gross_weight.toLocaleString('vi-VN')} kg` : ''}
           </Text>
           {ticket.gross_weighed_at && (
             <>
               <br />
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {new Date(ticket.gross_weighed_at).toLocaleString('vi-VN')}
+                {fmtDateTime(ticket.gross_weighed_at)}
               </Text>
             </>
           )}
@@ -222,13 +232,13 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
       children: (
         <div>
           <Text strong={ticket.tare_weight != null} type={ticket.tare_weight == null ? 'secondary' : undefined}>
-            Cân Tare{ticket.tare_weight != null ? ` — ${ticket.tare_weight.toLocaleString('vi-VN')} kg` : ''}
+            Cân xe rỗng{ticket.tare_weight != null ? ` — ${ticket.tare_weight.toLocaleString('vi-VN')} kg` : ''}
           </Text>
           {ticket.tare_weighed_at && (
             <>
               <br />
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {new Date(ticket.tare_weighed_at).toLocaleString('vi-VN')}
+                {fmtDateTime(ticket.tare_weighed_at)}
               </Text>
             </>
           )}
@@ -246,13 +256,13 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
           >
             {ticket.status === 'cancelled'
               ? 'Đã hủy'
-              : `Hoàn tất${ticket.net_weight != null ? ` — NET ${ticket.net_weight.toLocaleString('vi-VN')} kg` : ''}`}
+              : `Hoàn tất${ticket.net_weight != null ? ` — KL hàng ${ticket.net_weight.toLocaleString('vi-VN')} kg` : ''}`}
           </Text>
           {ticket.completed_at && (
             <>
               <br />
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {new Date(ticket.completed_at).toLocaleString('vi-VN')}
+                {fmtDateTime(ticket.completed_at)}
               </Text>
             </>
           )}
@@ -262,7 +272,7 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
+    <div ref={rootRef} style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       {/* Header */}
       <div className="print-hidden" style={{ background: PRIMARY_COLOR, padding: '16px', position: 'sticky', top: 0, zIndex: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -288,16 +298,16 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
           <Card size="small" style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
             <Row>
               <Col span={8} style={{ textAlign: 'center', padding: 16 }}>
-                <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Gross</Text>
+                <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Xe + hàng</Text>
                 <div style={{ ...MONO_FONT, fontSize: 22, fontWeight: 700, color: '#141414' }}>
-                  {ticket.gross_weight != null ? ticket.gross_weight.toLocaleString('vi-VN') : '---'}
+                  {ticket.gross_weight != null ? ticket.gross_weight.toLocaleString('vi-VN') : '—'}
                 </div>
                 <Text type="secondary" style={{ fontSize: 12 }}>kg</Text>
               </Col>
               <Col span={8} style={{ textAlign: 'center', padding: 16, borderLeft: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0' }}>
-                <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Tare</Text>
+                <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Xe rỗng</Text>
                 <div style={{ ...MONO_FONT, fontSize: 22, fontWeight: 700, color: '#141414' }}>
-                  {ticket.tare_weight != null ? ticket.tare_weight.toLocaleString('vi-VN') : '---'}
+                  {ticket.tare_weight != null ? ticket.tare_weight.toLocaleString('vi-VN') : '—'}
                 </div>
                 <Text type="secondary" style={{ fontSize: 12 }}>kg</Text>
               </Col>
@@ -308,12 +318,12 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
                   background: ticket.net_weight != null ? '#F0FDF4' : undefined,
                 }}
               >
-                <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>NET</Text>
+                <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>KL hàng</Text>
                 <div style={{
                   ...MONO_FONT, fontSize: 22, fontWeight: 700,
                   color: ticket.net_weight != null ? '#15803D' : '#141414',
                 }}>
-                  {ticket.net_weight != null ? ticket.net_weight.toLocaleString('vi-VN') : '---'}
+                  {ticket.net_weight != null ? ticket.net_weight.toLocaleString('vi-VN') : '—'}
                 </div>
                 <Text type="secondary" style={{ fontSize: 12 }}>kg</Text>
               </Col>
@@ -324,8 +334,9 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
           {ticket.net_weight != null && (ticket as any).drc && (
             <Card size="small" style={{ borderRadius: 12, background: '#FFFBEB', borderColor: '#F59E0B' }}>
               <div style={{ textAlign: 'center' }}>
+                {/* net × DRC = khối lượng KHÔ — trước ghi "Quy kho" (đọc thành "quy ra kho") */}
                 <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Quy kho (DRC {(ticket as any).drc}%)
+                  Quy khô (DRC {(ticket as any).drc}%)
                 </Text>
                 <div style={{ ...MONO_FONT, fontSize: 20, fontWeight: 700, color: '#B45309' }}>
                   {((ticket.net_weight * (ticket as any).drc) / 100).toLocaleString('vi-VN')} kg
@@ -464,29 +475,11 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
         </Space>
       </div>
 
-      {/* ===== BẢN IN A4 — màn hình giấu đi, chỉ hiện khi window.print() ===== */}
-      <div className="print-only"><PrintSheet ticket={ticket} /></div>
-
-      <style>{`
-        .print-only { display: none; }
-        @media print {
-          /* Ẩn TOÀN BỘ app shell + giao diện màn hình — chỉ in Sheet phiếu cân.
-             (Khuôn in chép từ PaymentRequestPrintPage; .print-hidden gắn trên
-             header/nút từ trước nhưng chưa từng có CSS — định nghĩa tại đây.) */
-          body * { visibility: hidden !important; }
-          .print-hidden { display: none !important; }
-          .print-only, .print-only * { visibility: visible !important; }
-          .print-only {
-            display: block !important;
-            position: absolute !important; left: 0; top: 0; width: 100%;
-            padding: 12mm !important; box-sizing: border-box;
-          }
-          html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
-          /* margin:0 → trình duyệt KHÔNG in header/footer (ngày giờ, URL, số trang).
-             Lề tài liệu trả lại bằng padding của .print-only ở trên. */
-          @page { size: A4; margin: 0; }
-        }
-      `}</style>
+      {/* ===== BẢN IN A4 — portal ra <body>, chỉ in khi trang này đang hiện (tab ẩn không đè bản in trang khác) ===== */}
+      <PhieuKhoPrintPortal rootRef={rootRef}>
+        {/* portal đệm 8mm + 4mm ở đây = lề 12mm như bản cũ (lề giấy = 0, xem handlePrint) */}
+        <div style={{ padding: '4mm' }}><PrintSheet ticket={ticket} /></div>
+      </PhieuKhoPrintPortal>
     </div>
   )
 }
@@ -574,10 +567,10 @@ function PrintSheet({ ticket }: { ticket: WeighbridgeTicket }) {
         </tbody>
       </table>
 
-      {/* Quy kho theo DRC — cùng công thức với khối hiển thị trên màn hình */}
+      {/* Quy khô theo DRC — cùng công thức với khối hiển thị trên màn hình (sửa nhãn "Quy kho" sai nghĩa) */}
       {ticket.net_weight != null && drc ? (
         <div style={{ border: '1px solid #F59E0B', background: '#FFFBEB', borderRadius: 4, padding: '6px 10px', marginBottom: 10, textAlign: 'center' }}>
-          Quy kho (DRC {drc}%): <strong style={{ ...MONO_FONT, color: '#B45309' }}>{((ticket.net_weight * drc) / 100).toLocaleString('vi-VN')} kg</strong>
+          Quy khô (DRC {drc}%): <strong style={{ ...MONO_FONT, color: '#B45309' }}>{((ticket.net_weight * drc) / 100).toLocaleString('vi-VN')} kg</strong>
         </div>
       ) : null}
 

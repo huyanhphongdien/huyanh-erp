@@ -44,8 +44,18 @@ import {
   CircleDot,
   ArrowRight,
 } from 'lucide-react'
+import { App } from 'antd'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { fmtDate, fmtTime, fmtVndCompact } from '../../utils/format'
+import { toDateStrVN } from '../../utils/dateVN'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import {
+  PROJECT_STATUS_LABELS,
+  PHASE_STATUS_LABELS as PHASE_STATUS_LABELS_SRC,
+  MILESTONE_STATUS_LABELS,
+} from '../../services/project/project.types'
+import { ISSUE_SEVERITY_LABELS } from '../../services/project/issueService'
 
 // ============================================================================
 // TYPES
@@ -163,7 +173,7 @@ interface PortfolioReportData {
 // ============================================================================
 
 const REPORT_TYPES: { key: ReportType; label: string; description: string; icon: React.ReactNode }[] = [
-  { key: 'progress',  label: 'Báo cáo tiến độ',  description: 'Chi tiết phases, milestones, risks',  icon: <TrendingUp className="w-4 h-4" /> },
+  { key: 'progress',  label: 'Báo cáo tiến độ',  description: 'Chi tiết giai đoạn, mốc, rủi ro',  icon: <TrendingUp className="w-4 h-4" /> },
   { key: 'status',    label: 'Báo cáo trạng thái', description: 'Tóm tắt 1 trang cho BGĐ',           icon: <FileText className="w-4 h-4" /> },
   { key: 'portfolio', label: 'Báo cáo tổng hợp',  description: 'Tất cả DA — dạng bảng',              icon: <FolderKanban className="w-4 h-4" /> },
 ]
@@ -174,10 +184,9 @@ const REPORT_PERIODS: { key: ReportPeriod; label: string }[] = [
   { key: 'quarter', label: 'Quý này' },
 ]
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Nháp', planning: 'Lên kế hoạch', approved: 'Đã duyệt',
-  in_progress: 'Đang chạy', on_hold: 'Tạm dừng', completed: 'Hoàn thành', cancelled: 'Đã hủy',
-}
+// Nhãn đọc từ project.types (một nguồn — Đợt 3 audit UI 17/11/2026). Bản chép cũ ghi "Lên kế hoạch"/"Đang chạy",
+// giai đoạn "Xong", mốc "Sắp tới"/"Trễ"/"Hủy" — lệch với mọi màn khác của module.
+const STATUS_LABELS: Record<string, string> = PROJECT_STATUS_LABELS
 
 const HEALTH_CONFIG = {
   green: { label: 'Đúng tiến độ', color: '#16A34A', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500' },
@@ -192,29 +201,16 @@ const SEVERITY_COLORS: Record<string, string> = {
   low: 'bg-blue-100 text-blue-700',
 }
 
-const PHASE_STATUS_LABELS: Record<string, string> = {
-  pending: 'Chờ', in_progress: 'Đang chạy', completed: 'Xong', skipped: 'Bỏ qua',
-}
+const PHASE_STATUS_LABELS: Record<string, string> = PHASE_STATUS_LABELS_SRC
 
-const MS_STATUS_LABELS: Record<string, string> = {
-  pending: 'Chờ', approaching: 'Sắp tới', completed: 'Xong', overdue: 'Trễ', cancelled: 'Hủy',
-}
+const MS_STATUS_LABELS: Record<string, string> = MILESTONE_STATUS_LABELS
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-function formatDate(d?: string | null): string {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-function formatCurrency(amount: number): string {
-  if (!amount) return '0'
-  if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1)} tỷ`
-  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(0)} tr`
-  return amount.toLocaleString('vi-VN')
-}
+// formatDate / formatCurrency cục bộ đã bỏ → fmtDate / fmtVndCompact (src/utils/format.ts): "1,5 tỷ" dấu phẩy
+// vi-VN, số nhỏ có ' ₫' (bản cũ in "1.5 tỷ" dấu chấm kiểu Anh)
 
 function getPeriodDates(period: ReportPeriod): { start: string; end: string; label: string } {
   const now = new Date()
@@ -247,9 +243,10 @@ function getPeriodDates(period: ReportPeriod): { start: string; end: string; lab
 
   start.setHours(0, 0, 0, 0)
   end.setHours(23, 59, 59, 999)
+  // Ngày theo giờ VN: toISOString() đổi nửa đêm VN thành 17:00 hôm trước (UTC) → ngày đầu kỳ lùi 1 ngày
   return {
-    start: start.toISOString().split('T')[0],
-    end: end.toISOString().split('T')[0],
+    start: toDateStrVN(start),
+    end: toDateStrVN(end),
     label,
   }
 }
@@ -276,6 +273,7 @@ function calculateHealth(progressPct: number, plannedStart?: string, plannedEnd?
 const ProjectReportPage: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useAuthStore()
+  const { message } = App.useApp()
   const reportRef = useRef<HTMLDivElement>(null)
 
   // === Filters ===
@@ -352,6 +350,8 @@ const ProjectReportPage: React.FC = () => {
       setShowFilters(false)
     } catch (err) {
       console.error('[Report] Generate failed:', err)
+      // Trước đây chỉ console.error — bấm "Tạo báo cáo" mà lỗi thì màn đứng im, không biết vì sao
+      message.error(dichLoiHeThong(err, 'Tạo báo cáo thất bại'))
     } finally {
       setGenerating(false)
     }
@@ -604,7 +604,7 @@ const ProjectReportPage: React.FC = () => {
     // Build CSV content for simple export
     let csv = ''
     if (reportType === 'portfolio' && portfolioData) {
-      csv = 'Mã DA,Tên DA,PM,Phòng ban,Trạng thái,Tiến độ %,Sức khỏe,NS Dự toán,NS Thực tế,NS %,Rủi ro,Vấn đề,Milestone tới\n'
+      csv = 'Mã DA,Tên DA,PM,Phòng ban,Trạng thái,Tiến độ %,Sức khỏe,NS Dự toán,NS Thực tế,NS %,Rủi ro,Vấn đề,Mốc tới\n'
       portfolioData.items.forEach(item => {
         csv += `${item.code},"${item.name}","${item.pm_name || ''}","${item.department_name || ''}",${STATUS_LABELS[item.status] || item.status},${item.progress_pct},${HEALTH_CONFIG[item.health].label},${item.budget_planned},${item.budget_actual},${item.budget_pct},${item.risk_count},${item.open_issues},"${item.next_milestone || ''}"\n`
       })
@@ -615,11 +615,11 @@ const ProjectReportPage: React.FC = () => {
       csv += `Trạng thái,"${STATUS_LABELS[progressData.project.status]}"\n`
       csv += `Tiến độ,${progressData.project.progress_pct}%\n`
       csv += `Sức khỏe,"${progressData.health_label}"\n`
-      csv += `\nPhase,Trạng thái,Tiến độ %\n`
+      csv += `\nGiai đoạn,Trạng thái,Tiến độ %\n`
       progressData.phases.forEach(ph => {
         csv += `"${ph.name}",${PHASE_STATUS_LABELS[ph.status] || ph.status},${ph.progress_pct}\n`
       })
-      csv += `\nMilestone,Hạn,Trạng thái\n`
+      csv += `\nMốc,Hạn,Trạng thái\n`
       progressData.milestones.forEach(ms => {
         csv += `"${ms.name}",${ms.due_date || ''},${MS_STATUS_LABELS[ms.status] || ms.status}\n`
       })
@@ -788,7 +788,7 @@ const ProjectReportPage: React.FC = () => {
         {/* === QUICK STATS === */}
         <div className="grid grid-cols-4 gap-2">
           {[
-            { label: 'Tasks', value: `${d.task_stats.completed}/${d.task_stats.total}`, icon: <CheckCircle2 className="w-3.5 h-3.5" />, color: '#16A34A' },
+            { label: 'Công việc xong', value: `${d.task_stats.completed}/${d.task_stats.total}`, icon: <CheckCircle2 className="w-3.5 h-3.5" />, color: '#16A34A' },
             { label: 'Đang làm', value: d.task_stats.in_progress, icon: <Clock className="w-3.5 h-3.5" />, color: '#2563EB' },
             { label: 'Quá hạn', value: d.task_stats.overdue, icon: <AlertTriangle className="w-3.5 h-3.5" />, color: d.task_stats.overdue > 0 ? '#DC2626' : '#6B7280' },
             { label: 'Rủi ro', value: d.risks.length, icon: <ShieldAlert className="w-3.5 h-3.5" />, color: d.risks.length > 0 ? '#EA580C' : '#6B7280' },
@@ -806,8 +806,8 @@ const ProjectReportPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-gray-100 p-4">
             <h3 className="text-[13px] font-semibold text-gray-700 mb-2">Ngân sách</h3>
             <div className="flex items-center justify-between text-[12px] mb-1.5">
-              <span className="text-gray-500">Dự toán: <strong className="text-gray-700">{formatCurrency(d.project.budget_planned)}</strong></span>
-              <span className="text-gray-500">Thực tế: <strong className="text-gray-700">{formatCurrency(d.project.budget_actual)}</strong></span>
+              <span className="text-gray-500">Dự toán: <strong className="text-gray-700">{fmtVndCompact(d.project.budget_planned)}</strong></span>
+              <span className="text-gray-500">Thực tế: <strong className="text-gray-700">{fmtVndCompact(d.project.budget_actual)}</strong></span>
             </div>
             <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
               <div
@@ -826,7 +826,7 @@ const ProjectReportPage: React.FC = () => {
 
         {/* === PHASES (full for progress, mini for status) === */}
         <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 className="text-[13px] font-semibold text-gray-700 mb-3">Tiến độ theo Phase</h3>
+          <h3 className="text-[13px] font-semibold text-gray-700 mb-3">Tiến độ theo giai đoạn</h3>
           <div className="space-y-2.5">
             {d.phases.map((ph, i) => (
               <div key={i}>
@@ -845,7 +845,7 @@ const ProjectReportPage: React.FC = () => {
                 </div>
                 {!isStatus && ph.planned_start && (
                   <div className="text-[10px] text-gray-400 mt-0.5 ml-4">
-                    {formatDate(ph.planned_start)} → {formatDate(ph.planned_end)}
+                    {fmtDate(ph.planned_start)} → {fmtDate(ph.planned_end)}
                   </div>
                 )}
               </div>
@@ -856,7 +856,7 @@ const ProjectReportPage: React.FC = () => {
         {/* === MILESTONES (full for progress) === */}
         {!isStatus && d.milestones.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <h3 className="text-[13px] font-semibold text-gray-700 mb-3">Milestones</h3>
+            <h3 className="text-[13px] font-semibold text-gray-700 mb-3">Mốc</h3>
             <div className="space-y-2">
               {d.milestones.map((ms, i) => {
                 const isOverdue = ms.status === 'overdue' || (ms.due_date && new Date(ms.due_date) < new Date() && ms.status !== 'completed')
@@ -878,10 +878,10 @@ const ProjectReportPage: React.FC = () => {
                     </div>
                     <div className="text-right shrink-0">
                       <div className={`text-[11px] font-mono ${isOverdue ? 'text-red-600' : 'text-gray-500'}`}>
-                        {formatDate(ms.due_date)}
+                        {fmtDate(ms.due_date)}
                       </div>
                       {ms.completed_date && (
-                        <div className="text-[10px] text-emerald-500">✓ {formatDate(ms.completed_date)}</div>
+                        <div className="text-[10px] text-emerald-500">✓ {fmtDate(ms.completed_date)}</div>
                       )}
                     </div>
                   </div>
@@ -921,7 +921,8 @@ const ProjectReportPage: React.FC = () => {
               {d.issues.map((iss, i) => (
                 <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50">
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${SEVERITY_COLORS[iss.severity] || 'bg-gray-100 text-gray-600'}`}>
-                    {iss.severity?.toUpperCase()}
+                    {/* trước đây in thẳng mã tiếng Anh "CRITICAL"/"HIGH" */}
+                    {(ISSUE_SEVERITY_LABELS as Record<string, string>)[iss.severity] ?? iss.severity}
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] text-gray-700 truncate">{iss.title}</div>
@@ -935,7 +936,7 @@ const ProjectReportPage: React.FC = () => {
 
         {/* === REPORT INFO === */}
         <div className="text-center text-[10px] text-gray-400 py-2">
-          Báo cáo tạo bởi {user?.full_name || 'System'} · {new Date().toLocaleString('vi-VN')} · Huy Anh Rubber ERP
+          Báo cáo tạo bởi {user?.full_name || 'Hệ thống'} · {fmtDate(new Date())} {fmtTime(new Date())} · Huy Anh Rubber ERP
         </div>
       </div>
     )
@@ -953,7 +954,7 @@ const ProjectReportPage: React.FC = () => {
       <div ref={reportRef} className="space-y-4">
         {/* Header */}
         <div className="bg-[#1B4D3E] rounded-xl p-4 text-white">
-          <div className="text-[11px] text-white/60 uppercase tracking-wide">Portfolio Report</div>
+          <div className="text-[11px] text-white/60 uppercase tracking-wide">Báo cáo tổng hợp dự án</div>
           <h2 className="text-[16px] font-bold mt-0.5">Báo cáo tổng hợp dự án</h2>
           <div className="text-[12px] text-white/70 mt-1">{d.period.label} · Công ty TNHH Cao su Huy Anh</div>
         </div>
@@ -978,8 +979,8 @@ const ProjectReportPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-gray-100 p-4">
             <h3 className="text-[13px] font-semibold text-gray-700 mb-2">Tổng ngân sách</h3>
             <div className="flex items-center justify-between text-[12px] mb-1.5">
-              <span>Dự toán: <strong>{formatCurrency(d.summary.total_budget_planned)}</strong></span>
-              <span>Thực tế: <strong>{formatCurrency(d.summary.total_budget_actual)}</strong></span>
+              <span>Dự toán: <strong>{fmtVndCompact(d.summary.total_budget_planned)}</strong></span>
+              <span>Thực tế: <strong>{fmtVndCompact(d.summary.total_budget_actual)}</strong></span>
             </div>
             <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
               <div
@@ -1023,7 +1024,7 @@ const ProjectReportPage: React.FC = () => {
                     <span className="text-[11px] font-mono font-bold text-gray-600">{item.progress_pct}%</span>
                   </div>
                   <div className="flex items-center gap-3 text-[10px] text-gray-400">
-                    <span>NS: {formatCurrency(item.budget_actual)}/{formatCurrency(item.budget_planned)}</span>
+                    <span>NS: {fmtVndCompact(item.budget_actual)}/{fmtVndCompact(item.budget_planned)}</span>
                     <span>Rủi ro: {item.risk_count}</span>
                     <span>Vấn đề: {item.open_issues}</span>
                   </div>
@@ -1031,7 +1032,7 @@ const ProjectReportPage: React.FC = () => {
                     <div className="flex items-center gap-1 mt-1.5 text-[10px] text-[#1B4D3E]">
                       <Target className="w-3 h-3" />
                       <span className="truncate">{item.next_milestone}</span>
-                      {item.next_milestone_date && <span className="text-gray-400 ml-1">{formatDate(item.next_milestone_date)}</span>}
+                      {item.next_milestone_date && <span className="text-gray-400 ml-1">{fmtDate(item.next_milestone_date)}</span>}
                     </div>
                   )}
                 </div>
@@ -1054,7 +1055,7 @@ const ProjectReportPage: React.FC = () => {
                   <th className="px-4 py-3 text-right font-medium">NS Thực tế</th>
                   <th className="px-4 py-3 text-center font-medium">Rủi ro</th>
                   <th className="px-4 py-3 text-center font-medium">Vấn đề</th>
-                  <th className="px-4 py-3 text-left font-medium">Milestone tới</th>
+                  <th className="px-4 py-3 text-left font-medium">Mốc tới</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -1079,13 +1080,13 @@ const ProjectReportPage: React.FC = () => {
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-block w-3 h-3 rounded-full`} style={{ backgroundColor: hc.color }} title={hc.label} />
                       </td>
-                      <td className="px-4 py-3 text-right text-[11px] font-mono text-gray-600">{formatCurrency(item.budget_planned)}</td>
-                      <td className="px-4 py-3 text-right text-[11px] font-mono text-gray-600">{formatCurrency(item.budget_actual)}</td>
+                      <td className="px-4 py-3 text-right text-[11px] font-mono text-gray-600">{fmtVndCompact(item.budget_planned)}</td>
+                      <td className="px-4 py-3 text-right text-[11px] font-mono text-gray-600">{fmtVndCompact(item.budget_actual)}</td>
                       <td className="px-4 py-3 text-center text-[11px] font-mono">{item.risk_count || '—'}</td>
                       <td className="px-4 py-3 text-center text-[11px] font-mono">{item.open_issues || '—'}</td>
                       <td className="px-4 py-3 text-[11px] text-gray-500 max-w-[150px] truncate">
                         {item.next_milestone ? (
-                          <span>{item.next_milestone} <span className="text-gray-400">({formatDate(item.next_milestone_date)})</span></span>
+                          <span>{item.next_milestone} <span className="text-gray-400">({fmtDate(item.next_milestone_date)})</span></span>
                         ) : '—'}
                       </td>
                     </tr>
@@ -1098,7 +1099,7 @@ const ProjectReportPage: React.FC = () => {
 
         {/* Report Info */}
         <div className="text-center text-[10px] text-gray-400 py-2">
-          Báo cáo tạo bởi {user?.full_name || 'System'} · {new Date().toLocaleString('vi-VN')} · Huy Anh Rubber ERP
+          Báo cáo tạo bởi {user?.full_name || 'Hệ thống'} · {fmtDate(new Date())} {fmtTime(new Date())} · Huy Anh Rubber ERP
         </div>
       </div>
     )

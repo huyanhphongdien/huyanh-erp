@@ -7,6 +7,8 @@
 
 import { supabase } from '../../lib/supabase'
 import { compressImage } from '../../lib/imageCompress'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { RAW_PHOTO_KIND_LABELS as RAW_PHOTO_KIND_LABELS_CHUNG } from './raw.types'
 
 export type RawPhotoKind = 'toan_canh' | 'man_hinh_can' | 'bo_sung'
 export type RawPhotoRefType = 'mix_issue_out' | 'mix_issue_return' | 'mix_lot' | 'raw_issue' | 'stocktake' | 'raw_recheck'
@@ -25,7 +27,8 @@ export interface RawPhoto {
   note: string | null
 }
 
-export const RAW_PHOTO_KIND_LABELS: Record<RawPhotoKind, string> = { toan_canh: 'Toàn cảnh', man_hinh_can: 'Màn hình cân', bo_sung: 'Bổ sung' }
+/** Cùng MỘT bản với raw.types (trước chép tay 2 nơi) — giữ tên export cũ làm alias. */
+export const RAW_PHOTO_KIND_LABELS = RAW_PHOTO_KIND_LABELS_CHUNG as Record<RawPhotoKind, string>
 
 function getGps(timeoutMs = 4000): Promise<{ lat: number; lng: number } | null> {
   return new Promise((resolve) => {
@@ -62,7 +65,7 @@ export const rawPhotoService = {
     const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const path = `${(opts.facilityCode || 'XX').toUpperCase()}/${ym}/${opts.refType}/${opts.refId}/${opts.kind}-${now.getTime()}.jpg`
     const { error: upErr } = await supabase.storage.from('raw-photos').upload(path, compressed, { contentType: compressed.type || 'image/jpeg', upsert: false })
-    if (upErr) throw new Error(`Tải ảnh lên thất bại: ${upErr.message}`)
+    if (upErr) throw new Error(dichLoiHeThong(upErr, 'Tải ảnh lên thất bại'))
     const publicUrl = supabase.storage.from('raw-photos').getPublicUrl(path).data.publicUrl
 
     const [{ data: { user } }, gps] = await Promise.all([supabase.auth.getUser(), getGps()])

@@ -28,6 +28,7 @@ import {
   Breadcrumb,
 } from 'antd'
 import { FileWordOutlined, DownloadOutlined, CodeOutlined, HomeOutlined } from '@ant-design/icons'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import {
   downloadContract,
   deriveKind,
@@ -207,8 +208,7 @@ export default function ContractGeneratorTestPage() {
       await downloadContract(kind, data, `${data.contract_no}_${type}.docx`)
       message.success(`Đã sinh ${type} (${kind}) — ${data.contract_no}_${type}.docx`)
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      message.error(`Sinh ${type} thất bại: ${msg}`)
+      message.error(dichLoiHeThong(e, `Sinh ${type} thất bại`))
       console.error(e)
     } finally {
       setLoading(null)
@@ -222,8 +222,7 @@ export default function ContractGeneratorTestPage() {
       await downloadContract(deriveKind(data.incoterm, 'PI'), data, `${data.contract_no}_PI.docx`)
       message.success(`Đã sinh cả SC + PI cho ${data.contract_no}`)
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      message.error(`Sinh thất bại: ${msg}`)
+      message.error(dichLoiHeThong(e, 'Sinh thất bại'))
     } finally {
       setLoading(null)
     }

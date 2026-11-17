@@ -5,19 +5,15 @@
 import { Drawer, Card, Table, Progress, Typography, Empty, Row, Col, Statistic, Button } from 'antd'
 import { SafetyCertificateOutlined, BankOutlined, RightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import dayjs from 'dayjs'
-import { CIC_LABEL, CIC_COLOR } from '../../services/finance/loanService'
-import { ALERT_LABEL, ALERT_COLOR } from '../../services/finance/depositService'
+import type { FinLoanComputed } from '../../services/finance/loanService'
+import { ALERT_LABEL, ALERT_COLOR, type FinDepositComputed } from '../../services/finance/depositService'
 import { ASSET_TYPE_LABEL } from '../../services/finance/collateralService'
 import { LINE_TYPE_LABEL, type FinCreditLineComputed } from '../../services/finance/creditLineService'
+import { fmtVndNum, fmtTy, fmtDate } from '../../utils/format'
+import { FIN_LIGHT } from '../../services/finance/finLight'
+import { pill, CicPill } from './finUi'
 
 const { Text } = Typography
-const fmtVnd = (n?: number | null) => (n || 0).toLocaleString('vi-VN')
-const fmtTy = (n: number) => `${((n || 0) / 1_000_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} tỷ`
-const fDate = (s?: string | null) => (s ? dayjs(s).format('DD/MM/YYYY') : '—')
-const pill = (bg: string, txt: string) => (
-  <span style={{ display: 'inline-block', background: bg, color: '#fff', fontWeight: 700, fontSize: 12, padding: '2px 9px', borderRadius: 5, whiteSpace: 'nowrap' }}>{txt}</span>
-)
 
 export default function FacilityDrawer({ line, open, onClose }: {
   line: FinCreditLineComputed | null
@@ -43,10 +39,10 @@ export default function FacilityDrawer({ line, open, onClose }: {
 
       <Card size="small" style={{ marginTop: 10 }}>
         <Text strong style={{ fontSize: 12 }}>Mức sử dụng hạn mức</Text>
-        <Progress percent={Math.min(usedPct, 100)} status={usedPct >= 100 ? 'exception' : 'active'} format={() => `${usedPct}%`} strokeColor={usedPct >= 90 ? '#dc2626' : '#1677ff'} />
+        <Progress percent={Math.min(usedPct, 100)} status={usedPct >= 100 ? 'exception' : 'active'} format={() => `${usedPct}%`} strokeColor={usedPct >= 100 ? FIN_LIGHT.overdue : usedPct >= 90 ? FIN_LIGHT.due : '#1677ff'} />
         <Text strong style={{ fontSize: 12 }}>Đảm bảo phủ dư nợ ({fmtTy(line.securedTotal)} / {fmtTy(line.used)})</Text>
         <Progress percent={Math.min(coverPct, 100)} status={coverPct >= 100 ? 'success' : 'normal'} format={() => `${coverPct}%`} strokeColor={coverPct >= 100 ? '#16a34a' : '#f59e0b'} />
-        <Text type="secondary" style={{ fontSize: 11 }}>🔒 Tiền gửi {fmtTy(line.secured)} + 🏛 Tài sản {fmtTy(line.securedAssets)}{line.line_type ? ` · ${LINE_TYPE_LABEL[line.line_type] || line.line_type} · hết hạn HĐTD ${fDate(line.to_date)}` : ''}</Text>
+        <Text type="secondary" style={{ fontSize: 11 }}>🔒 Tiền gửi {fmtTy(line.secured)} + 🏛 Tài sản {fmtTy(line.securedAssets)}{line.line_type ? ` · ${LINE_TYPE_LABEL[line.line_type] || line.line_type} · hết hạn HĐTD ${fmtDate(line.to_date)}` : ''}</Text>
       </Card>
 
       {/* Tiền gửi đảm bảo */}
@@ -59,9 +55,9 @@ export default function FacilityDrawer({ line, open, onClose }: {
             onRow={(r: any) => ({ onClick: () => { onClose(); navigate(`/finance/deposits?focus=${r.id}`) }, style: { cursor: 'pointer' } })}
             columns={[
               { title: 'Ngân hàng', dataIndex: 'bank', render: (v: string, r: any) => <span><b>{v}</b>{r.holder ? <div style={{ fontSize: 11, color: '#9ca3af' }}>{r.holder}</div> : null}</span> },
-              { title: 'Số tiền', dataIndex: 'amount', align: 'right' as const, render: (v: number) => <b>{fmtVnd(v)}</b> },
-              { title: 'Đáo hạn', dataIndex: 'effective_maturity', align: 'center' as const, render: (v: string) => fDate(v) },
-              { title: 'Trạng thái', key: 'al', align: 'center' as const, render: (_: any, r: any) => pill(ALERT_COLOR[r.alert], ALERT_LABEL[r.alert]) },
+              { title: 'Số tiền', dataIndex: 'amount', align: 'right' as const, render: (v: number) => <b>{fmtVndNum(v)}</b> },
+              { title: 'Đáo hạn', dataIndex: 'effective_maturity', align: 'center' as const, render: (v: string) => fmtDate(v) },
+              { title: 'Trạng thái', key: 'al', align: 'center' as const, render: (_: unknown, r: FinDepositComputed) => pill(ALERT_COLOR[r.alert], ALERT_LABEL[r.alert]) },
             ] as any} />}
 
       {/* Tài sản đảm bảo */}
@@ -72,8 +68,8 @@ export default function FacilityDrawer({ line, open, onClose }: {
         : <Table rowKey="id" size="small" pagination={false} dataSource={line.collaterals}
             columns={[
               { title: 'Tài sản', dataIndex: 'asset_name', render: (v: string, r: any) => <span><b>{v}</b>{r.asset_type ? <div style={{ fontSize: 11, color: '#9ca3af' }}>{ASSET_TYPE_LABEL[r.asset_type] || r.asset_type}</div> : null}</span> },
-              { title: 'Định giá', dataIndex: 'appraisal_value', align: 'right' as const, render: (v: number) => fmtVnd(v) },
-              { title: 'Giá trị BĐ', dataIndex: 'secured_value', align: 'right' as const, render: (v: number) => <b style={{ color: '#7c3aed' }}>{fmtVnd(v)}</b> },
+              { title: 'Định giá', dataIndex: 'appraisal_value', align: 'right' as const, render: (v: number | null) => fmtVndNum(v) },
+              { title: 'Giá trị BĐ', dataIndex: 'secured_value', align: 'right' as const, render: (v: number | null) => <b style={{ color: '#7c3aed' }}>{fmtVndNum(v)}</b> },
             ] as any} />}
 
       {/* Khoản vay rút */}
@@ -86,9 +82,9 @@ export default function FacilityDrawer({ line, open, onClose }: {
             onRow={(r: any) => ({ onClick: () => { onClose(); navigate(`/finance/loans?focus=${r.id}`) }, style: { cursor: 'pointer' } })}
             columns={[
               { title: 'Số khế ước', dataIndex: 'loan_no', render: (v: string | null) => <span style={{ color: '#1677ff' }}>{v || '—'}</span> },
-              { title: 'Còn lại', dataIndex: 'remaining', align: 'right' as const, render: (v: number) => <b style={{ color: '#92400E' }}>{fmtVnd(v)}</b> },
-              { title: 'Đến hạn', dataIndex: 'due_date', align: 'center' as const, render: (v: string) => fDate(v) },
-              { title: 'Trạng thái', key: 'cic', align: 'center' as const, render: (_: any, r: any) => pill(CIC_COLOR[r.cic], CIC_LABEL[r.cic]) },
+              { title: 'Còn lại', dataIndex: 'remaining', align: 'right' as const, render: (v: number) => <b style={{ color: '#92400E' }}>{fmtVndNum(v)}</b> },
+              { title: 'Đến hạn', dataIndex: 'due_date', align: 'center' as const, render: (v: string) => fmtDate(v) },
+              { title: 'Trạng thái', key: 'cic', align: 'center' as const, render: (_: unknown, r: FinLoanComputed) => <CicPill loan={r} /> },
             ] as any} />}
 
       <div style={{ marginTop: 14, textAlign: 'right' }}>

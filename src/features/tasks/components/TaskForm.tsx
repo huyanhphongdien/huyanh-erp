@@ -18,6 +18,9 @@ import {
   X,
   Lock,
 } from 'lucide-react'
+import { TASK_PRIORITY_LABELS, type TaskPriority } from '../../../types'
+import { DIFFICULTY_COEF, DIFFICULTY_LABEL, type TaskDifficulty } from '../../../services/taskScoring'
+import { todayVN } from '../../../utils/dateVN'
 
 // ============================================================================
 // TYPES
@@ -78,12 +81,17 @@ interface TaskFormProps {
 // PRIORITY CONFIG
 // ============================================================================
 
-const PRIORITY_OPTIONS = [
-  { value: 'low', label: 'Thấp', color: 'text-gray-600' },
-  { value: 'medium', label: 'Trung bình', color: 'text-yellow-600' },
-  { value: 'high', label: 'Cao', color: 'text-orange-600' },
-  { value: 'urgent', label: 'Khẩn cấp', color: 'text-red-600' },
-]
+// Nhãn ưu tiên đọc từ MỘT map (types/index.ts) — không chép tay
+const PRIORITY_OPTIONS = (Object.keys(TASK_PRIORITY_LABELS) as TaskPriority[]).map(value => ({
+  value,
+  label: TASK_PRIORITY_LABELS[value],
+}))
+
+// Độ khó + hệ số đọc từ taskScoring (nguồn công thức điểm) — đổi hệ số là nhãn tự đổi theo
+const DIFFICULTY_OPTIONS = (Object.keys(DIFFICULTY_LABEL) as TaskDifficulty[]).map(value => ({
+  value,
+  label: `${DIFFICULTY_LABEL[value]} (×${String(DIFFICULTY_COEF[value]).replace('.', ',')})`,
+}))
 
 // ============================================================================
 // MAIN COMPONENT - TaskForm
@@ -110,7 +118,8 @@ export function TaskForm({
     assignee_id: initialData?.assignee_id || '',
     priority: (initialData?.priority as any) || 'medium',
     difficulty: 'normal',
-    start_date: '',
+    // Tạo việc: tuyệt đại đa số bắt đầu HÔM NAY (giờ VN) — điền sẵn, vẫn sửa được
+    start_date: mode === 'create' ? todayVN() : '',
     due_date: initialData?.due_date || '',
     notes: '',
     initial_progress: 0,
@@ -225,6 +234,15 @@ export function TaskForm({
         )
       : null
 
+  // Nút Tạo bị khoá → nói rõ vì sao ngay dưới nút (trước đây khoá im lặng khi chưa chọn phòng ban)
+  const blockReason = !formData.name.trim()
+    ? 'Nhập tên công việc để tạo'
+    : !isSelfMode && !formData.assignee_id
+      ? (!isDepartmentLocked && !formData.department_id
+          ? 'Chọn phòng ban rồi chọn người phụ trách để tạo'
+          : 'Chọn người phụ trách để tạo')
+      : ''
+
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border border-gray-200">
       <div className="p-6 space-y-6">
@@ -279,7 +297,7 @@ export function TaskForm({
               Phân công
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Phòng ban */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -375,7 +393,7 @@ export function TaskForm({
             <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide border-b pb-2">
               Phân công
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <Building className="w-4 h-4 inline mr-1" />Phòng ban
@@ -402,7 +420,8 @@ export function TaskForm({
             Thời gian & Ưu tiên
           </h3>
 
-          <div className="grid grid-cols-3 gap-4">
+          {/* 4 ô: 1 cột điện thoại · 2 cột tablet · 4 cột máy tính (lưới 3 cột cũ làm ô Hạn rơi lẻ) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Độ ưu tiên */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -432,9 +451,9 @@ export function TaskForm({
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
-                <option value="normal">Bình thường (×1.0)</option>
-                <option value="hard">Khó (×1.2)</option>
-                <option value="critical">Rất khó (×1.5)</option>
+                {DIFFICULTY_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
             </div>
 
@@ -509,7 +528,7 @@ export function TaskForm({
       {children}
 
       {/* Actions */}
-      <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg">
+      <div className="flex flex-wrap justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg">
         <button
           type="button"
           onClick={onCancel}
@@ -520,7 +539,8 @@ export function TaskForm({
         </button>
         <button
           type="submit"
-          disabled={isLoading || !formData.name.trim() || (!isSelfMode && !formData.assignee_id)}
+          disabled={isLoading || !!blockReason}
+          title={blockReason || undefined}
           className={`px-6 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors ${
             isSelfMode
               ? 'bg-green-600 hover:bg-green-700'
@@ -534,6 +554,12 @@ export function TaskForm({
               ? 'Cập nhật'
               : isSelfMode ? 'Tạo việc cá nhân' : 'Tạo công việc'}
         </button>
+        {!isLoading && blockReason && (
+          <p className="basis-full text-right text-xs text-amber-700 flex items-center justify-end gap-1">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            {blockReason}
+          </p>
+        )}
       </div>
     </form>
   )

@@ -16,7 +16,9 @@ import type {
   StockBatch,
   RubberGrade,
 } from './wms.types'
+import { BATCH_STATUS_LABELS } from './wms.types'
 import { rubberGradeService } from './rubberGradeService'
+import { toDateStrVN } from '../../utils/dateVN'
 
 /** Helper: classify DRC -> SVR grade */
 function classifyGrade(drc: number): RubberGrade {
@@ -267,11 +269,11 @@ export const qcService = {
     // 3. Evaluate DRC
     const evaluation = this.evaluateDRC(drc_value, standard)
 
-    // 4. Tính next_recheck_date
+    // 4. Tính next_recheck_date (ngày theo giờ VN — toISOString() lệch −1 ngày trước 7h sáng)
     const today = new Date()
     const nextRecheck = new Date(today)
     nextRecheck.setDate(today.getDate() + evaluation.next_recheck_days)
-    const nextRecheckStr = nextRecheck.toISOString().split('T')[0]
+    const nextRecheckStr = toDateStrVN(nextRecheck)
 
     // 5. Insert batch_qc_results
     const { data: qcResult, error: qcErr } = await supabase
@@ -308,7 +310,7 @@ export const qcService = {
       .update({
         initial_drc: drc_value,
         latest_drc: drc_value,
-        last_qc_date: today.toISOString().split('T')[0],
+        last_qc_date: toDateStrVN(today),
         qc_status: evaluation.qc_status,
         next_recheck_date: nextRecheckStr,
         rubber_grade: drc_value ? classifyGrade(drc_value) : null,
@@ -443,13 +445,13 @@ export const qcService = {
     include_upcoming_days?: number  // bao gồm lô sắp đến hạn trong X ngày
   }): Promise<RecheckBatchItem[]> {
     const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
+    const todayStr = toDateStrVN(today)
 
     // Nếu include_upcoming_days > 0, lấy thêm lô sắp đến hạn
     const upcomingDays = options?.include_upcoming_days ?? 0
     const cutoffDate = new Date(today)
     cutoffDate.setDate(today.getDate() + upcomingDays)
-    const cutoffStr = cutoffDate.toISOString().split('T')[0]
+    const cutoffStr = toDateStrVN(cutoffDate)   // giờ VN — UTC trước 7h sáng làm lô đến hạn hôm nay rơi khỏi danh sách
 
     let query = supabase
       .from('stock_batches')
@@ -550,7 +552,7 @@ export const qcService = {
     if (batchErr) throw batchErr
     if (!batch) throw new Error('Không tìm thấy lô hàng')
     if (batch.status !== 'active') {
-      throw new Error(`Lô hàng không ở trạng thái active (hiện tại: ${batch.status})`)
+      throw new Error(`Lô hàng không còn ở trạng thái "${BATCH_STATUS_LABELS.active}" nên không tái kiểm được (hiện tại: ${BATCH_STATUS_LABELS[batch.status] ?? batch.status})`)
     }
 
     // 2. Lấy ngưỡng QC theo material
@@ -569,7 +571,7 @@ export const qcService = {
     } else {
       const nextRecheck = new Date(today)
       nextRecheck.setDate(today.getDate() + evaluation.next_recheck_days)
-      nextRecheckStr = nextRecheck.toISOString().split('T')[0]
+      nextRecheckStr = toDateStrVN(nextRecheck)
     }
 
     // 5. Insert batch_qc_results (check_type = 'recheck')
@@ -604,7 +606,7 @@ export const qcService = {
     // 6. Update stock_batches
     const updateData: Record<string, any> = {
       latest_drc: drc_value,
-      last_qc_date: today.toISOString().split('T')[0],
+      last_qc_date: toDateStrVN(today),
       qc_status: evaluation.qc_status,
       rubber_grade: drc_value ? classifyGrade(drc_value) : undefined,
       updated_at: new Date().toISOString(),

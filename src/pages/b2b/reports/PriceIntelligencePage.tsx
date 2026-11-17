@@ -10,6 +10,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { ArrowLeftOutlined, FundOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
+import { toDateStrVN, vnDayStartTs } from '../../../utils/dateVN'
 
 const { Title, Text } = Typography
 
@@ -35,12 +36,15 @@ export default function PriceIntelligencePage() {
     queryFn: async () => {
       // Single query for all 12 months instead of N+1
       const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-      const startStr = startDate.toISOString().split('T')[0]
+      // Ngày lịch theo giờ VN — toISOString() (UTC) lùi về 30/31 tháng trước (audit 17/11/2026).
+      // created_at là timestamptz, DB chạy giờ UTC: chuỗi ngày trần = 0h UTC (7h sáng VN) → deal tạo 0h–7h
+      // ngày đầu kỳ bị rơi; vnDayStartTs gắn +07:00 = đúng nửa đêm VN.
+      const startTs = vnDayStartTs(toDateStrVN(startDate))
 
       let query = supabase
         .from('b2b_deals')
         .select('unit_price, created_at')
-        .gte('created_at', startStr)
+        .gte('created_at', startTs)
         .not('status', 'eq', 'cancelled')
         .gt('unit_price', 0)
 
@@ -144,7 +148,7 @@ export default function PriceIntelligencePage() {
             <Statistic
               title="Giá TB tháng này"
               value={currentMonth?.avgPrice || 0}
-              suffix="VNĐ/kg"
+              suffix="₫/kg"
               valueStyle={{ color: '#1B4D3E', fontSize: 20 }}
               formatter={v => Number(v).toLocaleString('vi-VN')}
             />
@@ -153,7 +157,7 @@ export default function PriceIntelligencePage() {
         <Col xs={8}>
           <Card size="small" style={{ borderRadius: 12 }}>
             <Statistic
-              title="Thay đổi vs tháng trước"
+              title="Thay đổi so với tháng trước"
               value={Math.abs(priceChange)}
               suffix="%"
               prefix={priceChange >= 0 ? <ArrowUpOutlined style={{ color: '#cf1322' }} /> : <ArrowDownOutlined style={{ color: '#52c41a' }} />}
@@ -164,7 +168,7 @@ export default function PriceIntelligencePage() {
         <Col xs={8}>
           <Card size="small" style={{ borderRadius: 12 }}>
             <Statistic
-              title="Deals tháng này"
+              title="Deal tháng này"
               value={currentMonth?.dealCount || 0}
               valueStyle={{ fontSize: 20 }}
             />
@@ -183,7 +187,7 @@ export default function PriceIntelligencePage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} width={60} tickFormatter={v => `${(v / 1000).toFixed(0)}K`} />
-                    <Tooltip formatter={(v) => `${Number(v).toLocaleString('vi-VN')} VNĐ/kg`} />
+                    <Tooltip formatter={(v) => `${Number(v).toLocaleString('vi-VN')} ₫/kg`} />
                     <Legend />
                     <Line type="monotone" dataKey="avgPrice" name="Giá TB" stroke="#1B4D3E" strokeWidth={2} dot={{ r: 4 }} />
                     <Line type="monotone" dataKey="maxPrice" name="Cao nhất" stroke="#cf1322" strokeWidth={1} strokeDasharray="4 4" />

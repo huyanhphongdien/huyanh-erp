@@ -17,6 +17,20 @@ interface EmployeeFormData {
   status?: string
 }
 
+/** Trạng thái hồ sơ nhân viên (EmployeeStatus) — MỘT nguồn nhãn + màu (antd) cho Sổ nhân viên và form. */
+export const EMPLOYEE_STATUS_LABELS: Record<string, string> = {
+  active: 'Đang làm việc',
+  inactive: 'Tạm nghỉ',
+  on_leave: 'Đang nghỉ phép',
+  terminated: 'Đã nghỉ việc',
+}
+export const EMPLOYEE_STATUS_COLORS: Record<string, string> = {
+  active: 'green',
+  inactive: 'orange',
+  on_leave: 'gold',
+  terminated: 'red',
+}
+
 // Interface riêng cho employee params
 interface EmployeePaginationParams {
   page?: number

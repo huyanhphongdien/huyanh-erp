@@ -34,6 +34,7 @@ import { PRODUCT_TYPE_LABELS } from '../../services/b2b/chatMessageService'
 import type { ConfirmDealFormData } from '../../types/b2b.types'
 import { calculateEstimatedValue } from '../../services/b2b/dealConfirmService'
 import { supabase } from '../../lib/supabase'
+import { fmtVnd, vndInputProps } from '../../utils/format'
 
 const { Text, Title } = Typography
 const { TextArea } = Input
@@ -51,14 +52,6 @@ interface ConfirmDealModalProps {
   partnerName?: string
   /** Chỉ factory mới có quyền tạm ứng */
   showAdvanceSection?: boolean
-}
-
-// ============================================
-// HELPERS
-// ============================================
-
-const formatCurrency = (value: number): string => {
-  return value.toLocaleString('vi-VN')
 }
 
 // ============================================
@@ -298,7 +291,7 @@ const ConfirmDealModal = ({
           </Radio.Group>
           <div style={{ marginTop: 6, fontSize: 11, color: '#666' }}>
             {dealType === 'purchase' && '→ DRC đã đo & chốt từ trước. Thanh toán theo khối lượng cân thực tế đem về × giá chốt.'}
-            {dealType === 'processing' && '→ Giá tạm tính. Sau SX + QC final → giá cuối = DRC sản phẩm × đơn giá.'}
+            {dealType === 'processing' && '→ Giá tạm tính. Sau SX + QC cuối → giá cuối = DRC sản phẩm × đơn giá.'}
           </div>
         </Form.Item>
 
@@ -375,7 +368,7 @@ const ConfirmDealModal = ({
 
         <Form.Item
           name="agreed_price"
-          label="Đơn giá thỏa thuận (đ/kg)"
+          label="Đơn giá thỏa thuận (₫/kg)"
           rules={[
             { required: true, message: 'Nhập đơn giá' },
             { type: 'number', min: 100, message: 'Giá không hợp lệ' },
@@ -386,8 +379,7 @@ const ConfirmDealModal = ({
             style={{ width: '100%' }}
             min={100}
             step={100}
-            formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-            parser={(v) => Number(v!.replace(/,/g, '')) || 0}
+            {...vndInputProps}
             size="large"
           />
         </Form.Item>
@@ -434,16 +426,15 @@ const ConfirmDealModal = ({
             Giá trị ước tính
           </Text>
           <Title level={3} style={{ color: '#ffd700', margin: '4px 0 0' }}>
-            {liveEstimatedValue > 0 ? `${formatCurrency(liveEstimatedValue)} VNĐ` : '—'}
+            {liveEstimatedValue > 0 ? fmtVnd(liveEstimatedValue) : '—'}
           </Title>
         </div>
 
         {dealType === 'processing' && (
           <>
-            <Form.Item label="Phí gia công (đ/tấn)" name="processing_fee_per_ton">
-              <InputNumber style={{width:'100%'}} min={0} placeholder="VD: 2,500,000"
-                formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={v => v!.replace(/,/g, '') as any} />
+            <Form.Item label="Phí gia công (₫/tấn)" name="processing_fee_per_ton">
+              <InputNumber style={{width:'100%'}} min={0} placeholder="VD: 2.500.000"
+                {...vndInputProps} />
             </Form.Item>
             <Form.Item label="Tỷ lệ thu hồi dự kiến (%)" name="expected_output_rate" initialValue={80}>
               <InputNumber style={{width:'100%'}} min={1} max={100} suffix="%" />
@@ -497,7 +488,7 @@ const ConfirmDealModal = ({
               >
                 <Form.Item
                   name="advance_amount"
-                  label="Số tiền ứng (VNĐ)"
+                  label="Số tiền ứng (₫)"
                   rules={[
                     { required: true, message: 'Nhập số tiền ứng' },
                     { type: 'number', min: 1, message: 'Số tiền phải > 0' },
@@ -512,9 +503,8 @@ const ConfirmDealModal = ({
                     style={{ width: '100%' }}
                     min={1}
                     step={1000000}
-                    formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(v) => Number(v!.replace(/,/g, '')) || 0}
-                    placeholder="VD: 20,000,000"
+                    {...vndInputProps}
+                    placeholder="VD: 20.000.000"
                     size="large"
                   />
                 </Form.Item>
@@ -572,19 +562,19 @@ const ConfirmDealModal = ({
               >
                 <Row justify="space-between" style={{ marginBottom: 4 }}>
                   <Text>Giá trị Deal:</Text>
-                  <Text strong>{formatCurrency(liveEstimatedValue)} VNĐ</Text>
+                  <Text strong>{fmtVnd(liveEstimatedValue)}</Text>
                 </Row>
                 <Row justify="space-between" style={{ marginBottom: 4 }}>
                   <Text>Tạm ứng:</Text>
                   <Text strong style={{ color: '#cf1322' }}>
-                    - {formatCurrency(advanceAmount)} VNĐ
+                    - {fmtVnd(advanceAmount)}
                   </Text>
                 </Row>
                 <Divider style={{ margin: '8px 0' }} />
                 <Row justify="space-between">
                   <Text strong>Còn phải trả:</Text>
                   <Text strong style={{ color: '#1890ff', fontSize: 16 }}>
-                    {formatCurrency(balanceDue)} VNĐ
+                    {fmtVnd(balanceDue)}
                   </Text>
                 </Row>
               </div>

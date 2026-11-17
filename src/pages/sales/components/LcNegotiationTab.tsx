@@ -22,6 +22,8 @@ import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
 import { lcNegotiationDoc, collectionDiscountDoc, saveDocx } from '../../../services/sales/docxExport'
 import { generateDNCK } from '../../../services/sales/discountRequestService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
 import DocLetterhead from './DocLetterhead'
 
 const { Title, Text, Paragraph } = Typography
@@ -45,6 +47,10 @@ export default function LcNegotiationTab(
   const [banks, setBanks] = useState<CompanyBank[]>([])
   const [neg, setNeg] = useState<LcNegotiation | null>(null)
   const [loading, setLoading] = useState(true)
+  // ⚠ Tải lỗi mà vẫn hiện form (giá trị mặc định) thì bấm "Lưu" là ghi đè đơn chiết khấu thật
+  // → lỗi tải thì chỉ hiện khối lỗi + Thử lại.
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [saving, setSaving] = useState(false)
   const [savingTpl, setSavingTpl] = useState(false)
   // Số bản riêng đơn (mặc định lấy hồ sơ khách; sửa cho L/C của đơn này)
@@ -58,6 +64,7 @@ export default function LcNegotiationTab(
     let cancelled = false
     ;(async () => {
       setLoading(true)
+      setLoadError(null)
       try {
         const [i, p, b, n] = await Promise.all([
           documentService.getInvoiceData(orderId, lotNo),
@@ -92,14 +99,14 @@ export default function LcNegotiationTab(
           submitted_date: n?.submitted_date ? dayjs(n.submitted_date) : dayjs(),
           status: n?.status || 'draft',
         })
-      } catch (e: any) {
-        if (!cancelled) message.error(e?.message || 'Lỗi tải đơn chiết khấu')
+      } catch (e: unknown) {
+        if (!cancelled) setLoadError(e || true)
       } finally {
         if (!cancelled) setLoading(false)
       }
     })()
     return () => { cancelled = true }
-  }, [orderId, order.customer_id, form, lotNo])
+  }, [orderId, order.customer_id, form, lotNo, reloadKey])
 
   // Tự tính số tiền thương lượng khi đổi %
   const onPctChange = (pct: number | null) => {
@@ -137,8 +144,8 @@ export default function LcNegotiationTab(
       setNeg(saved)
       message.success('Đã lưu đơn chiết khấu')
       onSaved?.()   // báo BOE nạp lại (số L/C, tenor, ngân hàng phát hành)
-    } catch (e: any) {
-      message.error(e?.message || 'Lỗi lưu')
+    } catch (e: unknown) {
+      message.error(dichLoiHeThong(e, 'Lỗi lưu đơn chiết khấu'))
     } finally {
       setSaving(false)
     }
@@ -158,8 +165,8 @@ export default function LcNegotiationTab(
         doc_checklist: buildDocChecklist(),
       })
       message.success('Đã lưu làm mẫu chiết khấu + số bản cho khách — đơn sau tự điền')
-    } catch (e: any) {
-      message.error(e?.message || 'Lỗi lưu mẫu')
+    } catch (e: unknown) {
+      message.error(dichLoiHeThong(e, 'Lỗi lưu mẫu'))
     } finally {
       setSavingTpl(false)
     }
@@ -190,14 +197,15 @@ export default function LcNegotiationTab(
       setNeg(saved)
       onSaved?.()
       await generateDNCK(orderId, lotNo)
-    } catch (e: any) {
-      message.error(e?.message || 'Lỗi sinh đơn ĐNCK')
+    } catch (e: unknown) {
+      message.error(dichLoiHeThong(e, 'Lỗi sinh đơn ĐNCK'))
     } finally {
       setGenDnck(false)
     }
   }
 
-  if (loading) return <Spin tip="Loading..." />
+  if (loading) return <Spin tip="Đang tải..." />
+  if (loadError) return <PageState error={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
 
   const v = watched || form.getFieldsValue()
   const bank = banks.find((b) => b.id === v.bank_id) || null

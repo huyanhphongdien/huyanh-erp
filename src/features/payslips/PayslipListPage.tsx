@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { payrollService } from '../../services'
+import { payrollService, PAYSLIP_STATUS_LABELS, PAYSLIP_STATUS_COLORS } from '../../services'
 import { Button, Input, Select, Card, Pagination, Modal } from '../../components/ui'
 import { PayslipDetail } from './PayslipDetail'
+import PageState from '../../components/common/PageState'
+import { EnumTag } from '../../components/common/EnumTag'
+import { fmtVnd } from '../../utils/format'
 
 // Define Payslip type inline
 interface Payslip {
@@ -22,19 +25,13 @@ interface Payslip {
   status: string
 }
 
-const statusLabels: Record<string, { label: string; color: string }> = {
-  draft: { label: 'Nháp', color: 'bg-gray-100 text-gray-800' },
-  confirmed: { label: 'Đã xác nhận', color: 'bg-green-100 text-green-800' },
-  paid: { label: 'Đã trả', color: 'bg-blue-100 text-blue-800' }
-}
-
 export function PayslipListPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(null)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['payslips', page, search, statusFilter],
     queryFn: () => payrollService.getPayslips({ 
       page, 
@@ -44,9 +41,7 @@ export function PayslipListPage() {
     })
   })
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value)
-  }
+  const formatCurrency = fmtVnd
 
   return (
     <div className="p-6">
@@ -67,9 +62,7 @@ export function PayslipListPage() {
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
             options={[
               { value: '', label: 'Tất cả trạng thái' },
-              { value: 'draft', label: 'Nháp' },
-              { value: 'confirmed', label: 'Đã xác nhận' },
-              { value: 'paid', label: 'Đã trả' }
+              ...Object.entries(PAYSLIP_STATUS_LABELS).map(([value, label]) => ({ value, label }))
             ]}
             className="w-48"
           />
@@ -98,6 +91,12 @@ export function PayslipListPage() {
                     Đang tải...
                   </td>
                 </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={9} className="p-0">
+                    <PageState error={error} onRetry={() => refetch()} />
+                  </td>
+                </tr>
               ) : !data?.data?.length ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
@@ -106,7 +105,6 @@ export function PayslipListPage() {
                 </tr>
               ) : (
                 data.data.map((item: Payslip) => {
-                  const statusInfo = statusLabels[item.status] || statusLabels.draft
                   return (
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium">{item.payslip_number}</td>
@@ -123,9 +121,7 @@ export function PayslipListPage() {
                         {formatCurrency(item.net_salary)}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <span className={`px-2 py-1 rounded text-xs ${statusInfo.color}`}>
-                          {statusInfo.label}
-                        </span>
+                        <EnumTag value={item.status} labels={PAYSLIP_STATUS_LABELS} colors={PAYSLIP_STATUS_COLORS} />
                       </td>
                       <td className="px-4 py-3 text-sm">
                         <Button 
@@ -144,7 +140,7 @@ export function PayslipListPage() {
           </table>
         </div>
 
-        {data && data.totalPages > 1 && (
+        {!error && data && data.totalPages > 1 && (
           <div className="p-4 border-t">
             <Pagination 
               currentPage={page} 

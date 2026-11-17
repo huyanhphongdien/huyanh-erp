@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form'
 import { useMutation } from '@tanstack/react-query'
 import { positionService } from '../../services'
 import { Button, Input, Select } from '../../components/ui'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 // Define types inline
 interface Position {
@@ -103,7 +104,7 @@ export function PositionForm({ position, onSuccess, onCancel }: PositionFormProp
 
       {mutation.error && (
         <p className="text-danger text-sm">
-          {(mutation.error as Error).message}
+          {dichLoiHeThong(mutation.error, 'Lưu chức vụ thất bại')}
         </p>
       )}
 

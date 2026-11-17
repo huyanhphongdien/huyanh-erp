@@ -19,9 +19,12 @@ import { useAuthStore } from './stores/authStore';
 // Layout
 import { MainLayout } from './components/common/MainLayout';
 import AdminGate from './components/common/AdminGate';
+import NotFoundPage from './components/common/NotFoundPage';
 
 // Auth
 import { LoginPage } from './features/auth/LoginPage';
+// Import TĨNH (không lazy): trang phải đọc token khôi phục trên URL trước khi supabase-js xoá hash
+import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 
 // ===== LAZY LOADED PAGES — Mobile Performance Optimization =====
 // Heavy pages (>500 lines) and less-frequently-used pages are lazy-loaded
@@ -157,8 +160,8 @@ const PurchaseReportPage = lazy(() => import('./features/purchasing/pages/Purcha
 const NotificationPage = lazy(() => import('./pages/b2b/NotificationPage'));
 
 // ===== WMS MODULE (lazy) =====
-const WMSMaterialListPage = lazy(() => import('./pages/wms/materials/MaterialListPage'));
-const WMSWarehouseListPage = lazy(() => import('./pages/wms/warehouses/WarehouseListPage'));
+// MaterialListPage / WarehouseListPage chỉ còn render trong tab của WMSConfigTabbedPage (/wms/config) —
+// 2 route đứng riêng /wms/materials, /wms/warehouses đã đổi thành redirect (Đợt 3 audit UI 17/11/2026).
 const WMSWarehouseLocationPage = lazy(() => import('./pages/wms/warehouses/WarehouseLocationPage'));
 const StockInListPage = lazy(() => import('./pages/wms/stock-in/StockInListPage'));
 const StockInCreatePage = lazy(() => import('./pages/wms/stock-in/StockInCreatePage'));
@@ -453,6 +456,9 @@ function App() {
             {/* ERP Login                                                    */}
             {/* ============================================================ */}
             <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+            {/* Đặt mật khẩu mới từ link email (authStore.forgotPassword → redirectTo /reset-password). KHÔNG bọc
+                PublicRoute: phiên khôi phục làm isAuthenticated = true → PublicRoute đẩy về '/' trước khi kịp đặt. */}
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             {/* ============================================================ */}
             {/* CÔNG KHAI — quét QR máy báo hỏng (công nhân KHÔNG cần login) */}
@@ -618,8 +624,9 @@ function App() {
                   <Route path="inventory/:materialId" element={<InventoryDetailPage />} />
                 </Route>
                 <Route path="nvl-dashboard" element={<Navigate to="/wms/vat-tu?tab=nvl" replace />} />
-                <Route path="materials" element={<WMSMaterialListPage />} />
-                <Route path="warehouses" element={<WMSWarehouseListPage />} />
+                {/* Cửa lặp của /wms/config (tab materials | warehouses) — chuyển hướng như /wms/settings */}
+                <Route path="materials" element={<Navigate to="/wms/config?tab=materials" replace />} />
+                <Route path="warehouses" element={<Navigate to="/wms/config?tab=warehouses" replace />} />
                 <Route path="warehouses/:id/locations" element={<WMSWarehouseLocationPage />} />
                 {/* Phase A: redirect to consolidated /wms inventory tabbed */}
                 <Route path="alerts" element={<Navigate to="/wms/vat-tu?tab=alerts" replace />} />
@@ -868,8 +875,8 @@ function App() {
               <Route path="evaluations/results" element={<Navigate to="/my-tasks?tab=approved" replace />} />
             </Route>
 
-            {/* 404 */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* 404 — báo rõ "Không tìm thấy trang này" + nút Về Tổng quan (trước: lặng lẽ đẩy về '/') */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </AuthInitializer>
       </BrowserRouter>

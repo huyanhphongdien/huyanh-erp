@@ -54,6 +54,7 @@ import {
   deriveKind,
 } from '../../services/sales/contractGeneratorService'
 import { riskReasonText } from '../../services/sales/contractRisk'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -91,8 +92,7 @@ export default function ContractSignPage() {
       const data = await salesContractWorkflowService.listForSigning()
       setRows(data)
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      message.error(`Không tải được queue: ${msg}`)
+      message.error(dichLoiHeThong(e, 'Không tải được hàng chờ'))
     } finally {
       setLoading(false)
     }
@@ -141,8 +141,7 @@ export default function ContractSignPage() {
       }
       message.success('Đã tải .docx — in ra ký + đóng dấu rồi scan upload lại')
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      message.error(`Tải .docx thất bại: ${msg}`)
+      message.error(dichLoiHeThong(e, 'Tải .docx thất bại'))
     } finally {
       setDocLoading(null)
     }
@@ -228,8 +227,7 @@ export default function ContractSignPage() {
           setActive(updated)  // refresh drawer với signer_confirmed_at
           void refresh()
         } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e)
-          message.error(`Xác nhận thất bại: ${msg}`)
+          message.error(dichLoiHeThong(e, 'Xác nhận thất bại'))
         } finally {
           setConfirming(false)
         }
@@ -279,8 +277,7 @@ export default function ContractSignPage() {
           closeSign()
           void refresh()
         } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e)
-          message.error(`Trả lại thất bại: ${msg}`)
+          message.error(dichLoiHeThong(e, 'Trả lại thất bại'))
         } finally {
           setSendingBack(false)
         }
@@ -337,8 +334,7 @@ export default function ContractSignPage() {
           closeSign()
           void refresh()
         } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e)
-          message.error(`Đánh dấu FINAL thất bại: ${msg}`)
+          message.error(dichLoiHeThong(e, 'Đánh dấu FINAL thất bại'))
         } finally {
           setSigning(false)
         }
@@ -793,7 +789,7 @@ function UploadFlowSignFiles({ contract }: { contract: SalesOrderContract }) {
       const url = await salesContractWorkflowService.getDownloadUrl(path)
       window.open(url, '_blank')
     } catch (e: unknown) {
-      message.error(`Download thất bại: ${e instanceof Error ? e.message : String(e)}`)
+      message.error(dichLoiHeThong(e, 'Tải xuống thất bại'))
     } finally {
       setDownloadingKey(null)
     }

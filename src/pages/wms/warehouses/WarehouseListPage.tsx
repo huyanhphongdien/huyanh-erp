@@ -39,6 +39,9 @@ import {
   SaveOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
+import { WAREHOUSE_TYPE_LABELS } from '../../../services/wms/warehouseService'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 const MONO_FONT = "'JetBrains Mono', monospace"
@@ -63,11 +66,8 @@ interface LocationStats {
 }
 
 // ===== CONSTANTS =====
-const TYPE_LABELS: Record<string, string> = {
-  finished: 'Thành phẩm',
-  raw: 'Nguyên liệu',
-  mixed: 'Hỗn hợp',
-}
+// Nhãn loại kho: một nguồn ở warehouseService (màu ở service là class Tailwind nên giữ màu antd tại đây)
+const TYPE_LABELS: Record<string, string> = WAREHOUSE_TYPE_LABELS
 
 const TYPE_COLORS: Record<string, string> = {
   finished: 'green',
@@ -101,11 +101,12 @@ const WarehouseFormModal: React.FC<{
     }
     setLoadingEdit(true)
     ;(async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('warehouses')
         .select('*')
         .eq('id', warehouseId)
         .single()
+      if (error) message.error(dichLoiHeThong(error, 'Không tải được thông tin kho'))
 
       if (data) {
         form.setFieldsValue({
@@ -159,7 +160,7 @@ const WarehouseFormModal: React.FC<{
       onSaved(result)
     } catch (err: any) {
       if (err.errorFields) return
-      message.error(err.message || 'Lỗi khi lưu')
+      message.error(dichLoiHeThong(err, 'Lỗi khi lưu kho'))
     } finally {
       setSaving(false)
     }
@@ -188,9 +189,9 @@ const WarehouseFormModal: React.FC<{
         <Form form={form} layout="vertical" initialValues={{ type: 'finished' }}>
           <Form.Item name="type" label="Loại kho" rules={[{ required: true }]}>
             <Select>
-              <Select.Option value="finished">Thành phẩm</Select.Option>
-              <Select.Option value="raw">Nguyên liệu</Select.Option>
-              <Select.Option value="mixed">Hỗn hợp</Select.Option>
+              <Select.Option value="finished">{TYPE_LABELS.finished}</Select.Option>
+              <Select.Option value="raw">{TYPE_LABELS.raw}</Select.Option>
+              <Select.Option value="mixed">{TYPE_LABELS.mixed}</Select.Option>
             </Select>
           </Form.Item>
 
@@ -241,6 +242,8 @@ export default function WarehouseListPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [locationStats, setLocationStats] = useState<Record<string, LocationStats>>({})
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có kho nào"
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [filterType, setFilterType] = useState('all')
   const [formOpen, setFormOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -248,6 +251,7 @@ export default function WarehouseListPage() {
   // ===== LOAD DATA =====
   const loadWarehouses = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const { data, error } = await supabase
         .from('warehouses')
@@ -279,7 +283,7 @@ export default function WarehouseListPage() {
       }
     } catch (err) {
       console.error('Load warehouses error:', err)
-      message.error('Không thể tải danh sách kho')
+      setLoadError(err)
     } finally {
       setLoading(false)
     }
@@ -419,9 +423,9 @@ export default function WarehouseListPage() {
         <Space size={8}>
           {[
             { value: 'all', label: 'Tất cả' },
-            { value: 'finished', label: 'Thành phẩm' },
-            { value: 'raw', label: 'Nguyên liệu' },
-            { value: 'mixed', label: 'Hỗn hợp' },
+            { value: 'finished', label: TYPE_LABELS.finished },
+            { value: 'raw', label: TYPE_LABELS.raw },
+            { value: 'mixed', label: TYPE_LABELS.mixed },
           ].map(f => (
             <Button
               key={f.value}
@@ -439,6 +443,7 @@ export default function WarehouseListPage() {
       {/* Content */}
       <div style={{ padding: '0 16px 24px' }}>
         <Card size="small" bodyStyle={{ padding: 0 }}>
+          <PageState error={loadError} onRetry={loadWarehouses}>
           <Table
             dataSource={filtered}
             columns={columns}
@@ -469,6 +474,7 @@ export default function WarehouseListPage() {
               ),
             }}
           />
+          </PageState>
         </Card>
       </div>
 

@@ -61,6 +61,9 @@ import { useAuthStore } from '../../../stores/authStore'
 import { supabase } from '../../../lib/supabase'
 import PartnerCreateModal from './PartnerCreateModal'
 import PartnerEditModal from './PartnerEditModal'
+import { fmtNum } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
 
 const { Title, Text } = Typography
 
@@ -117,7 +120,7 @@ const PartnerCard = ({ partner, onView, onChat, onDeals }: PartnerCardProps) => 
             />
           </Badge>
         </Tooltip>,
-        <Tooltip title="Giao dịch" key="deals">
+        <Tooltip title="Xem deal" key="deals">
           <Badge count={partner.deals_processing} size="small" color="blue">
             <Button
               type="text"
@@ -171,7 +174,7 @@ const PartnerCard = ({ partner, onView, onChat, onDeals }: PartnerCardProps) => 
       <Row gutter={8}>
         <Col span={12}>
           <div style={{ textAlign: 'center', padding: '8px 0' }}>
-            <Text type="secondary" style={{ fontSize: 11 }}>Deals</Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>Số deal</Text>
             <br />
             <Text strong style={{ fontSize: 16, color: '#1B4D3E' }}>
               {partner.deals_count || 0}
@@ -183,7 +186,7 @@ const PartnerCard = ({ partner, onView, onChat, onDeals }: PartnerCardProps) => 
             <Text type="secondary" style={{ fontSize: 11 }}>Sản lượng</Text>
             <br />
             <Text strong style={{ fontSize: 16, color: '#1B4D3E' }}>
-              {partner.total_quantity?.toFixed(1) || 0} <Text type="secondary" style={{ fontSize: 11 }}>tấn</Text>
+              {fmtNum(partner.total_quantity || 0, 1)} <Text type="secondary" style={{ fontSize: 11 }}>tấn</Text>
             </Text>
           </div>
         </Col>
@@ -224,6 +227,8 @@ const PartnerListPage = () => {
   const [provisioning, setProvisioning] = useState<string | null>(null)  // partner id hoặc 'bulk'
   const [cred, setCred] = useState<{ name: string; phone: string; password: string } | null>(null)
   const [bulkText, setBulkText] = useState<string | null>(null)
+  // Lỗi tải danh sách ≠ "Chưa có đại lý nào" (audit 17/11/2026)
+  const [loadError, setLoadError] = useState<unknown>(null)
   // Chỉ admin được tạo / sửa đại lý (1 đầu mối, tránh trùng)
   const isAdmin = user?.role === 'admin'
 
@@ -253,18 +258,11 @@ const PartnerListPage = () => {
       if (r) setCred({ name: p.name, phone: p.phone || '', password: r.password })
       message.success(`Đã cấp tài khoản cho ${p.name}`)
     } catch (e: any) {
-      message.error('Cấp tài khoản thất bại: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Cấp tài khoản thất bại'))
     } finally { setProvisioning(null) }
   }
 
-  async function handleProvisionAll() {
-    const targets = partners.filter(p => !accountIds.has(p.id) && p.phone)
-    const noPhone = partners.filter(p => !accountIds.has(p.id) && !p.phone)
-    if (targets.length === 0) {
-      message.info(noPhone.length ? `Các đại lý chưa có TK đều thiếu SĐT (${noPhone.length}) — bổ sung SĐT trước` : 'Mọi đại lý (trang này) đã có tài khoản')
-      return
-    }
-    if (!window.confirm(`Cấp tài khoản cho ${targets.length} đại lý chưa có account (trang này)?` + (noPhone.length ? `\n${noPhone.length} đại lý thiếu SĐT sẽ bỏ qua.` : ''))) return
+  async function runProvisionAll(targets: Partner[], noPhone: Partner[]) {
     setProvisioning('bulk')
     const lines: string[] = []
     let ok = 0
@@ -272,12 +270,34 @@ const PartnerListPage = () => {
       try {
         const r = await provisionOne(p)
         if (r) { lines.push(`${p.name}\n  SĐT đăng nhập: ${p.phone || ''}\n  Mật khẩu tạm: ${r.password}`); ok++ }
-      } catch (e: any) { lines.push(`${p.name} — LỖI: ${e?.message || e}`) }
+      } catch (e: any) { lines.push(`${p.name} — LỖI: ${dichLoiHeThong(e, 'không cấp được')}`) }
     }
     for (const p of noPhone) lines.push(`${p.name} — BỎ QUA (thiếu SĐT)`)
     setProvisioning(null)
     setBulkText(lines.join('\n\n'))
     message.success(`Đã cấp ${ok}/${targets.length} tài khoản`)
+  }
+
+  function handleProvisionAll() {
+    const targets = partners.filter(p => !accountIds.has(p.id) && p.phone)
+    const noPhone = partners.filter(p => !accountIds.has(p.id) && !p.phone)
+    if (targets.length === 0) {
+      message.info(noPhone.length ? `Các đại lý chưa có TK đều thiếu SĐT (${noPhone.length}) — bổ sung SĐT trước` : 'Mọi đại lý (trang này) đã có tài khoản')
+      return
+    }
+    // Modal antd thay window.confirm (nút OK/Cancel hệ thống, chuỗi nhiều dòng khó đọc) — audit 17/11/2026
+    Modal.confirm({
+      title: `Cấp tài khoản cho ${targets.length} đại lý?`,
+      content: (
+        <div>
+          <div>Các đại lý chưa có tài khoản đăng nhập trên <b>trang đang xem</b> sẽ được cấp mật khẩu tạm.</div>
+          {noPhone.length > 0 && <div style={{ marginTop: 6, color: '#b45309' }}>{noPhone.length} đại lý thiếu SĐT sẽ bị bỏ qua.</div>}
+        </div>
+      ),
+      okText: 'Cấp tài khoản',
+      cancelText: 'Không',
+      onOk: () => { void runProvisionAll(targets, noPhone) },
+    })
   }
 
   // ============================================
@@ -287,6 +307,7 @@ const PartnerListPage = () => {
   const fetchPartners = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
 
       const params: PartnerListParams = {
         page: pagination.current,
@@ -330,7 +351,8 @@ const PartnerListPage = () => {
       }
     } catch (error) {
       console.error('Error fetching partners:', error)
-      message.error('Không thể tải danh sách đại lý')
+      setLoadError(error)
+      message.error(dichLoiHeThong(error, 'Không thể tải danh sách đại lý'))
     } finally {
       setLoading(false)
     }
@@ -376,7 +398,7 @@ const PartnerListPage = () => {
       openChatTab({ id: room.id, partner_name: partner.name })
     } catch (error: any) {
       console.error('handleOpenChat error:', error)
-      message.error('Không thể mở chat: ' + (error?.message || ''))
+      message.error(dichLoiHeThong(error, 'Không thể mở chat'))
     }
   }
 
@@ -453,6 +475,7 @@ const PartnerListPage = () => {
 
       {/* Bảng đại lý — dễ quan sát, quét nhanh */}
       <Card style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
+        <PageState error={!loading && loadError} onRetry={fetchPartners}>
         <Table<Partner>
           rowKey="id"
           loading={loading}
@@ -503,7 +526,7 @@ const PartnerListPage = () => {
               render: (tier: PartnerTier) => <Tag color={TIER_COLORS[tier]}>{TIER_ICONS[tier]} {TIER_LABELS[tier]}</Tag>,
             },
             {
-              title: 'Deals', dataIndex: 'deals_count', key: 'deals_count', width: 90, align: 'center',
+              title: 'Số deal', dataIndex: 'deals_count', key: 'deals_count', width: 90, align: 'center',
               render: (n: number, r: Partner) => (
                 <Space size={4}>
                   <span>{n || 0}</span>
@@ -524,7 +547,7 @@ const PartnerListPage = () => {
                       <Button type="text" size="small" icon={<MessageOutlined />} onClick={() => handleOpenChat(r)} />
                     </Badge>
                   </Tooltip>
-                  <Tooltip title="Giao dịch">
+                  <Tooltip title="Xem deal">
                     <Button type="text" size="small" icon={<ShoppingOutlined />} onClick={() => handleViewDeals(r)} />
                   </Tooltip>
                   {isAdmin && (
@@ -549,6 +572,7 @@ const PartnerListPage = () => {
             },
           ]}
         />
+        </PageState>
       </Card>
 
       <PartnerCreateModal

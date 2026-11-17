@@ -11,19 +11,19 @@ import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, SafetyOutli
 import dayjs from 'dayjs'
 import FinanceLendingTabs from './FinanceLendingTabs'
 import {
-  collateralService, ASSET_TYPE_LABEL, COLLATERAL_STATUS_LABEL, type FinCollateral,
+  collateralService, ASSET_TYPE_LABEL, COLLATERAL_STATUS_LABEL, COLLATERAL_STATUS_COLOR, type FinCollateral,
 } from '../../services/finance/collateralService'
 import { creditLineService, type FinCreditLineComputed } from '../../services/finance/creditLineService'
 import { attachmentService } from '../../services/finance/attachmentService'
 import FinanceAttachments from './FinanceAttachments'
 import { useAuthStore } from '../../stores/authStore'
+import { fmtVndNum, fmtTy, fmtDate, vndInputProps } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
+import { EnumTag } from '../../components/common/EnumTag'
+import { stdPagination } from '../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
-const fmtVnd = (n?: number | null) => (n || 0).toLocaleString('vi-VN')
-const fmtTy = (n: number) => `${((n || 0) / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} tỷ`
-const fDate = (s?: string | null) => (s ? dayjs(s).format('DD/MM/YYYY') : '—')
-const numFmt = (v?: number | string) => `${v ?? ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-const numParse = (v?: string) => (v || '').replace(/\./g, '')
 
 export default function FinanceCollateralPage() {
   const user = useAuthStore((s) => s.user)
@@ -31,6 +31,7 @@ export default function FinanceCollateralPage() {
   const [rows, setRows] = useState<FinCollateral[]>([])
   const [lines, setLines] = useState<FinCreditLineComputed[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<FinCollateral | null>(null)
   const [saving, setSaving] = useState(false)
@@ -39,12 +40,12 @@ export default function FinanceCollateralPage() {
   const [attachCounts, setAttachCounts] = useState<Map<string, number>>(new Map())
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setLoading(true); setLoadError(null)
     try {
       const [c, l] = await Promise.all([collateralService.list(), creditLineService.listComputed()])
       setRows(c); setLines(l)
       try { setAttachCounts(await attachmentService.countFor('collateral', c.map((x) => x.id))) } catch { /* chưa migrate file */ }
-    } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
+    } catch (e) { setLoadError(e) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
@@ -82,12 +83,12 @@ export default function FinanceCollateralPage() {
       if (editing) await collateralService.update(editing.id, payload)
       else await collateralService.create({ ...payload, created_by: actorId })
       message.success('Đã lưu tài sản'); setOpen(false); load()
-    } catch (e: any) { if (e?.errorFields) return; message.error('Lỗi lưu: ' + (e?.message || e)) }
+    } catch (e: any) { if (e?.errorFields) return; message.error(dichLoiHeThong(e, 'Lưu tài sản thất bại')) }
     finally { setSaving(false) }
   }
   const handleDelete = async (r: FinCollateral) => {
     try { await collateralService.remove(r.id); message.success('Đã xoá'); load() }
-    catch (e: any) { message.error('Lỗi xoá: ' + (e?.message || e)) }
+    catch (e) { message.error(dichLoiHeThong(e, 'Xoá tài sản thất bại')) }
   }
 
   const columns = [
@@ -96,18 +97,19 @@ export default function FinanceCollateralPage() {
     { title: 'Đảm bảo cho hạn mức', key: 'line', width: 200, render: (_: any, r: FinCollateral) => (
       r.credit_line ? <span style={{ fontSize: 12 }}>🏦 <b>{r.credit_line.bank}</b>{r.credit_line.contract_no ? <div style={{ fontSize: 11, color: '#9ca3af' }}>{r.credit_line.contract_no}</div> : null}</span>
         : (r.contract_ref ? <Text type="secondary" style={{ fontSize: 12 }}>HĐ {r.contract_ref}</Text> : <Text type="secondary">— chưa nối</Text>)) },
-    { title: 'Ngày định giá', dataIndex: 'appraisal_date', width: 110, render: (v: string) => fDate(v) },
-    { title: 'Giá trị định giá', dataIndex: 'appraisal_value', width: 140, align: 'right' as const, render: (v: number) => fmtVnd(v) },
-    { title: 'Giá trị bảo đảm', dataIndex: 'secured_value', width: 140, align: 'right' as const, render: (v: number) => <b style={{ color: '#7c3aed' }}>{fmtVnd(v)}</b> },
+    { title: 'Ngày định giá', dataIndex: 'appraisal_date', width: 110, render: (v: string) => fmtDate(v) },
+    { title: 'Giá trị định giá', dataIndex: 'appraisal_value', width: 140, align: 'right' as const, render: (v: number | null) => fmtVndNum(v) },
+    { title: 'Giá trị bảo đảm', dataIndex: 'secured_value', width: 140, align: 'right' as const, render: (v: number | null) => <b style={{ color: '#7c3aed' }}>{fmtVndNum(v)}</b> },
     { title: 'Trạng thái', dataIndex: 'status', width: 120, align: 'center' as const, render: (v: string) => (
-      <Tag color={v === 'released' ? 'default' : 'purple'}>{COLLATERAL_STATUS_LABEL[v as 'active'] || v}</Tag>) },
+      <EnumTag value={v} labels={COLLATERAL_STATUS_LABEL} colors={COLLATERAL_STATUS_COLOR} />) },
     { title: '', key: 'act', width: 110, fixed: 'right' as const, render: (_: any, r: FinCollateral) => (
       <Space size={2}>
         <Tooltip title="Hồ sơ tài sản"><Badge count={attachCounts.get(r.id) || 0} size="small" offset={[-2, 2]}>
           <Button type="text" size="small" icon={<PaperClipOutlined style={{ color: '#1E3A5F' }} />} onClick={() => setAttach(r)} />
         </Badge></Tooltip>
         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
-        <Popconfirm title="Xoá tài sản này?" okText="Xoá" cancelText="Huỷ" onConfirm={() => handleDelete(r)}>
+        <Popconfirm title="Xoá tài sản này?" description="Giá trị bảo đảm sẽ không còn tính vào hạn mức. Đã giải chấp thì đổi trạng thái để giữ lịch sử."
+          okText="Xoá" cancelText="Huỷ" okButtonProps={{ danger: true }} onConfirm={() => handleDelete(r)}>
           <Button type="text" size="small" danger icon={<DeleteOutlined />} />
         </Popconfirm>
       </Space>) },
@@ -132,9 +134,11 @@ export default function FinanceCollateralPage() {
       </Row>
 
       <Card size="small" styles={{ body: { padding: 0 } }}>
+        <PageState error={loadError} onRetry={load}>
         <Table rowKey="id" size="small" loading={loading} columns={columns as any} dataSource={rows}
-          pagination={{ pageSize: 30, showSizeChanger: false }} scroll={{ x: 1100 }}
+          pagination={stdPagination(50)} scroll={{ x: 1100 }}
           locale={{ emptyText: 'Chưa có tài sản đảm bảo. Bấm "Thêm tài sản".' }} />
+        </PageState>
       </Card>
 
       <Modal title={editing ? 'Sửa tài sản đảm bảo' : 'Thêm tài sản đảm bảo'} open={open} onCancel={() => setOpen(false)}
@@ -149,7 +153,7 @@ export default function FinanceCollateralPage() {
               <Select options={Object.entries(ASSET_TYPE_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
             </Form.Item>
             <Form.Item name="status" label="Trạng thái">
-              <Select options={[{ value: 'active', label: 'Đang thế chấp' }, { value: 'released', label: 'Đã giải chấp' }]} />
+              <Select options={Object.entries(COLLATERAL_STATUS_LABEL).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
             <Form.Item name="credit_line_id" label="🏦 Đảm bảo cho hạn mức" style={{ gridColumn: '1 / -1' }}
               tooltip="Tài sản này thế chấp cho hạn mức (facility) nào">
@@ -160,10 +164,10 @@ export default function FinanceCollateralPage() {
             <Form.Item name="contract_ref" label="Số HĐ bảo đảm (tham khảo)"><Input placeholder="vd: 4000-LCL-202500495" /></Form.Item>
             <Form.Item name="bank" label="Ngân hàng"><Input placeholder="vd: Agribank" /></Form.Item>
             <Form.Item name="appraisal_date" label="Ngày định giá"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
-            <Form.Item name="appraisal_value" label="Giá trị định giá (đ)"><InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} /></Form.Item>
-            <Form.Item name="secured_value" label="Giá trị bảo đảm (đ)" style={{ gridColumn: '1 / -1' }}
+            <Form.Item name="appraisal_value" label="Giá trị định giá (₫)"><InputNumber min={0} style={{ width: '100%' }} {...vndInputProps} /></Form.Item>
+            <Form.Item name="secured_value" label="Giá trị bảo đảm (₫)" style={{ gridColumn: '1 / -1' }}
               tooltip="Giá trị NH nhận làm tài sản đảm bảo (thường = định giá × tỷ lệ cho vay)">
-              <InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} />
+              <InputNumber min={0} style={{ width: '100%' }} {...vndInputProps} />
             </Form.Item>
           </div>
           <Form.Item name="note" label="Ghi chú"><Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }} /></Form.Item>

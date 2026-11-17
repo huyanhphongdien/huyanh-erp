@@ -45,10 +45,17 @@ import type { SalesOrder, SalesOrderStatus } from '../../services/sales/salesTyp
 import { ORDER_STATUS_LABELS, soDisplayCode } from '../../services/sales/salesTypes'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
 import { useAuthStore } from '../../stores/authStore'
+// Nhãn + màu QC của lô NVL: MỘT bản chung BATCH_QC_STATUS_* (wms.types) — bỏ map chép tay đã lệch
+// ('Chờ kiểm tra' vs 'Chờ QC', needs_blend cam vs tím)
+import { PRODUCTION_STATUS_LABELS, BATCH_QC_STATUS_LABELS, BATCH_QC_STATUS_COLORS } from '../../services/wms/wms.types'
+import { fmtDate, fmtKg } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
+import EnumTag from '../../components/common/EnumTag'
 
 const { Title, Text } = Typography
 
-const formatDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString('vi-VN') : '')
+const formatDate = (s?: string | null) => fmtDate(s)   // 'DD/MM/YYYY' chuẩn (utils/format)
 
 export default function SalesOrderProductionPage() {
   const { orderId } = useParams<{ orderId: string }>()
@@ -58,6 +65,7 @@ export default function SalesOrderProductionPage() {
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
   const [nvlAvailability, setNvlAvailability] = useState<NvlAvailability | null>(null)
@@ -72,11 +80,14 @@ export default function SalesOrderProductionPage() {
     if (!orderId) return
     try {
       setLoading(true)
+      setLoadError(null)
       const o = await salesOrderService.getById(orderId)
       setOrder(o)
     } catch (err) {
+      // Lỗi tải ≠ "Không tìm thấy đơn hàng" (nạp lại hỏng thì toast: đang xem bản cũ)
       console.error(err)
-      message.error('Không thể tải thông tin đơn hàng')
+      setLoadError(err)
+      message.error(dichLoiHeThong(err, 'Không thể tải thông tin đơn hàng'))
     } finally {
       setLoading(false)
     }
@@ -94,7 +105,7 @@ export default function SalesOrderProductionPage() {
       const result = await salesProductionService.getProductionProgress(orderId)
       setProductionProgress(result)
     } catch (err: any) {
-      message.error(err?.message || 'Không thể tải tiến độ sản xuất')
+      message.error(dichLoiHeThong(err, 'Không thể tải tiến độ sản xuất'))
     } finally {
       setProgressLoading(false)
     }
@@ -113,7 +124,7 @@ export default function SalesOrderProductionPage() {
       setNvlAvailability(result)
       setSelectedBatchIds(result.suitable_batches.map((b) => b.batch_id))
     } catch (err: any) {
-      message.error(err?.message || 'Không thể kiểm tra NVL')
+      message.error(dichLoiHeThong(err, 'Không thể kiểm tra NVL'))
     } finally {
       setNvlLoading(false)
     }
@@ -130,7 +141,7 @@ export default function SalesOrderProductionPage() {
       message.success(`Đã tạo lệnh sản xuất: ${prodOrder.code}`)
       loadOrder()
     } catch (err: any) {
-      message.error(err?.message || 'Không thể tạo lệnh sản xuất')
+      message.error(dichLoiHeThong(err, 'Không thể tạo lệnh sản xuất'))
     } finally {
       setCreateProdLoading(false)
     }
@@ -146,7 +157,7 @@ export default function SalesOrderProductionPage() {
       message.success('Đã chuyển trạng thái: Sẵn sàng giao hàng')
       loadOrder()
     } catch (err: any) {
-      message.error(err?.message || 'Không thể cập nhật trạng thái')
+      message.error(dichLoiHeThong(err, 'Không thể cập nhật trạng thái'))
     } finally {
       setActionLoading(false)
     }
@@ -156,6 +167,14 @@ export default function SalesOrderProductionPage() {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
         <Spin size="large" />
+      </div>
+    )
+  }
+
+  if (loadError && !order) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState error={loadError} onRetry={loadOrder} />
       </div>
     )
   }
@@ -225,7 +244,7 @@ export default function SalesOrderProductionPage() {
                   <Statistic title="Mã lệnh SX" value={po?.code || order.production_order_id || ''} valueStyle={{ fontSize: 14, color: '#1B4D3E' }} />
                 </Col>
                 <Col xs={12} sm={6}>
-                  <Statistic title="Cấp mủ" value={po?.target_grade || order.grade} valueStyle={{ fontSize: 14, color: '#1890ff' }} />
+                  <Statistic title="Loại hàng (Grade)" value={po?.target_grade || order.grade} valueStyle={{ fontSize: 14, color: '#1890ff' }} />
                 </Col>
                 <Col xs={12} sm={6}>
                   <Statistic title="SL mục tiêu" value={po?.target_quantity || order.quantity_kg || 0} suffix="kg" valueStyle={{ fontSize: 14 }} />
@@ -234,10 +253,9 @@ export default function SalesOrderProductionPage() {
                   <Statistic
                     title="Trạng thái SX"
                     value={
-                      po?.status === 'completed' ? 'Hoàn thành' :
-                      po?.status === 'in_progress' ? 'Đang SX' :
-                      po?.status === 'cancelled' ? 'Đã hủy' :
-                      po?.status || 'Nháp'
+                      po?.status
+                        ? ((PRODUCTION_STATUS_LABELS as Record<string, string>)[po.status] ?? po.status)
+                        : 'Nháp'
                     }
                     valueStyle={{
                       fontSize: 14,
@@ -364,7 +382,7 @@ export default function SalesOrderProductionPage() {
         dataIndex: 'weight_kg',
         key: 'weight_kg',
         align: 'right' as const,
-        render: (v: number) => v.toLocaleString('vi-VN'),
+        render: (v: number) => fmtKg(v),
       },
       {
         title: 'DRC (%)',
@@ -377,11 +395,7 @@ export default function SalesOrderProductionPage() {
         title: 'QC',
         dataIndex: 'qc_status',
         key: 'qc_status',
-        render: (v: string) => (
-          <Tag color={v === 'passed' ? 'green' : v === 'failed' ? 'red' : 'default'}>
-            {v === 'passed' ? 'Đạt' : v === 'failed' ? 'Không đạt' : v}
-          </Tag>
-        ),
+        render: (v: string) => <EnumTag value={v} labels={BATCH_QC_STATUS_LABELS} colors={BATCH_QC_STATUS_COLORS} />,
       },
       { title: 'Kho', dataIndex: 'warehouse_name', key: 'warehouse_name' },
       {

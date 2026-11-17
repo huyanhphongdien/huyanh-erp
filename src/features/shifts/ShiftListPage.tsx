@@ -9,6 +9,7 @@ import { shiftService } from '../../services';
 import { Card, Button, Modal, ConfirmDialog } from '../../components/ui';
 import { ShiftForm } from './ShiftForm';
 import { DepartmentShiftConfig } from './DepartmentShiftConfig';
+import PageState from '../../components/common/PageState';
 import { 
   Plus, Pencil, Trash2, Timer, Building2, 
   Sun, Moon, Sunrise, Clock, Search, Filter
@@ -86,7 +87,7 @@ export function ShiftListPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Query
-  const { data: shifts, isLoading } = useQuery({
+  const { data: shifts, isLoading, error: shiftsError, refetch: refetchShifts } = useQuery({
     queryKey: ['shifts', search, categoryFilter],
     queryFn: () => shiftService.getAll({ 
       page: 1, 
@@ -229,6 +230,9 @@ export function ShiftListPage() {
                 </div>
               ))}
             </div>
+          ) : shiftsError ? (
+            // Lỗi tải ≠ "không tìm thấy ca làm việc nào"
+            <PageState error={shiftsError} onRetry={() => refetchShifts()} />
           ) : (
             <div className="space-y-4 sm:space-y-6">
               {(categoryFilter === 'all' 

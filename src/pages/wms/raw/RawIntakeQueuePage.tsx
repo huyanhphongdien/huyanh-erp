@@ -22,13 +22,14 @@ import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { rawLotService, type MaGoiY } from '../../../services/wms/rawLotService'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import { ticketTypeLabel } from '../../../services/wms/wms.types'
+import { fmtKg, fmtPct, fmtDate, fmtDateTime as fmtTime } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { stdPagination, LimitNotice } from '../../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
 
-const fmtKg = (n: number | null | undefined, digits = 0) =>
-  n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: digits, minimumFractionDigits: digits })
-const fmtPct = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' %')
-const fmtTime = (iso: string | null) => (iso ? new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '—')
+/** Trần tải hàng đợi (rawStockService.getIntakeQueue limit) — chạm trần thì báo. */
+const LOAD_LIMIT = 300
 
 type Filter = 'cho_nhap' | 'da_nhap' | 'tat_ca'
 
@@ -44,6 +45,7 @@ export default function RawIntakeQueuePage() {
   const [filter, setFilter] = useState<Filter>('cho_nhap')
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<RawIntakeQueueRow[]>([])
+  const [fetched, setFetched] = useState(0)   // số dòng server trả (trước khi lọc "đã nhập") — so với trần tải
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -51,18 +53,22 @@ export default function RawIntakeQueuePage() {
   const [submitting, setSubmitting] = useState(false)
   const [lastResult, setLastResult] = useState<{ code: string; batches: NhapKhoResult[] } | null>(null)
   const [settings, setSettings] = useState<RawSettings>(RAW_SETTINGS_DEFAULT)
+  // Modal nhập kho CÓ KIỂM SOÁT (finding #5): mã NVL bắt buộc, lỗi server thì modal vẫn mở, giữ chữ đã gõ
+  const [nhapPhieu, setNhapPhieu] = useState<RawIntakeQueueRow | null>(null)
+  const [maNhap, setMaNhap] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try {
       const [data, se] = await Promise.all([
-        rawStockService.getIntakeQueue({ facilityId, includeDone: filter !== 'cho_nhap', limit: 300 }),
+        rawStockService.getIntakeQueue({ facilityId, includeDone: filter !== 'cho_nhap', limit: LOAD_LIMIT }),
         rawSettingsService.getForFacility(facilityId ?? null),
       ])
       setRows(filter === 'da_nhap' ? data.filter((r) => r.da_nhap) : data)
+      setFetched(data.length)
       setSettings(se)
     } catch (e: any) {
-      setError(e?.message || 'Không tải được hàng đợi nhập kho')
+      setError(dichLoiHeThong(e, 'Không tải được hàng đợi nhập kho'))
     } finally { setLoading(false) }
   }, [facilityId, filter])
 
@@ -85,7 +91,7 @@ export default function RawIntakeQueuePage() {
       message.success(`Đã ghi DRC ${drcInput} % vào phiếu ${selected.code}`)
       setDrcInput(null)
       await load()
-    } catch (e: any) { message.error(e?.message || 'Không ghi được DRC') }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Không ghi được DRC')) }
     finally { setDrcSaving(false) }
   }
 
@@ -107,34 +113,27 @@ export default function RawIntakeQueuePage() {
 
   const handleNhapKho = () => {
     if (!selected) return
-    let maTyped = goiY[selected.ticket_id]?.ma || ''
-    Modal.confirm({
-      title: `Nhập kho phiếu ${selected.code}?`,
-      content: (
-        <div>
-          <p><Text strong>Mã nguyên liệu</Text> <Input size="small" defaultValue={goiY[selected.ticket_id]?.ma || ''} placeholder="TMHG-40 (bắt buộc)" style={{ width: 200, fontFamily: 'monospace' }} onChange={(e) => { maTyped = e.target.value }} />{goiY[selected.ticket_id]?.ma_goc && <Text type="secondary"> · phiếu gõ "{goiY[selected.ticket_id]?.ma_goc?.trim()}"</Text>}</p>
-          <p>{selected.so_dong_lo > 0 ? `Tách thành ${selected.so_dong_lo} lô theo dòng lô trên phiếu.` : 'Tạo 1 lô cho cả phiếu.'}</p>
-          <p>Ướt {fmtKg(selected.so_dong_lo > 0 ? selected.wet_kg_dong : selected.net_weight)} kg · DRC {fmtPct(selected.drc_dung)} · quy khô ≈ {fmtKg(selected.dry_kg_du_kien)} kg</p>
-          <p>Nguồn hàng: {nguonHang ? RAW_LOT_SOURCE_LABELS[nguonHang] : 'tự suy từ phiếu'}</p>
-          <Text type="secondary">Sau khi nhập, sổ kho khô cộng ngay; không có bước hủy, sai thì BGĐ điều chỉnh.</Text>
-        </div>
-      ),
-      okText: 'Xác nhận nhập kho', cancelText: 'Hủy',
-      onOk: async () => {
-        setSubmitting(true)
-        try {
-          const g = goiY[selected.ticket_id]
-          const ma = maTyped.trim()
-          const batches = await rawStockService.nhapKho(selected.ticket_id, { nguonHang: nguonHang ?? null, rawLotId: ma && g?.ma === ma ? g.raw_lot_id ?? null : null, ma: ma || null })
-          setLastResult({ code: selected.code, batches })
-          message.success(`Đã nhập ${batches.length} lô từ phiếu ${selected.code}`)
-          setSelectedId(null); setNguonHang(undefined)
-          await load()
-        } catch (e: any) {
-          message.error(e?.message || 'Nhập kho thất bại')
-        } finally { setSubmitting(false) }
-      },
-    })
+    setMaNhap(goiY[selected.ticket_id]?.ma || '')
+    setNhapPhieu(selected)
+  }
+
+  const submitNhapKho = async () => {
+    const p = nhapPhieu
+    const ma = maNhap.trim()
+    if (!p) return
+    if (!ma) { message.warning('Gõ mã nguyên liệu trước khi nhập kho'); return }
+    setSubmitting(true)
+    try {
+      const g = goiY[p.ticket_id]
+      const batches = await rawStockService.nhapKho(p.ticket_id, { nguonHang: nguonHang ?? null, rawLotId: g?.ma === ma ? g.raw_lot_id ?? null : null, ma })
+      setLastResult({ code: p.code, batches })
+      message.success(`Đã nhập ${batches.length} lô từ phiếu ${p.code}`)
+      setNhapPhieu(null); setSelectedId(null); setNguonHang(undefined)
+      await load()
+    } catch (e: any) {
+      // Giữ modal MỞ + giữ mã đã gõ — sửa rồi bấm lại, không phải chọn phiếu từ đầu
+      message.error(dichLoiHeThong(e, 'Nhập kho thất bại'))
+    } finally { setSubmitting(false) }
   }
 
   const columns: ColumnsType<RawIntakeQueueRow> = [
@@ -164,7 +163,7 @@ export default function RawIntakeQueuePage() {
               <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/nvl')} />
               <div>
                 <Title level={3} style={{ margin: 0 }}>Nhập kho từ phiếu cân</Title>
-                <Text type="secondary">Phiếu cân vào đã hoàn tất từ ngày mở sổ {settings.ngay_mo_so ? settings.ngay_mo_so.split('-').reverse().join('/') : ''} · mỗi dòng lô trên phiếu = 1 lô · không nhập được khi thiếu DRC</Text>
+                <Text type="secondary">Phiếu cân vào đã hoàn tất từ ngày mở sổ {settings.ngay_mo_so ? fmtDate(settings.ngay_mo_so) : ''} · mỗi dòng lô trên phiếu = 1 lô · không nhập được khi thiếu DRC</Text>
               </div>
             </Space>
           </Col>
@@ -210,10 +209,11 @@ export default function RawIntakeQueuePage() {
         <Row gutter={[12, 12]}>
           <Col xs={24} xl={selected ? 15 : 24}>
             <Card size="small" bodyStyle={{ padding: 0 }}>
+              {!loading && !error && <div style={{ padding: '0 8px' }}><LimitNotice shown={fetched} limit={LOAD_LIMIT} what="phiếu" /></div>}
               <Table<RawIntakeQueueRow> rowKey="ticket_id" columns={columns} dataSource={filtered} size="small" loading={loading}
-                pagination={{ pageSize: 20, showSizeChanger: false }}
+                pagination={stdPagination(20)}
                 onRow={(r) => ({ onClick: () => { setSelectedId(r.ticket_id); setNguonHang(undefined) }, style: { cursor: 'pointer', background: r.ticket_id === selectedId ? '#E8F5F0' : undefined } })}
-                locale={{ emptyText: <Empty description="Không có phiếu nào" /> }} />
+                locale={{ emptyText: <Empty description={error ? 'Không tải được — xem lỗi phía trên' : 'Không có phiếu nào'} /> }} />
             </Card>
           </Col>
           {selected && (
@@ -265,6 +265,34 @@ export default function RawIntakeQueuePage() {
             </Col>
           )}
         </Row>
+
+        <Modal
+          open={!!nhapPhieu}
+          title={nhapPhieu ? `Nhập kho phiếu ${nhapPhieu.code}?` : ''}
+          onCancel={() => { if (!submitting) setNhapPhieu(null) }}
+          onOk={submitNhapKho}
+          okText="Xác nhận nhập kho"
+          cancelText="Hủy"
+          confirmLoading={submitting}
+          okButtonProps={{ disabled: !maNhap.trim() }}
+          destroyOnHidden
+        >
+          {nhapPhieu && (
+            <div>
+              <p>
+                <Text strong>Mã nguyên liệu</Text>{' '}
+                <Input size="small" autoFocus value={maNhap} onChange={(e) => setMaNhap(e.target.value)} onPressEnter={() => { if (maNhap.trim() && !submitting) submitNhapKho() }}
+                  placeholder="TMHG-40 (bắt buộc)" status={maNhap.trim() ? undefined : 'error'} style={{ width: 200, fontFamily: 'monospace' }} />
+                {goiY[nhapPhieu.ticket_id]?.ma_goc && <Text type="secondary"> · phiếu gõ "{goiY[nhapPhieu.ticket_id]?.ma_goc?.trim()}"</Text>}
+              </p>
+              {!maNhap.trim() && <p><Text type="danger" style={{ fontSize: 12 }}>Bắt buộc có mã nguyên liệu mới nhập kho được.</Text></p>}
+              <p>{nhapPhieu.so_dong_lo > 0 ? `Tách thành ${nhapPhieu.so_dong_lo} lô theo dòng lô trên phiếu.` : 'Tạo 1 lô cho cả phiếu.'}</p>
+              <p>Ướt {fmtKg(nhapPhieu.so_dong_lo > 0 ? nhapPhieu.wet_kg_dong : nhapPhieu.net_weight)} kg · DRC {fmtPct(nhapPhieu.drc_dung)} · quy khô ≈ {fmtKg(nhapPhieu.dry_kg_du_kien)} kg</p>
+              <p>Nguồn hàng: {nguonHang ? RAW_LOT_SOURCE_LABELS[nguonHang] : 'tự suy từ phiếu'}</p>
+              <Text type="secondary">Sau khi nhập, sổ kho khô cộng ngay; không có bước hủy, sai thì BGĐ điều chỉnh.</Text>
+            </div>
+          )}
+        </Modal>
       </Space>
     </div>
   )

@@ -12,7 +12,10 @@
 //   Section 5: Open Issues count by severity
 //   Footer: Ngày xuất, Người lập
 // Method: Generate HTML → open print window (no external PDF lib needed)
+// 17/11/2026 (Đợt 3 audit UI): nhãn sức khoẻ DA tiếng Việt (trước in 'ON TRACK'/'AT RISK'/'BEHIND'),
+// chặn popup báo bằng message antd thay alert(). Định dạng số/ngày của bản in GIỮ NGUYÊN (khớp mẫu in).
 // ============================================================================
+import { message } from 'antd'
 
 // ============================================================================
 // TYPES (mirrors ProjectReportPage data)
@@ -81,9 +84,10 @@ export interface PDFReportData {
 // ============================================================================
 
 const HEALTH_COLORS = {
-  green: { bg: '#16A34A', light: '#F0FDF4', label: 'ON TRACK' },
-  amber: { bg: '#EA580C', light: '#FFF7ED', label: 'AT RISK' },
-  red:   { bg: '#DC2626', light: '#FEF2F2', label: 'BEHIND' },
+  // nhãn ngắn ~ độ dài bản cũ: vòng RAG chỉ rộng 90px
+  green: { bg: '#16A34A', light: '#F0FDF4', label: 'ĐÚNG HẠN' },
+  amber: { bg: '#EA580C', light: '#FFF7ED', label: 'CÓ RỦI RO' },
+  red:   { bg: '#DC2626', light: '#FEF2F2', label: 'BỊ CHẬM' },
 }
 
 const STATUS_VI: Record<string, string> = {
@@ -363,7 +367,7 @@ export function exportStatusReportPDF(data: PDFReportData): void {
   // Open print window
   const win = window.open('', '_blank')
   if (!win) {
-    alert('Không thể mở cửa sổ in. Vui lòng cho phép popup.')
+    message.warning('Trình duyệt chặn cửa sổ in — cho phép popup cho trang này rồi bấm Xuất PDF lại.')
     return
   }
   win.document.write(html)

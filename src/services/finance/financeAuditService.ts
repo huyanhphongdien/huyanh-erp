@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { vnDayStartTs, vnDayEndTs } from '../../utils/dateVN'
 import type { AuditLogEntry, AuditLogListParams } from '../auditLogService'
 
 export type { AuditLogEntry, AuditLogListParams } from '../auditLogService'
@@ -24,8 +25,11 @@ export const financeAuditService = {
     if (recordId) q = q.eq('record_id', recordId)
     if (changedByEmail) q = q.ilike('changed_by_email', `%${changedByEmail}%`)
     if (action && action !== 'all') q = q.eq('action', action)
-    if (dateFrom) q = q.gte('changed_at', dateFrom + 'T00:00:00Z')
-    if (dateTo) q = q.lte('changed_at', dateTo + 'T23:59:59Z')
+    // Ngày lọc là ngày theo GIỜ VN: mốc có +07:00 (dateVN), KHÔNG phụ thuộc múi giờ máy người xem. (Trước 17/11/2026
+    // gắn 'Z' = nửa đêm UTC = 07:00 giờ VN → mất sự kiện 00:00–07:00 của ngày đầu, lẫn sự kiện tới 07:00 sáng hôm sau
+    // ngày cuối; bản new Date(…).toISOString() sau đó vẫn lệch nếu máy không đặt giờ VN.)
+    if (dateFrom) q = q.gte('changed_at', vnDayStartTs(dateFrom))
+    if (dateTo) q = q.lte('changed_at', vnDayEndTs(dateTo))
 
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
@@ -40,16 +44,21 @@ export const financeAuditService = {
     const d7 = new Date(now.getTime() - 7 * 86400000).toISOString()
     const d30 = new Date(now.getTime() - 30 * 86400000).toISOString()
 
-    const [{ count: today }, { count: l7 }, { count: l30 }] = await Promise.all([
+    const byTime = await Promise.all([
       supabase.from(TABLE).select('id', { count: 'exact', head: true }).gte('changed_at', todayStart),
       supabase.from(TABLE).select('id', { count: 'exact', head: true }).gte('changed_at', d7),
       supabase.from(TABLE).select('id', { count: 'exact', head: true }).gte('changed_at', d30),
     ])
-    const [{ count: ins }, { count: upd }, { count: del }] = await Promise.all([
+    const byAction = await Promise.all([
       supabase.from(TABLE).select('id', { count: 'exact', head: true }).eq('action', 'INSERT').gte('changed_at', d30),
       supabase.from(TABLE).select('id', { count: 'exact', head: true }).eq('action', 'UPDATE').gte('changed_at', d30),
       supabase.from(TABLE).select('id', { count: 'exact', head: true }).eq('action', 'DELETE').gte('changed_at', d30),
     ])
+    // Supabase trả lỗi trong object (không throw) — phải tự ném, kẻo trang hiện "0 sự kiện" giả
+    const failed = [...byTime, ...byAction].find((r) => r.error)
+    if (failed?.error) throw new Error('Không đếm được nhật ký tài chính: ' + failed.error.message)
+    const [{ count: today }, { count: l7 }, { count: l30 }] = byTime
+    const [{ count: ins }, { count: upd }, { count: del }] = byAction
     return {
       today: today || 0, last_7d: l7 || 0, last_30d: l30 || 0,
       by_action: { INSERT: ins || 0, UPDATE: upd || 0, DELETE: del || 0 },
@@ -80,13 +89,25 @@ export const FIN_FIELD_LABELS: Record<string, string> = {
   disbursement_date: 'Ngày giải ngân', due_date: 'Ngày đến hạn', start_date: 'Từ ngày', end_date: 'Đến ngày',
   deposit_date: 'Ngày gửi', maturity_date: 'Ngày đáo hạn',
   credit_line_id: 'Thuộc hạn mức', secured_credit_line_id: 'Đảm bảo cho hạn mức', loan_id: 'Khoản vay',
-  customer_name: 'Khách hàng', buyer_name: 'Khách hàng', term_days: 'Số ngày nợ', atd: 'ATD', etd: 'ETD',
+  customer_name: 'Khách hàng', buyer_name: 'Khách hàng', term_days: 'Hạn thanh toán (ngày)', atd: 'ATD', etd: 'ETD',
   value_usd: 'Giá trị (USD)', received_date: 'Ngày tiền về', collect_due_date: 'Hạn thu',
   appraised_value: 'Định giá', secured_value: 'Giá trị bảo đảm', asset_name: 'Tên tài sản', asset_type: 'Loại tài sản',
   balance_vnd: 'Số dư VNĐ', balance_usd: 'Số dư USD', as_of_date: 'Cập nhật ngày',
   pay_day: 'Ngày nộp', est_amount: 'Số tiền ước', category: 'Nhóm', name: 'Tên',
   paid: 'Đã trả', is_paid: 'Đã trả', paid_at: 'Ngày trả', period_no: 'Kỳ', interest_amount: 'Tiền lãi',
   freq: 'Kỳ trả', interest_freq: 'Kỳ trả lãi', interest_day: 'Ngày trả lãi',
+  // Tên cột THẬT của các bảng fin_* (bổ sung 17/11/2026 — trước đó nhật ký hiện tên cột tiếng Anh thô)
+  disbursed_date: 'Ngày giải ngân', purpose: 'Mục đích', sales_order_id: 'Đơn hàng bán', paid_amount: 'Số đã trả',
+  paid_date: 'Ngày trả', source: 'Nguồn tiền', holder: 'Chủ sổ', reopen_date: 'Ngày mở lại', extended_to: 'Gia hạn đến',
+  term: 'Kỳ hạn', expected_interest: 'Lãi dự kiến', secured_loan_id: 'Đảm bảo cho khoản vay', line_type: 'Loại hạn mức',
+  from_date: 'Từ ngày', to_date: 'Đến ngày', base_amount: 'Dư nợ tính lãi', rate: 'Lãi suất (%/năm)',
+  commodity: 'Mặt hàng', amount_received: 'Đã thu', doc_sent_date: 'Ngày gửi BCT', doc_tracking: 'Số DHL',
+  account_no: 'Số tài khoản', vnd: 'Số dư VNĐ', usd: 'Số dư USD', kip: 'Số dư KÍP', sort_order: 'Thứ tự',
+  due_day: 'Ngày nộp trong tháng', due_rule: 'Lịch nộp', amount_est: 'Số tiền ước', active: 'Đang áp dụng',
+  contract_ref: 'Số HĐ bảo đảm', appraisal_date: 'Ngày định giá', appraisal_value: 'Giá trị định giá',
+  entity_type: 'Loại đối tượng', entity_id: 'Mã đối tượng', doc_type: 'Loại chứng từ', file_name: 'Tên file',
+  file_path: 'Đường dẫn file', file_size: 'Cỡ file', mime_type: 'Kiểu file', uploaded_by: 'Người tải lên',
+  created_by: 'Người tạo',
 }
 
 // Format changed_fields dùng nhãn tài chính (thay cho formatChangedFields của auditLogService)

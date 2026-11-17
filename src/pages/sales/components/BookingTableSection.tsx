@@ -13,12 +13,17 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { salesBookingService, type SalesBooking } from '../../../services/sales/salesBookingService'
+import { fmtDate } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
 
-const fDate = (s?: string | null) => (s ? dayjs(s).format('DD/MM/YYYY') : '—')
+const fDate = (s?: string | null) => fmtDate(s)
 
 export default function BookingTableSection({ orderId, canEdit }: { orderId: string; canEdit: boolean }) {
   const [rows, setRows] = useState<SalesBooking[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có booking" (trước đây catch {} nuốt lỗi)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<SalesBooking | null>(null)
   const [saving, setSaving] = useState(false)
@@ -29,7 +34,8 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { setRows(await salesBookingService.list(orderId)) } catch { /* ignore */ }
+    setLoadError(null)
+    try { setRows(await salesBookingService.list(orderId)) } catch (e) { setLoadError(e || true) }
     setLoading(false)
   }, [orderId])
   useEffect(() => { load() }, [load])
@@ -59,7 +65,7 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
       setPendingFile(r)
       message.success('Đã tải file: ' + r.file_name)
     } catch (e: unknown) {
-      message.error('Tải file lỗi: ' + (e instanceof Error ? e.message : String(e)))
+      message.error(dichLoiHeThong(e, 'Tải file thất bại'))
     } finally { setUploading(false) }
   }
 
@@ -92,14 +98,14 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
       setOpen(false)
       load()
     } catch (e: unknown) {
-      if ((e as { errorFields?: unknown }).errorFields) return
-      message.error('Lưu lỗi: ' + (e instanceof Error ? e.message : String(e)))
+      if ((e as { errorFields?: unknown })?.errorFields) return
+      message.error(dichLoiHeThong(e, 'Lưu booking thất bại'))
     } finally { setSaving(false) }
   }
 
   const handleDelete = async (b: SalesBooking) => {
     try { await salesBookingService.remove(b.id); message.success('Đã xóa'); load() }
-    catch (e: unknown) { message.error('Xóa lỗi: ' + (e instanceof Error ? e.message : String(e))) }
+    catch (e: unknown) { message.error(dichLoiHeThong(e, 'Xóa booking thất bại')) }
   }
 
   const columns: ColumnsType<SalesBooking> = [
@@ -125,7 +131,8 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
       render: (_: unknown, r: SalesBooking) => (
         <Space size={2}>
           <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
-          <Popconfirm title="Xóa booking này?" okText="Xóa" cancelText="Hủy" onConfirm={() => handleDelete(r)}>
+          <Popconfirm title="Xóa booking này?" description="Chứng từ theo lô sẽ không còn lấy được B/L / tàu của booking này."
+            okText="Xóa" cancelText="Không" okButtonProps={{ danger: true }} onConfirm={() => handleDelete(r)}>
             <Button type="text" size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -142,16 +149,20 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
         {canEdit && <Button size="small" type="primary" icon={<PlusOutlined />} onClick={openAdd} style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>Thêm booking</Button>}
       </div>
 
-      <Table
-        rowKey="id"
-        size="small"
-        loading={loading}
-        columns={columns}
-        dataSource={rows}
-        pagination={false}
-        scroll={{ x: 900 }}
-        locale={{ emptyText: 'Chưa có booking. Bấm "Thêm booking" để khai báo từng lô.' }}
-      />
+      {loadError ? (
+        <PageState error={loadError} onRetry={load} minHeight={100} />
+      ) : (
+        <Table
+          rowKey="id"
+          size="small"
+          loading={loading}
+          columns={columns}
+          dataSource={rows}
+          pagination={false}
+          scroll={{ x: 900 }}
+          locale={{ emptyText: 'Chưa có booking. Bấm "Thêm booking" để khai báo từng lô.' }}
+        />
+      )}
 
       <Modal
         title={editing ? 'Sửa booking' : 'Thêm booking / lô'}
@@ -179,7 +190,7 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
             <Form.Item name="etd" label="ETD"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="eta" label="ETA"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="cutoff" label="Cutoff" tooltip="vd: 06/06 10:00 hoặc Sat 10:00"><Input placeholder="06/06 10:00" /></Form.Item>
-            <Form.Item name="bl_number" label="B/L Number"><Input placeholder="(điền sau)" /></Form.Item>
+            <Form.Item name="bl_number" label="Số B/L"><Input placeholder="(điền sau)" /></Form.Item>
             <Form.Item name="bl_date" label="Ngày B/L" tooltip="Ngày phát hành B/L của lô này — chứng từ theo lô dùng ngày này (Invoice/WL/Hối phiếu/Beneficiary)"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="port_of_loading" label="Cảng xếp (POL)"><Input placeholder="Da Nang" /></Form.Item>
             <Form.Item name="port_of_destination" label="Cảng đích (POD)"><Input placeholder="Shanghai" /></Form.Item>

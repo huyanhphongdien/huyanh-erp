@@ -3,6 +3,8 @@
 // File: src/services/finance/cashService.ts
 // ============================================================================
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
+import { FIN_LIGHT } from './finLight'
 
 export interface FinCashBalance {
   id: string
@@ -44,6 +46,15 @@ export const CATEGORY_LABEL: Record<string, string> = {
   thue_tc: 'Thuê tài chính', dien: 'Tiền điện', bao_hiem: 'Bảo hiểm', lai_vay: 'Lãi vay', thue: 'Thuế', khac: 'Khác',
 }
 
+// Đèn khoản phải nộp. KHÔNG có mức "quá hạn" (nextDueFromDay tự lăn sang tháng sau) → không dùng ĐỎ:
+// ≤3 ngày = CAM "tới hạn", ≤7 ngày = VÀNG "sắp nộp" (trước 17/11/2026 ≤3 ngày tô đỏ, đọc nhầm thành trễ hạn).
+export const PAY_ALERT_LABEL: Record<FinPayableComputed['alert'], string> = {
+  due: 'Tới hạn nộp (≤3 ngày)', soon: 'Sắp nộp (≤7 ngày)', ok: 'Còn hạn',
+}
+export const PAY_ALERT_COLOR: Record<FinPayableComputed['alert'], string> = {
+  due: FIN_LIGHT.due, soon: FIN_LIGHT.soon, ok: FIN_LIGHT.ok,
+}
+
 function dDiff(a: Date, b: Date): number {
   return Math.round((Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()) - Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())) / 86_400_000)
 }
@@ -55,7 +66,7 @@ export function nextDueFromDay(due_day: number | null, today = new Date()): stri
   let target = new Date(y, m, Math.min(due_day, daysInMonth(y, m)))
   if (target.getDate() < d) { const nm = m + 1; target = new Date(y, nm, Math.min(due_day, daysInMonth(y, nm))) }
   // Định dạng theo lịch ĐỊA PHƯƠNG (toISOString lệch -1 ngày ở UTC+7)
-  return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`
+  return toDateStrVN(target)
 }
 function daysInMonth(y: number, m: number) { return new Date(y, m + 1, 0).getDate() }
 

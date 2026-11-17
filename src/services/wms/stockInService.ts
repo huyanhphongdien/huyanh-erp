@@ -9,6 +9,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { vnDayStartTs, vnDayEndTs } from '../../utils/dateVN'
 import { batchService } from './batchService'
 import { recordInventoryMove } from './inventorySync'
 import type {
@@ -20,6 +21,12 @@ import type {
   QCStatus,
   WMSPaginationParams,
   PaginatedResponse,
+} from './wms.types'
+
+// Nhãn + màu phiếu nhập / nguồn nhập — MỘT bản ở wms.types (Đợt 3 audit UI).
+export {
+  STOCK_IN_STATUS_LABELS, STOCK_IN_STATUS_COLORS,
+  STOCK_IN_SOURCE_LABELS, STOCK_IN_SOURCE_COLORS,
 } from './wms.types'
 
 // ============================================================================
@@ -185,8 +192,8 @@ export const stockInService = {
     if (status) query = query.eq('status', status)
     if (warehouse_id) query = query.eq('warehouse_id', warehouse_id)
     if (type) query = query.eq('type', type)
-    if (from_date) query = query.gte('created_at', `${from_date}T00:00:00`)
-    if (to_date) query = query.lte('created_at', `${to_date}T23:59:59`)
+    if (from_date) query = query.gte('created_at', vnDayStartTs(from_date))
+    if (to_date) query = query.lte('created_at', vnDayEndTs(to_date))
 
     if (search && search.trim()) {
       query = query.ilike('code', `%${search.trim()}%`)

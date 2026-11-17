@@ -8,6 +8,12 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { fmtDate, fmtKg, fmtNum, fmtVnd } from '../../utils/format'
+import { DEAL_TYPE_LABELS } from '../../types/b2b.constants'
+import {
+  STOCK_IN_STATUS_LABELS, STOCK_IN_SOURCE_LABELS,
+  STOCK_OUT_STATUS_LABELS, STOCK_OUT_REASON_LABELS,
+} from './wms.types'
 
 // ============================================================================
 // TYPES
@@ -37,24 +43,16 @@ export interface TraceNode {
 // HELPERS
 // ============================================================================
 
+// Định dạng qua utils/format (Đợt 3 audit UI) — giữ ngữ nghĩa cũ: ngày trống → null (node không hiện ngày),
+// KL ≥ 1 tấn ghi "tấn", nhỏ hơn ghi "kg"; số theo vi-VN (trước là toFixed dấu chấm thập phân).
 function formatDate(dateStr: string | null | undefined): string | null {
-  if (!dateStr) return null
-  try {
-    const d = new Date(dateStr)
-    return d.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    })
-  } catch {
-    return dateStr
-  }
+  return dateStr ? fmtDate(dateStr) : null
 }
 
 function formatWeight(kg: number | null | undefined): string {
   if (kg == null) return ''
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tấn`
-  return `${kg.toFixed(1)} kg`
+  if (kg >= 1000) return `${fmtNum(kg / 1000, 2)} tấn`
+  return `${fmtKg(kg)} kg`
 }
 
 // ============================================================================
@@ -80,7 +78,10 @@ export const traceabilityService = {
       .eq('id', batchId)
       .single()
 
-    if (batchErr || !batch) return null
+    // Lỗi tải (mạng, quyền…) phải nổi lên để màn hiện lỗi + Thử lại — trước đây nuốt thành null = "không tìm thấy".
+    // PGRST116 (0 dòng) mới đúng là không có lô.
+    if (batchErr && batchErr.code !== 'PGRST116') throw batchErr
+    if (!batch) return null
 
     const batchMaterial = Array.isArray(batch.material) ? batch.material[0] : batch.material
     const batchLabel = batch.batch_no || batchId.slice(0, 8)
@@ -229,7 +230,7 @@ export const traceabilityService = {
 
       const warehouse = Array.isArray(sio.warehouse) ? sio.warehouse[0] : sio.warehouse
       const sioDetail = [
-        sio.source_type === 'deal' ? 'Từ deal' : sio.source_type === 'production' ? 'Từ sản xuất' : (sio.source_type || ''),
+        sio.source_type === 'deal' ? 'Từ deal' : sio.source_type === 'production' ? 'Từ sản xuất' : (STOCK_IN_SOURCE_LABELS[sio.source_type] || sio.source_type || ''),
         warehouse?.name || '',
         formatWeight(sio.total_weight || detail.weight),
       ].filter(Boolean).join(' | ')
@@ -275,19 +276,12 @@ export const traceabilityService = {
 
     if (dealErr || !deal) return null
 
-    const DEAL_TYPE_MAP: Record<string, string> = {
-      purchase: 'Mua hàng',
-      sale: 'Bán hàng',
-      processing: 'Gia công',
-      consignment: 'Ký gửi',
-    }
-
     const dealDetail = [
-      DEAL_TYPE_MAP[deal.deal_type || ''] || deal.deal_type || '',
+      (DEAL_TYPE_LABELS as Record<string, string>)[deal.deal_type || ''] || deal.deal_type || '',
       deal.product_name || '',
       deal.lot_code ? `Lô: ${deal.lot_code}` : '',
       deal.quantity_kg != null ? formatWeight(deal.quantity_kg) : '',
-      deal.total_value_vnd != null ? `${deal.total_value_vnd.toLocaleString('vi-VN')} VND` : '',
+      deal.total_value_vnd != null ? fmtVnd(deal.total_value_vnd) : '',
     ].filter(Boolean).join(' | ')
 
     const dealNode: TraceNode = {
@@ -380,19 +374,13 @@ export const traceabilityService = {
       .eq('id', dealId)
       .single()
 
-    if (dealErr || !deal) return null
+    if (dealErr && dealErr.code !== 'PGRST116') throw dealErr   // lỗi tải ≠ "không tìm thấy" (xem traceFromBatch)
+    if (!deal) return null
 
     const partner = Array.isArray(deal.partner) ? deal.partner[0] : deal.partner
 
-    const DEAL_TYPE_MAP: Record<string, string> = {
-      purchase: 'Mua hàng',
-      sale: 'Bán hàng',
-      processing: 'Gia công',
-      consignment: 'Ký gửi',
-    }
-
     const dealDetail = [
-      DEAL_TYPE_MAP[deal.deal_type || ''] || '',
+      (DEAL_TYPE_LABELS as Record<string, string>)[deal.deal_type || ''] || '',
       deal.product_name || '',
       deal.quantity_kg != null ? formatWeight(deal.quantity_kg) : '',
       partner?.name || '',
@@ -428,7 +416,7 @@ export const traceabilityService = {
       const sioDetail = [
         warehouse?.name || '',
         formatWeight(sio.total_weight),
-        sio.status || '',
+        STOCK_IN_STATUS_LABELS[sio.status] || sio.status || '',   // trước in thẳng 'confirmed'/'draft'
       ].filter(Boolean).join(' | ')
 
       const stockInNode: TraceNode = {
@@ -503,7 +491,8 @@ export const traceabilityService = {
       .eq('id', batchId)
       .single()
 
-    if (batchErr || !batch) return null
+    if (batchErr && batchErr.code !== 'PGRST116') throw batchErr   // lỗi tải ≠ "không tìm thấy" (xem traceFromBatch)
+    if (!batch) return null
 
     const mat = Array.isArray(batch.material) ? batch.material[0] : batch.material
     const isRaw = (mat as any)?.type === 'raw' || batch.batch_type === 'raw'
@@ -557,14 +546,6 @@ export const traceabilityService = {
       .eq('batch_id', batchId)
 
     if (outDetails && outDetails.length > 0) {
-      const REASON_LABELS: Record<string, string> = {
-        sale: 'Bán hàng',
-        production: 'Sản xuất',
-        transfer: 'Chuyển kho',
-        blend: 'Phối trộn',
-        adjust: 'Điều chỉnh',
-        return: 'Trả hàng',
-      }
       const seenOrders = new Set<string>()
       for (const det of outDetails) {
         const so = Array.isArray(det.stock_out) ? det.stock_out[0] : det.stock_out
@@ -573,10 +554,10 @@ export const traceabilityService = {
 
         const wh = Array.isArray((so as any).warehouse) ? (so as any).warehouse[0] : (so as any).warehouse
         const outDetail = [
-          REASON_LABELS[so.reason] || so.reason || '',
+          STOCK_OUT_REASON_LABELS[so.reason] || so.reason || '',
           wh?.name || '',
           formatWeight(det.weight || det.quantity),
-          so.status || '',
+          STOCK_OUT_STATUS_LABELS[so.status] || so.status || '',   // trước in thẳng 'confirmed'/'picking'
         ].filter(Boolean).join(' | ')
 
         const outNode: TraceNode = {

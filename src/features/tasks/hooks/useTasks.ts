@@ -8,6 +8,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
+import { vnDayStartTs, vnDayEndTs } from '../../../utils/dateVN'
 
 // ============ INLINE TYPES ============
 interface TaskFilter {
@@ -16,7 +17,7 @@ interface TaskFilter {
   assignee_id?: string
   assigner_id?: string
   status?: string | string[]
-  priority?: string
+  priority?: string | string[]
   date_from?: string
   date_to?: string
   due_date_from?: string
@@ -146,7 +147,13 @@ async function fetchTasks(
   }
 
   if (filter?.priority) {
-    query = query.eq('priority', filter.priority)
+    // TaskFilters gửi MẢNG (chọn nhiều / nút "Ưu tiên cao" = high+urgent). .eq với mảng thành
+    // "priority=eq.high,urgent" → luôn ra danh sách trống. Mảng → .in như status.
+    if (Array.isArray(filter.priority)) {
+      query = query.in('priority', filter.priority)
+    } else {
+      query = query.eq('priority', filter.priority)
+    }
   }
 
   // ★ Date filters — due_date
@@ -159,10 +166,10 @@ async function fetchTasks(
 
   // ★ Date filters — created_at
   if (filter?.created_date_from) {
-    query = query.gte('created_at', filter.created_date_from + 'T00:00:00')
+    query = query.gte('created_at', vnDayStartTs(filter.created_date_from))
   }
   if (filter?.created_date_to) {
-    query = query.lte('created_at', filter.created_date_to + 'T23:59:59')
+    query = query.lte('created_at', vnDayEndTs(filter.created_date_to))
   }
 
   // ★ Filter theo loại task
@@ -177,7 +184,7 @@ async function fetchTasks(
   // ★ Mặc định: chỉ hiện task tháng hiện tại (created_at >= đầu tháng)
   if (!filter?.date_from && !filter?.due_date_from && !filter?.created_date_from && !filter?.search) {
     const now = new Date()
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00`
+    const monthStart = vnDayStartTs(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`)
     query = query.gte('created_at', monthStart)
   }
 

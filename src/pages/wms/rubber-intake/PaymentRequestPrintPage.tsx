@@ -8,9 +8,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer } from 'lucide-react'
+import { Alert, Button } from 'antd'
 import logoImg from '../../../assets/logo.png'
 import { readVietnameseNumber } from '../../../utils/readVietnameseNumber'
 import { useAuthStore } from '../../../stores/authStore'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import {
   paymentRequestService,
   type PaymentRequest,
@@ -36,21 +38,44 @@ export default function PaymentRequestPrintPage() {
   const [req, setReq] = useState<PaymentRequest | null>(null)
   const [lines, setLines] = useState<PaymentRequestLine[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "không tìm thấy" — đừng để kế toán tưởng phiếu đã bị xoá
+  const [loadError, setLoadError] = useState<unknown>(null)
+  // Kèm STK ngân hàng chỉ là phần PHỤ của bản in: lỗi thì vẫn in đủ dòng (chưa kèm STK) + cảnh báo.
+  // Trước đây lỗi này rơi vào catch chung → req có mà lines rỗng → in phiếu 0 dòng, tổng 0, không báo gì.
+  const [bankError, setBankError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
+    setLoadError(null)
+    setBankError(null)
     paymentRequestService.getById(id).then(async res => {
       if (res) {
         setReq(res.request)
-        setLines(await paymentRequestService.enrichLinesWithBank(res.lines))
+        setLines(res.lines)
+        try {
+          setLines(await paymentRequestService.enrichLinesWithBank(res.lines))
+        } catch (e) {
+          setBankError(e || 'Không tải được tài khoản ngân hàng')
+        }
       }
       setLoading(false)
-    }).catch(() => setLoading(false))
-  }, [id])
+    }).catch((e) => { setLoadError(e || 'Không tải được đề nghị'); setLoading(false) })
+  }, [id, reloadKey])
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600" /></div>
+  }
+  if (loadError && !req) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-2 px-6 text-center">
+        <p className="text-red-600 font-semibold">Không tải được đề nghị để in</p>
+        <p className="text-sm text-gray-500">{dichLoiHeThong(loadError, 'Có lỗi khi tải')}</p>
+        <button onClick={() => setReloadKey(k => k + 1)} className="mt-2 px-4 py-2 rounded bg-red-50 text-red-600 text-sm font-semibold">Thử lại</button>
+        <button onClick={() => navigate('/rubber/payment-requests')} className="text-blue-600 text-sm">Quay lại</button>
+      </div>
+    )
   }
   if (!req) {
     return (
@@ -72,6 +97,17 @@ export default function PaymentRequestPrintPage() {
 
       {/* Preview */}
       <div className="no-print bg-gray-200 min-h-[calc(100vh-56px)] py-6 px-4 flex flex-col items-center">
+        {/* Cảnh báo nằm trong khối no-print → KHÔNG lên giấy */}
+        {bankError != null && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ width: '210mm', maxWidth: '100%', marginBottom: 12 }}
+            title="Chưa kèm được số tài khoản ngân hàng vào cột Ghi chú"
+            description={`Phiếu vẫn in đủ ${lines.length} dòng và tổng tiền; dòng đại lý chưa nhập tay STK sẽ chỉ có tên người nhận. Bấm Thử lại trước khi in nếu cần STK. (${dichLoiHeThong(bankError, 'Lỗi tải ngân hàng')})`}
+            action={<Button size="small" onClick={() => setReloadKey(k => k + 1)}>Thử lại</Button>}
+          />
+        )}
         <div className="bg-white shadow-md" style={{ width: '210mm', minHeight: '297mm', padding: '14mm' }}>
           <Sheet req={req} lines={lines} preparedBy={user?.full_name} msnv={user?.employee_code} />
         </div>

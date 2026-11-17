@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import rubberIntakeService from '../../../services/rubber/rubberIntakeService'
 import type { RubberIntake } from '../../../services/rubber/rubberIntakeService'
+import { addDaysStr } from '../../../utils/dateVN'
 
 // ============================================================================
 // HELPERS
@@ -30,10 +31,9 @@ function formatDateVN(s: string): string {
   return `${days[d.getDay()]}, ${d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
 }
 
+// Cộng/trừ ngày thuần lịch — bản cũ toISOString() (UTC) làm ‹ › đứng yên/nhảy lùi ở múi +7
 function shiftDate(dateStr: string, delta: number): string {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + delta)
-  return d.toISOString().slice(0, 10)
+  return addDaysStr(dateStr, delta)
 }
 
 function fmt(n?: number | null): string {

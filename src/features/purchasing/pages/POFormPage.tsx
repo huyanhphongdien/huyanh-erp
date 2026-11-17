@@ -18,6 +18,7 @@ import { employeeService } from '../../../services/employeeService'
 import { supplierService } from '../../../services/supplierService'
 import { materialService } from '../../../services/materialService'
 import { useAuthStore } from '../../../stores/authStore'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // Components
 import { OrderHeader } from './components/orders/OrderHeader'
@@ -95,6 +96,8 @@ function POFormPage() {
         setMaterials(mats || [])
       } catch (err) {
         console.error('Lỗi tải dữ liệu dropdown:', err)
+        // Báo ra màn — trước đây nuốt im, ô chọn NCC/vật tư trống mà không ai biết vì sao
+        setError(dichLoiHeThong(err, 'Không tải được danh mục phòng ban / nhân viên / NCC / vật tư — tải lại trang (Ctrl+R)'))
       }
     }
     loadDropdowns()
@@ -157,7 +160,7 @@ function POFormPage() {
         if (order.expected_delivery_date || order.delivery_address) setDefaultShowDelivery(true)
         if (order.notes || order.internal_notes) setShowNotes(true)
       } catch (err: any) {
-        setError(err.message || 'Lỗi tải đơn hàng')
+        setError(dichLoiHeThong(err, 'Lỗi tải đơn hàng'))
       } finally {
         setLoading(false)
       }
@@ -253,7 +256,7 @@ function POFormPage() {
         state: { message: isEditMode ? 'Cập nhật đơn hàng thành công!' : 'Tạo đơn hàng thành công!' },
       })
     } catch (err: any) {
-      setError(err.message || 'Lỗi lưu đơn hàng')
+      setError(dichLoiHeThong(err, 'Lỗi lưu đơn hàng'))
     } finally {
       setSaving(false)
     }

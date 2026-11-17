@@ -11,6 +11,7 @@
 // ============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   DollarSign,
   AlertTriangle,
@@ -29,12 +30,15 @@ import {
   CreditCard,
   Banknote,
 } from 'lucide-react';
-import { invoicePaymentService } from '../../../services/invoicePaymentService';
+import { invoicePaymentService, PAYMENT_STATUS_MAP } from '../../../services/invoicePaymentService';
 import type {
   SupplierDebtSummary,
   OverdueInvoice,
   PaymentStats,
 } from '../../../services/invoicePaymentService';
+// Định dạng: utils/format (bản formatCurrency/formatDate tự viết đã xoá)
+import { fmtVnd as formatCurrency, fmtDate as formatDate } from '../../../utils/format';
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -49,6 +53,7 @@ type SortOrder = 'asc' | 'desc';
 // ============================================================================
 
 const SupplierDebtPage: React.FC = () => {
+  const navigate = useNavigate();
   // Data
   const [debtSummaries, setDebtSummaries] = useState<SupplierDebtSummary[]>([]);
   const [overdueInvoices, setOverdueInvoices] = useState<OverdueInvoice[]>([]);
@@ -83,7 +88,7 @@ const SupplierDebtPage: React.FC = () => {
       setPaymentStats(stats);
     } catch (err: any) {
       console.error('Error loading debt data:', err);
-      setError('Không thể tải dữ liệu công nợ');
+      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu công nợ'));
     } finally {
       setIsLoading(false);
     }
@@ -97,33 +102,14 @@ const SupplierDebtPage: React.FC = () => {
   // HELPERS
   // ============================================================================
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    return new Date(dateStr).toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  };
-
+  // Nhãn trạng thái thanh toán: MỘT map ở invoicePaymentService (trước đây 'Chưa TT'/'TT một phần'/'Đã TT')
   const getPaymentStatusBadge = (status: string) => {
-    const map: Record<string, { label: string; className: string }> = {
-      unpaid: { label: 'Chưa TT', className: 'bg-red-100 text-red-700' },
-      partial: { label: 'TT một phần', className: 'bg-yellow-100 text-yellow-700' },
-      paid: { label: 'Đã TT', className: 'bg-green-100 text-green-700' },
-    };
-    const info = map[status] || { label: status, className: 'bg-gray-100 text-gray-700' };
+    const cfg = PAYMENT_STATUS_MAP[status];
+    const label = cfg?.label || status;
+    const className = cfg ? `${cfg.bgColor} ${cfg.color}` : 'bg-gray-100 text-gray-700';
     return (
-      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${info.className}`}>
-        {info.label}
+      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${className}`}>
+        {label}
       </span>
     );
   };
@@ -137,7 +123,7 @@ const SupplierDebtPage: React.FC = () => {
       // Filter by search
       if (search) {
         const q = search.toLowerCase();
-        if (!s.supplier_name.toLowerCase().includes(q) && !s.supplier_code.toLowerCase().includes(q)) {
+        if (!(s.supplier_name || '').toLowerCase().includes(q) && !(s.supplier_code || '').toLowerCase().includes(q)) {
           return false;
         }
       }
@@ -162,10 +148,11 @@ const SupplierDebtPage: React.FC = () => {
   const filteredOverdueInvoices = overdueInvoices.filter(inv => {
     if (!search) return true;
     const q = search.toLowerCase();
+    // Số hóa đơn NCC không bắt buộc (có thể null) → phải `|| ''`, không thì gõ tìm là sập trang
     return (
-      inv.supplier_name.toLowerCase().includes(q) ||
-      inv.supplier_code.toLowerCase().includes(q) ||
-      inv.invoice_number.toLowerCase().includes(q) ||
+      (inv.supplier_name || '').toLowerCase().includes(q) ||
+      (inv.supplier_code || '').toLowerCase().includes(q) ||
+      (inv.invoice_number || '').toLowerCase().includes(q) ||
       (inv.order_code && inv.order_code.toLowerCase().includes(q))
     );
   });
@@ -282,7 +269,7 @@ const SupplierDebtPage: React.FC = () => {
               <p className="text-lg font-bold text-green-600">
                 {formatCurrency(paymentStats?.total_amount || 0)}
               </p>
-              <p className="text-xs text-gray-400">{paymentStats?.total_payments || 0} lần TT</p>
+              <p className="text-xs text-gray-400">{paymentStats?.total_payments || 0} lần thanh toán</p>
             </div>
           </div>
         </div>
@@ -346,7 +333,7 @@ const SupplierDebtPage: React.FC = () => {
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Tìm NCC, mã HĐ..."
+                placeholder="Tìm NCC, số hóa đơn..."
                 className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg w-48 focus:ring-1 focus:ring-blue-500"
               />
             </div>
@@ -372,11 +359,27 @@ const SupplierDebtPage: React.FC = () => {
             // =================== DEBT TAB ===================
             <div className="overflow-x-auto">
               {filteredDebtSummaries.length === 0 ? (
-                <div className="flex flex-col items-center py-16 text-gray-400">
-                  <CheckCircle className="w-12 h-12 mb-3 text-green-300" />
-                  <p className="text-sm font-medium">Không có công nợ nào!</p>
-                  <p className="text-xs">Tất cả hóa đơn đã được thanh toán</p>
-                </div>
+                // Trống vì TÌM/LỌC thì nói đúng là không khớp — không được báo "tất cả đã thanh toán" (sai nghĩa)
+                search || filterDebt === 'overdue' ? (
+                  <div className="flex flex-col items-center py-16 text-gray-400">
+                    <Search className="w-10 h-10 mb-3 text-gray-300" />
+                    <p className="text-sm font-medium">
+                      {search ? 'Không tìm thấy NCC phù hợp' : 'Không có NCC nào đang quá hạn'}
+                    </p>
+                    <p className="text-xs">{search ? 'Thử từ khóa khác hoặc đổi bộ lọc' : 'Đổi bộ lọc để xem NCC khác'}</p>
+                  </div>
+                ) : debtSummaries.length === 0 ? (
+                  <div className="flex flex-col items-center py-16 text-gray-400">
+                    <FileText className="w-12 h-12 mb-3 text-gray-300" />
+                    <p className="text-sm font-medium">Chưa có hóa đơn NCC nào</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center py-16 text-gray-400">
+                    <CheckCircle className="w-12 h-12 mb-3 text-green-300" />
+                    <p className="text-sm font-medium">Không có công nợ nào!</p>
+                    <p className="text-xs">Tất cả hóa đơn đã được thanh toán</p>
+                  </div>
+                )
               ) : (
                 <table className="w-full text-sm">
                   <thead>
@@ -386,13 +389,13 @@ const SupplierDebtPage: React.FC = () => {
                           NCC <SortIcon field="supplier_name" />
                         </div>
                       </th>
-                      <th className="text-center px-3 py-3 font-medium text-gray-600">HĐ</th>
+                      <th className="text-center px-3 py-3 font-medium text-gray-600">Hóa đơn</th>
                       <th className="text-right px-3 py-3 font-medium text-gray-600">
                         <div className="flex items-center justify-end gap-1">
-                          Tổng HĐ <SortIcon field="total_invoice_amount" />
+                          Tổng hóa đơn <SortIcon field="total_invoice_amount" />
                         </div>
                       </th>
-                      <th className="text-right px-3 py-3 font-medium text-gray-600">Đã TT</th>
+                      <th className="text-right px-3 py-3 font-medium text-gray-600">Đã trả</th>
                       <th className="text-right px-3 py-3 font-medium text-gray-600">
                         <div className="flex items-center justify-end gap-1">
                           Còn nợ <SortIcon field="total_remaining_amount" />
@@ -403,7 +406,7 @@ const SupplierDebtPage: React.FC = () => {
                           Quá hạn <SortIcon field="overdue_amount" />
                         </div>
                       </th>
-                      <th className="text-center px-3 py-3 font-medium text-gray-600">TT</th>
+                      <th className="text-center px-3 py-3 font-medium text-gray-600" title="Phần trăm tổng hóa đơn đã trả">Tỷ lệ đã trả</th>
                       <th className="px-3 py-3"></th>
                     </tr>
                   </thead>
@@ -414,7 +417,12 @@ const SupplierDebtPage: React.FC = () => {
                         : 0;
 
                       return (
-                        <tr key={supplier.supplier_id} className="hover:bg-gray-50">
+                        <tr
+                          key={supplier.supplier_id}
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => navigate(`/purchasing/suppliers/${supplier.supplier_id}`)}
+                          title="Mở chi tiết nhà cung cấp"
+                        >
                           <td className="px-4 py-3">
                             <div>
                               <p className="font-medium text-gray-900">{supplier.supplier_name}</p>
@@ -423,12 +431,12 @@ const SupplierDebtPage: React.FC = () => {
                           </td>
                           <td className="text-center px-3 py-3">
                             <div className="text-xs space-y-0.5">
-                              <div>{supplier.total_invoices} HĐ</div>
+                              <div>{supplier.total_invoices} hóa đơn</div>
                               {supplier.unpaid_invoices > 0 && (
-                                <span className="text-red-500">{supplier.unpaid_invoices} chưa TT</span>
+                                <span className="text-amber-600">{supplier.unpaid_invoices} chưa trả</span>
                               )}
                               {supplier.partial_invoices > 0 && (
-                                <span className="text-yellow-500">{supplier.partial_invoices} TT 1 phần</span>
+                                <span className="text-orange-500">{supplier.partial_invoices} trả một phần</span>
                               )}
                             </div>
                           </td>
@@ -496,7 +504,7 @@ const SupplierDebtPage: React.FC = () => {
                         Tổng cộng ({filteredDebtSummaries.length} NCC)
                       </td>
                       <td className="text-center px-3 py-3 text-gray-700">
-                        {filteredDebtSummaries.reduce((sum, s) => sum + s.total_invoices, 0)} HĐ
+                        {filteredDebtSummaries.reduce((sum, s) => sum + s.total_invoices, 0)} hóa đơn
                       </td>
                       <td className="text-right px-3 py-3 text-gray-700">
                         {formatCurrency(filteredDebtSummaries.reduce((sum, s) => sum + s.total_invoice_amount, 0))}
@@ -520,11 +528,19 @@ const SupplierDebtPage: React.FC = () => {
             // =================== OVERDUE TAB ===================
             <div className="overflow-x-auto">
               {filteredOverdueInvoices.length === 0 ? (
-                <div className="flex flex-col items-center py-16 text-gray-400">
-                  <CheckCircle className="w-12 h-12 mb-3 text-green-300" />
-                  <p className="text-sm font-medium">Không có hóa đơn quá hạn!</p>
-                  <p className="text-xs">Tất cả đang trong thời hạn thanh toán</p>
-                </div>
+                search && overdueInvoices.length > 0 ? (
+                  <div className="flex flex-col items-center py-16 text-gray-400">
+                    <Search className="w-10 h-10 mb-3 text-gray-300" />
+                    <p className="text-sm font-medium">Không tìm thấy hóa đơn quá hạn phù hợp</p>
+                    <p className="text-xs">Thử từ khóa khác</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center py-16 text-gray-400">
+                    <CheckCircle className="w-12 h-12 mb-3 text-green-300" />
+                    <p className="text-sm font-medium">Không có hóa đơn quá hạn!</p>
+                    <p className="text-xs">Tất cả đang trong thời hạn thanh toán</p>
+                  </div>
+                )
               ) : (
                 <table className="w-full text-sm">
                   <thead>
@@ -532,9 +548,9 @@ const SupplierDebtPage: React.FC = () => {
                       <th className="text-left px-4 py-3 font-medium text-red-700">Hóa đơn</th>
                       <th className="text-left px-3 py-3 font-medium text-red-700">NCC</th>
                       <th className="text-left px-3 py-3 font-medium text-red-700">Đơn hàng</th>
-                      <th className="text-center px-3 py-3 font-medium text-red-700">Hạn TT</th>
+                      <th className="text-center px-3 py-3 font-medium text-red-700">Hạn thanh toán</th>
                       <th className="text-center px-3 py-3 font-medium text-red-700">Quá hạn</th>
-                      <th className="text-right px-3 py-3 font-medium text-red-700">Tổng HĐ</th>
+                      <th className="text-right px-3 py-3 font-medium text-red-700">Tổng hóa đơn</th>
                       <th className="text-right px-3 py-3 font-medium text-red-700">Còn nợ</th>
                       <th className="text-center px-3 py-3 font-medium text-red-700">Trạng thái</th>
                     </tr>

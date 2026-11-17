@@ -18,6 +18,19 @@ export const DISPATCH_STATUS_LABELS: Record<DispatchStatus, string> = {
   completed: 'Hoàn tất',
   cancelled: 'Đã huỷ',
 }
+/** Màu Tag (tên màu antd) của trạng thái lệnh — MỘT nguồn cho Sổ lệnh + chi tiết lệnh
+ *  (trước 17/11/2026 mỗi trang tự chép một bản STATUS_COLOR). */
+export const DISPATCH_STATUS_COLORS: Record<DispatchStatus, string> = {
+  draft: 'default',
+  dispatched: 'blue',
+  in_transit: 'gold',
+  completed: 'green',
+  cancelled: 'red',
+}
+
+/** Trần số dòng tải một lần — trang hiện <LimitNotice> khi chạm trần thay vì im lặng mất dòng cũ. */
+export const SALES_ORDER_OPTION_LIMIT = 50
+export const FETCH_REPORT_LIMIT = 500
 
 export const TRIP_TYPE_LABELS: Record<TripType, string> = {
   port: 'Xuất hàng đi cảng',
@@ -1024,7 +1037,7 @@ async function listFetchReport(params: { date_from?: string; date_to?: string } 
   let q = supabase.from('dispatch_orders').select(ORDER_SELECT)
     .eq('trip_type', 'fetch_mu')
     .order('dispatch_date', { ascending: false })
-    .limit(500)
+    .limit(FETCH_REPORT_LIMIT)
   if (params.date_from) q = q.gte('dispatch_date', params.date_from)
   if (params.date_to) q = q.lte('dispatch_date', params.date_to)
   const { data, error } = await q
@@ -1105,7 +1118,7 @@ async function listSalesOrderOptions(search?: string): Promise<SalesOrderOption[
     `)
     .not('status', 'in', '(cancelled)')
     .order('created_at', { ascending: false })
-    .limit(50)
+    .limit(SALES_ORDER_OPTION_LIMIT)
   if (search) q = q.or(`code.ilike.%${search}%,contract_no.ilike.%${search}%,grade.ilike.%${search}%`)
   const { data, error } = await q
   if (error) throw error

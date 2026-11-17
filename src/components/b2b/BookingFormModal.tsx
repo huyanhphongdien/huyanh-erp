@@ -26,6 +26,7 @@ import {
 } from '../../services/b2b/chatMessageService'
 import dayjs from 'dayjs'
 import RubberRegionPicker from './RubberRegionPicker'
+import { fmtVnd, vndInputProps } from '../../utils/format'
 
 const { Text, Title } = Typography
 const { TextArea } = Input
@@ -129,10 +130,6 @@ const BookingFormModal = ({
     }
   }
 
-  const formatCurrency = (value: number): string => {
-    return value.toLocaleString('vi-VN')
-  }
-
   return (
     <Modal
       title={
@@ -230,7 +227,7 @@ const BookingFormModal = ({
           <Col span={24}>
             <Form.Item
               name="price_per_kg"
-              label="Đơn giá (đ/kg)"
+              label="Đơn giá (₫/kg)"
               rules={[
                 { required: true, message: 'Nhập đơn giá' },
                 { type: 'number', min: 100, message: 'Giá không hợp lệ' },
@@ -240,9 +237,8 @@ const BookingFormModal = ({
                 style={{ width: '100%' }}
                 min={100}
                 step={100}
-                placeholder="VD: 12,000"
-                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => Number(value!.replace(/,/g, '')) || 0}
+                placeholder="VD: 12.000"
+                {...vndInputProps}
                 size="large"
               />
             </Form.Item>
@@ -318,7 +314,7 @@ const BookingFormModal = ({
             level={3}
             style={{ color: '#ffd700', margin: '4px 0 0' }}
           >
-            {estimatedValue > 0 ? `${formatCurrency(estimatedValue)} VNĐ` : '—'}
+            {estimatedValue > 0 ? fmtVnd(estimatedValue) : '—'}
           </Title>
         </div>
       </Form>

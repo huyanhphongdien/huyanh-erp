@@ -17,6 +17,25 @@ import type {
   RubberType,
 } from '../../types/b2b.types'
 
+// MỘT nguồn nhãn + màu trạng thái thưởng đại lý (Đợt 3 audit UI 17/11/2026) — màu tên antd theo
+// quy ước dòng tiền, khớp Quyết toán: nháp default · chờ duyệt gold · đã duyệt CHỜ chi blue ·
+// đã chi green · huỷ red. Trang Thưởng đại lý nên đọc từ đây thay cho bảng class Tailwind cục bộ.
+export const MONTHLY_BONUS_STATUS_LABELS: Record<MonthlyBonusStatus, string> = {
+  draft: 'Nháp',
+  pending_approval: 'Chờ duyệt',
+  approved: 'Đã duyệt',
+  paid: 'Đã chi',
+  cancelled: 'Đã huỷ',
+}
+
+export const MONTHLY_BONUS_STATUS_COLORS: Record<MonthlyBonusStatus, string> = {
+  draft: 'default',
+  pending_approval: 'gold',
+  approved: 'blue',
+  paid: 'green',
+  cancelled: 'red',
+}
+
 export interface ListMonthlyBonusParams {
   year?: number
   quarter?: 1 | 2 | 3 | 4

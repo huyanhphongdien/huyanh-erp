@@ -11,6 +11,7 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
+import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS } from '../types';
 
 // ============================================================================
 // TYPES — task_activities (rich audit log với 21 action types)
@@ -118,24 +119,11 @@ export const ACTION_CONFIG: Record<TaskActivityAction, {
   subtask_completed: { label: 'đã hoàn thành công việc con', icon: '✅', color: 'text-green-600', bgColor: 'bg-green-100' },
 };
 
-export const STATUS_LABELS: Record<string, string> = {
-  draft: 'Nháp',
-  new: 'Mới',
-  in_progress: 'Đang làm',
-  paused: 'Tạm dừng',
-  pending_review: 'Chờ review',
-  completed: 'Hoàn thành',
-  finished: 'Hoàn thành',
-  cancelled: 'Đã hủy',
-  accepted: 'Đã duyệt',
-};
+// Giữ tên export cũ làm alias của MỘT nguồn (types/index.ts) — bản chép cũ ghi "Chờ review" (tiếng Anh)
+// trong khi mọi nơi khác "Chờ duyệt".
+export const STATUS_LABELS: Record<string, string> = TASK_STATUS_LABELS;
 
-export const PRIORITY_LABELS: Record<string, string> = {
-  low: 'Thấp',
-  medium: 'Trung bình',
-  high: 'Cao',
-  urgent: 'Khẩn cấp',
-};
+export const PRIORITY_LABELS: Record<string, string> = TASK_PRIORITY_LABELS;
 
 // ============================================================================
 // HELPERS

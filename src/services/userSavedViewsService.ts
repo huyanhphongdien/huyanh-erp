@@ -45,11 +45,11 @@ export const userSavedViewsService = {
   async create(input: CreateSavedViewInput): Promise<SavedView> {
     // Get current user's employee_id
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Chưa login')
+    if (!user) throw new Error('Chưa đăng nhập — đăng nhập lại rồi lưu bộ lọc')
     // Cột link auth trong bảng employees là `user_id` (KHÔNG phải auth_user_id)
     const { data: emp } = await supabase
       .from('employees').select('id').eq('user_id', user.id).single()
-    if (!emp) throw new Error('Không tìm thấy employee record')
+    if (!emp) throw new Error('Không tìm thấy hồ sơ nhân viên của tài khoản này — liên hệ HCNS')
 
     const { data, error } = await supabase
       .from('user_saved_views')

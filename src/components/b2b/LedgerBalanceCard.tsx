@@ -12,7 +12,9 @@ import {
   WalletOutlined,
 } from '@ant-design/icons'
 import GlassCard from '../ui/GlassCard'
+import PageState from '../common/PageState'
 import { ledgerService } from '../../services/b2b/ledgerService'
+import { fmtVndNum } from '../../utils/format'
 
 interface LedgerBalanceCardProps {
   partnerId?: string
@@ -24,10 +26,6 @@ interface LedgerBalanceCardProps {
   loading?: boolean
 }
 
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('vi-VN').format(value)
-}
-
 const LedgerBalanceCard: React.FC<LedgerBalanceCardProps> = ({
   partnerId,
   balance: externalBalance,
@@ -35,6 +33,8 @@ const LedgerBalanceCard: React.FC<LedgerBalanceCardProps> = ({
 }) => {
   const [balance, setBalance] = useState(externalBalance || { total_debit: 0, total_credit: 0, balance: 0 })
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (externalBalance) {
@@ -47,19 +47,30 @@ const LedgerBalanceCard: React.FC<LedgerBalanceCardProps> = ({
     const fetchBalance = async () => {
       try {
         setLoading(true)
+        setLoadError(null)
         const data = await ledgerService.getPartnerBalance(partnerId)
         setBalance(data)
       } catch (error) {
         console.error('Error fetching balance:', error)
+        setLoadError(error)
       } finally {
         setLoading(false)
       }
     }
 
     fetchBalance()
-  }, [partnerId, externalBalance])
+  }, [partnerId, externalBalance, reloadKey])
 
   const isLoading = externalLoading || loading
+
+  // Tải lỗi → báo lỗi + Thử lại, KHÔNG hiện số dư 0 ₫ giả
+  if (!isLoading && loadError) {
+    return (
+      <GlassCard>
+        <PageState error={loadError} onRetry={() => setReloadKey(k => k + 1)} minHeight={100} />
+      </GlassCard>
+    )
+  }
 
   if (isLoading) {
     return (
@@ -76,9 +87,9 @@ const LedgerBalanceCard: React.FC<LedgerBalanceCardProps> = ({
       <Row gutter={[16, 16]}>
         <Col span={8}>
           <Statistic
-            title="Tổng nợ (Debit)"
+            title="Tổng Nợ"
             value={balance.total_debit}
-            formatter={(value) => formatCurrency(Number(value))}
+            formatter={(value) => fmtVndNum(Number(value))}
             prefix={<ArrowUpOutlined />}
             valueStyle={{ color: '#ff4d4f', fontSize: 18 }}
             suffix="₫"
@@ -86,9 +97,9 @@ const LedgerBalanceCard: React.FC<LedgerBalanceCardProps> = ({
         </Col>
         <Col span={8}>
           <Statistic
-            title="Tổng có (Credit)"
+            title="Tổng Có"
             value={balance.total_credit}
-            formatter={(value) => formatCurrency(Number(value))}
+            formatter={(value) => fmtVndNum(Number(value))}
             prefix={<ArrowDownOutlined />}
             valueStyle={{ color: '#52c41a', fontSize: 18 }}
             suffix="₫"
@@ -98,7 +109,7 @@ const LedgerBalanceCard: React.FC<LedgerBalanceCardProps> = ({
           <Statistic
             title="Số dư"
             value={Math.abs(balance.balance)}
-            formatter={(value) => formatCurrency(Number(value))}
+            formatter={(value) => fmtVndNum(Number(value))}
             prefix={<WalletOutlined />}
             valueStyle={{
               color: balance.balance > 0 ? '#ff4d4f' : balance.balance < 0 ? '#52c41a' : '#8c8c8c',

@@ -17,6 +17,9 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from 'antd'
 import { supabase } from '../../../lib/supabase'
 import { B2BSectionTabs, DASHBOARD_TABS } from '../../../components/b2b/B2BSectionTabs'
+import { TIER_LABELS, TIER_COLORS } from '../../../services/b2b/partnerService'
+import EnumTag from '../../../components/common/EnumTag'
+import { fmtNum, fmtTy, fmtVndCompact } from '../../../utils/format'
 
 const { Title, Text } = Typography
 
@@ -152,7 +155,7 @@ export default function B2BAnalyticsDashboard() {
       {/* KPI Row */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col xs={6}><Card size="small" style={{ borderRadius: 12 }}>
-          <Statistic title="Giá trị B2B" value={totalValue} formatter={v => `${(Number(v) / 1e9).toFixed(1)} tỷ`} prefix={<DollarOutlined style={{ color: '#1B4D3E' }} />} valueStyle={{ color: '#1B4D3E' }} />
+          <Statistic title="Giá trị B2B" value={totalValue} formatter={v => fmtTy(Number(v), 1)} prefix={<DollarOutlined style={{ color: '#1B4D3E' }} />} valueStyle={{ color: '#1B4D3E' }} />
         </Card></Col>
         <Col xs={6}><Card size="small" style={{ borderRadius: 12 }}>
           <Statistic title="Sản lượng" value={Math.round(totalVolume)} suffix="tấn" prefix={<ExperimentOutlined style={{ color: '#1890ff' }} />} valueStyle={{ color: '#1890ff' }} />
@@ -161,14 +164,14 @@ export default function B2BAnalyticsDashboard() {
           <Statistic title="Số deal" value={totalDeals} prefix={<FunnelPlotOutlined style={{ color: '#722ed1' }} />} valueStyle={{ color: '#722ed1' }} />
         </Card></Col>
         <Col xs={6}><Card size="small" style={{ borderRadius: 12 }}>
-          <Statistic title="Đại lý active" value={activePartners} prefix={<TeamOutlined style={{ color: '#fa8c16' }} />} valueStyle={{ color: '#fa8c16' }} />
+          <Statistic title="Đại lý đang hoạt động" value={activePartners} prefix={<TeamOutlined style={{ color: '#fa8c16' }} />} valueStyle={{ color: '#fa8c16' }} />
         </Card></Col>
       </Row>
 
       <Row gutter={16}>
         {/* Funnel */}
         <Col xs={24} lg={8}>
-          <Card size="small" title={<><FunnelPlotOutlined /> Funnel chuyển đổi ({year})</>} style={{ borderRadius: 12, marginBottom: 16 }}>
+          <Card size="small" title={<><FunnelPlotOutlined /> Phễu chuyển đổi ({year})</>} style={{ borderRadius: 12, marginBottom: 16 }}>
             {loadingFunnel ? <Spin /> : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
                 {funnelSteps.map((step, idx) => {
@@ -236,23 +239,24 @@ export default function B2BAnalyticsDashboard() {
                       <Text strong style={{ fontSize: 13 }}>{r.partner?.name || '—'}</Text>
                       <div style={{ fontSize: 11, color: '#999' }}>
                         {r.partner?.code}
-                        {r.partner?.tier && <Tag style={{ marginLeft: 4, fontSize: 10 }}>{r.partner.tier}</Tag>}
+                        {r.partner?.tier && <EnumTag value={r.partner.tier} labels={TIER_LABELS} colors={TIER_COLORS} style={{ marginLeft: 4, fontSize: 10 }} />}
                       </div>
                     </div>
                   ),
                 },
                 {
-                  title: 'Giá trị (VNĐ)', key: 'value', align: 'right' as const,
-                  render: (_: any, r: any) => <Text strong>{(r.value / 1e6).toFixed(0)}M</Text>,
+                  title: 'Giá trị', key: 'value', align: 'right' as const,
+                  // Rút gọn tỷ/tr theo vi-VN (trước "1234M" — chữ M tiếng Anh)
+                  render: (_: any, r: any) => <Text strong>{fmtVndCompact(r.value)}</Text>,
                   sorter: (a: any, b: any) => a.value - b.value,
                 },
                 {
                   title: 'Tấn', dataIndex: 'volume', align: 'right' as const,
-                  render: (v: number) => `${v.toFixed(1)}`,
+                  render: (v: number) => fmtNum(v, 1),
                   sorter: (a: any, b: any) => a.volume - b.volume,
                 },
                 {
-                  title: 'Deals', dataIndex: 'deals', align: 'center' as const,
+                  title: 'Số deal', dataIndex: 'deals', align: 'center' as const,
                   sorter: (a: any, b: any) => a.deals - b.deals,
                 },
                 {

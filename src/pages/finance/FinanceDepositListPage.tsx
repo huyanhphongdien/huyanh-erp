@@ -4,7 +4,7 @@
 // ============================================================================
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
-  Card, Table, Button, Tag, Typography, Modal, Form, Input, InputNumber, DatePicker,
+  Card, Table, Button, Typography, Modal, Form, Input, InputNumber, DatePicker,
   Select, AutoComplete, Space, message, Popconfirm, Segmented, Tooltip, Row, Col, Statistic, Alert, Drawer, Badge,
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
@@ -12,7 +12,7 @@ import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import FinanceLendingTabs from './FinanceLendingTabs'
 import {
-  depositService, ALERT_LABEL, ALERT_COLOR, ALERT_BG,
+  depositService, ALERT_LABEL, ALERT_COLOR, ALERT_BG, DEPOSIT_STATUS_LABELS, DEPOSIT_PURPOSE_LABELS, DEPOSIT_PURPOSE_COLORS,
   type FinDepositComputed,
 } from '../../services/finance/depositService'
 import { BANKS } from '../../services/finance/loanService'
@@ -22,13 +22,14 @@ import FinanceAttachments from './FinanceAttachments'
 import { attachmentService } from '../../services/finance/attachmentService'
 import { PaperClipOutlined } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
+import { fmtVnd, fmtVndNum, fmtTy, fmtDate, vndInputProps } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
+import { EnumTag } from '../../components/common/EnumTag'
+import { stdPagination } from '../../components/common/tableDefaults'
+import { FinPill, hanText, useFocusRow } from './finUi'
 
 const { Title, Text } = Typography
-const fmtVnd = (n?: number | null) => (n || 0).toLocaleString('vi-VN')
-const fmtTy = (n: number) => `${((n || 0) / 1_000_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} tỷ`
-const fDate = (s?: string | null) => (s ? dayjs(s).format('DD/MM/YYYY') : '—')
-const numFmt = (v?: number | string) => `${v ?? ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-const numParse = (v?: string) => (v || '').replace(/\./g, '')
 
 export default function FinanceDepositListPage() {
   const user = useAuthStore((s) => s.user)
@@ -36,6 +37,7 @@ export default function FinanceDepositListPage() {
   const [rows, setRows] = useState<FinDepositComputed[]>([])
   const [lines, setLines] = useState<FinCreditLineComputed[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [filter, setFilter] = useState('all')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<FinDepositComputed | null>(null)
@@ -46,26 +48,20 @@ export default function FinanceDepositListPage() {
   const [attachCounts, setAttachCounts] = useState<Map<string, number>>(new Map())
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setLoading(true); setLoadError(null)
     try {
       const [d, l] = await Promise.all([depositService.list(), creditLineService.listComputed()])
       setRows(d); setLines(l)
       try { setAttachCounts(await attachmentService.countFor('deposit', d.map((x) => x.id))) } catch { /* bảng file chưa tạo */ }
-    } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
+    } catch (e) { setLoadError(e) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
 
   const [sp] = useSearchParams()
   const focusId = sp.get('focus')
-  // Cuộn tới dòng được mở từ Drawer Hạn mức (?focus=<id>)
-  useEffect(() => {
-    if (!focusId || loading) return
-    const t = setTimeout(() => {
-      document.querySelector(`[data-row-key="${focusId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 300)
-    return () => clearTimeout(t)
-  }, [focusId, loading, rows])
+  // Cuộn tới dòng được mở từ Drawer Hạn mức / Tổng quan (?focus=<id>)
+  useFocusRow(focusId, !loading, rows)
 
   const lineMap = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines])
   const lineOptions = useMemo(() => lines.filter((l) => l.status === 'active')
@@ -76,7 +72,9 @@ export default function FinanceDepositListPage() {
     const total = active.reduce((s, d) => s + (d.amount || 0), 0)
     const secure = active.filter((d) => d.purpose === 'dam_bao_vay').reduce((s, d) => s + (d.amount || 0), 0)
     const near = active.filter((d) => d.alert === 'due' || d.alert === 'overdue' || d.alert === 'soon')
-    return { total, secure, nearCount: near.length, urgent: active.filter((d) => d.alert === 'due' || d.alert === 'overdue') }
+    const urgent = active.filter((d) => d.alert === 'due' || d.alert === 'overdue')
+    // đỏ chỉ khi có HĐ ĐÃ quá hạn; còn trong tuần (chưa quá) = cam
+    return { total, secure, nearCount: near.length, urgent, urgentOverdue: urgent.some((d) => d.alert === 'overdue') }
   }, [rows])
 
   const view = useMemo(() => {
@@ -116,33 +114,31 @@ export default function FinanceDepositListPage() {
       if (editing) await depositService.update(editing.id, payload)
       else await depositService.create({ ...payload, created_by: actorId })
       message.success('Đã lưu HĐTG'); setOpen(false); load()
-    } catch (e: any) { if (e?.errorFields) return; message.error('Lỗi lưu: ' + (e?.message || e)) }
+    } catch (e: any) { if (e?.errorFields) return; message.error(dichLoiHeThong(e, 'Lưu HĐTG thất bại')) }
     finally { setSaving(false) }
   }
   const handleDelete = async (d: FinDepositComputed) => {
     try { await depositService.remove(d.id); message.success('Đã xoá'); load() }
-    catch (e: any) { message.error('Lỗi xoá: ' + (e?.message || e)) }
+    catch (e) { message.error(dichLoiHeThong(e, 'Xoá HĐTG thất bại')) }
   }
 
-  const pill = { display: 'inline-block', color: '#fff', fontWeight: 700, fontSize: 12, padding: '2px 9px', borderRadius: 5, whiteSpace: 'nowrap' as const }
   const alertTag = (d: FinDepositComputed) => (
-    <span style={{ ...pill, background: ALERT_COLOR[d.alert] }}>
-      {d.days_to_maturity != null && d.alert !== 'closed' && d.alert !== 'ok'
-        ? (d.days_to_maturity >= 0 ? `còn ${d.days_to_maturity}d · ` : `quá ${-d.days_to_maturity}d · `) : ''}
+    <FinPill color={ALERT_COLOR[d.alert]}>
+      {d.days_to_maturity != null && d.alert !== 'closed' && d.alert !== 'ok' ? `${hanText(d.days_to_maturity)} · ` : ''}
       {ALERT_LABEL[d.alert]}
-    </span>
+    </FinPill>
   )
 
   const columns = [
     { title: 'Ngân hàng', dataIndex: 'bank', width: 140, render: (v: string, r: FinDepositComputed) => (
       <span><b>{v}</b>{r.holder ? <div style={{ fontSize: 11, color: '#9ca3af' }}>{r.holder}</div> : null}{r.deposit_no ? <div style={{ fontSize: 11, color: '#9ca3af' }}>{r.deposit_no}</div> : null}</span>) },
-    { title: 'Số tiền', dataIndex: 'amount', width: 130, align: 'right' as const, render: (v: number) => <b>{fmtVnd(v)}</b> },
+    { title: 'Số tiền', dataIndex: 'amount', width: 130, align: 'right' as const, render: (v: number) => <b>{fmtVndNum(v)}</b> },
     { title: 'LS', dataIndex: 'interest_rate', width: 70, align: 'right' as const, render: (v: number | null) => v != null ? `${v}%` : '—' },
     { title: 'Kỳ hạn', dataIndex: 'term', width: 90, render: (v: string | null) => v || '—' },
-    { title: 'Ngày gửi', dataIndex: 'deposit_date', width: 100, align: 'center' as const, render: fDate },
+    { title: 'Ngày gửi', dataIndex: 'deposit_date', width: 100, align: 'center' as const, render: (v: string | null) => fmtDate(v) },
     { title: 'Đáo hạn', dataIndex: 'effective_maturity', width: 110, align: 'center' as const, render: (v: string, r: FinDepositComputed) => (
-      <span>{fDate(v)}{r.extended_to ? <div style={{ fontSize: 10, color: '#16a34a' }}>(gia hạn)</div> : null}</span>) },
-    { title: 'Mục đích', dataIndex: 'purpose', width: 110, render: (v: string) => v === 'dam_bao_vay' ? <Tag color="blue">Đảm bảo vay</Tag> : <Tag>Thường</Tag> },
+      <span>{fmtDate(v)}{r.extended_to ? <div style={{ fontSize: 10, color: '#16a34a' }}>(gia hạn)</div> : null}</span>) },
+    { title: 'Mục đích', dataIndex: 'purpose', width: 130, render: (v: string | null) => <EnumTag value={v} labels={DEPOSIT_PURPOSE_LABELS} colors={DEPOSIT_PURPOSE_COLORS} /> },
     { title: 'Đảm bảo cho hạn mức', key: 'secured', width: 185, render: (_: any, r: FinDepositComputed) => {
       const cl = r.secured_credit_line_id ? lineMap.get(r.secured_credit_line_id) : null
       return cl
@@ -151,14 +147,15 @@ export default function FinanceDepositListPage() {
           </Button>
         : <Text type="secondary" style={{ fontSize: 12 }}>— chưa nối</Text>
     } },
-    { title: 'Trạng thái', key: 'alert', width: 160, render: (_: any, r: FinDepositComputed) => alertTag(r) },
+    { title: 'Trạng thái', key: 'alert', width: 250, render: (_: any, r: FinDepositComputed) => alertTag(r) },
     { title: '', key: 'act', width: 102, fixed: 'right' as const, render: (_: any, r: FinDepositComputed) => (
       <Space size={2}>
         <Tooltip title="Tài liệu (sổ/giấy CN…)"><Badge count={attachCounts.get(r.id) || 0} size="small" offset={[-2, 2]}>
           <Button type="text" size="small" icon={<PaperClipOutlined style={{ color: '#1E3A5F' }} />} onClick={() => setAttachDep(r)} />
         </Badge></Tooltip>
         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
-        <Popconfirm title="Xoá HĐTG này?" okText="Xoá" cancelText="Huỷ" onConfirm={() => handleDelete(r)}>
+        <Popconfirm title="Xoá HĐTG này?" description="Tiền gửi sẽ không còn tính vào đảm bảo hạn mức. Đã tất toán thì đổi trạng thái thay vì xoá."
+          okText="Xoá" cancelText="Huỷ" okButtonProps={{ danger: true }} onConfirm={() => handleDelete(r)}>
           <Button type="text" size="small" danger icon={<DeleteOutlined />} />
         </Popconfirm>
       </Space>) },
@@ -176,14 +173,14 @@ export default function FinanceDepositListPage() {
       </div>
 
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-        <Col xs={12} md={6}><Card size="small"><Statistic title="Tổng tiền gửi" value={fmtTy(k.total)} valueStyle={{ color: '#1B4D3E', fontWeight: 800 }} /><Text type="secondary" style={{ fontSize: 12 }}>{fmtVnd(k.total)} đ</Text></Card></Col>
+        <Col xs={12} md={6}><Card size="small"><Statistic title="Tổng tiền gửi" value={fmtTy(k.total)} valueStyle={{ color: '#1B4D3E', fontWeight: 800 }} /><Text type="secondary" style={{ fontSize: 12 }}>{fmtVnd(k.total)}</Text></Card></Col>
         <Col xs={12} md={6}><Card size="small"><Statistic title="Đảm bảo khoản vay" value={fmtTy(k.secure)} valueStyle={{ color: '#1677ff', fontWeight: 800 }} /></Card></Col>
-        <Col xs={12} md={6}><Card size="small" style={{ background: k.urgent.length ? '#fff7ed' : undefined }}><Statistic title="Cần tái tục gấp (≤7d/quá hạn)" value={k.urgent.length} suffix="HĐ" valueStyle={{ color: k.urgent.length ? '#dc2626' : '#16a34a', fontWeight: 800 }} /></Card></Col>
-        <Col xs={12} md={6}><Card size="small"><Statistic title="Sắp đáo hạn (≤30d)" value={k.nearCount} suffix="HĐ" valueStyle={{ color: '#ca8a04', fontWeight: 800 }} /></Card></Col>
+        <Col xs={12} md={6}><Card size="small" style={{ background: k.urgent.length ? '#fff7ed' : undefined }}><Statistic title="Cần tái tục gấp (≤7 ngày / quá hạn)" value={k.urgent.length} suffix="HĐ" valueStyle={{ color: !k.urgent.length ? ALERT_COLOR.ok : k.urgentOverdue ? ALERT_COLOR.overdue : ALERT_COLOR.due, fontWeight: 800 }} /></Card></Col>
+        <Col xs={12} md={6}><Card size="small"><Statistic title="Sắp đáo hạn (≤30 ngày)" value={k.nearCount} suffix="HĐ" valueStyle={{ color: '#ca8a04', fontWeight: 800 }} /></Card></Col>
       </Row>
 
       {k.urgent.length > 0 && (
-        <Alert type="error" showIcon style={{ marginBottom: 12 }}
+        <Alert type={k.urgentOverdue ? 'error' : 'warning'} showIcon style={{ marginBottom: 12 }}
           message={`${k.urgent.length} HĐTG cần TÁI TỤC gấp — quên là bị tất toán ép (đảm bảo khoản vay sẽ hụt).`} />
       )}
 
@@ -196,10 +193,12 @@ export default function FinanceDepositListPage() {
         ]} />
 
       <Card size="small" styles={{ body: { padding: 0 } }}>
+        <PageState error={loadError} onRetry={load}>
         <Table rowKey="id" size="small" loading={loading} columns={columns as any} dataSource={view}
-          pagination={{ pageSize: 30, showSizeChanger: false }} scroll={{ x: 1380 }}
+          pagination={stdPagination(50)} scroll={{ x: 1380 }}
           rowClassName={(r) => (r.id === focusId ? 'ant-table-row-selected' : '')}
           onRow={(r) => ({ style: { background: r.id === focusId ? '#fffbe6' : ALERT_BG[r.alert] } })} />
+        </PageState>
       </Card>
 
       <Modal title={editing ? 'Sửa HĐTG' : 'Thêm HĐTG'} open={open} onCancel={() => setOpen(false)}
@@ -212,15 +211,15 @@ export default function FinanceDepositListPage() {
             </Form.Item>
             <Form.Item name="deposit_no" label="Số HĐTG / cầm cố"><Input placeholder="vd: 1012/2024/HĐTG" /></Form.Item>
             <Form.Item name="holder" label="Chủ sổ"><Input placeholder="vd: Công ty / Sổ TK anh Huy" /></Form.Item>
-            <Form.Item name="amount" label="Số tiền (VNĐ)" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} /></Form.Item>
+            <Form.Item name="amount" label="Số tiền (VNĐ)" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} {...vndInputProps} /></Form.Item>
             <Form.Item name="interest_rate" label="Lãi suất (%/năm)"><InputNumber min={0} step={0.1} style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="term" label="Kỳ hạn"><Input placeholder="12 tháng" /></Form.Item>
             <Form.Item name="deposit_date" label="Ngày gửi"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="maturity_date" label="Ngày đến hạn"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="extended_to" label="Gia hạn đến" tooltip="Nếu đã tái tục/gia hạn → đèn tính theo ngày này"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
-            <Form.Item name="expected_interest" label="Lãi cuối kỳ dự kiến"><InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} /></Form.Item>
+            <Form.Item name="expected_interest" label="Lãi cuối kỳ dự kiến"><InputNumber min={0} style={{ width: '100%' }} {...vndInputProps} /></Form.Item>
             <Form.Item name="purpose" label="Mục đích">
-              <Select options={[{ value: 'dam_bao_vay', label: 'Đảm bảo khoản vay' }, { value: 'thuong', label: 'Tiền gửi thường' }]} />
+              <Select options={Object.entries(DEPOSIT_PURPOSE_LABELS).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
             <Form.Item name="secured_credit_line_id" label="🔗 Đảm bảo cho HẠN MỨC" style={{ gridColumn: '1 / -1' }}
               tooltip="HĐTG này cầm cố bảo lãnh cho hạn mức (facility) nào — đúng bản chất, 1 hạn mức gồm nhiều khoản vay">
@@ -229,7 +228,7 @@ export default function FinanceDepositListPage() {
                 options={lineOptions} notFoundContent="Chưa có hạn mức" />
             </Form.Item>
             <Form.Item name="status" label="Trạng thái">
-              <Select options={[{ value: 'active', label: 'Đang gửi' }, { value: 'closed', label: 'Đã tất toán' }]} />
+              <Select options={Object.entries(DEPOSIT_STATUS_LABELS).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
             <Form.Item name="currency" hidden initialValue="VND"><Input /></Form.Item>
           </div>

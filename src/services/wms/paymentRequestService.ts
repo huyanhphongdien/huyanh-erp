@@ -19,6 +19,24 @@ export type PaymentRequestStatus = 'draft' | 'submitted' | 'approved' | 'paid' |
 export type PaymentLineSource = 'deal' | 'supplier' | 'manual'
 export type PaymentCurrency = 'VND' | 'KIP' | 'THB'
 
+/** Nhãn + màu (tên màu antd) TRẠNG THÁI đề nghị thanh toán — MỘT bản cho Sổ / Chi tiết
+ *  (Đợt 3 audit UI 17/11/2026: 2 trang đang chép STATUS_CFG riêng). Màu theo quy ước dòng tiền:
+ *  nháp xám · đã gửi (chờ duyệt) vàng · đã duyệt chờ chi xanh dương · đã chi xanh lá · huỷ đỏ. */
+export const PAYMENT_REQUEST_STATUS_LABELS: Record<PaymentRequestStatus, string> = {
+  draft: 'Nháp',
+  submitted: 'Đã gửi',
+  approved: 'Đã duyệt',
+  paid: 'Đã chi',
+  cancelled: 'Đã huỷ',
+}
+export const PAYMENT_REQUEST_STATUS_COLORS: Record<PaymentRequestStatus, string> = {
+  draft: 'default',
+  submitted: 'gold',
+  approved: 'blue',
+  paid: 'green',
+  cancelled: 'red',
+}
+
 export interface PaymentRequest {
   id: string
   code: string
@@ -182,6 +200,12 @@ async function fetchDealNumbers(ids: string[]): Promise<Map<string, string>> {
   return map
 }
 
+/** 'YYYY-MM-DD' (ngày VN) → mốc đầu/cuối ngày dạng ISO UTC cho cột timestamptz; chuỗi khác giữ cách cũ. */
+function vnDayBoundIso(day: string, edge: 'start' | 'end'): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return edge === 'end' ? `${day}T23:59:59.999Z` : day
+  return new Date(`${day}T${edge === 'end' ? '23:59:59.999' : '00:00:00'}`).toISOString()
+}
+
 function deriveSource(t: { deal_id?: string | null; supplier_id?: string | null }): PaymentLineSource {
   if (t.deal_id) return 'deal'
   if (t.supplier_id) return 'supplier'
@@ -198,8 +222,10 @@ function roundDong(n: number): number {
  * "Thành tiền" giữ chính xác (weight×giá) để minh bạch; tiền CHI THỰC TẾ + ghi sổ
  * công nợ dùng số đã làm tròn này (theo yêu cầu kế toán). Làm tròn THEO TỪNG DÒNG
  * để khớp đúng cột "Làm tròn" hiển thị cho người dùng.
+ * EXPORT (Đợt 3 audit UI 17/11/2026): đây là bản luật DUY NHẤT — trang Tạo / Chi tiết / In
+ * đề nghị thanh toán import hàm này thay vì chép tay (đã có 4 bản sao, sửa một nơi lệch tiền).
  */
-function roundThousand(n: number): number {
+export function roundThousand(n: number | null | undefined): number {
   return Math.round((n || 0) / 1000) * 1000
 }
 
@@ -256,6 +282,10 @@ async function fetchDealUnitPrices(ids: string[]): Promise<Map<string, number>> 
  * Trả Map<ticket_id, { pricePerKg, code, pcgId, fees }>. Chỉ PCG status='locked'.
  * Fees gồm cả per-ton lẫn per-lot — sẽ tính tổng và trừ ra dòng "Phí" trên ĐNTT.
  */
+// ⚠ Ngày khớp PCG = 10 ký tự đầu created_at (NGÀY UTC) — cùng quy ước với bridge phiếu cân → rubber_intake_batches
+// (intake_date = created_at::date trên DB chạy UTC) và rubberIntakeB2BService.autoApplyPcgPrice. Phiếu cân 0h–7h sáng VN
+// vì thế khớp PCG của hôm trước. Muốn đổi sang ngày VN phải sửa CẢ BA chỗ cùng lúc (migration bridge + 2 hàm), kẻo lô
+// nhập và Đề nghị thanh toán áp hai giá khác nhau cho cùng một phiếu — việc treo, chờ owner chốt.
 async function resolvePcgForTickets(
   rows: Array<{ id: string; deal_id?: string | null; partner_id?: string | null; facility_id?: string | null; created_at?: string | null }>
 ): Promise<Map<string, { pricePerKg: number; code: string; pcgId: string; fees: PriceLockFee[] }>> {
@@ -355,8 +385,11 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
 
   if (params.facility_id) q = q.eq('facility_id', params.facility_id)
   if (params.rubber_type) q = q.eq('rubber_type', params.rubber_type)
-  if (params.date_from) q = q.gte('created_at', params.date_from)
-  if (params.date_to) q = q.lte('created_at', `${params.date_to}T23:59:59.999Z`)
+  // Mốc NGÀY theo giờ VN — cùng cách weighbridgeService.getAll (17/11/2026) để danh sách phiếu
+  // ở đây khớp đúng trang Phiếu cân. Trước đó '…T23:59:59.999Z' / ngày trần = mốc UTC (7h sáng VN):
+  // phiếu cân trước 7h sáng của ngày đầu bị sót, của ngày sau ngày cuối lại lọt vào.
+  if (params.date_from) q = q.gte('created_at', vnDayBoundIso(params.date_from, 'start'))
+  if (params.date_to) q = q.lte('created_at', vnDayBoundIso(params.date_to, 'end'))
 
   const { data, error } = await q
   if (error) throw error
@@ -844,8 +877,12 @@ async function _setStatus(
     .eq('id', id)
   if (fromStatuses.length) q = q.in('status', fromStatuses)
   const { data, error } = await q.select(REQUEST_SELECT).single()
+  // 0 dòng khớp (PGRST116) = phiếu không còn ở trạng thái nguồn (người khác vừa thao tác / đã xoá).
+  // Trước đây người dùng nhận nguyên văn lỗi JSON tiếng Anh của PostgREST.
+  if ((error && (error as any).code === 'PGRST116') || (!error && !data)) {
+    throw new Error('Đề nghị không còn ở trạng thái cho phép bước này (có thể người khác vừa thao tác) — tải lại trang rồi thử lại')
+  }
   if (error) throw error
-  if (!data) throw new Error('Không thể chuyển trạng thái (sai trạng thái nguồn?)')
   return normalizeRequest(data)
 }
 

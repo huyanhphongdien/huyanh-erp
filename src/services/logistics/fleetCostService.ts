@@ -12,6 +12,7 @@
 
 import { supabase } from '../../lib/supabase'
 import { compressImage } from '../../lib/imageCompress'
+import { DASH, fmtVnd, fmtVndNum } from '../../utils/format'
 
 // ============================================================================
 // TYPES & LABELS
@@ -37,6 +38,18 @@ export const EXPENSE_KINDS = Object.keys(EXPENSE_KIND_LABELS) as ExpenseKind[]
 export const HIRE_KIND = 'hire' as const
 export const HIRE_KIND_LABEL = 'Cước thuê xe ngoài'
 export const COST_STATUS_LABELS: Record<CostStatus, string> = { open: 'Đang nhập', reviewed: 'Đã duyệt' }
+/** Trạng thái chi phí CHUYẾN như người dùng thấy (suy từ cost_status + đã có khoản chi chưa).
+ *  MỘT nguồn nhãn/màu cho Sổ chi phí đội xe + khối chi phí trong chi tiết lệnh + Excel
+ *  (trước 17/11/2026 hai màn tự gõ 'chờ duyệt' / 'Chờ kế toán duyệt', 'chưa nhập' / 'Chưa nhập chi phí'). */
+export type TripCostState = 'empty' | 'pending' | 'reviewed'
+export const TRIP_COST_STATE_LABELS: Record<TripCostState, string> = {
+  empty: 'Chưa nhập chi phí', pending: 'Chờ kế toán duyệt', reviewed: 'Đã duyệt',
+}
+export const TRIP_COST_STATE_COLORS: Record<TripCostState, string> = {
+  empty: 'default', pending: 'gold', reviewed: 'green',
+}
+export const tripCostState = (costStatus: CostStatus | null | undefined, nExpenses: number): TripCostState =>
+  costStatus === 'reviewed' ? 'reviewed' : nExpenses > 0 ? 'pending' : 'empty'
 /** Cờ `counted` của khoản chi (owner chỉnh 10/11/2026):
  *  true  = khoản chi TRONG danh mục chi phí công ty đã quy định → tính vào chuyến, vào đề nghị thanh toán.
  *  false = CHƯA THÔNG QUA — ngoài quy định hoặc chưa có quyết định, chờ BGĐ / kế toán; KHÔNG có nghĩa tài xế chịu.
@@ -234,11 +247,13 @@ export interface AdvanceInput {
 const num = (v: unknown): number => (v === null || v === undefined || v === '' ? 0 : Number(v) || 0)
 const numOrNull = (v: unknown): number | null => (v === null || v === undefined || v === '' ? null : Number(v))
 
-/** "1.234.567" — tiền không lẻ (cả VNĐ lẫn LAK). */
-export const fmtAmt = (v: number | null | undefined): string => (v == null ? '' : Math.round(v).toLocaleString('vi-VN'))
+/** "1.234.567" — số nguyên vi-VN (tiền VNĐ lẫn LAK, cả km). Cùng công thức fmtVndNum của utils/format;
+ *  giữ tên vì 4 màn đang import. Ô trống (null) → '—' theo luật chung (trước trả ''). */
+export const fmtAmt = (v: number | null | undefined): string => fmtVndNum(v)
+/** Tiền kèm đồng tiền của khoản chi: VND → "1.234.567 ₫" (fmtVnd), LAK → "1.234.567 LAK". */
 export const fmtMoney = (v: number | null | undefined, cur: CostCurrency = 'VND'): string => {
-  if (v == null) return ''
-  return cur === 'VND' ? `${fmtAmt(v)} ₫` : `${fmtAmt(v)} LAK`
+  if (v == null) return DASH
+  return cur === 'VND' ? fmtVnd(v) : `${fmtVndNum(v)} LAK`
 }
 /** Tháng "YYYY-MM" → khoảng ngày [from, to] */
 export const monthRange = (ym: string): { from: string; to: string } => {

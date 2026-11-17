@@ -36,6 +36,7 @@ import {
   Divider,
   List,
   Radio,
+  message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -67,6 +68,11 @@ import { dealWmsService } from '../../../services/b2b/dealWmsService'
 import type { ActiveDealForStockIn } from '../../../services/b2b/dealWmsService'
 import type { RubberGrade } from '../../../services/wms/wms.types'
 import { RUBBER_GRADE_LABELS } from '../../../services/wms/wms.types'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { useUnsavedWarning } from '../../../hooks/useUnsavedWarning'
+import { fmtKg, fmtNum } from '../../../utils/format'
+import { BATCH_QC_STATUS_LABELS, BATCH_QC_STATUS_COLORS } from '../qc/qcLabels'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -156,13 +162,10 @@ const REASONS: { value: StockOutReason; label: string; icon: React.ReactNode; de
   { value: 'return', label: 'Trả hàng', icon: <RollbackOutlined />, desc: 'Trả lại NCC/SX' },
 ]
 
-const QC_TAG: Record<string, { color: string; label: string }> = {
-  passed: { color: 'success', label: 'Đạt' },
-  warning: { color: 'warning', label: 'Cảnh báo' },
-  failed: { color: 'error', label: 'Không đạt' },
-  needs_blend: { color: 'purple', label: 'Cần phối trộn' },
-  pending: { color: 'default', label: 'Chờ QC' },
-}
+// Một nguồn nhãn QC lô (qcLabels) — giữ tên QC_TAG cho các chỗ đang dùng trong file
+const QC_TAG: Record<string, { color: string; label: string }> = Object.fromEntries(
+  Object.keys(BATCH_QC_STATUS_LABELS).map(k => [k, { color: BATCH_QC_STATUS_COLORS[k] || 'default', label: BATCH_QC_STATUS_LABELS[k] }]),
+)
 
 const monoStyle: React.CSSProperties = { fontFamily: "'JetBrains Mono', monospace" }
 
@@ -208,6 +211,8 @@ const StockOutCreatePage: React.FC = () => {
   // Step 2: Stock in warehouse + selected items
   const [batchStocks, setBatchStocks] = useState<BatchStock[]>([])
   const [loadingBatches, setLoadingBatches] = useState(false)
+  // Lỗi tải tồn kho ≠ "kho chưa có hàng tồn" — thủ kho tưởng hết hàng khi thật ra mất mạng
+  const [batchLoadError, setBatchLoadError] = useState<unknown>(null)
   const [outItems, setOutItems] = useState<OutItem[]>([])
   const [addModalOpen, setAddModalOpen] = useState(false)
 
@@ -228,6 +233,9 @@ const StockOutCreatePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [successCode, setSuccessCode] = useState<string | null>(null)
 
+  // Đã chọn lô mà lỡ F5 / đóng tab → trình duyệt hỏi lại (audit 17/11: form nặng, mất công chọn lô)
+  useUnsavedWarning(outItems.length > 0 && !successCode)
+
   // ========================================================================
   // LOAD DATA
   // ========================================================================
@@ -245,7 +253,6 @@ const StockOutCreatePage: React.FC = () => {
 
       if (!empErr && emp) {
         setCurrentUserId(emp.id)
-        console.log('[StockOut] Employee ID:', emp.id, '(from auth:', user.id, ')')
       } else {
         console.warn('[StockOut] Employee not found for auth user:', user.id, empErr)
         setCurrentUserId(user.id)
@@ -257,14 +264,9 @@ const StockOutCreatePage: React.FC = () => {
   const loadBatchStocks = useCallback(async (warehouseId: string) => {
     if (!warehouseId) return
     setLoadingBatches(true)
+    setBatchLoadError(null)
     try {
-      const { data: allBatches, error: debugErr } = await supabase
-        .from('stock_batches')
-        .select('id, batch_no, warehouse_id, status, qc_status, quantity_remaining, location_id')
-        .eq('warehouse_id', warehouseId)
-
-      console.log('[StockOut] DEBUG all batches in warehouse:', warehouseId, allBatches)
-
+      // (Đã bỏ query DEBUG tải toàn bộ lô trong kho chỉ để console.log — chạy thừa mỗi lần chọn kho)
       const { data, error: err } = await supabase
         .from('stock_batches')
         .select(`
@@ -281,15 +283,13 @@ const StockOutCreatePage: React.FC = () => {
 
       if (err) throw err
 
-      console.log('[StockOut] Filtered batches (active, qty>0):', data?.length, data)
-
       const mapped: BatchStock[] = (data || []).map((row: any) => ({
         id: row.id,
         batch_no: row.batch_no,
         material_id: row.material_id,
         material_sku: row.material?.sku || '',
         material_name: row.material?.name || '',
-        material_unit: row.material?.unit || 'banh',
+        material_unit: row.material?.unit || 'bành',
         weight_per_unit: row.material?.weight_per_unit || null,
         warehouse_id: row.warehouse_id,
         location_id: row.location?.id || null,
@@ -308,16 +308,10 @@ const StockOutCreatePage: React.FC = () => {
       }))
 
       setBatchStocks(mapped)
-
-      if (mapped.length === 0 && allBatches && allBatches.length > 0) {
-        console.warn('[StockOut] Batches exist but none matched filters!', {
-          allBatchStatuses: allBatches.map(b => ({ id: b.id, status: b.status, qc: b.qc_status, qty: b.quantity_remaining })),
-          query: 'status=active AND quantity_remaining > 0',
-        })
-      }
     } catch (e) {
-      console.error('Loi load tồn kho:', e)
+      console.error('Lỗi tải tồn kho:', e)
       setBatchStocks([])
+      setBatchLoadError(e)
     } finally {
       setLoadingBatches(false)
     }
@@ -360,6 +354,8 @@ const StockOutCreatePage: React.FC = () => {
         setActiveDeals(deals)
       } catch (err) {
         console.error('Load active sale deals:', err)
+        // Báo rõ — ô "Deal B2B" rỗng vì lỗi khác hẳn "không có Deal nào đang mở"
+        message.error(dichLoiHeThong(err, 'Không tải được danh sách Deal B2B'))
       }
       setLoadingDeals(false)
     }
@@ -477,8 +473,8 @@ const StockOutCreatePage: React.FC = () => {
     setOutItems(prev => prev.filter(i => i.tempId !== tempId))
   }
 
-  // S4: Auto-pick FIFO — oldest batch trước, fulfill target kg
-  // Respect filter hiện tại (QC/material), cho phép partial batch.
+  // S4: Tự chọn lô cũ trước (FIFO) — lô cũ nhất trước, đến khi đủ số kg mục tiêu
+  // Theo bộ lọc QC / sản phẩm đang chọn, cho phép lấy một phần lô.
   // Decision khi target > tổng available: pick max + warn (không block).
   const handleAutoPickFIFO = () => {
     if (!autoPickTargetKg || autoPickTargetKg <= 0) return
@@ -493,7 +489,7 @@ const StockOutCreatePage: React.FC = () => {
       )
 
     if (candidates.length === 0) {
-      setError('Không có lô phù hợp (kiểm tra filter QC/material)')
+      setError('Không có lô phù hợp (kiểm tra bộ lọc QC / sản phẩm)')
       return
     }
 
@@ -554,7 +550,7 @@ const StockOutCreatePage: React.FC = () => {
     }
 
     if (picked.length === 0) {
-      setError('Không fill được lô nào — target có thể nhỏ hơn weight_per_unit của lô nhỏ nhất')
+      setError('Không chọn được lô nào — số kg mục tiêu nhỏ hơn khối lượng 1 bành của lô nhỏ nhất')
       return
     }
 
@@ -564,7 +560,7 @@ const StockOutCreatePage: React.FC = () => {
     const filledKg = autoPickTargetKg - remainingKg
     if (remainingKg > 0) {
       setError(
-        `Chỉ fill được ${filledKg.toLocaleString('vi-VN')} kg / ${autoPickTargetKg.toLocaleString('vi-VN')} kg mục tiêu — tồn kho không đủ`,
+        `Chỉ chọn được ${fmtKg(filledKg)} kg / ${fmtKg(autoPickTargetKg)} kg mục tiêu — tồn kho không đủ`,
       )
     }
     setAutoPickTargetKg(null)
@@ -637,8 +633,8 @@ const StockOutCreatePage: React.FC = () => {
       setSuccessCode(order.code)
       setTimeout(() => navigate('/wms/stock-out'), 1500)
     } catch (err: any) {
-      console.error('Loi luu nhap:', err)
-      setError(err.message || 'Có lỗi xảy ra khi lưu phiếu')
+      console.error('Lỗi lưu nháp:', err)
+      setError(dichLoiHeThong(err, 'Có lỗi xảy ra khi lưu phiếu'))
     } finally {
       setSaving(false)
     }
@@ -669,8 +665,8 @@ const StockOutCreatePage: React.FC = () => {
       setSuccessCode((confirmed as any).code || order.code)
       setTimeout(() => navigate('/wms/stock-out'), 1500)
     } catch (err: any) {
-      console.error('Loi xac nhan xuất kho:', err)
-      setError(err.message || 'Có lỗi xảy ra khi xác nhận xuất kho')
+      console.error('Lỗi xác nhận xuất kho:', err)
+      setError(dichLoiHeThong(err, 'Có lỗi xảy ra khi xác nhận xuất kho'))
     } finally {
       setSaving(false)
     }
@@ -746,7 +742,7 @@ const StockOutCreatePage: React.FC = () => {
       width: 120,
       render: (_: any, r: BatchStock) => {
         const loc = r.location_code
-          ? `${r.location_code}${r.location_shelf ? ` · Ke ${r.location_shelf}` : ''}`
+          ? `${r.location_code}${r.location_shelf ? ` · Kệ ${r.location_shelf}` : ''}`
           : 'Chưa gán'
         return <Text type="secondary" style={{ fontSize: 12 }}>{loc}</Text>
       },
@@ -775,7 +771,7 @@ const StockOutCreatePage: React.FC = () => {
       key: 'quantity_remaining',
       width: 80,
       align: 'right',
-      render: (qty: number) => <Text strong style={{ ...monoStyle, color: '#1B4D3E' }}>{qty.toLocaleString('vi-VN')}</Text>,
+      render: (qty: number) => <Text strong style={{ ...monoStyle, color: '#1B4D3E' }}>{fmtNum(qty)}</Text>,
     },
     {
       title: '',
@@ -864,7 +860,7 @@ const StockOutCreatePage: React.FC = () => {
             size="small"
             style={{ width: 80, ...monoStyle }}
           />
-          <Text type="secondary" style={{ fontSize: 11 }}>/ {record.max_quantity.toLocaleString('vi-VN')}</Text>
+          <Text type="secondary" style={{ fontSize: 11 }}>/ {fmtNum(record.max_quantity)}</Text>
         </Space>
       ),
     },
@@ -991,7 +987,7 @@ const StockOutCreatePage: React.FC = () => {
         {outItems.length > 0 && (
           <Badge count={outItems.length} style={{ backgroundColor: '#1B4D3E' }}>
             <Tag style={{ ...monoStyle, fontSize: 14 }}>
-              {totalQty.toLocaleString('vi-VN')} {outItems[0]?.material_unit || 'banh'}
+              {fmtNum(totalQty)} {outItems[0]?.material_unit || 'bành'}
             </Tag>
           </Badge>
         )}
@@ -1057,6 +1053,11 @@ const StockOutCreatePage: React.FC = () => {
               {header.warehouse_id && batchStocks.length > 0 && (
                 <div style={{ marginTop: 12 }}>
                   <Text type="secondary" style={monoStyle}>{batchStocks.length} lô tồn kho</Text>
+                </div>
+              )}
+              {header.warehouse_id && batchLoadError != null && (
+                <div style={{ marginTop: 12 }}>
+                  <PageState error={batchLoadError} onRetry={() => loadBatchStocks(header.warehouse_id)} minHeight={80} />
                 </div>
               )}
             </Card>
@@ -1201,7 +1202,7 @@ const StockOutCreatePage: React.FC = () => {
                     style={{ width: '100%' }}
                   />
                 </Form.Item>
-                <Form.Item label="Số bành (bale count)">
+                <Form.Item label="Số bành">
                   <InputNumber
                     value={header.bale_count}
                     onChange={val => setHeader(h => ({ ...h, bale_count: val }))}
@@ -1250,7 +1251,7 @@ const StockOutCreatePage: React.FC = () => {
                   <InboxOutlined style={{ color: '#2D8B6E' }} />
                   <span>Danh sách xuất ({outItems.length} lô)</span>
                   <Text strong style={{ ...monoStyle, color: '#1B4D3E' }}>
-                    {totalQty.toLocaleString('vi-VN')} {outItems[0]?.material_unit || 'banh'}
+                    {fmtNum(totalQty)} {outItems[0]?.material_unit || 'bành'}
                   </Text>
                 </Space>
               }
@@ -1283,7 +1284,7 @@ const StockOutCreatePage: React.FC = () => {
             bodyStyle={{ padding: 12 }}
           >
             <Space wrap style={{ width: '100%' }}>
-              <Text strong>⚡ Auto-fill FIFO:</Text>
+              <Text strong>⚡ Tự chọn lô cũ trước:</Text>
               <InputNumber
                 value={autoPickTargetKg}
                 onChange={v => setAutoPickTargetKg(v)}
@@ -1299,10 +1300,10 @@ const StockOutCreatePage: React.FC = () => {
                 disabled={!autoPickTargetKg || autoPickTargetKg <= 0 || batchStocks.length === 0}
                 style={{ background: '#E8A838', borderColor: '#E8A838' }}
               >
-                Tự chọn lô (FIFO)
+                Tự chọn lô
               </Button>
               <Text type="secondary" style={{ fontSize: 11 }}>
-                Tự pick lô cũ nhất đến khi đủ target. Respect filter QC/material hiện tại.
+                Lấy lô nhập trước đến khi đủ số kg mục tiêu — theo bộ lọc QC / sản phẩm đang chọn.
               </Text>
             </Space>
           </Card>
@@ -1365,13 +1366,16 @@ const StockOutCreatePage: React.FC = () => {
             </Space>
 
             <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12 }}>
-              Hàng tồn — FIFO (lô cũ trước) — Click "Thêm" để chọn
+              Hàng tồn — lô nhập trước xếp trước — bấm "Thêm" để chọn
             </Text>
 
             {loadingBatches ? (
               <div style={{ textAlign: 'center', padding: 40 }}>
                 <Spin tip="Đang tải hàng tồn..." />
               </div>
+            ) : batchLoadError != null ? (
+              // Lỗi tải ≠ "Kho này chưa có hàng tồn"
+              <PageState error={batchLoadError} onRetry={() => loadBatchStocks(header.warehouse_id)} />
             ) : filteredBatches.length === 0 ? (
               <Empty
                 description={
@@ -1491,8 +1495,9 @@ const StockOutCreatePage: React.FC = () => {
               <Statistic
                 title={<span style={{ color: 'rgba(255,255,255,0.7)' }}>Tổng số lượng</span>}
                 value={totalQty}
-                suffix={outItems[0]?.material_unit || 'banh'}
+                suffix={outItems[0]?.material_unit || 'bành'}
                 valueStyle={{ ...monoStyle, color: '#fff', fontSize: 28 }}
+                formatter={(val) => fmtNum(Number(val))}
               />
               <Divider style={{ borderColor: 'rgba(255,255,255,0.2)', margin: '16px 0' }} />
               <Statistic
@@ -1500,7 +1505,7 @@ const StockOutCreatePage: React.FC = () => {
                 value={totalWeight > 0 ? totalWeight : 0}
                 suffix="kg"
                 valueStyle={{ ...monoStyle, color: '#fff', fontSize: 20 }}
-                formatter={(val) => val ? (val as number).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : '—'}
+                formatter={(val) => val ? fmtKg(Number(val)) : '—'}
               />
               <div style={{ marginTop: 16, color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
                 {outItems.length} lô · {new Set(outItems.map(i => i.material_id)).size} sản phẩm

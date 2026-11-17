@@ -15,11 +15,13 @@ import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { fmtKg, fmtPct, fmtSigned, fmtDate } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { stdPagination, LimitNotice } from '../../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
-const fmtKg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
-const fmtPct = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %')
-const fmtSigned = (n: number, d = 0) => (n > 0 ? '+' : '') + fmtKg(n, d)
+/** Trần tải lô (rawStockService.getBatches limit) */
+const LOAD_LIMIT = 1000
 
 export default function RawRecheckPage() {
   const navigate = useNavigate()
@@ -57,13 +59,13 @@ export default function RawRecheckPage() {
     setLoading(true); setError(null)
     try {
       const [all, due, v, s] = await Promise.all([
-        rawStockService.getBatches({ facilityId, limit: 1000 }),
+        rawStockService.getBatches({ facilityId, limit: LOAD_LIMIT }),
         rawRecheckService.listDue(facilityId),
         rawRecheckService.listVariance(facilityId),
         rawSettingsService.getForFacility(facilityId ?? null),
       ])
       setBatches(all); setDueIds(new Set(due.map((d) => d.batch_id))); setVariance(v); setSettings(s)
-    } catch (e: any) { setError(e?.message || 'Không tải được danh sách lô') }
+    } catch (e: any) { setError(dichLoiHeThong(e, 'Không tải được danh sách lô')) }
     finally { setLoading(false) }
   }, [facilityId])
 
@@ -100,7 +102,7 @@ export default function RawRecheckPage() {
       const r = await rawRecheckService.canLai(target.batch_id, wet, drc, lyDo.trim() || null, note.trim() || null)
       message.success(`${r.batch_no}: khô ${fmtKg(r.kho_truoc)} → ${fmtKg(r.kho_sau)} kg (${fmtSigned(r.lech_kho_pct ?? 0, 2)} %)`)
       setTarget(null); await load()
-    } catch (e: any) { message.error(e?.message || 'Không ghi được') }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Không ghi được')) }
     finally { setSaving(false) }
   }
 
@@ -116,7 +118,7 @@ export default function RawRecheckPage() {
   ]
 
   const varColumns: ColumnsType<DryVariance> = [
-    { title: 'Ngày', dataIndex: 'txn_date', key: 'txn_date', render: (v) => new Date(v).toLocaleDateString('vi-VN') },
+    { title: 'Ngày', dataIndex: 'txn_date', key: 'txn_date', render: (v) => fmtDate(v) },
     { title: 'Lô', dataIndex: 'batch_no', key: 'batch_no', render: (v, r) => <a onClick={() => navigate(`/wms/nvl/lo/${r.batch_id}`)}><Text code>{v}</Text></a> },
     { title: 'Chênh ướt', dataIndex: 'chenh_uot_kg', key: 'chenh_uot_kg', align: 'right', render: (v) => fmtSigned(v) },
     { title: 'Chênh khô', dataIndex: 'chenh_kho_kg', key: 'chenh_kho_kg', align: 'right', render: (v) => <Text strong type="danger">{fmtSigned(v)}</Text> },
@@ -151,8 +153,9 @@ export default function RawRecheckPage() {
         {!canWrite && !rawRole.loading && <Alert type="warning" showIcon message="Chỉ thủ kho NVL, QC hoặc BGĐ mới ghi cân lại." />}
 
         <Card size="small" bodyStyle={{ padding: 0 }}>
-          <Table<RawBatchBalance> rowKey="batch_id" columns={columns} dataSource={rows} size="small" loading={loading} pagination={{ pageSize: 20, showSizeChanger: false }}
-            locale={{ emptyText: filter === 'due' ? 'Không có lô đến hạn' : 'Không có lô' }} />
+          {!loading && !error && <div style={{ padding: '0 8px' }}><LimitNotice shown={batches.length} limit={LOAD_LIMIT} what="lô" /></div>}
+          <Table<RawBatchBalance> rowKey="batch_id" columns={columns} dataSource={rows} size="small" loading={loading} pagination={stdPagination(20)}
+            locale={{ emptyText: error ? 'Không tải được — xem lỗi phía trên' : filter === 'due' ? 'Không có lô đến hạn' : 'Không có lô' }} />
         </Card>
 
         <Card size="small" title={<Space>Lô lệch khô quá ngưỡng · 90 ngày<Tag color={variance.length ? 'red' : 'default'}>{variance.length}</Tag></Space>}>

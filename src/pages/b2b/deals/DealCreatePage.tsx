@@ -42,6 +42,10 @@ import {
   DEAL_TYPE_LABELS,
 } from '../../../services/b2b/dealService'
 import { supabase } from '../../../lib/supabase'
+import { TIER_LABELS, TIER_COLORS } from '../../../services/b2b/partnerService'
+import EnumTag from '../../../components/common/EnumTag'
+import { fmtVnd, vndInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -64,13 +68,7 @@ interface Partner {
 // CONSTANTS
 // ============================================
 
-const TIER_COLORS: Record<string, string> = {
-  diamond: 'purple',
-  gold: 'gold',
-  silver: 'default',
-  bronze: 'orange',
-  new: 'cyan',
-}
+// Hạng đại lý: nhãn + màu dùng chung TIER_LABELS/TIER_COLORS (partnerService) — trước in mã thô 'DIAMOND'
 
 const PRODUCT_OPTIONS = [
   { value: 'SVR 10', label: 'SVR 10' },
@@ -105,6 +103,8 @@ const DELIVERY_TERMS = [
 interface PartnerSelectStepProps {
   partners: Partner[]
   loading: boolean
+  /** true = tải danh sách đại lý THẤT BẠI (khác với tìm không ra) */
+  loadFailed?: boolean
   selectedPartner: Partner | null
   onSelect: (partner: Partner) => void
   onNext: () => void
@@ -113,6 +113,7 @@ interface PartnerSelectStepProps {
 const PartnerSelectStep = ({
   partners,
   loading,
+  loadFailed,
   selectedPartner,
   onSelect,
   onNext,
@@ -166,9 +167,7 @@ const PartnerSelectStep = ({
                       <Text type="secondary" style={{ fontSize: 12 }}>
                         {partner.code}
                       </Text>
-                      <Tag color={TIER_COLORS[partner.tier]} style={{ fontSize: 10 }}>
-                        {partner.tier.toUpperCase()}
-                      </Tag>
+                      <EnumTag value={partner.tier} labels={TIER_LABELS} colors={TIER_COLORS} style={{ fontSize: 10 }} />
                     </Space>
                   </div>
                 </Space>
@@ -190,7 +189,11 @@ const PartnerSelectStep = ({
 
         {filteredPartners.length === 0 && (
           <div style={{ textAlign: 'center', padding: 40 }}>
-            <Text type="secondary">Không tìm thấy đại lý</Text>
+            {loading
+              ? <Text type="secondary">Đang tải danh sách đại lý…</Text>
+              : loadFailed
+                ? <Text type="danger">Không tải được danh sách đại lý — kiểm tra mạng rồi tải lại trang</Text>
+                : <Text type="secondary">Không tìm thấy đại lý</Text>}
           </div>
         )}
       </div>
@@ -262,9 +265,7 @@ const DealInfoStep = ({ form, selectedPartner, onBack, onNext }: DealInfoStepPro
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   {selectedPartner.code}
                 </Text>
-                <Tag color={TIER_COLORS[selectedPartner.tier]}>
-                  {selectedPartner.tier.toUpperCase()}
-                </Tag>
+                <EnumTag value={selectedPartner.tier} labels={TIER_LABELS} colors={TIER_COLORS} />
               </Space>
             </div>
           </Space>
@@ -335,7 +336,7 @@ const DealInfoStep = ({ form, selectedPartner, onBack, onNext }: DealInfoStepPro
           <Col xs={24} md={8}>
             <Form.Item
               name="unit_price"
-              label="Đơn giá (đ/kg)"
+              label="Đơn giá (₫/kg)"
               rules={[
                 { required: true, message: 'Vui lòng nhập đơn giá' },
                 { type: 'number', min: 1, message: 'Đơn giá phải lớn hơn 0' },
@@ -344,10 +345,9 @@ const DealInfoStep = ({ form, selectedPartner, onBack, onNext }: DealInfoStepPro
               <InputNumber
                 style={{ width: '100%' }}
                 min={0}
-                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => value!.replace(/\$\s?|(,*)/g, '') as any}
+                {...vndInputProps}
                 placeholder="Nhập đơn giá"
-                suffix="đ/kg"
+                suffix="₫/kg"
               />
             </Form.Item>
           </Col>
@@ -362,7 +362,7 @@ const DealInfoStep = ({ form, selectedPartner, onBack, onNext }: DealInfoStepPro
                 }}
               >
                 <Text strong style={{ color: '#1B4D3E', fontSize: 18 }}>
-                  {totalValue.toLocaleString('vi-VN')} VNĐ
+                  {fmtVnd(totalValue)}
                 </Text>
               </div>
             </Form.Item>
@@ -383,12 +383,11 @@ const DealInfoStep = ({ form, selectedPartner, onBack, onNext }: DealInfoStepPro
           </Col>
           {dealType === 'processing' && (
             <Col xs={24} md={12}>
-              <Form.Item name="processing_fee_per_ton" label="Phí gia công (đ/tấn)">
+              <Form.Item name="processing_fee_per_ton" label="Phí gia công (₫/tấn)">
                 <InputNumber
                   style={{ width: '100%' }}
                   min={0}
-                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(value) => value!.replace(/\$\s?|(,*)/g, '') as any}
+                  {...vndInputProps}
                   placeholder="Nhập phí gia công"
                 />
               </Form.Item>
@@ -457,11 +456,11 @@ const ConfirmStep = ({ form, selectedPartner, onBack, onSubmit, loading }: Confi
             <Text strong>{values.quantity_tons} tấn</Text>
           </Descriptions.Item>
           <Descriptions.Item label="Đơn giá">
-            {values.unit_price?.toLocaleString('vi-VN')} đ/kg
+            {values.unit_price?.toLocaleString('vi-VN')} ₫/kg
           </Descriptions.Item>
           <Descriptions.Item label="Thành tiền" span={2}>
             <Text strong style={{ color: '#1B4D3E', fontSize: 20 }}>
-              {values.total_value_vnd?.toLocaleString('vi-VN')} VNĐ
+              {fmtVnd(values.total_value_vnd)}
             </Text>
           </Descriptions.Item>
           {values.delivery_terms && (
@@ -471,7 +470,7 @@ const ConfirmStep = ({ form, selectedPartner, onBack, onSubmit, loading }: Confi
           )}
           {values.processing_fee_per_ton && (
             <Descriptions.Item label="Phí gia công">
-              {values.processing_fee_per_ton.toLocaleString('vi-VN')} đ/tấn
+              {values.processing_fee_per_ton.toLocaleString('vi-VN')} ₫/tấn
             </Descriptions.Item>
           )}
           {values.notes && (
@@ -511,6 +510,8 @@ const DealCreatePage = () => {
   const [currentStep, setCurrentStep] = useState(0)
   const [partners, setPartners] = useState<Partner[]>([])
   const [loadingPartners, setLoadingPartners] = useState(true)
+  // Lỗi tải ≠ "Không tìm thấy đại lý" — bước 1 báo rõ khi không tải được danh sách
+  const [partnersFailed, setPartnersFailed] = useState(false)
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [createdDeal, setCreatedDeal] = useState<{ id: string; deal_number: string } | null>(null)
@@ -544,7 +545,8 @@ const DealCreatePage = () => {
         }
       } catch (error) {
         console.error('Error fetching partners:', error)
-        message.error('Không thể tải danh sách đại lý')
+        setPartnersFailed(true)
+        message.error(dichLoiHeThong(error, 'Không thể tải danh sách đại lý'))
       } finally {
         setLoadingPartners(false)
       }
@@ -582,7 +584,7 @@ const DealCreatePage = () => {
       message.success('Tạo giao dịch thành công!')
     } catch (error) {
       console.error('Error creating deal:', error)
-      message.error('Không thể tạo giao dịch')
+      message.error(dichLoiHeThong(error, 'Không thể tạo giao dịch'))
     } finally {
       setSubmitting(false)
     }
@@ -639,6 +641,7 @@ const DealCreatePage = () => {
           <PartnerSelectStep
             partners={partners}
             loading={loadingPartners}
+            loadFailed={partnersFailed}
             selectedPartner={selectedPartner}
             onSelect={setSelectedPartner}
             onNext={() => setCurrentStep(1)}

@@ -16,6 +16,8 @@ import { CheckCircleOutlined, ExperimentOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { executeProductionIntake } from '../../../services/b2b/intakeProductionService'
 import { useAuthStore } from '../../../stores/authStore'
+import { fmtVnd, vndInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 
@@ -59,10 +61,11 @@ export default function ProductionWizardPage() {
         setStep(3)
         message.success(`Deal ${res.deal_number} tạo xong. Chờ BGĐ duyệt + sản xuất.`)
       } else {
-        message.error(res.error || 'Lỗi')
+        message.error(dichLoiHeThong(res.error, 'Không tạo được deal'))
       }
     } catch (e: any) {
-      message.error(e.message)
+      if (e?.errorFields) { message.warning('Còn ô bắt buộc chưa điền — kiểm tra lại'); return }
+      message.error(dichLoiHeThong(e, 'Không tạo được deal'))
     } finally {
       setSubmitting(false)
     }
@@ -70,13 +73,13 @@ export default function ProductionWizardPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <Title level={3}>🅱️ DRC-after-production (Chạy đầu ra)</Title>
+      <Title level={3}>🅱️ Chạy đầu ra (DRC sau sản xuất)</Title>
       <Text type="secondary">
-        Đại lý tier ≥ silver. QC sample DRC → BGĐ duyệt → SX → actual DRC → quyết toán.
+        Đại lý hạng Bạc trở lên. QC đo DRC mẫu → BGĐ duyệt → sản xuất → DRC thực tế → quyết toán.
       </Text>
 
       <Steps current={step} style={{ marginTop: 24 }} items={[
-        { title: 'Đại lý + QC sample' },
+        { title: 'Đại lý + DRC mẫu' },
         { title: 'Cân + Nhập kho' },
         { title: 'Xem lại' },
         { title: 'Chờ SX' },
@@ -87,11 +90,11 @@ export default function ProductionWizardPage() {
           {step === 0 && (
             <>
               <Alert type="info" showIcon style={{ marginBottom: 16 }}
-                message="Bước 1: Chọn đại lý + QC đo sample_drc + đề xuất đơn giá" />
+                message="Bước 1: Chọn đại lý + QC đo DRC mẫu + đề xuất đơn giá" />
 
               <Row gutter={16}>
                 <Col span={12}>
-                  <Form.Item name="partner_id" label="Đại lý (tier ≥ silver)" rules={[{ required: true }]}>
+                  <Form.Item name="partner_id" label="Đại lý (hạng Bạc trở lên)" rules={[{ required: true }]}>
                     <Select showSearch placeholder="Chọn đại lý" />
                   </Form.Item>
                 </Col>
@@ -113,22 +116,21 @@ export default function ProductionWizardPage() {
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item name="sample_drc" label="Sample DRC (%) — QC đo mẫu"
+                  <Form.Item name="sample_drc" label="DRC mẫu (%) — QC đo mẫu"
                     rules={[{ required: true, type: 'number', min: 0, max: 100 }]}>
                     <InputNumber min={0} max={100} step={0.5} prefix={<ExperimentOutlined />} style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item name="expected_price" label="Đơn giá VNĐ/kg (đã thỏa thuận)" rules={[{ required: true }]}>
+                  <Form.Item name="expected_price" label="Đơn giá ₫/kg (đã thoả thuận)" rules={[{ required: true }]}>
                     <InputNumber<number> min={0} step={1000}
-                      formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                      parser={v => Number(String(v).replace(/\D/g, '')) || 0}
+                      {...vndInputProps}
                       style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
               </Row>
 
-              <Alert type="warning" message="Lưu ý: actual DRC sau SX có thể khác sample" />
+              <Alert type="warning" message="Lưu ý: DRC thực tế sau sản xuất có thể khác DRC mẫu" />
 
               <Space style={{ marginTop: 16 }}>
                 <Button type="primary" onClick={() => setStep(1)}>Tiếp theo</Button>
@@ -139,7 +141,7 @@ export default function ProductionWizardPage() {
           {step === 1 && (
             <>
               <Alert type="info" showIcon style={{ marginBottom: 16 }}
-                message="Bước 2: Cân xe + chọn mode SX (pooled/isolated)" />
+                message="Bước 2: Cân xe + chọn chế độ sản xuất (chung / riêng)" />
 
               <Row gutter={16}>
                 <Col span={8}>
@@ -178,13 +180,13 @@ export default function ProductionWizardPage() {
                 <Col span={12}>
                   <Form.Item name="production_mode" label="Chế độ SX" initialValue="pooled">
                     <Select options={[
-                      { value: 'pooled', label: 'Pooled (chung pool, DRC trung bình) — default' },
-                      { value: 'isolated', label: 'Isolated (riêng, phí +5-10%) — tier gold+' },
+                      { value: 'pooled', label: 'Chạy chung (DRC trung bình) — mặc định' },
+                      { value: 'isolated', label: 'Chạy riêng (phí +5–10%) — hạng Vàng trở lên' },
                     ]} />
                   </Form.Item>
                 </Col>
                 <Col span={12}>
-                  <Form.Item name="production_sla_days" label="SLA ngày" initialValue={7}>
+                  <Form.Item name="production_sla_days" label="Hạn sản xuất (ngày)" initialValue={7}>
                     <InputNumber min={1} max={30} style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
@@ -200,22 +202,22 @@ export default function ProductionWizardPage() {
           {step === 2 && (
             <>
               <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-                message="Ước tính gross (chưa final). Actual sẽ khác sau SX." />
+                message="Tiền hàng ƯỚC TÍNH (chưa chốt) — số thật sẽ khác sau sản xuất." />
 
               <Card size="small">
                 <Row gutter={16}>
-                  <Col span={6}>qty: <strong>{qty.toLocaleString('vi-VN')} kg</strong></Col>
-                  <Col span={6}>sample DRC: <strong>{drc}%</strong></Col>
-                  <Col span={6}>giá: <strong>{price.toLocaleString('vi-VN')} VNĐ/kg</strong></Col>
-                  <Col span={6}><Tag color="orange">Estimated</Tag></Col>
+                  <Col span={6}>KL: <strong>{qty.toLocaleString('vi-VN')} kg</strong></Col>
+                  <Col span={6}>DRC mẫu: <strong>{drc}%</strong></Col>
+                  <Col span={6}>Giá: <strong>{price.toLocaleString('vi-VN')} ₫/kg</strong></Col>
+                  <Col span={6}><Tag color="orange">Ước tính</Tag></Col>
                 </Row>
                 <Divider />
                 <Text strong style={{ fontSize: 20, color: '#1B4D3E' }}>
-                  Gross ước tính: {estimatedGross.toLocaleString('vi-VN')} VNĐ
+                  Tiền hàng ước tính: {fmtVnd(estimatedGross)}
                 </Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  Range ±5% tùy actual DRC. Tạm ứng tối đa theo tier (gold 70%).
+                  Chênh ±5% tuỳ DRC thực tế. Tạm ứng tối đa theo hạng đại lý (Vàng 70%).
                 </Text>
               </Card>
 
@@ -236,11 +238,11 @@ export default function ProductionWizardPage() {
             <Result status="info" title={`Deal ${result.deal_number} đang chờ duyệt`}
               subTitle={
                 <Space direction="vertical">
-                  <Text>Gross ước tính: <strong>{result.estimated_gross_vnd.toLocaleString('vi-VN')} VNĐ</strong></Text>
-                  <Text>Advance max: <strong>{result.advance_max_allowed_vnd.toLocaleString('vi-VN')} VNĐ</strong></Text>
+                  <Text>Tiền hàng ước tính: <strong>{fmtVnd(result.estimated_gross_vnd)}</strong></Text>
+                  <Text>Tạm ứng tối đa: <strong>{fmtVnd(result.advance_max_allowed_vnd)}</strong></Text>
                   <Text type="secondary">
-                    Sau khi BGĐ duyệt → status=accepted → có thể tạo advance.
-                    Sau khi SX xong → onProductionFinish → actual DRC + giá cuối.
+                    Sau khi BGĐ duyệt (Đã duyệt) → được tạo tạm ứng.
+                    Sau khi sản xuất xong → ghi DRC thực tế + giá cuối để quyết toán.
                   </Text>
                 </Space>
               }

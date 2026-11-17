@@ -36,6 +36,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import { QCBadge } from '../../../components/wms/QCInputForm'
+import PageState from '../../../components/common/PageState'
+import { fmtDate } from '../../../utils/format'
 
 const { Title, Text } = Typography
 const MONO_FONT = "'JetBrains Mono', monospace"
@@ -86,11 +88,12 @@ interface LocationWithBatches {
 // CONSTANTS
 // ============================================================================
 
+// Đợt 3 audit UI: nhãn cũ sai nghĩa — 'Dây' (= sợi dây) cho ô ĐẦY, 'Không đúng' cho ô KHÔNG DÙNG, 'Trong' cho ô TRỐNG
 const STATUS_COLORS: Record<string, { bg: string; border: string; text: string; label: string; tagColor: string }> = {
-  empty:       { bg: '#D1FAE5', border: '#86EFAC', text: '#166534', label: 'Trong',      tagColor: 'green' },
+  empty:       { bg: '#D1FAE5', border: '#86EFAC', text: '#166534', label: 'Trống',      tagColor: 'green' },
   partial:     { bg: '#FEF3C7', border: '#FCD34D', text: '#92400E', label: 'Đang dùng',  tagColor: 'orange' },
-  full:        { bg: '#FEE2E2', border: '#FCA5A5', text: '#991B1B', label: 'Dây',        tagColor: 'red' },
-  unavailable: { bg: '#F3F4F6', border: '#D1D5DB', text: '#9CA3AF', label: 'Không đúng', tagColor: 'default' },
+  full:        { bg: '#FEE2E2', border: '#FCA5A5', text: '#991B1B', label: 'Đầy',        tagColor: 'red' },
+  unavailable: { bg: '#F3F4F6', border: '#D1D5DB', text: '#9CA3AF', label: 'Không dùng', tagColor: 'default' },
 }
 
 // ============================================================================
@@ -204,7 +207,7 @@ const LocationCell: React.FC<{
       )}
 
       {!hasBatches && loc.status === 'empty' && (
-        <span style={{ fontSize: 8, color: '#999', marginTop: 2 }}>trong</span>
+        <span style={{ fontSize: 8, color: '#999', marginTop: 2 }}>trống</span>
       )}
     </div>
   )
@@ -236,9 +239,9 @@ const LocationDetailModal: React.FC<{
             <Text strong style={{ fontFamily: MONO_FONT, fontSize: 16 }}>{loc.code}</Text>
             <br />
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {loc.shelf ? `Ke ${loc.shelf}` : ''}
-              {loc.row_name ? ` - Hang ${loc.row_name}` : ''}
-              {loc.column_name ? ` - O ${loc.column_name}` : ''}
+              {loc.shelf ? `Kệ ${loc.shelf}` : ''}
+              {loc.row_name ? ` - Hàng ${loc.row_name}` : ''}
+              {loc.column_name ? ` - Ô ${loc.column_name}` : ''}
             </Text>
           </div>
         </Space>
@@ -253,18 +256,18 @@ const LocationDetailModal: React.FC<{
           format={() => <Text strong style={{ color: style.text }}>{loc.usage_percent}%</Text>}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666' }}>
-          <span>Dang chua: {loc.current_quantity.toLocaleString('vi-VN')}</span>
-          <span>Suc chua: {loc.capacity ? loc.capacity.toLocaleString('vi-VN') : '—'}</span>
+          <span>Đang chứa: {loc.current_quantity.toLocaleString('vi-VN')}</span>
+          <span>Sức chứa: {loc.capacity ? loc.capacity.toLocaleString('vi-VN') : '—'}</span>
         </div>
       </div>
 
       {/* Batch list */}
       {loc.batches.length === 0 ? (
-        <Empty image={<InboxOutlined style={{ fontSize: 32, color: '#ccc' }} />} description="O nay dang trong" />
+        <Empty image={<InboxOutlined style={{ fontSize: 32, color: '#ccc' }} />} description="Ô này đang trống" />
       ) : (
         <div>
           <Text strong style={{ fontSize: 12, color: '#555' }}>
-            <InboxOutlined /> Lô hàng tai vị trí ({loc.batches.length})
+            <InboxOutlined /> Lô hàng tại vị trí ({loc.batches.length})
           </Text>
 
           <Space direction="vertical" style={{ width: '100%', marginTop: 8 }} size={8}>
@@ -285,7 +288,7 @@ const LocationDetailModal: React.FC<{
                       </Text>
                     </div>
                     <Text type="secondary" style={{ fontSize: 11 }}>
-                      Nhap: {new Date(batch.received_date).toLocaleDateString('vi-VN')}
+                      Nhập: {fmtDate(batch.received_date)}
                     </Text>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -332,6 +335,8 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
   const [locations, setLocations] = useState<LocationWithBatches[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  // Lỗi tải ≠ "Kho chưa có vị trí nào"
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   // UI
   const [selectedLoc, setSelectedLoc] = useState<LocationWithBatches | null>(null)
@@ -347,6 +352,7 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
     if (!warehouseId) return
 
     try {
+      setLoadError(null)
       const { data: wh, error: whErr } = await supabase
         .from('warehouses')
         .select('id, code, name, type, address')
@@ -370,7 +376,7 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
         .from('stock_batches')
         .select(`
           id, batch_no, material_id, location_id,
-          quantity_remaining, latest_drc, qc_status,
+          quantity_remaining, latest_drc, qc_status, rubber_grade,
           received_date, status,
           material:materials(id, sku, name, unit)
         `)
@@ -392,10 +398,11 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
           material_id: b.material_id,
           material_sku: (b.material as any)?.sku || '',
           material_name: (b.material as any)?.name || '',
-          material_unit: (b.material as any)?.unit || 'banh',
+          material_unit: (b.material as any)?.unit || 'bành',
           quantity_remaining: b.quantity_remaining,
           latest_drc: b.latest_drc,
           qc_status: b.qc_status,
+          rubber_grade: b.rubber_grade ?? undefined,
           received_date: b.received_date,
         }
 
@@ -411,7 +418,8 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
 
       setLocations(merged)
     } catch (e) {
-      console.error('Loi load du lieu kho:', e)
+      console.error('Lỗi tải dữ liệu kho:', e)
+      setLoadError(e)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -503,7 +511,7 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
                 )}
               </Title>
               <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
-                {stats.total} o &bull; {stats.totalBatches} lô hàng
+                {stats.total} ô &bull; {stats.totalBatches} lô hàng
               </Text>
             </div>
           </Space>
@@ -519,10 +527,10 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
         <Space size={16} style={{ marginTop: 8, overflowX: 'auto', width: '100%' }} wrap>
           {[
             { label: 'Tổng', value: stats.total, color: '#fff' },
-            { label: 'Trong', value: stats.empty, color: '#86EFAC' },
+            { label: 'Trống', value: stats.empty, color: '#86EFAC' },
             { label: 'Đang dùng', value: stats.partial, color: '#FCD34D' },
-            { label: 'Dây', value: stats.full, color: '#FCA5A5' },
-            { label: 'K. dung', value: stats.unavailable, color: '#9CA3AF' },
+            { label: 'Đầy', value: stats.full, color: '#FCA5A5' },
+            { label: 'Không dùng', value: stats.unavailable, color: '#9CA3AF' },
           ].map(s => (
             <Space key={s.label} size={4}>
               <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: s.color }} />
@@ -540,7 +548,7 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
             prefix={<SearchOutlined />}
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
-            placeholder="Tìm mã o, lo, san pham..."
+            placeholder="Tìm mã ô, lô, sản phẩm..."
             allowClear
             style={{ flex: 1 }}
           />
@@ -563,7 +571,7 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
               onClick={() => setFilterShelf('all')}
               style={filterShelf === 'all' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
             >
-              Tat ca
+              Tất cả
             </Button>
             {shelves.map(s => (
               <Button
@@ -573,7 +581,7 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
                 onClick={() => setFilterShelf(s)}
                 style={filterShelf === s ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
               >
-                Ke {s}
+                Kệ {s}
               </Button>
             ))}
           </Space>
@@ -584,11 +592,15 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
 
       {/* CONTENT */}
       <div style={{ flex: 1, overflow: 'auto', paddingBottom: 20 }}>
-        {filtered.length === 0 ? (
+        {loadError ? (
+          <div style={{ padding: 16 }}>
+            <PageState error={loadError} onRetry={handleRefresh} />
+          </div>
+        ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '64px 0' }}>
             <Empty
               image={<EnvironmentOutlined style={{ fontSize: 40, color: '#ccc' }} />}
-              description={locations.length === 0 ? 'Kho chưa có vị trí nào' : 'Không tìm thấy vị trí phu hop'}
+              description={locations.length === 0 ? 'Kho chưa có vị trí nào' : 'Không tìm thấy vị trí phù hợp'}
             />
           </div>
         ) : viewMode === 'grid' ? (
@@ -598,7 +610,7 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
               <div key={shelf} style={{ marginBottom: 20 }}>
                 <Text strong style={{ color: '#1B4D3E', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   <AppstoreOutlined />
-                  {shelf.startsWith('K') ? `Ke ${shelf}` : shelf} &bull; {locs.length} o
+                  {shelf.startsWith('K') ? `Kệ ${shelf}` : shelf} &bull; {locs.length} ô
                 </Text>
                 <div style={{
                   display: 'grid',
@@ -653,7 +665,7 @@ const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propI
                             </Text>
                           </div>
                         ) : (
-                          <div><Text type="secondary" style={{ fontSize: 12 }}>Trong</Text></div>
+                          <div><Text type="secondary" style={{ fontSize: 12 }}>Trống</Text></div>
                         )}
                       </div>
                       {hasBatches && (

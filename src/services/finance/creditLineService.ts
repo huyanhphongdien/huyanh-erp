@@ -47,6 +47,8 @@ export type FinCreditLineInput = Partial<Omit<FinCreditLine, 'id' | 'created_at'
 export const LINE_TYPE_LABEL: Record<string, string> = {
   vay: 'Vay vốn', chiet_khau: 'Chiết khấu BCT', thau_chi: 'Thấu chi', lc: 'L/C', khac: 'Khác',
 }
+export const CREDIT_LINE_STATUS_LABELS: Record<string, string> = { active: 'Hiệu lực', expired: 'Hết hạn', closed: 'Đã đóng' }
+export const CREDIT_LINE_STATUS_COLORS: Record<string, string> = { active: 'green', expired: 'orange', closed: 'default' }
 
 function computeLine(cl: FinCreditLine, loans: FinLoanComputed[], deposits: FinDepositComputed[], collaterals: FinCollateral[]): FinCreditLineComputed {
   const ls = loans.filter((l) => l.credit_line_id === cl.id)

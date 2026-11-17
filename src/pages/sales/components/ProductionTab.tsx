@@ -36,6 +36,10 @@ import { salesProductionService, canCreateProduction, type ProductionProgress } 
 import { defaultBalesPerContainer } from '../../../services/sales/baleMath'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
+import { PRODUCTION_STATUS_LABELS, PRODUCTION_STATUS_COLORS } from '../../../services/wms/wms.types'
+import { fmtDate, fmtKg } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
 import OrderActionButtons from './OrderActionButtons'
 import StockPickerSection from './StockPickerSection'
 
@@ -58,6 +62,8 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
   const navigate = useNavigate()
   const [productionProgress, setProductionProgress] = useState<ProductionProgress | null>(null)
   const [progressLoading, setProgressLoading] = useState(false)
+  // Đơn ĐÃ có lệnh SX mà tải tiến độ lỗi → báo lỗi (trước đây nuốt im, khối tiến độ biến mất)
+  const [progressError, setProgressError] = useState<unknown>(null)
   const [readyDate, setReadyDate] = useState<dayjs.Dayjs | null>(
     order.ready_date ? dayjs(order.ready_date) : null,
   )
@@ -69,11 +75,13 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
   const loadProgress = useCallback(async () => {
     if (!order.production_order_id) return
     setProgressLoading(true)
+    setProgressError(null)
     try {
       const data = await salesProductionService.getProductionProgress(order.id)
       setProductionProgress(data)
-    } catch {
-      // silent — may not have production order
+    } catch (e) {
+      // Tới đây là đơn CÓ production_order_id (đã return ở trên nếu không) → lỗi thật
+      setProgressError(e || true)
     } finally {
       setProgressLoading(false)
     }
@@ -92,8 +100,8 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
       } as any)
       message.success('Đã cập nhật ngày sẵn sàng')
       onSaved()
-    } catch (e: any) {
-      message.error(e.message)
+    } catch (e: unknown) {
+      message.error(dichLoiHeThong(e, 'Lưu ngày sẵn sàng thất bại'))
     } finally {
       setSavingReadyDate(false)
     }
@@ -151,6 +159,14 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
       )
     }
 
+    if (progressError) {
+      return (
+        <Card size="small" title="Tiến độ sản xuất" style={{ marginBottom: 16 }}>
+          <PageState error={progressError} onRetry={loadProgress} minHeight={110} />
+        </Card>
+      )
+    }
+
     if (!productionProgress) return null
 
     const po = productionProgress.production_order
@@ -196,8 +212,9 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
           </Col>
           <Col span={6}>
             <div style={{ fontSize: 11, color: '#999' }}>Trạng thái</div>
-            <Tag color={isCompleted ? 'green' : po?.status === 'in_progress' ? 'orange' : 'default'}>
-              {isCompleted ? 'Hoàn thành' : po?.status === 'in_progress' ? 'Đang SX' : po?.status || 'Nháp'}
+            {/* Nhãn/màu lệnh SX từ map chung wms.types — không in mã thô 'scheduled'/'cancelled' */}
+            <Tag color={isCompleted ? 'green' : (PRODUCTION_STATUS_COLORS as Record<string, string>)[po?.status || 'draft'] || 'default'}>
+              {isCompleted ? 'Hoàn thành' : (PRODUCTION_STATUS_LABELS as Record<string, string>)[po?.status || 'draft'] || po?.status}
             </Tag>
           </Col>
           <Col span={6}>
@@ -241,7 +258,7 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
     <Card size="small" title="Thông tin sản xuất" style={{ marginBottom: 16 }}>
       <Descriptions column={2} size="small" bordered>
         <Descriptions.Item label="Grade"><Tag color="green">{order.grade}</Tag></Descriptions.Item>
-        <Descriptions.Item label="Số lượng">{order.quantity_tons} tấn ({(order.quantity_kg || order.quantity_tons * 1000).toLocaleString('vi-VN')} kg)</Descriptions.Item>
+        <Descriptions.Item label="Số lượng">{order.quantity_tons} tấn ({fmtKg(order.quantity_kg || order.quantity_tons * 1000)} kg)</Descriptions.Item>
         <Descriptions.Item label="Tổng bành">{totalBales}</Descriptions.Item>
         <Descriptions.Item label="Bành/container">{balesPerContainer}</Descriptions.Item>
         <Descriptions.Item label="Container cần">{containerCount} x {order.container_type || '20ft'}</Descriptions.Item>
@@ -272,7 +289,7 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
               </Button>
             </Space>
           ) : (
-            <span>{order.ready_date ? dayjs(order.ready_date).format('DD/MM/YYYY') : '—'}</span>
+            <span>{fmtDate(order.ready_date)}</span>
           )}
         </Descriptions.Item>
       </Descriptions>
@@ -382,7 +399,7 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
           color: '#874d00',
           marginBottom: 8,
         }}>
-          💡 BP Sản xuất / QC: chỉ cần xác nhận đơn này đã sẵn sàng. Bấm nút bên phải để chuyển stage tiếp theo (chi tiết SX có thể xem trong section bên dưới).
+          💡 BP Sản xuất / QC: chỉ cần xác nhận đơn này đã sẵn sàng. Bấm nút bên phải để chuyển sang bước tiếp theo (chi tiết SX xem ở mục bên dưới).
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="production" size="middle" />

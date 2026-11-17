@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
 import {
   Card, Table, Tag, Typography, Space, DatePicker, Row, Col, Breadcrumb, Button,
 } from 'antd'
 import { TruckOutlined, ReloadOutlined, InboxOutlined } from '@ant-design/icons'
-import dayjs, { Dayjs } from 'dayjs'
+import type { Dayjs } from 'dayjs'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
-  dispatchService, FETCH_RUBBER_LABELS, type DispatchOrder,
+  dispatchService, FETCH_RUBBER_LABELS, FETCH_REPORT_LIMIT, type DispatchOrder,
 } from '../../../services/logistics/dispatchService'
+import { DASH, fmtDate, fmtPct } from '../../../utils/format'
+import PageState from '../../../components/common/PageState'
+import { LimitNotice, stdPagination } from '../../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
 
@@ -16,10 +19,10 @@ const { Title, Text } = Typography
 const DIFF_PCT_WARN = 1
 
 export default function FetchReportPage() {
-  const navigate = useNavigate()
+  const openTab = useOpenTab()
   const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null)
 
-  const { data: trips = [], isLoading, refetch, isFetching } = useQuery({
+  const { data: trips = [], isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['fetch-report', range?.[0]?.format('YYYY-MM-DD'), range?.[1]?.format('YYYY-MM-DD')],
     queryFn: () => dispatchService.listFetchReport({
       date_from: range?.[0]?.format('YYYY-MM-DD'),
@@ -40,8 +43,11 @@ export default function FetchReportPage() {
   const inTransit = trips.length - settled.length
 
   const columns = [
-    { title: 'Ngày', dataIndex: 'dispatch_date', width: 100, render: (v: string) => dayjs(v).format('DD/MM/YYYY') },
-    { title: 'Lệnh', dataIndex: 'code', width: 140, render: (v: string, r: DispatchOrder) => <a onClick={() => navigate(`/logistics/dispatch/${r.id}`)}><b>{v}</b></a> },
+    { title: 'Ngày', dataIndex: 'dispatch_date', width: 100, render: (v: string) => fmtDate(v) },
+    // Mở lệnh thành TAB (khuôn Sổ lệnh) — navigate() đè mất tab đang mở.
+    { title: 'Lệnh', dataIndex: 'code', width: 140, render: (v: string, r: DispatchOrder) => <a onClick={() => openTab({
+      key: `dispatch-${r.id}`, title: `Lệnh ${r.code}`, componentId: 'dispatch-detail', props: { id: r.id }, path: `/logistics/dispatch/${r.id}`,
+    })}><b>{v}</b></a> },
     { title: 'Xe / Tài xế', width: 200, render: (_: any, r: DispatchOrder) => (
       <Space size={4} wrap>
         {r.tractor_plate && <Tag icon={<TruckOutlined />} color="blue">{r.tractor_plate}</Tag>}
@@ -49,7 +55,7 @@ export default function FetchReportPage() {
       </Space>
     ) },
     { title: 'Mủ / Lô', width: 150, render: (_: any, r: DispatchOrder) => (
-      <span>{r.fetch_rubber_type ? (FETCH_RUBBER_LABELS[r.fetch_rubber_type] || r.fetch_rubber_type) : '–'}{r.fetch_lot_code ? ` · ${r.fetch_lot_code}` : ''}</span>
+      <span>{r.fetch_rubber_type ? (FETCH_RUBBER_LABELS[r.fetch_rubber_type] || r.fetch_rubber_type) : DASH}{r.fetch_lot_code ? ` · ${r.fetch_lot_code}` : ''}</span>
     ) },
     {
       title: 'Pallet (đi → rời TL → để lại)', width: 230, render: (_: any, r: DispatchOrder) => {
@@ -73,7 +79,7 @@ export default function FetchReportPage() {
         if (tl != null && pd != null && tl > 0) {
           const diff = pd - tl
           const pct = Math.abs(diff) / tl * 100
-          diffEl = <Text style={{ color: pct > DIFF_PCT_WARN ? '#dc2626' : '#15803d' }}> ({diff > 0 ? '+' : ''}{diff.toLocaleString('vi-VN')}kg · {pct.toFixed(1)}%)</Text>
+          diffEl = <Text style={{ color: pct > DIFF_PCT_WARN ? '#dc2626' : '#15803d' }}> ({diff > 0 ? '+' : ''}{diff.toLocaleString('vi-VN')}kg · {fmtPct(pct, 1)})</Text>
         }
         return (
           <span style={{ fontSize: 13 }}>
@@ -106,6 +112,8 @@ export default function FetchReportPage() {
           </Space>
         </div>
 
+        {/* Tải hỏng → báo lỗi + Thử lại thay cho sổ pallet 0 / "Chưa có chuyến" giả. */}
+        <PageState error={isError ? error : null} onRetry={() => refetch()}>
         {/* SỔ PALLET — số dư đang ở Tân Lâm */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col xs={24} md={12}>
@@ -131,11 +139,13 @@ export default function FetchReportPage() {
           </Col>
         </Row>
 
+        <LimitNotice shown={trips.length} limit={FETCH_REPORT_LIMIT} what="chuyến" />
         <Table
-          rowKey="id" size="middle" loading={isLoading} pagination={{ pageSize: 20 }}
+          rowKey="id" size="middle" loading={isLoading} pagination={stdPagination(20)}
           columns={columns as any} dataSource={trips} scroll={{ x: 1050 }}
           locale={{ emptyText: 'Chưa có chuyến đi lấy mủ nào' }}
         />
+        </PageState>
       </Card>
     </div>
   )

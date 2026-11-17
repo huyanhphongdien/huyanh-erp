@@ -9,6 +9,8 @@ import { Card, Button, Spin, message, Modal } from 'antd'
 import { RefreshCw, Eye, Send } from 'lucide-react'
 import { salesDigestService, type DigestData } from '../../services/sales/salesDigestService'
 import { supabase } from '../../lib/supabase'
+import { fmtMoney } from '../../services/sales/salesMoney'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 export default function SalesDigestPage() {
   const [data, setData] = useState<DigestData | null>(null)
@@ -23,7 +25,7 @@ export default function SalesDigestPage() {
       setData(d)
       setHtml(salesDigestService.renderHtml(d))
     } catch (err: any) {
-      message.error('Lỗi generate digest: ' + (err.message || err))
+      message.error(dichLoiHeThong(err, 'Không tạo được bản tin'))
     } finally {
       setLoading(false)
     }
@@ -71,10 +73,10 @@ export default function SalesDigestPage() {
           if (result?.success) {
             message.success(`Đã gửi đến ${result.sent_to?.join(', ') || 'minhld@huyanhrubber.com'}`)
           } else {
-            message.error('Lỗi gửi: ' + (result?.error || 'Unknown'))
+            message.error(dichLoiHeThong(result?.error, 'Gửi email thất bại'))
           }
         } catch (err: any) {
-          message.error('Lỗi: ' + (err.message || err))
+          message.error(dichLoiHeThong(err, 'Gửi email thất bại'))
         } finally {
           setSending(false)
         }
@@ -87,13 +89,13 @@ export default function SalesDigestPage() {
       <Card
         title={
           <span style={{ color: '#1B4D3E', fontSize: 16 }}>
-            📨 Sales Daily Digest — Preview
+            📨 Bản tin bán hàng hằng ngày — Xem trước
           </span>
         }
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
             <Button icon={<RefreshCw size={14} />} onClick={generate} loading={loading}>
-              Regenerate
+              Tạo lại
             </Button>
             <Button icon={<Eye size={14} />} onClick={handleDownloadHtml} disabled={!html}>
               Tải HTML
@@ -131,13 +133,13 @@ export default function SalesDigestPage() {
               color="#0a72ef"
             />
             <SummaryStat
-              label="Tổng đơn active"
+              label="Tổng đơn đang chạy"
               value={data.total_active_orders}
               color="#1B4D3E"
             />
             <SummaryStat
               label="Giá trị đang xử lý"
-              value={`$${(data.total_value_in_progress_usd / 1000).toFixed(0)}K`}
+              value={fmtMoney(data.total_value_in_progress_usd, 'USD', { compact: true })}
               color="#1B4D3E"
             />
           </div>

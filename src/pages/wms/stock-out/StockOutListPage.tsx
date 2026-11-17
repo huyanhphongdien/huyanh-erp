@@ -1,42 +1,37 @@
 // ============================================================================
-// STOCK OUT LIST PAGE — Ant Design
+// STOCK OUT LIST PAGE — AdvancedDataTable (cùng khuôn Sổ nhập kho / Sổ chuyển kho)
 // File: src/pages/wms/stock-out/StockOutListPage.tsx
-// Rewrite: Tailwind -> Ant Design v6, add rubber fields
+// Đợt 3 audit UI (17/11/2026): bỏ bảng tự viết (tải cứng 100 phiếu rồi im lặng mất phiếu 101,
+// KPI cộng trên dữ liệu cụt + không theo nhà máy, không Xuất Excel, lỗi tải hiện "chưa có phiếu")
+// → AdvancedDataTable: lọc cột, khoảng ngày, Xuất Excel, khối lỗi + Thử lại, báo chạm trần tải.
 // ============================================================================
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { Tag, Typography, Button, Space, Card, Row, Col, Statistic } from 'antd'
+import { PlusOutlined, ExportOutlined } from '@ant-design/icons'
+import { supabase } from '../../../lib/supabase'
+import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
 import { useOpenTab } from '../../../hooks/useOpenTab'
 import { useFacilityFilter } from '../../../stores/facilityFilterStore'
 import { useActiveWarehouses } from '../../../hooks/useActiveWarehouses'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
-import {
-  Card,
-  Table,
-  Tag,
-  Button,
-  Space,
-  Input,
-  Select,
-  Typography,
-  Spin,
-  Row,
-  Col,
-  Statistic,
-  Empty,
-} from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import {
-  PlusOutlined,
-  SearchOutlined,
-  ArrowLeftOutlined,
-  ExportOutlined,
-} from '@ant-design/icons'
-import { supabase } from '../../../lib/supabase'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import type { RubberGrade } from '../../../services/wms/wms.types'
+import { RUBBER_GRADE_LABELS } from '../../../services/wms/wms.types'
+import { fmtDate, fmtNum, fmtKg } from '../../../utils/format'
+import {
+  STOCK_OUT_STATUS_LABELS, STOCK_OUT_STATUS_COLORS,
+  STOCK_OUT_REASON_LABELS, STOCK_OUT_REASON_COLORS,
+} from './stockOutLabels'
 
-const { Title, Text } = Typography
+const { Text } = Typography
+const PRIMARY = '#1B4D3E'
+const monoStyle: React.CSSProperties = { fontFamily: "'JetBrains Mono', monospace" }
+
+/** Trần tải một lần. Chạm trần → AdvancedDataTable báo "đang hiện N phiếu gần nhất" (loadLimit). */
+const LOAD_LIMIT = 500
 
 // ============================================================================
 // TYPES
@@ -73,32 +68,6 @@ interface StockOutOrder {
 // CONSTANTS
 // ============================================================================
 
-const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-  draft: { color: 'default', label: 'Nháp' },
-  picking: { color: 'processing', label: 'Đang lấy' },
-  picked: { color: 'warning', label: 'Đã lấy' },
-  confirmed: { color: 'success', label: 'Đã xuất' },
-  cancelled: { color: 'error', label: 'Đã hủy' },
-}
-
-const REASON_LABELS: Record<string, string> = {
-  sale: 'Bán hàng',
-  production: 'Sản xuất',
-  transfer: 'Chuyển kho',
-  blend: 'Phối trộn',
-  adjust: 'Điều chỉnh',
-  return: 'Trả hàng',
-}
-
-const REASON_COLORS: Record<string, string> = {
-  sale: 'green',
-  production: 'blue',
-  transfer: 'purple',
-  blend: 'cyan',
-  adjust: 'default',
-  return: 'orange',
-}
-
 const TYPE_LABELS: Record<string, string> = { raw: 'NVL', finished: 'TP' }
 const TYPE_COLORS: Record<string, string> = { raw: 'orange', finished: 'green' }
 
@@ -110,35 +79,8 @@ const extractWeighbridgeCode = (notes: string | null | undefined): string | null
   return match ? match[1] : null
 }
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'Tất cả trạng thái' },
-  { value: 'draft', label: 'Nháp' },
-  { value: 'picking', label: 'Đang lấy' },
-  { value: 'picked', label: 'Đã lấy' },
-  { value: 'confirmed', label: 'Đã xuất' },
-  { value: 'cancelled', label: 'Đã hủy' },
-]
-
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-function formatNumber(num?: number | null): string {
-  if (num === undefined || num === null) return '—'
-  return num.toLocaleString('vi-VN')
-}
-
-function formatWeight(kg?: number | null): string {
-  if (!kg) return '—'
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)} tan`
-  return `${formatNumber(kg)} kg`
-}
-
-const monoStyle: React.CSSProperties = { fontFamily: "'JetBrains Mono', monospace" }
+const toOptions = (labels: Record<string, string>) =>
+  Object.entries(labels).map(([value, label]) => ({ value, label }))
 
 // ============================================================================
 // COMPONENT
@@ -152,27 +94,11 @@ const StockOutListPage: React.FC = () => {
   const { currentFacilityId, setCurrentFacilityId } = useFacilityFilter()
   const { data: warehouses = [] } = useActiveWarehouses()
 
-  // State
-  const [orders, setOrders] = useState<StockOutOrder[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchText, setSearchText] = useState('')
-  const [activeFilter, setActiveFilter] = useState<string>('')
-
-  // F2: Map warehouse_id → facility_id để filter
-  const warehouseIdsForFacility = useMemo(() => {
-    if (!currentFacilityId) return null
-    return new Set(
-      warehouses
-        .filter(w => (w as any).facility_id === currentFacilityId)
-        .map(w => w.id),
-    )
-  }, [warehouses, currentFacilityId])
-
-  // Load data from Supabase
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      const { data, error } = await supabase
+  // Giữ select riêng của trang (có svr_grade — STOCK_OUT_LIST_SELECT của service chưa có cột này)
+  const { data: orders = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['stock-out-orders-all'],
+    queryFn: async () => {
+      const { data, error: err } = await supabase
         .from('stock_out_orders')
         .select(`
           id, code, type, warehouse_id,
@@ -183,212 +109,134 @@ const StockOutListPage: React.FC = () => {
           warehouse:warehouses(id, code, name)
         `)
         .order('created_at', { ascending: false })
-        .limit(100)
+        .limit(LOAD_LIMIT)
+      if (err) throw err
+      return (data || []) as unknown as StockOutOrder[]
+    },
+    staleTime: 60000,
+    // Bản cũ tải lại mỗi lần mở sổ — giữ hành vi đó: xác nhận/huỷ ở tab chi tiết xong quay lại là thấy ngay
+    refetchOnMount: 'always',
+  })
 
-      if (!error && data) {
-        setOrders(data as unknown as StockOutOrder[])
-      } else if (error) {
-        console.error('Loi tai danh sach phiếu xuất:', error)
-      }
-      setLoading(false)
+  // F2: Lọc theo nhà máy qua kho (warehouse_id → facility_id)
+  const filteredOrders = useMemo(() => {
+    if (!currentFacilityId) return orders
+    const whIds = new Set(
+      warehouses.filter(w => (w as any).facility_id === currentFacilityId).map(w => w.id),
+    )
+    return orders.filter(o => whIds.has(o.warehouse_id))
+  }, [orders, currentFacilityId, warehouses])
+
+  // KPI — tính trên dữ liệu ĐÃ lọc nhà máy (trước: cộng trên 100 phiếu thô, bỏ qua bộ lọc)
+  const kpi = useMemo(() => {
+    const confirmed = filteredOrders.filter(o => o.status === 'confirmed')
+    return {
+      total: filteredOrders.length,
+      draft: filteredOrders.filter(o => o.status === 'draft').length,
+      picking: filteredOrders.filter(o => o.status === 'picking' || o.status === 'picked').length,
+      confirmed: confirmed.length,
+      confirmedQty: confirmed.reduce((sum, o) => sum + (o.total_quantity || 0), 0),
+      confirmedWeight: confirmed.reduce((sum, o) => sum + (o.total_weight || 0), 0),
     }
-    load()
-  }, [])
+  }, [filteredOrders])
 
-  // Filter + search logic
-  const filteredOrders = useCallback(() => {
-    let result = [...orders]
-
-    // F2: Facility filter
-    if (warehouseIdsForFacility) {
-      result = result.filter(o => warehouseIdsForFacility.has(o.warehouse_id))
-    }
-
-    // Status filter
-    if (activeFilter) {
-      result = result.filter(o => o.status === activeFilter)
-    }
-
-    // Search
-    if (searchText.trim()) {
-      const term = searchText.trim().toLowerCase()
-      result = result.filter(o =>
-        o.code.toLowerCase().includes(term) ||
-        o.customer_name?.toLowerCase().includes(term) ||
-        o.customer_order_ref?.toLowerCase().includes(term) ||
-        o.warehouse?.name?.toLowerCase().includes(term) ||
-        o.notes?.toLowerCase().includes(term)
-      )
-    }
-
-    return result
-  }, [orders, activeFilter, searchText, warehouseIdsForFacility])
-
-  const displayOrders = filteredOrders()
-
-  // Summary stats
-  const totalCount = orders.length
-  const draftCount = orders.filter(o => o.status === 'draft').length
-  const pickingCount = orders.filter(o => o.status === 'picking' || o.status === 'picked').length
-  const confirmedCount = orders.filter(o => o.status === 'confirmed').length
-  const confirmedQty = orders
-    .filter(o => o.status === 'confirmed')
-    .reduce((sum, o) => sum + (o.total_quantity || 0), 0)
-  const confirmedWeight = orders
-    .filter(o => o.status === 'confirmed')
-    .reduce((sum, o) => sum + (o.total_weight || 0), 0)
-
-  // Handlers
-  const handleTapRow = (record: StockOutOrder) => {
+  const openDetail = (record: StockOutOrder) => {
     openTab({
       key: `stock-out-${record.id}`,
-      title: `Phiếu ${(record as any).code || record.id.slice(0, 8)}`,
+      title: `Phiếu ${record.code || record.id.slice(0, 8)}`,
       componentId: 'stock-out-detail',
       props: { id: record.id },
       path: `/wms/stock-out/${record.id}`,
     })
   }
 
-  const handleCreateNew = () => {
-    navigate('/wms/stock-out/new')
-  }
-
-  const handleGoBack = () => {
-    navigate('/wms/vat-tu')
-  }
-
   // ============================================================================
   // TABLE COLUMNS
   // ============================================================================
-  const columns: ColumnsType<StockOutOrder> = [
-    {
-      title: 'Mã phiếu',
-      dataIndex: 'code',
-      key: 'code',
-      width: 180,
-      render: (code: string) => (
-        <Text strong style={{ ...monoStyle, color: '#1B4D3E' }}>{code}</Text>
-      ),
-    },
-    {
-      title: 'Loại',
-      dataIndex: 'type',
-      key: 'type',
-      width: 80,
-      render: (t: string) => <Tag color={TYPE_COLORS[t] || 'default'}>{TYPE_LABELS[t] || t || '—'}</Tag>,
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      width: 110,
-      render: (status: string) => {
-        const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.draft
-        return <Tag color={cfg.color}>{cfg.label}</Tag>
-      },
-    },
-    {
-      title: 'Kho',
-      key: 'warehouse',
-      width: 150,
-      render: (_: any, record: StockOutOrder) => (
-        <Text>{record.warehouse?.name || record.warehouse?.code || '—'}</Text>
-      ),
-    },
-    {
-      title: 'Lý do',
-      dataIndex: 'reason',
-      key: 'reason',
-      width: 180,
-      render: (reason: string, record: StockOutOrder) => {
-        const ticketCode = extractWeighbridgeCode((record as any).notes)
+  const columns: ColumnDef<StockOutOrder>[] = [
+    { key: 'code', title: 'Mã phiếu', dataIndex: 'code', width: 170, sortable: true,
+      render: (v) => <Text strong style={{ ...monoStyle, color: PRIMARY }}>{v}</Text> },
+    { key: 'type', title: 'Loại', dataIndex: 'type', width: 80,
+      filterType: 'select', filterOptions: toOptions(TYPE_LABELS),
+      render: (v) => <Tag color={TYPE_COLORS[v] || 'default'}>{TYPE_LABELS[v] || v || '—'}</Tag>,
+      exportRender: (v) => TYPE_LABELS[v] || v || '' },
+    { key: 'status', title: 'Trạng thái', dataIndex: 'status', width: 130,
+      filterType: 'select', filterOptions: toOptions(STOCK_OUT_STATUS_LABELS),
+      render: (v) => <Tag color={STOCK_OUT_STATUS_COLORS[v] || 'default'}>{STOCK_OUT_STATUS_LABELS[v] || v}</Tag>,
+      exportRender: (v) => STOCK_OUT_STATUS_LABELS[v] || v },
+    { key: 'warehouse', title: 'Kho', dataIndex: ['warehouse', 'name'], width: 150,
+      render: (_, r) => r.warehouse?.name || r.warehouse?.code || '—',
+      exportRender: (_, r) => r.warehouse?.name || r.warehouse?.code || '' },
+    { key: 'reason', title: 'Lý do', dataIndex: 'reason', width: 190,
+      filterType: 'select', filterOptions: toOptions(STOCK_OUT_REASON_LABELS),
+      render: (v, r) => {
+        const ticketCode = extractWeighbridgeCode(r.notes)
         return (
           <Space size={4} wrap>
-            <Tag color={REASON_COLORS[reason] || 'default'}>
-              {REASON_LABELS[reason] || reason}
-            </Tag>
-            {ticketCode && (
-              <Tag color="cyan" style={{ margin: 0 }}>⚖ {ticketCode}</Tag>
-            )}
+            <Tag color={STOCK_OUT_REASON_COLORS[v] || 'default'}>{STOCK_OUT_REASON_LABELS[v] || v}</Tag>
+            {ticketCode && <Tag color="cyan" style={{ margin: 0 }}>⚖ {ticketCode}</Tag>}
           </Space>
         )
       },
+      exportRender: (v, r) => {
+        const ticketCode = extractWeighbridgeCode(r.notes)
+        const label = STOCK_OUT_REASON_LABELS[v] || v
+        return ticketCode ? `${label} (${ticketCode})` : label
+      },
     },
-    {
-      title: 'Grade',
-      dataIndex: 'svr_grade',
-      key: 'svr_grade',
-      width: 100,
-      render: (grade: RubberGrade | null) => <GradeBadge grade={grade} size="small" />,
-    },
-    {
-      title: 'Khách hàng',
-      key: 'customer',
-      width: 160,
-      render: (_: any, record: StockOutOrder) => (
-        record.customer_name ? (
-          <div>
-            <Text>{record.customer_name}</Text>
-            {record.customer_order_ref && (
-              <div><Text type="secondary" style={{ ...monoStyle, fontSize: 12 }}>{record.customer_order_ref}</Text></div>
-            )}
-          </div>
-        ) : <Text type="secondary">—</Text>
-      ),
-    },
-    {
-      title: 'Số lượng',
-      dataIndex: 'total_quantity',
-      key: 'total_quantity',
-      width: 100,
-      align: 'right',
-      render: (qty: number | null) => (
-        <Text strong style={monoStyle}>{formatNumber(qty)}</Text>
-      ),
-    },
-    {
-      title: 'Trọng lượng',
-      dataIndex: 'total_weight',
-      key: 'total_weight',
-      width: 110,
-      align: 'right',
-      render: (weight: number | null) => (
-        <Text style={monoStyle}>{formatWeight(weight)}</Text>
-      ),
-    },
-    {
-      title: 'Ngày tạo',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      width: 120,
-      render: (dt: string) => <Text type="secondary">{formatDate(dt)}</Text>,
-    },
-    {
-      title: 'Ghi chú',
-      dataIndex: 'notes',
-      key: 'notes',
-      ellipsis: true,
-      render: (notes: string | null) => notes ? <Text type="secondary">{notes}</Text> : '—',
-    },
+    { key: 'svr_grade', title: 'Grade', dataIndex: 'svr_grade', width: 100,
+      filterType: 'select', filterOptions: toOptions(RUBBER_GRADE_LABELS),
+      render: (v) => <GradeBadge grade={v} size="small" />,
+      exportRender: (v) => (v ? RUBBER_GRADE_LABELS[v as RubberGrade] || v : '') },
+    { key: 'customer', title: 'Khách hàng', dataIndex: 'customer_name', width: 170,
+      render: (_, r) => r.customer_name ? (
+        <div>
+          <Text>{r.customer_name}</Text>
+          {r.customer_order_ref && (
+            <div><Text type="secondary" style={{ ...monoStyle, fontSize: 12 }}>{r.customer_order_ref}</Text></div>
+          )}
+        </div>
+      ) : <Text type="secondary">—</Text>,
+      exportRender: (_, r) => [r.customer_name, r.customer_order_ref].filter(Boolean).join(' · ') },
+    { key: 'total_quantity', title: 'Số lượng', dataIndex: 'total_quantity', width: 100, align: 'right', sortable: true,
+      summary: 'sum',
+      render: (v) => <Text strong style={monoStyle}>{fmtNum(v)}</Text>,
+      exportRender: (v) => (v == null ? '' : Number(v)) },
+    { key: 'total_weight', title: 'Trọng lượng (kg)', dataIndex: 'total_weight', width: 140, align: 'right', sortable: true,
+      summary: 'sum',
+      render: (v) => <Text style={monoStyle}>{fmtKg(v)}</Text>,
+      exportRender: (v) => (v == null ? '' : Number(v)) },
+    { key: 'created_at', title: 'Ngày tạo', dataIndex: 'created_at', width: 110, sortable: true,
+      render: (v) => <Text type="secondary">{fmtDate(v)}</Text>,
+      exportRender: (v) => (v ? fmtDate(v) : '') },
+    { key: 'notes', title: 'Ghi chú', dataIndex: 'notes', width: 220, ellipsis: true,
+      render: (v) => v ? <Text type="secondary">{v}</Text> : '—',
+      exportRender: (v) => v || '' },
   ]
 
   // ============================================================================
   // RENDER
   // ============================================================================
+  const kpiCards: { title: string; value: number; color: string; suffix?: string; isKg?: boolean }[] = [
+    { title: 'Tổng phiếu', value: kpi.total, color: '#262626' },
+    { title: 'Nháp', value: kpi.draft, color: '#8c8c8c' },
+    { title: 'Đang xử lý', value: kpi.picking, color: '#1890ff' },
+    { title: 'Đã xuất kho', value: kpi.confirmed, color: PRIMARY },
+    { title: 'SL đã xuất', value: kpi.confirmedQty, color: PRIMARY, suffix: 'bành' },
+    { title: 'KL đã xuất', value: kpi.confirmedWeight, color: '#2D8B6E', suffix: 'kg', isKg: true },
+  ]
+  // Tải lỗi mà chưa có dữ liệu → KPI hiện '—' (không vẽ 0 như thật); lỗi + Thử lại hiện ở khối bảng bên dưới
+  const kpiChuaCoSo = !!error && orders.length === 0
+
   return (
-    <div style={{ padding: 24 }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Space size={12}>
-          <Button icon={<ArrowLeftOutlined />} onClick={handleGoBack} />
-          <div>
-            <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
-              <ExportOutlined style={{ marginRight: 8 }} />
-              Phiếu xuất kho
-            </Title>
-            <Text type="secondary">NVL & Thành phẩm</Text>
-          </div>
-          <Text type="secondary" style={{ fontSize: 13 }}>🏭</Text>
+    <div style={{ padding: 24, maxWidth: 1600, margin: '0 auto' }}>
+      {/* Header — route /wms/vat-tu đã rút khỏi menu 30/10 nên bỏ nút "Quay lại" trỏ về đó */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+        <Space size={12} align="center" wrap>
+          <Text strong style={{ fontSize: 18, color: PRIMARY }}>
+            <ExportOutlined style={{ marginRight: 8 }} />Phiếu xuất kho
+          </Text>
+          <Text type="secondary" style={{ fontSize: 13 }}>NVL & Thành phẩm · 🏭</Text>
           <FacilityPicker
             value={currentFacilityId}
             onChange={setCurrentFacilityId}
@@ -397,141 +245,51 @@ const StockOutListPage: React.FC = () => {
             style={{ width: 220 }}
           />
         </Space>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          size="large"
-          onClick={handleCreateNew}
-          style={{ backgroundColor: '#E8A838', borderColor: '#E8A838' }}
-        >
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/wms/stock-out/new')} style={{ background: PRIMARY }}>
           Tạo phiếu xuất
         </Button>
       </div>
 
-      {/* Summary Stats */}
-      <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={6} md={4}>
-          <Card size="small">
-            <Statistic
-              title="Tổng phiếu"
-              value={totalCount}
-              valueStyle={monoStyle}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6} md={4}>
-          <Card size="small">
-            <Statistic
-              title="Nháp"
-              value={draftCount}
-              valueStyle={{ ...monoStyle, color: '#8c8c8c' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6} md={4}>
-          <Card size="small">
-            <Statistic
-              title="Đang xử lý"
-              value={pickingCount}
-              valueStyle={{ ...monoStyle, color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6} md={4}>
-          <Card size="small">
-            <Statistic
-              title="Đã xuất"
-              value={confirmedCount}
-              valueStyle={{ ...monoStyle, color: '#1B4D3E' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6} md={4}>
-          <Card size="small">
-            <Statistic
-              title="SL đã xuất"
-              value={confirmedQty}
-              suffix="banh"
-              valueStyle={{ ...monoStyle, color: '#1B4D3E' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6} md={4}>
-          <Card size="small">
-            <Statistic
-              title="KL đã xuất"
-              value={confirmedWeight}
-              suffix="kg"
-              valueStyle={{ ...monoStyle, color: '#2D8B6E' }}
-              formatter={(val) => formatNumber(val as number)}
-            />
-          </Card>
-        </Col>
+      {/* KPI — trên dữ liệu đã lọc nhà máy */}
+      <Row gutter={[12, 12]} style={{ marginBottom: 8 }}>
+        {kpiCards.map(c => (
+          <Col xs={12} sm={8} md={4} key={c.title}>
+            <Card size="small" style={{ borderRadius: 10 }}>
+              <Statistic
+                title={c.title}
+                value={c.value}
+                suffix={kpiChuaCoSo ? undefined : c.suffix}
+                loading={isLoading && orders.length === 0}
+                valueStyle={{ ...monoStyle, color: kpiChuaCoSo ? undefined : c.color }}
+                formatter={(val) => (kpiChuaCoSo ? '—' : c.isKg ? fmtKg(Number(val)) : fmtNum(Number(val)))}
+              />
+            </Card>
+          </Col>
+        ))}
       </Row>
+      {orders.length >= LOAD_LIMIT && (
+        <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 8 }}>
+          Số liệu trên tính theo {fmtNum(LOAD_LIMIT)} phiếu gần nhất đã tải.
+        </Text>
+      )}
 
-      {/* Filters */}
-      <Card size="small" style={{ marginBottom: 16 }}>
-        <Space wrap>
-          <Input
-            placeholder="Tìm mã phiếu, khách hàng, kho..."
-            prefix={<SearchOutlined />}
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            allowClear
-            style={{ width: 300 }}
-          />
-          <Select
-            value={activeFilter}
-            onChange={val => setActiveFilter(val)}
-            options={STATUS_OPTIONS}
-            style={{ width: 180 }}
-          />
-        </Space>
-      </Card>
-
-      {/* Table */}
-      <Card styles={{ body: { padding: 0 } }}>
-        <Table<StockOutOrder>
+      <div style={{ marginTop: 8 }}>
+        <AdvancedDataTable<StockOutOrder>
           columns={columns}
-          dataSource={displayOrders}
+          dataSource={filteredOrders}
           rowKey="id"
-          loading={loading}
-          pagination={{
-            total: displayOrders.length,
-            pageSize: 20,
-            showSizeChanger: true,
-            showTotal: (total) => `${total} phiếu`,
-          }}
-          onRow={(record) => ({
-            onClick: () => handleTapRow(record),
-            style: { cursor: 'pointer' },
-          })}
-          scroll={{ x: 1200 }}
-          locale={{
-            emptyText: (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  activeFilter || searchText.trim()
-                    ? 'Không tìm thấy phiếu'
-                    : 'Chưa có phiếu xuất kho'
-                }
-              >
-                {!activeFilter && !searchText.trim() && (
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={handleCreateNew}
-                    style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
-                  >
-                    Tạo phiếu xuất
-                  </Button>
-                )}
-              </Empty>
-            ),
-          }}
+          loading={isLoading}
+          error={error}
+          loadLimit={LOAD_LIMIT}
+          title="Phiếu xuất kho"
+          dateRangeField="created_at"
+          onRefresh={() => refetch()}
+          onRowClick={openDetail}
+          exportFileName="Phieu_Xuat_Kho"
+          pageSize={50}
+          emptyText="Chưa có phiếu xuất kho nào"
         />
-      </Card>
+      </div>
     </div>
   )
 }

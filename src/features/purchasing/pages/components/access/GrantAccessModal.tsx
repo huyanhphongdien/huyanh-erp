@@ -24,6 +24,8 @@ import type {
   AccessLevel,
   EmployeeForGrant,
 } from '../../../../../services/purchaseAccessService';
+import { useDebounce } from '../../../../../hooks/useDebounce';
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -49,7 +51,10 @@ const GrantAccessModal: React.FC<GrantAccessModalProps> = ({
   // State
   const [employees, setEmployees] = useState<EmployeeForGrant[]>([]);
   const [loading, setLoading] = useState(true);
+  // Lỗi tải danh sách NV — trước đây nuốt im rồi báo "Không tìm thấy nhân viên" (sai nghĩa)
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400); // gõ xong 400ms mới bắn query
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeForGrant | null>(null);
   const [accessLevel, setAccessLevel] = useState<AccessLevel>('full');
   const [notes, setNotes] = useState('');
@@ -63,14 +68,16 @@ const GrantAccessModal: React.FC<GrantAccessModalProps> = ({
   const fetchEmployees = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await purchaseAccessService.getEmployeesForGrant(search || undefined);
+      setLoadError(null);
+      const data = await purchaseAccessService.getEmployeesForGrant(debouncedSearch || undefined);
       setEmployees(data);
     } catch (err: any) {
       console.error('Error fetching employees:', err);
+      setLoadError(dichLoiHeThong(err, 'Không tải được danh sách nhân viên'));
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     if (isOpen) {
@@ -110,7 +117,7 @@ const GrantAccessModal: React.FC<GrantAccessModalProps> = ({
       onSuccess();
     } catch (err: any) {
       console.error('Error granting access:', err);
-      setError(err.message || 'Không thể cấp quyền');
+      setError(dichLoiHeThong(err, 'Không thể cấp quyền'));
     } finally {
       setSaving(false);
     }
@@ -124,8 +131,8 @@ const GrantAccessModal: React.FC<GrantAccessModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      {/* Backdrop — đang lưu hoặc đã chọn NV thì bấm trúng nền không đóng (mất lựa chọn/ghi chú) */}
+      <div className="absolute inset-0 bg-black/50" onClick={!saving && !selectedEmployee ? onClose : undefined} />
 
       {/* Modal */}
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] flex flex-col">
@@ -176,6 +183,17 @@ const GrantAccessModal: React.FC<GrantAccessModalProps> = ({
                   <div className="flex items-center justify-center py-10">
                     <Loader2 className="w-5 h-5 animate-spin text-blue-500 mr-2" />
                     <span className="text-gray-500 text-sm">Đang tải...</span>
+                  </div>
+                ) : loadError ? (
+                  <div className="text-center py-10">
+                    <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                    <p className="text-red-700 text-sm font-medium">{loadError}</p>
+                    <button
+                      onClick={fetchEmployees}
+                      className="mt-2 text-sm text-blue-600 hover:underline"
+                    >
+                      Thử lại
+                    </button>
                   </div>
                 ) : employees.length === 0 ? (
                   <div className="text-center py-10">

@@ -77,7 +77,8 @@ export function Hac13CodeDisplay({
         <button
           type="button"
           onClick={handleCopy}
-          aria-label="Copy HAC-13 code"
+          aria-label="Sao chép mã HAC-13"
+          title={copied ? 'Đã sao chép' : 'Sao chép mã HAC-13'}
           className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}

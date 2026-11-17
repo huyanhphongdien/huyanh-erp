@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { performanceService } from '../../services'
 import { Button, Input, Select, Card, Pagination, Modal } from '../../components/ui'
 import { PerformanceReviewForm } from './PerformanceReviewForm'
+import PageState from '../../components/common/PageState'
 
 // Define type inline to avoid import issues
 interface PerformanceReview {
@@ -57,7 +58,7 @@ export function PerformanceReviewListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<PerformanceReview | null>(null)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['performance-reviews', page, periodFilter, statusFilter],
     queryFn: () => performanceService.getReviews({ 
       page, 
@@ -151,6 +152,12 @@ export function PerformanceReviewListPage() {
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                     Đang tải...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={7} className="p-0">
+                    <PageState error={error} onRetry={() => refetch()} />
                   </td>
                 </tr>
               ) : reviews.length === 0 ? (

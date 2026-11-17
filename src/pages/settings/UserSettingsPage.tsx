@@ -2,32 +2,35 @@
 // USER SETTINGS PAGE (RESPONSIVE)
 // File: src/pages/UserSettingsPage.tsx
 // Huy Anh ERP System - Phase 1: Đổi mật khẩu + Profile cơ bản
+// 17/11/2026 (Đợt 3 audit UI): gỡ 4 mục "Sắp ra mắt" (tab Thông báo, tab Giao diện, dòng 2FA, dòng Phiên
+// đăng nhập) — lời hứa chưa làm chiếm chỗ trên màn ai cũng mở để đổi mật khẩu; ERP KHÔNG có dark mode.
+// Khi làm thật thì thêm lại (bản cũ còn trong git). Màu nhấn xanh dương → xanh thương hiệu (Tailwind `primary`).
 // ============================================================================
 
 import React, { useState, useEffect } from 'react'
-import { 
-  Settings, 
-  User, 
-  Lock, 
-  Bell, 
-  Palette, 
+import {
+  Settings,
+  User,
+  Lock,
   Shield,
   Clock,
   AlertTriangle,
   Loader2
 } from 'lucide-react'
-import { 
-  userSettingsService, 
-  type UserProfile 
+import {
+  userSettingsService,
+  type UserProfile
 } from '../../services/userSettingsService'
 import { ChangePasswordForm } from '../../features/user-settings/components/ChangePasswordForm'
 import { ProfileEditor } from '../../features/user-settings/components/ProfileEditor'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate, fmtDateTime } from '../../utils/format'
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type TabId = 'profile' | 'security' | 'notifications' | 'appearance'
+type TabId = 'profile' | 'security'
 
 interface Tab {
   id: TabId
@@ -49,27 +52,11 @@ const TABS: Tab[] = [
     shortLabel: 'Hồ sơ',
     icon: <User className="w-4 h-4 sm:w-5 sm:h-5" /> 
   },
-  { 
-    id: 'security', 
+  {
+    id: 'security',
     label: 'Bảo mật',
     shortLabel: 'Bảo mật',
-    icon: <Lock className="w-4 h-4 sm:w-5 sm:h-5" /> 
-  },
-  { 
-    id: 'notifications', 
-    label: 'Thông báo',
-    shortLabel: 'Thông báo',
-    icon: <Bell className="w-4 h-4 sm:w-5 sm:h-5" />,
-    disabled: true,
-    badge: 'Sắp ra mắt'
-  },
-  { 
-    id: 'appearance', 
-    label: 'Giao diện',
-    shortLabel: 'Giao diện',
-    icon: <Palette className="w-4 h-4 sm:w-5 sm:h-5" />,
-    disabled: true,
-    badge: 'Sắp ra mắt'
+    icon: <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
   },
 ]
 
@@ -101,7 +88,7 @@ export function UserSettingsPage() {
       const { data, error: profileError } = await userSettingsService.getCurrentUserProfile()
       
       if (profileError) {
-        setError(profileError.message)
+        setError(dichLoiHeThong(profileError, 'Không thể tải thông tin tài khoản'))
         return
       }
       
@@ -131,7 +118,7 @@ export function UserSettingsPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 animate-spin text-blue-600 mx-auto mb-3 sm:mb-4" />
+          <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 animate-spin text-primary mx-auto mb-3 sm:mb-4" />
           <p className="text-gray-500 text-sm sm:text-base">Đang tải thông tin...</p>
         </div>
       </div>
@@ -153,7 +140,7 @@ export function UserSettingsPage() {
           <p className="text-gray-500 mb-4 text-sm sm:text-base">{error}</p>
           <button
             onClick={loadProfile}
-            className="px-5 sm:px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+            className="px-5 sm:px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-secondary transition-colors text-sm sm:text-base"
           >
             Thử lại
           </button>
@@ -171,8 +158,8 @@ export function UserSettingsPage() {
       {/* Header */}
       <div className="mb-4 sm:mb-6 md:mb-8">
         <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
-          <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg">
-            <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+          <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg">
+            <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Cài đặt tài khoản</h1>
         </div>
@@ -202,7 +189,7 @@ export function UserSettingsPage() {
         <div className="mb-4 sm:mb-6 flex items-center gap-2 text-xs sm:text-sm text-gray-500">
           <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
           <span>
-            Lần đổi mật khẩu cuối: {new Date(profile.last_password_change).toLocaleDateString('vi-VN')} 
+            Lần đổi mật khẩu cuối: {fmtDate(profile.last_password_change)}
             ({passwordExpiry.daysSinceChange} ngày trước)
           </span>
         </div>
@@ -220,7 +207,7 @@ export function UserSettingsPage() {
                 disabled={tab.disabled}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap text-sm font-medium transition-colors flex-shrink-0 ${
                   activeTab === tab.id
-                    ? 'bg-blue-100 text-blue-700'
+                    ? 'bg-primary/10 text-primary'
                     : tab.disabled
                       ? 'text-gray-400 cursor-not-allowed'
                       : 'text-gray-600 hover:bg-gray-100'
@@ -230,7 +217,7 @@ export function UserSettingsPage() {
                 <span>{tab.shortLabel}</span>
                 {tab.badge && (
                   <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[10px] rounded-full">
-                    Soon
+                    {tab.badge}
                   </span>
                 )}
               </button>
@@ -248,13 +235,13 @@ export function UserSettingsPage() {
                 disabled={tab.disabled}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600'
+                    ? 'bg-primary/5 text-primary border-l-4 border-primary'
                     : tab.disabled
                       ? 'text-gray-400 cursor-not-allowed'
                       : 'text-gray-700 hover:bg-gray-50 border-l-4 border-transparent'
                 }`}
               >
-                <span className={activeTab === tab.id ? 'text-blue-600' : ''}>
+                <span className={activeTab === tab.id ? 'text-primary' : ''}>
                   {tab.icon}
                 </span>
                 <span className="font-medium">{tab.label}</span>
@@ -268,12 +255,12 @@ export function UserSettingsPage() {
           </nav>
           
           {/* Security Tips - Desktop only */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+          <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/10">
             <div className="flex items-center gap-2 mb-2">
-              <Shield className="w-5 h-5 text-blue-600" />
-              <h4 className="font-medium text-blue-900">Mẹo bảo mật</h4>
+              <Shield className="w-5 h-5 text-primary" />
+              <h4 className="font-medium text-primary">Mẹo bảo mật</h4>
             </div>
-            <ul className="text-sm text-blue-700 space-y-1.5">
+            <ul className="text-sm text-gray-700 space-y-1.5">
               <li>• Đổi mật khẩu định kỳ 90 ngày</li>
               <li>• Không chia sẻ mật khẩu với ai</li>
               <li>• Sử dụng mật khẩu mạnh</li>
@@ -305,12 +292,12 @@ export function UserSettingsPage() {
                 
                 <div className="space-y-3 sm:space-y-4">
                   {/* Last Password Change */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 sm:py-3 border-b border-gray-100 gap-1 sm:gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 sm:py-3 gap-1 sm:gap-3">
                     <div className="min-w-0">
                       <p className="font-medium text-gray-900 text-sm sm:text-base">Lần đổi mật khẩu cuối</p>
                       <p className="text-xs sm:text-sm text-gray-500">
-                        {profile?.last_password_change 
-                          ? new Date(profile.last_password_change).toLocaleString('vi-VN')
+                        {profile?.last_password_change
+                          ? fmtDateTime(profile.last_password_change)
                           : 'Chưa có thông tin'
                         }
                       </p>
@@ -325,42 +312,16 @@ export function UserSettingsPage() {
                       </span>
                     )}
                   </div>
-                  
-                  {/* 2FA Status */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 sm:py-3 border-b border-gray-100 gap-1 sm:gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900 text-sm sm:text-base">Xác thực 2 yếu tố (2FA)</p>
-                      <p className="text-xs sm:text-sm text-gray-500">
-                        Bảo vệ tài khoản với mã xác thực bổ sung
-                      </p>
-                    </div>
-                    <span className="self-start sm:self-auto px-2 sm:px-3 py-0.5 sm:py-1 bg-gray-100 text-gray-500 rounded-full text-xs sm:text-sm flex-shrink-0">
-                      Sắp ra mắt
-                    </span>
-                  </div>
-                  
-                  {/* Active Sessions */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 sm:py-3 gap-1 sm:gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900 text-sm sm:text-base">Phiên đăng nhập</p>
-                      <p className="text-xs sm:text-sm text-gray-500">
-                        Quản lý các thiết bị đã đăng nhập
-                      </p>
-                    </div>
-                    <span className="self-start sm:self-auto px-2 sm:px-3 py-0.5 sm:py-1 bg-gray-100 text-gray-500 rounded-full text-xs sm:text-sm flex-shrink-0">
-                      Sắp ra mắt
-                    </span>
-                  </div>
                 </div>
               </div>
 
               {/* Mobile Security Tips */}
-              <div className="lg:hidden p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-100">
+              <div className="lg:hidden p-3 sm:p-4 bg-primary/5 rounded-lg border border-primary/10">
                 <div className="flex items-center gap-2 mb-2">
-                  <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                  <h4 className="font-medium text-blue-900 text-sm sm:text-base">Mẹo bảo mật</h4>
+                  <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                  <h4 className="font-medium text-primary text-sm sm:text-base">Mẹo bảo mật</h4>
                 </div>
-                <ul className="text-xs sm:text-sm text-blue-700 space-y-1">
+                <ul className="text-xs sm:text-sm text-gray-700 space-y-1">
                   <li>• Đổi mật khẩu định kỳ 90 ngày</li>
                   <li>• Không chia sẻ mật khẩu với ai</li>
                   <li>• Sử dụng mật khẩu mạnh</li>
@@ -370,31 +331,6 @@ export function UserSettingsPage() {
             </div>
           )}
           
-          {/* Notifications Tab (Placeholder) */}
-          {activeTab === 'notifications' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8 text-center">
-              <Bell className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1.5 sm:mb-2">
-                Cài đặt thông báo
-              </h3>
-              <p className="text-gray-500 text-sm sm:text-base">
-                Tính năng này đang được phát triển và sẽ sớm ra mắt.
-              </p>
-            </div>
-          )}
-          
-          {/* Appearance Tab (Placeholder) */}
-          {activeTab === 'appearance' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8 text-center">
-              <Palette className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1.5 sm:mb-2">
-                Cài đặt giao diện
-              </h3>
-              <p className="text-gray-500 text-sm sm:text-base">
-                Tính năng này đang được phát triển và sẽ sớm ra mắt.
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>

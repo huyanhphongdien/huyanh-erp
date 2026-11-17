@@ -44,6 +44,7 @@ import nvlDashboardService, {
 import forecastService, { type GradeForecast } from '../../services/wms/forecastService'
 import { RUBBER_GRADE_LABELS, RUBBER_GRADE_COLORS } from '../../services/wms/wms.types'
 import type { RubberGrade } from '../../services/wms/wms.types'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 
@@ -250,7 +251,7 @@ const NVLDashboardPage = () => {
       setForecastData(fc)
     } catch (err: any) {
       console.error('NVL Dashboard load error:', err)
-      setError(err.message || 'Lỗi tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Lỗi tải dữ liệu bãi NVL'))
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -314,7 +315,8 @@ const NVLDashboardPage = () => {
             <Button icon={<EnvironmentOutlined />} onClick={() => navigate('/wms/yard-map')}>
               Bản đồ bãi
             </Button>
-            <Button icon={<ExperimentOutlined />} onClick={() => navigate('/wms/qc')}>
+            {/* Nút ghi "QC nhanh" thì mở đúng tab QC nhanh (trước mở tab Tổng quan QC) */}
+            <Button icon={<ExperimentOutlined />} onClick={() => navigate('/wms/qc?tab=quick-scan')}>
               QC nhanh
             </Button>
           </Space>

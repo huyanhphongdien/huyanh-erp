@@ -15,6 +15,34 @@ import { supabase } from '../../lib/supabase'
 export type RiskCategory = 'technical' | 'schedule' | 'resource' | 'external' | 'financial'
 export type RiskStatus = 'identified' | 'analyzing' | 'mitigating' | 'resolved' | 'accepted' | 'closed'
 
+// Nhãn + màu antd — MỘT nguồn cho Sổ rủi ro, tab Báo cáo… (Đợt 3 audit UI 17/11/2026: 2 bản chép đã lệch
+// "Đã nhận diện"/"Đã xác định", "Đã giải quyết"/"Đã xử lý", "Đã đóng"/"Đóng"). Trang đọc chữ từ đây.
+export const RISK_STATUS_LABELS: Record<RiskStatus, string> = {
+  identified: 'Đã nhận diện',
+  analyzing: 'Đang phân tích',
+  mitigating: 'Đang xử lý',
+  resolved: 'Đã giải quyết',
+  accepted: 'Chấp nhận',
+  closed: 'Đã đóng',
+}
+
+export const RISK_STATUS_COLORS: Record<RiskStatus, string> = {
+  identified: 'gold',
+  analyzing: 'blue',
+  mitigating: 'blue',
+  resolved: 'green',
+  accepted: 'default',
+  closed: 'default',
+}
+
+export const RISK_CATEGORY_LABELS: Record<RiskCategory, string> = {
+  technical: 'Kỹ thuật',
+  schedule: 'Tiến độ',
+  resource: 'Nguồn lực',
+  external: 'Bên ngoài',
+  financial: 'Tài chính',
+}
+
 export interface ProjectRisk {
   id: string
   project_id: string

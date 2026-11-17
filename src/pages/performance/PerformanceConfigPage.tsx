@@ -11,6 +11,9 @@ import { Card, Button, message, Modal, Tooltip, Tag } from 'antd';
 import { Save, RotateCcw, Info, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/authStore';
+import PageState from '../../components/common/PageState';
+import { fmtDateTime } from '../../utils/format';
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong';
 
 interface ConfigRow {
   config_key: string;
@@ -56,6 +59,8 @@ export default function PerformanceConfigPage() {
   const [editing, setEditing] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  // Lỗi tải: trước đây chỉ toast rồi vẽ trang trắng (0 thẻ cấu hình) như thể chưa có cấu hình nào
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const { user } = useAuthStore();
 
@@ -71,9 +76,8 @@ export default function PerformanceConfigPage() {
       .select('config_key, config_value, description, updated_at')
       .order('config_key');
 
-    if (error) {
-      message.error('Không tải được cấu hình: ' + error.message);
-    } else {
+    setLoadError(error || null);
+    if (!error) {
       setConfigs(data || []);
       const initialEditing: Record<string, string> = {};
       (data || []).forEach(c => {
@@ -89,13 +93,13 @@ export default function PerformanceConfigPage() {
     try { parsed = JSON.parse(jsonStr); } catch { return 'JSON không hợp lệ'; }
 
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      return 'Phải là object (key-value)';
+      return 'Phải là đối tượng dạng { "khóa": số }';
     }
 
     // A-H6 fix: validate mọi value là số hữu hạn (Number.isFinite chặn NaN, Infinity, string non-numeric)
     for (const [k, v] of Object.entries(parsed)) {
       if (!Number.isFinite(Number(v))) {
-        return `Value của "${k}" phải là số (đang "${v}")`;
+        return `Giá trị của "${k}" phải là số (đang "${v}")`;
       }
     }
 
@@ -113,7 +117,7 @@ export default function PerformanceConfigPage() {
       }
       const { A, B, C, D } = parsed;
       if (!(A > B && B > C && C > D)) return 'Phải A > B > C > D';
-      if (A > 100 || D < 0) return 'Range phải [0, 100]';
+      if (A > 100 || D < 0) return 'Ngưỡng phải nằm trong [0, 100]';
     }
     if (key === 'difficulty_scores') {
       const required = ['normal', 'hard', 'critical'] as const;
@@ -134,7 +138,7 @@ export default function PerformanceConfigPage() {
 
   async function saveConfig(key: string) {
     const err = validateValue(key, editing[key]);
-    if (err) { message.error('Validate fail: ' + err); return; }
+    if (err) { message.error('Giá trị chưa hợp lệ: ' + err); return; }
 
     setSaving(key);
     const parsed = JSON.parse(editing[key]);
@@ -149,7 +153,7 @@ export default function PerformanceConfigPage() {
 
     setSaving(null);
     if (error) {
-      message.error('Save fail: ' + error.message);
+      message.error(dichLoiHeThong(error, 'Lưu cấu hình thất bại'));
     } else {
       message.success(`Đã lưu ${KEY_LABELS[key] || key}. Snapshot tháng hiện tại sẽ tính lại tối nay 23:30.`);
       loadConfigs();
@@ -158,9 +162,9 @@ export default function PerformanceConfigPage() {
 
   function resetToDefault(key: string) {
     Modal.confirm({
-      title: `Reset ${KEY_LABELS[key]} về mặc định?`,
-      content: 'Giá trị hiện tại sẽ được thay bằng default. Bạn có chắc?',
-      okText: 'Reset', cancelText: 'Hủy', okType: 'danger',
+      title: `Đặt lại "${KEY_LABELS[key] || key}" về mặc định?`,
+      content: 'Ô chỉnh sửa sẽ điền lại giá trị mặc định — phải bấm Lưu thì mới áp dụng.',
+      okText: 'Đặt lại', cancelText: 'Không', okType: 'danger',
       onOk: () => {
         if (DEFAULTS[key]) {
           setEditing(prev => ({ ...prev, [key]: JSON.stringify(DEFAULTS[key], null, 2) }));
@@ -170,8 +174,12 @@ export default function PerformanceConfigPage() {
     });
   }
 
-  if (loading) {
-    return <div style={{ padding: 24 }}>Đang tải cấu hình...</div>;
+  if (loading || loadError) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState loading={loading} error={loadError} onRetry={loadConfigs} />
+      </div>
+    );
   }
 
   if (!canEdit) {
@@ -225,7 +233,7 @@ export default function PerformanceConfigPage() {
                 )}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <Tooltip title="Reset về mặc định">
+                <Tooltip title="Đặt lại về mặc định">
                   <Button icon={<RotateCcw size={14} />} size="small"
                     onClick={() => resetToDefault(cfg.config_key)} />
                 </Tooltip>
@@ -258,7 +266,7 @@ export default function PerformanceConfigPage() {
               </div>
             )}
             <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-              Updated: {new Date(cfg.updated_at).toLocaleString('vi-VN')}
+              Cập nhật lúc: {fmtDateTime(cfg.updated_at)}
             </div>
           </Card>
         );

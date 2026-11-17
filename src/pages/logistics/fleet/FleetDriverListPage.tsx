@@ -12,6 +12,10 @@ import {
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, IdcardOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { fleetService, type FleetDriver } from '../../../services/logistics/fleetService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { DASH } from '../../../utils/format'
+import PageState from '../../../components/common/PageState'
+import { stdPagination } from '../../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
 
@@ -19,6 +23,7 @@ export default function FleetDriverListPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<FleetDriver[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState<unknown>(null)
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<FleetDriver | null>(null)
@@ -27,10 +32,11 @@ export default function FleetDriverListPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadErr(null)
     try {
       setRows(await fleetService.listDrivers({ search: search || undefined }))
     } catch (e: any) {
-      message.error('Lỗi tải tài xế: ' + (e?.message || e))
+      setLoadErr(e)   // bảng không được hiện "trống" khi tải hỏng
     }
     setLoading(false)
   }, [search])
@@ -61,7 +67,7 @@ export default function FleetDriverListPage() {
       load()
     } catch (e: any) {
       if (e?.errorFields) return
-      message.error('Lỗi lưu: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi lưu tài xế'))
     }
     setSaving(false)
   }
@@ -72,15 +78,16 @@ export default function FleetDriverListPage() {
       message.success('Đã xoá')
       load()
     } catch (e: any) {
-      message.error('Lỗi xoá: ' + (e?.message || e))
+      // 23503 (tài xế đã có lệnh/tạm ứng) → dichLoiHeThong ra câu "đang được nơi khác tham chiếu"
+      message.error(dichLoiHeThong(e, 'Lỗi xoá tài xế'))
     }
   }
 
   const columns = [
     { title: 'Họ tên', dataIndex: 'full_name', key: 'full_name', render: (v: string) => <b>{v}</b> },
-    { title: 'SĐT', dataIndex: 'phone', key: 'phone', render: (v: string) => v || '–' },
-    { title: 'CCCD', dataIndex: 'id_no', key: 'id_no', render: (v: string) => v || '–' },
-    { title: 'GPLX', dataIndex: 'license_no', key: 'license_no', render: (v: string, r: FleetDriver) => v ? `${v}${r.license_class ? ` (${r.license_class})` : ''}` : '–' },
+    { title: 'SĐT', dataIndex: 'phone', key: 'phone', render: (v: string) => v || DASH },
+    { title: 'CCCD', dataIndex: 'id_no', key: 'id_no', render: (v: string) => v || DASH },
+    { title: 'GPLX', dataIndex: 'license_no', key: 'license_no', render: (v: string, r: FleetDriver) => v ? `${v}${r.license_class ? ` (${r.license_class})` : ''}` : DASH },
     { title: 'Trạng thái', dataIndex: 'active', key: 'active', width: 110, render: (v: boolean) => v ? <Tag color="green">Đang làm</Tag> : <Tag>Nghỉ</Tag> },
     {
       title: '', key: 'act', width: 110, render: (_: any, r: FleetDriver) => (
@@ -110,8 +117,10 @@ export default function FleetDriverListPage() {
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>Thêm tài xế</Button>
           </Space>
         </div>
-        <Table rowKey="id" size="middle" loading={loading} columns={columns as any} dataSource={rows}
-          pagination={{ pageSize: 20, showSizeChanger: false }} />
+        <PageState error={loadErr} onRetry={load}>
+          <Table rowKey="id" size="middle" loading={loading} columns={columns as any} dataSource={rows}
+            pagination={stdPagination(20)} />
+        </PageState>
       </Card>
 
       <Modal title={editing ? 'Sửa tài xế' : 'Thêm tài xế'} open={modalOpen} onOk={onSave} confirmLoading={saving}

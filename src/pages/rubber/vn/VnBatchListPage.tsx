@@ -13,6 +13,8 @@ import {
   Droplets, ClipboardList, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { fmtNum, fmtKg, fmtPct, fmtVndCompact, fmtDateShort } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES (inline — không phụ thuộc rubber.types)
@@ -46,32 +48,19 @@ interface VnBatch {
 // HELPERS
 // ============================================================================
 
-function fmt(n?: number | null): string {
-  if (n == null || n === 0) return '–'
-  return n.toLocaleString('vi-VN')
-}
+// Thẻ hẹp nên rút gọn: tiền "9,33 tỷ"/"350,5 tr" (fmtVndCompact), tấn "T" — số theo vi-VN qua format.ts
+// (toFixed cũ ra DẤU CHẤM thập phân). Trống → '—'; số 0 in "0".
 function fmtTon(t?: number | null): string {
-  if (!t) return '–'
-  return `${t.toFixed(3)}T`
+  if (t === null || t === undefined) return '—'
+  return `${fmtNum(t, 3)}T`
 }
-function fmtMoney(a?: number | null): string {
-  if (!a) return '–'
-  if (a >= 1e9) return `${(a / 1e9).toFixed(2)} tỷ`
-  if (a >= 1e6) return `${(a / 1e6).toFixed(1)} tr`
-  return fmt(a)
-}
+const fmtMoney = (a?: number | null): string => fmtVndCompact(a)
 function fmtWeight(kg?: number | null): string {
-  if (!kg) return '–'
-  return `${fmt(Math.round(kg))} kg`
+  if (kg === null || kg === undefined) return '—'
+  return `${fmtKg(kg)} kg`
 }
-function fmtDate(s?: string): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-}
-function fmtPercent(p?: number | null): string {
-  if (!p) return '–'
-  return `${p.toFixed(1)}%`
-}
+const fmtDate = (s?: string): string => fmtDateShort(s)   // 'DD/MM' cho thẻ
+const fmtPercent = (p?: number | null): string => (p ? fmtPct(p, 1) : '—')
 function getMonthLabel(y: number, m: number): string {
   return `Tháng ${m}/${y}`
 }
@@ -294,7 +283,7 @@ const VnBatchListPage: React.FC = () => {
       setBatches((data || []) as unknown as VnBatch[])
     } catch (err: unknown) {
       console.error('Lỗi tải chốt mủ Việt:', err)
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu'))
     } finally {
       setLoading(false)
     }

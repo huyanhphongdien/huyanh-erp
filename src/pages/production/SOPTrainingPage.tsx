@@ -30,7 +30,7 @@ interface TrainingAssignment {
 export default function SOPTrainingPage() {
   const navigate = useNavigate()
 
-  const { data: assignments = [], isLoading, refetch } = useQuery({
+  const { data: assignments = [], isLoading, error, refetch } = useQuery({
     queryKey: ['sop-training'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -88,6 +88,7 @@ export default function SOPTrainingPage() {
         dataSource={assignments}
         rowKey="id"
         loading={isLoading}
+        error={error}
         title="Huấn luyện SOP"
         onRefresh={() => refetch()}
         exportFileName="Huan_Luyen_SOP"

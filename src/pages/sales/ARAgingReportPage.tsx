@@ -27,13 +27,19 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
-  ClockCircleOutlined, DollarOutlined, TeamOutlined, FileTextOutlined,
+  ClockCircleOutlined, DollarOutlined, TeamOutlined, FileTextOutlined, DownloadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useAuthStore } from '../../stores/authStore'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
 import QuickPayModal, { type QuickPayTarget } from './components/QuickPayModal'
 import { arAgingService, type ArAgingRow } from '../../services/sales/arAgingService'
+import { exportArAgingExcel } from '../../services/sales/arAgingExcel'
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, countryLabel } from '../../services/sales/salesTypes'
+import { EnumTag } from '../../components/common/EnumTag'
+import PageState from '../../components/common/PageState'
+import { DASH, fmtUsd } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 
@@ -84,16 +90,11 @@ interface ARRecord {
 // HELPERS
 // ============================================================================
 
-const formatUSD = (v: number): string =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v)
+// USD: fmtUsd (utils/format, 0 số lẻ). Nhãn trạng thái đơn: ORDER_STATUS_LABELS (salesTypes) —
+// bỏ bản chép tay đã trôi ('Đang SX', invoiced = 'Đã xuất HĐ' trong khi chuẩn là 'Đã lập HĐ').
 
 // status "đã giao/xuất trở đi" — khớp cột "Đã giao khách" trên Kanban
 const DELIVERED_STATUSES = ['shipped', 'delivered', 'invoiced']
-
-const STATUS_LABELS: Record<string, string> = {
-  confirmed: 'Đã xác nhận', producing: 'Đang SX', ready: 'Sẵn sàng',
-  packing: 'Đóng gói', shipped: 'Đã xuất', delivered: 'Đã giao', invoiced: 'Đã xuất HĐ',
-}
 
 // ============================================================================
 // COMPONENT
@@ -108,6 +109,9 @@ export default function ARAgingReportPage() {
   /** Dòng công nợ gốc (lô / dư / đơn) — B3 sẽ bung ra bảng con. */
   const [arRows, setArRows] = useState<ArAgingRow[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "không ai nợ" — trước đây chỉ toast rồi để bảng trống
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [exporting, setExporting] = useState(false)
   const [filterCurrency, setFilterCurrency] = useState<string>('all')
   const [scope, setScope] = useState<'delivered' | 'all'>('delivered')
   // Bật MẶC ĐỊNH từ 27/08/2026: mốc tuổi giờ lấy từ lệnh điều động thật, và phần không
@@ -119,6 +123,7 @@ export default function ARAgingReportPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       // Mẫu số KHÔNG còn tính ở đây. Nó nằm trong v_ar_aging_rows, và trang chỉ cuộn
       // các dòng đó lên mức đơn để hiển thị. Xem arAgingService.ts.
@@ -165,7 +170,7 @@ export default function ARAgingReportPage() {
       setRawOrders([...byOrder.values()])
     } catch (e) {
       console.error('Công nợ khách load error:', e)
-      message.error('Lỗi tải công nợ')
+      setLoadError(e)
     }
     setLoading(false)
   }, [])
@@ -298,13 +303,13 @@ export default function ARAgingReportPage() {
       },
       {
         title: 'Trị giá', dataIndex: 'rowValueUsd', key: 'v', align: 'right',
-        render: (v: number) => <span style={{ color: v < 0 ? '#c2410c' : undefined }}>{formatUSD(v)}</span>,
+        render: (v: number) => <span style={{ color: v < 0 ? '#c2410c' : undefined }}>{fmtUsd(v)}</span>,
       },
       {
         title: 'Đã thu', key: 'p', align: 'right',
         render: (_, r) => (
           <span>
-            <Text type={r.rowPaidUsd > 0 ? 'success' : 'secondary'}>{formatUSD(r.rowPaidUsd)}</Text>
+            <Text type={r.rowPaidUsd > 0 ? 'success' : 'secondary'}>{fmtUsd(r.rowPaidUsd)}</Text>
             {r.rowKind === 'residual' && r.rowPaidUsd > 0 && (
               <Tooltip title="Tiền đã thu nhưng CHƯA gắn số lô. Ghi thu kèm số lô thì khoản này sẽ về đúng lô.">
                 <Tag color="purple" style={{ marginLeft: 6 }}>chưa gắn lô</Tag>
@@ -315,7 +320,7 @@ export default function ARAgingReportPage() {
       },
       {
         title: 'Còn nợ', dataIndex: 'rowOutstandingUsd', key: 'o', align: 'right',
-        render: (v: number) => <Text strong style={{ color: v < 0 ? '#c2410c' : '#f5222d' }}>{formatUSD(v)}</Text>,
+        render: (v: number) => <Text strong style={{ color: v < 0 ? '#c2410c' : '#f5222d' }}>{fmtUsd(v)}</Text>,
       },
       {
         title: '', key: 'act', align: 'right', width: 130,
@@ -346,11 +351,11 @@ export default function ARAgingReportPage() {
           {o.contractNo && <><br /><Text type="secondary" style={{ fontSize: 10 }}>{o.code}</Text></>}
         </div>
       ) },
-      { title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 110,
-        render: (v: string) => <Tag>{STATUS_LABELS[v] || v}</Tag> },
-      { title: 'Tổng', dataIndex: 'total', key: 'total', align: 'right', render: (v) => formatUSD(v) },
-      { title: 'Đã thu', dataIndex: 'paid', key: 'paid', align: 'right', render: (v) => <Text type="success">{formatUSD(v)}</Text> },
-      { title: 'Còn nợ', dataIndex: 'outstanding', key: 'out', align: 'right', render: (v) => <Text strong style={{ color: '#f5222d' }}>{formatUSD(v)}</Text> },
+      { title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 130,
+        render: (v: string) => <EnumTag value={v} labels={ORDER_STATUS_LABELS} colors={ORDER_STATUS_COLORS} /> },
+      { title: 'Tổng', dataIndex: 'total', key: 'total', align: 'right', render: (v) => fmtUsd(v) },
+      { title: 'Đã thu', dataIndex: 'paid', key: 'paid', align: 'right', render: (v) => <Text type="success">{fmtUsd(v)}</Text> },
+      { title: 'Còn nợ', dataIndex: 'outstanding', key: 'out', align: 'right', render: (v) => <Text strong style={{ color: '#f5222d' }}>{fmtUsd(v)}</Text> },
       { title: '', key: 'act', align: 'right', width: 150,
         render: (_, o) => canCollect
           ? <Button type="primary" size="small" icon={<DollarOutlined />} style={{ background: '#15803d', borderColor: '#15803d' }} onClick={() => openPay(o)}>Ghi nhận đã thu</Button>
@@ -377,15 +382,15 @@ export default function ARAgingReportPage() {
       render: (_, r) => (
         <div>
           <Text strong style={{ fontSize: 13 }}>{r.customer_name}</Text><br />
-          <Text type="secondary" style={{ fontSize: 11 }}>{r.customer_code} • {r.country || '-'}</Text>
+          <Text type="secondary" style={{ fontSize: 11 }}>{r.customer_code} • {countryLabel(r.country)}</Text>
         </div>
       ) },
     { title: 'Đơn', dataIndex: 'order_count', key: 'orders', width: 60, align: 'center' },
-    { title: 'Tổng giá trị', dataIndex: 'total_amount', key: 'total', width: 120, align: 'right', render: (v: number) => formatUSD(v) },
-    { title: 'Đã thu', dataIndex: 'paid_amount', key: 'paid', width: 110, align: 'right', render: (v: number) => <Text type="success">{formatUSD(v)}</Text> },
+    { title: 'Tổng giá trị', dataIndex: 'total_amount', key: 'total', width: 120, align: 'right', render: (v: number) => fmtUsd(v) },
+    { title: 'Đã thu', dataIndex: 'paid_amount', key: 'paid', width: 110, align: 'right', render: (v: number) => <Text type="success">{fmtUsd(v)}</Text> },
     { title: 'Còn nợ', dataIndex: 'outstanding', key: 'outstanding', width: 130, align: 'right',
       defaultSortOrder: 'descend', sorter: (a, b) => a.outstanding - b.outstanding,
-      render: (v: number) => <Text strong style={{ color: '#f5222d', fontSize: 14 }}>{formatUSD(v)}</Text> },
+      render: (v: number) => <Text strong style={{ color: '#f5222d', fontSize: 14 }}>{fmtUsd(v)}</Text> },
     { title: 'Thu nợ', key: 'progress', width: 110,
       render: (_, r) => {
         const pct = r.total_amount > 0 ? Math.round((r.paid_amount / r.total_amount) * 100) : 0
@@ -394,10 +399,10 @@ export default function ARAgingReportPage() {
   ]
 
   const agingCols: ColumnsType<ARRecord> = [
-    { title: '0-30 ngày', dataIndex: 'aging_0_30', key: 'a1', width: 100, align: 'right', render: (v: number) => v > 0 ? <Tag color="green">{formatUSD(v)}</Tag> : '-' },
-    { title: '31-60', dataIndex: 'aging_31_60', key: 'a2', width: 100, align: 'right', render: (v: number) => v > 0 ? <Tag color="gold">{formatUSD(v)}</Tag> : '-' },
-    { title: '61-90', dataIndex: 'aging_61_90', key: 'a3', width: 100, align: 'right', render: (v: number) => v > 0 ? <Tag color="orange">{formatUSD(v)}</Tag> : '-' },
-    { title: '> 90', dataIndex: 'aging_90_plus', key: 'a4', width: 100, align: 'right', render: (v: number) => v > 0 ? <Tag color="red">{formatUSD(v)}</Tag> : '-' },
+    { title: '0-30 ngày', dataIndex: 'aging_0_30', key: 'a1', width: 100, align: 'right', render: (v: number) => v > 0 ? <Tag color="green">{fmtUsd(v)}</Tag> : DASH },
+    { title: '31-60', dataIndex: 'aging_31_60', key: 'a2', width: 100, align: 'right', render: (v: number) => v > 0 ? <Tag color="gold">{fmtUsd(v)}</Tag> : DASH },
+    { title: '61-90', dataIndex: 'aging_61_90', key: 'a3', width: 100, align: 'right', render: (v: number) => v > 0 ? <Tag color="orange">{fmtUsd(v)}</Tag> : DASH },
+    { title: '> 90', dataIndex: 'aging_90_plus', key: 'a4', width: 100, align: 'right', render: (v: number) => v > 0 ? <Tag color="red">{fmtUsd(v)}</Tag> : DASH },
     // ⚠ CỘT THỨ NĂM BẮT BUỘC. Nợ không có ngày giao thì không thuộc bucket nào — nhét
     // nó vào "0-30" (mặc định days=0 của bản cũ) hay vào ">90" đều là bịa. Đây cũng là
     // danh sách việc phải làm: bổ sung ngày giao cho những đơn này.
@@ -406,11 +411,28 @@ export default function ARAgingReportPage() {
         <span style={{ cursor: 'help' }}>Chưa có mốc</span>
       </Tooltip>,
       dataIndex: 'aging_no_anchor', key: 'a5', width: 110, align: 'right',
-      render: (v: number) => v > 0 ? <Tag>{formatUSD(v)}</Tag> : '-',
+      render: (v: number) => v > 0 ? <Tag>{fmtUsd(v)}</Tag> : DASH,
     },
   ]
 
   const columns = showAging ? [...baseCols, ...agingCols] : baseCols
+
+  // Xuất Excel đúng các số đang hiện (sau lọc tiền tệ + phạm vi) — không tự tính công thức nào
+  const handleExport = async () => {
+    if (filtered.length === 0) { message.info('Không có khách nào để xuất'); return }
+    setExporting(true)
+    try {
+      const scopeLabel = (scope === 'delivered' ? 'Đơn đã giao' : 'Tất cả đơn còn nợ')
+        + (filterCurrency !== 'all' ? ` · Tiền tệ ${filterCurrency}` : '')
+      await exportArAgingExcel({ customers: filtered, scopeLabel })
+      message.success(`Đã xuất ${filtered.length} khách`)
+    } catch (e) {
+      console.error(e)
+      message.error(dichLoiHeThong(e, 'Lỗi xuất Excel'))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div style={{ padding: 24 }}>
@@ -438,8 +460,15 @@ export default function ARAgingReportPage() {
               { value: 'EUR', label: 'EUR' },
             ]}
           />
+          <Button icon={<DownloadOutlined />} loading={exporting} disabled={loading || !!loadError} onClick={handleExport}>
+            Xuất Excel
+          </Button>
         </div>
       </div>
+
+      {loadError && !loading ? (
+        <PageState error={loadError} onRetry={load} />
+      ) : (<>
 
       {/* KPI cốt lõi (bằng ĐÔ, không phụ thuộc tuổi nợ) */}
       <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -506,6 +535,7 @@ export default function ARAgingReportPage() {
           }}
         />
       </Card>
+      </>)}
 
       {/* Modal ghi nhận đã thu (dùng chung với kéo-thả Kanban) */}
       <QuickPayModal

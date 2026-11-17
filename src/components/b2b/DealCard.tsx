@@ -37,6 +37,7 @@ import {
   PRODUCT_TYPE_LABELS,
   type DealStatus,
 } from '../../types/b2b.constants'
+import { fmtNum, fmtVnd, fmtVndNum } from '../../utils/format'
 
 const { Text } = Typography
 
@@ -60,10 +61,6 @@ interface DealCardProps {
 // ============================================
 // HELPERS
 // ============================================
-
-const formatCurrency = (value: number): string => {
-  return value.toLocaleString('vi-VN')
-}
 
 // Gradient theo status — re-export từ b2b.constants
 const STATUS_GRADIENT = DEAL_STATUS_GRADIENT
@@ -116,7 +113,7 @@ const DealProgress = ({
         { key: 'accepted',   label: 'Duyệt',      done: isAccepted },
         { key: 'stock_in',   label: 'Nhập kho',   done: hasStockIn },
         { key: 'production', label: 'Sản xuất',   done: hasProduction },
-        { key: 'qc',         label: 'QC final',   done: hasQcFinal && hasProduction },
+        { key: 'qc',         label: 'QC cuối',    done: hasQcFinal && hasProduction },
         { key: 'paid',       label: 'Thanh toán', done: isSettled },
       ]
 
@@ -325,8 +322,8 @@ const DealCard = ({
             <br />
             <Text strong style={{ color: '#fff', fontSize: 13 }}>
               {metadata.actual_weight_kg
-                ? `${(metadata.actual_weight_kg / 1000).toFixed(2)} / ${quantityTons} T`
-                : `${quantityTons} tấn`}
+                ? `${fmtNum(metadata.actual_weight_kg / 1000, 2)} / ${fmtNum(quantityTons, 3)} T`
+                : `${fmtNum(quantityTons, 3)} tấn`}
             </Text>
           </Col>
           <Col span={12}>
@@ -346,7 +343,7 @@ const DealCard = ({
             </Text>
             <br />
             <Text strong style={{ color: '#fff', fontSize: 13 }}>
-              {formatCurrency(metadata.agreed_price)} đ/kg
+              {fmtVndNum(metadata.agreed_price)} ₫/kg
             </Text>
           </Col>
         </Row>
@@ -400,7 +397,7 @@ const DealCard = ({
           </Text>
           <br />
           <Text strong style={{ color: '#ffd700', fontSize: 16 }}>
-            {formatCurrency(displayValue)} VNĐ
+            {fmtVnd(displayValue)}
           </Text>
         </div>
       </div>
@@ -442,7 +439,7 @@ const DealCard = ({
               Đã tạm ứng
             </Text>
             <Text strong style={{ color: '#4ade80', fontSize: 13 }}>
-              {formatCurrency(metadata.total_advanced || 0)} VNĐ
+              {fmtVnd(metadata.total_advanced || 0)}
             </Text>
           </Row>
           <Row justify="space-between">
@@ -450,7 +447,7 @@ const DealCard = ({
               Còn lại
             </Text>
             <Text strong style={{ color: '#fbbf24', fontSize: 13 }}>
-              {formatCurrency(metadata.balance_due || 0)} VNĐ
+              {fmtVnd(metadata.balance_due || 0)}
             </Text>
           </Row>
         </div>
@@ -490,7 +487,7 @@ const DealCard = ({
           }}
         >
           <Text style={{ color: '#fff', fontSize: 12, flex: 1 }}>
-            Nhà máy đã chi {formatCurrency(metadata.pending_ack_advance_amount || 0)} VNĐ
+            Nhà máy đã chi {fmtVnd(metadata.pending_ack_advance_amount || 0)}
             {metadata.pending_ack_advance_number ? ` (${metadata.pending_ack_advance_number})` : ''}
           </Text>
           <Button

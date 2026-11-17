@@ -13,6 +13,8 @@ import {
 } from '../../services/opsService'
 import { firstName, hhmm, clock } from './opsUtil'
 import { getDeviceType, getDeviceInfo } from '../../utils/deviceDetect'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import OpsLoadError from './OpsLoadError'
 
 // Lấy vị trí GPS. App Ops chạy trên điện thoại → không có toạ độ là KHÔNG vào ca được
 // (luật 16/09/2026: điện thoại phải trong bán kính nhà máy; máy tính bỏ qua).
@@ -62,8 +64,8 @@ export default function OpsHome() {
       qc.invalidateQueries({ queryKey: ['open-attendance'] })
       qc.invalidateQueries({ queryKey: ['attendance'] })
       att.refetch()
-    } catch (e: any) {
-      setMsg({ ok: false, text: e?.message || 'Lỗi chấm công' })
+    } catch (e) {
+      setMsg({ ok: false, text: dichLoiHeThong(e, 'Lỗi chấm công') })
     } finally { setBusy(false) }
   }
 
@@ -71,6 +73,11 @@ export default function OpsHome() {
   const done = list.filter(taskDone).length
   const total = list.length
   const nextTask = list.find(t => !taskDone(t))
+  // Tải hỏng (và chưa có số cũ) → nói thẳng, đừng hiện "Chưa có việc" / "Chưa vào ca" giả
+  const tasksErr = tasks.isError && !tasks.data
+  const attErr = att.isError && !att.data
+  // Số máy đang chờ không đọc được → banner đỏ KHÔNG được biến mất im lặng (thợ tưởng mọi máy bình thường)
+  const issuesErr = issues.isError && !issues.data
 
   const rows = att.data || []
   const openRow = rows.find(r => r.check_in_time && !r.check_out_time) || null
@@ -110,6 +117,12 @@ export default function OpsHome() {
             </div>
           )}
 
+          {issuesErr && (
+            <div className="ops-card" style={{ padding: '4px 13px 12px' }}>
+              <OpsLoadError compact error={issues.error} onRetry={() => issues.refetch()} title="Chưa đọc được số máy đang chờ xử lý" />
+            </div>
+          )}
+
           {open.total > 0 && (
             <div className="ops-alert" onClick={() => nav('/m/yeu-cau')}>
               <span className="ic">{open.dung > 0 ? '🔴' : '🟡'}</span>
@@ -125,12 +138,14 @@ export default function OpsHome() {
           <div className="ops-card tint press" onClick={() => nav('/m/app/tuan-tra')}>
             <div className="ops-rw">
               <span className="ops-lbl" style={{ margin: 0 }}>Việc hôm nay</span>
-              <span className="ops-chip lime">{total > 0 ? `${total} việc` : 'chưa có'}</span>
+              {tasksErr ? <span className="ops-chip red">lỗi tải</span>
+                : <span className="ops-chip lime">{tasks.isLoading ? '…' : total > 0 ? `${total} việc` : 'chưa có'}</span>}
             </div>
             <div className="ops-rw" style={{ marginTop: 8 }}>
-              <span className="ops-mid">{total === 0 ? 'Chưa có việc hôm nay' : done >= total ? 'Đã xong hết 🎉' : nextTask?.name || 'Vòng việc hôm nay'}</span>
-              <span className="ops-sm ops-mono">{done}/{total}</span>
+              <span className="ops-mid">{tasks.isLoading ? 'Đang tải…' : tasksErr ? 'Không tải được việc hôm nay' : total === 0 ? 'Chưa có việc hôm nay' : done >= total ? 'Đã xong hết 🎉' : nextTask?.name || 'Vòng việc hôm nay'}</span>
+              {!tasksErr && !tasks.isLoading && <span className="ops-sm ops-mono">{done}/{total}</span>}
             </div>
+            {tasksErr && <OpsLoadError compact error={tasks.error} onRetry={() => tasks.refetch()} />}
             {total > 0 && (
               <div style={{ height: 6, borderRadius: 6, background: 'var(--line)', marginTop: 9, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${Math.round((done / total) * 100)}%`, background: 'var(--lime)', borderRadius: 6 }} />
@@ -142,10 +157,13 @@ export default function OpsHome() {
           <div className="ops-card">
             <div className="ops-rw">
               <span className="ops-lbl" style={{ margin: 0 }}>Ca hôm nay</span>
-              {openRow
+              {attErr ? <span className="ops-chip red">lỗi tải</span>
+                : openRow
                 ? <span className={`ops-chip ${openRow.late_minutes && openRow.late_minutes > 0 ? 'amb' : 'ok'}`}>{openRow.late_minutes && openRow.late_minutes > 0 ? `Trễ ${openRow.late_minutes}′` : 'Đang làm'}</span>
-                : doneRows.length > 0 ? <span className="ops-chip ok">Xong {doneRows.length} ca</span> : <span className="ops-chip mut">Chưa vào ca</span>}
+                : doneRows.length > 0 ? <span className="ops-chip ok">Xong {doneRows.length} ca</span>
+                : att.isLoading ? <span className="ops-chip mut">Đang tải…</span> : <span className="ops-chip mut">Chưa vào ca</span>}
             </div>
+            {attErr && <OpsLoadError compact error={att.error} onRetry={() => att.refetch()} title="Chưa đọc được chấm công hôm nay" />}
 
             {/* Liệt kê các ca đã/đang chấm hôm nay */}
             {rows.length > 0 && (
@@ -167,7 +185,8 @@ export default function OpsHome() {
                 {busy ? 'Đang xử lý…' : '🏁 Ra ca'}
               </button>
             ) : (
-              <button className="ops-btn g" style={{ marginTop: 10 }} disabled={busy} onClick={() => setPicker(true)}>
+              // Đang tải chấm công hôm nay thì chưa biết đã vào ca chưa → khoá nút, tránh vào ca đúp
+              <button className="ops-btn g" style={{ marginTop: 10 }} disabled={busy || att.isLoading} onClick={() => setPicker(true)}>
                 {busy ? 'Đang xử lý…' : (doneRows.length > 0 ? '📍 Vào ca tiếp' : '📍 Vào ca')}
               </button>
             )}
@@ -200,7 +219,9 @@ export default function OpsHome() {
             <div style={{ width: 40, height: 4, borderRadius: 4, background: 'var(--line)', margin: '0 auto 12px' }} />
             <div className="ops-mid" style={{ marginBottom: 4 }}>Chọn ca vào làm</div>
             <div className="ops-sm" style={{ marginBottom: 10 }}>Chấm ca nào chọn ca đó. Làm 2 ca thì ra ca rồi vào ca tiếp.</div>
-            {(shifts.data || []).length === 0 && <div className="ops-sm">Chưa có ca nào đang bật.</div>}
+            {shifts.isLoading && <div className="ops-sm">Đang tải danh sách ca…</div>}
+            {shifts.isError && !shifts.data && <OpsLoadError compact error={shifts.error} onRetry={() => shifts.refetch()} title="Không tải được danh sách ca" />}
+            {shifts.isSuccess && shifts.data.length === 0 && <div className="ops-sm">Chưa có ca nào đang bật.</div>}
             {(shifts.data || []).map(s => (
               <button key={s.id} className="ops-card press" style={{ width: '100%', textAlign: 'left', marginBottom: 8, border: 0 }} onClick={() => punch('in', s.id)}>
                 <div className="ops-rw">

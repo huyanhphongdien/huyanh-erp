@@ -5,37 +5,21 @@
 // FIX 2026-02-26:
 // - loadData: mỗi service call có try/catch riêng + fallback supabase trực tiếp
 // - materialTypeService có thể chỉ có getAllActive() thay vì getAll()
-// - unitService có thể không export getAll() — fallback query supabase
-// - previewMaterialCode có thể không tồn tại — fallback '---'
+// FIX 17/11/2026 (Đợt 3 audit UI): previewMaterialCode + unitService import TĨNH.
+//   Bản cũ dùng require() trong app Vite ESM → luôn ReferenceError bị try/catch nuốt → cả hai vĩnh viễn null:
+//   preview mã chỉ hiện 'VT-???' và danh sách ĐVT luôn đi đường query dự phòng.
 // ============================================================================
 
 import { useState, useEffect, useRef } from 'react'
 import { X, Package, Loader2, Save, AlertCircle, Eye } from 'lucide-react'
 import { supabase } from '../../../../../lib/supabase'
-import { materialService, type MaterialFormData } from '../../../../../services/materialService'
+import { materialService, previewMaterialCode, type MaterialFormData } from '../../../../../services/materialService'
 import { materialCategoryService, type MaterialCategory } from '../../../../../services/materialCategoryService'
 import { materialTypeService, type MaterialType } from '../../../../../services/materialTypeService'
 import { supplierService } from '../../../../../services/supplierService'
-
-// Safe import previewMaterialCode — có thể không export
-let previewMaterialCode: ((catId: string, typeId: string) => Promise<string>) | null = null
-try {
-  const mod = require('../../../../../services/materialService')
-  if (typeof mod.previewMaterialCode === 'function') {
-    previewMaterialCode = mod.previewMaterialCode
-  }
-} catch {
-  // not available
-}
-
-// Safe import unitService — module có thể thiếu hoặc API khác
-let unitService: any = null
-try {
-  const mod = require('../../../../../services/unitService')
-  unitService = mod.unitService || mod.default || null
-} catch {
-  // not available
-}
+import { unitService } from '../../../../../services/unitService'
+import { vndToInputText, vndInputToNumber } from '../../../moneyInput'
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong'
 
 // ===== TYPES =====
 
@@ -204,17 +188,13 @@ export function QuickAddMaterialModal({ initialName = '', onSave, onClose }: Qui
       let unitData: Unit[] = []
       // Try unitService.getAll
       try {
-        if (unitService && typeof unitService.getAll === 'function') {
-          const res = await unitService.getAll({ page: 1, pageSize: 200, isActive: true })
-          unitData = res?.data || (Array.isArray(res) ? res : [])
-        }
+        const res = await unitService.getAll({ page: 1, pageSize: 200, isActive: true })
+        unitData = res?.data || []
       } catch { /* ignore */ }
       // Try unitService.getAllActive
       if (unitData.length === 0) {
         try {
-          if (unitService && typeof unitService.getAllActive === 'function') {
-            unitData = await unitService.getAllActive()
-          }
+          unitData = await unitService.getAllActive()
         } catch { /* ignore */ }
       }
       // Fallback: supabase
@@ -283,15 +263,9 @@ export function QuickAddMaterialModal({ initialName = '', onSave, onClose }: Qui
       }
       try {
         setLoadingCode(true)
-        if (previewMaterialCode) {
-          const code = await previewMaterialCode(form.category_id, form.type_id || '')
-          setCodePreview(code)
-        } else {
-          // Fallback: show category code + ???
-          const cat = categories.find((c) => c.id === form.category_id)
-          const catCode = (cat as any)?.code || cat?.name?.substring(0, 2).toUpperCase() || 'VT'
-          setCodePreview(`${catCode}-???`)
-        }
+        // Cùng hàm sinh mã với materialService.create() → mã xem trước = mã sẽ tạo (trừ khi có người tạo chen ngang)
+        const code = await previewMaterialCode(form.category_id, form.type_id || undefined)
+        setCodePreview(code)
       } catch {
         setCodePreview('---')
       } finally {
@@ -360,7 +334,7 @@ export function QuickAddMaterialModal({ initialName = '', onSave, onClose }: Qui
       } else if (msg.includes('permission') || msg.includes('RLS') || msg.includes('policy')) {
         setError('Không có quyền tạo vật tư. Liên hệ quản trị viên.')
       } else {
-        setError(msg || 'Lỗi tạo vật tư. Vui lòng thử lại.')
+        setError(dichLoiHeThong(err, 'Lỗi tạo vật tư. Vui lòng thử lại.'))
       }
     } finally {
       setSaving(false)
@@ -602,11 +576,12 @@ export function QuickAddMaterialModal({ initialName = '', onSave, onClose }: Qui
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Giá mua gần nhất</label>
+                        {/* Ô tiền: chấm ngăn nghìn khi gõ */}
                         <input
-                          type="number"
-                          value={form.last_purchase_price || ''}
-                          onChange={(e) => updateField('last_purchase_price', parseFloat(e.target.value) || 0)}
-                          min={0}
+                          type="text"
+                          inputMode="numeric"
+                          value={vndToInputText(form.last_purchase_price || undefined)}
+                          onChange={(e) => updateField('last_purchase_price', vndInputToNumber(e.target.value) ?? 0)}
                           placeholder="0"
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-blue-500 outline-none"
                         />
@@ -617,10 +592,10 @@ export function QuickAddMaterialModal({ initialName = '', onSave, onClose }: Qui
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Giá tham khảo (VNĐ)</label>
                       <input
-                        type="number"
-                        value={form.reference_price || ''}
-                        onChange={(e) => updateField('reference_price', parseFloat(e.target.value) || 0)}
-                        min={0}
+                        type="text"
+                        inputMode="numeric"
+                        value={vndToInputText(form.reference_price || undefined)}
+                        onChange={(e) => updateField('reference_price', vndInputToNumber(e.target.value) ?? 0)}
                         placeholder="0"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-blue-500 outline-none"
                       />

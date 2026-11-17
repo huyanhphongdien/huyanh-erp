@@ -3,10 +3,12 @@
 // File: src/pages/wms/WMSSettingsPage.tsx
 // Module: Kho (WMS) - Huy Anh Rubber ERP
 // Phase 11: Alert Config UI
+// ⚠ Đợt 3 audit UI (17/11/2026): cấu hình này lưu ở localStorage CỦA TRÌNH DUYỆT (forecastService)
+//   — mỗi máy tự tính cảnh báo bằng ngưỡng của máy đó. Trang ghi rõ "chỉ áp dụng trên máy này"
+//   để admin khỏi tưởng đã chỉnh cho cả hệ. Lưu chung (bảng settings) là việc của service.
 // ============================================================================
 
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Card,
   Row,
@@ -16,10 +18,10 @@ import {
   Space,
   Typography,
   Divider,
+  Alert,
   message,
 } from 'antd'
 import {
-  ArrowLeftOutlined,
   SaveOutlined,
   UndoOutlined,
   SettingOutlined,
@@ -41,7 +43,6 @@ const { Title, Text } = Typography
 // ============================================================================
 
 const WMSSettingsPage = () => {
-  const navigate = useNavigate()
   const [config, setConfig] = useState<AlertConfig>(DEFAULT_ALERT_CONFIG)
   const [hasChanges, setHasChanges] = useState(false)
 
@@ -58,14 +59,14 @@ const WMSSettingsPage = () => {
   const handleSave = () => {
     forecastService.saveConfig(config)
     setHasChanges(false)
-    message.success('Đã lưu cấu hình cảnh báo')
+    message.success('Đã lưu cấu hình cảnh báo — chỉ áp dụng trên máy này')
   }
 
   const handleReset = () => {
     const defaults = forecastService.resetConfig()
     setConfig(defaults)
     setHasChanges(false)
-    message.info('Đã đặt lại cấu hình mặc định')
+    message.info('Đã đặt lại cấu hình mặc định trên máy này')
   }
 
   // --------------------------------------------------------------------------
@@ -75,20 +76,18 @@ const WMSSettingsPage = () => {
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
       {/* Header */}
-      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
+      {/* Trang sống trong tab "Cài đặt cảnh báo" của /wms/config — bỏ nút Quay lại (trước nhảy sang Kho NVL) */}
+      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
         <Col>
-          <Space>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/nvl')} type="text" />
-            <div>
-              <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
-                <SettingOutlined style={{ marginRight: 8 }} />
-                Cài đặt kho (WMS)
-              </Title>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Cấu hình ngưỡng cảnh báo và tham số dự báo tồn kho
-              </Text>
-            </div>
-          </Space>
+          <div>
+            <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
+              <SettingOutlined style={{ marginRight: 8 }} />
+              Cài đặt kho (WMS)
+            </Title>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Cấu hình ngưỡng cảnh báo và tham số dự báo tồn kho
+            </Text>
+          </div>
         </Col>
         <Col>
           <Space>
@@ -107,6 +106,14 @@ const WMSSettingsPage = () => {
           </Space>
         </Col>
       </Row>
+
+      <Alert
+        type="warning"
+        showIcon
+        style={{ marginBottom: 16, borderRadius: 8 }}
+        message="Cấu hình chỉ áp dụng trên MÁY NÀY"
+        description="Ngưỡng được lưu trong trình duyệt đang dùng. Người khác và máy khác vẫn dùng ngưỡng mặc định; xoá dữ liệu trình duyệt sẽ mất cấu hình đã lưu."
+      />
 
       {/* Section 1: Cảnh báo hao hụt */}
       <Card
@@ -251,13 +258,13 @@ const WMSSettingsPage = () => {
         style={{ marginBottom: 16 }}
       >
         <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
-          DRC nằm ngoài khoảng "warning" sẽ cảnh báo vàng; ngoài khoảng "critical" cảnh báo đỏ.
-          Dùng cho QC dashboard và alert list.
+          DRC nằm ngoài khoảng "cảnh báo" sẽ cảnh báo vàng; ngoài khoảng "nghiêm trọng" cảnh báo đỏ.
+          Dùng cho Tổng quan QC và danh sách Cảnh báo.
         </Text>
         <Row gutter={[24, 16]}>
           <Col xs={24} sm={12} md={6}>
             <div style={{ marginBottom: 8 }}>
-              <Text strong>Warning DRC min</Text>
+              <Text strong>Cảnh báo — DRC tối thiểu</Text>
             </div>
             <InputNumber
               value={config.drc_warning_min}
@@ -271,7 +278,7 @@ const WMSSettingsPage = () => {
           </Col>
           <Col xs={24} sm={12} md={6}>
             <div style={{ marginBottom: 8 }}>
-              <Text strong>Warning DRC max</Text>
+              <Text strong>Cảnh báo — DRC tối đa</Text>
             </div>
             <InputNumber
               value={config.drc_warning_max}
@@ -285,7 +292,7 @@ const WMSSettingsPage = () => {
           </Col>
           <Col xs={24} sm={12} md={6}>
             <div style={{ marginBottom: 8 }}>
-              <Text strong>Critical DRC min</Text>
+              <Text strong>Nghiêm trọng — DRC tối thiểu</Text>
             </div>
             <InputNumber
               value={config.drc_critical_min}
@@ -299,7 +306,7 @@ const WMSSettingsPage = () => {
           </Col>
           <Col xs={24} sm={12} md={6}>
             <div style={{ marginBottom: 8 }}>
-              <Text strong>Critical DRC max</Text>
+              <Text strong>Nghiêm trọng — DRC tối đa</Text>
             </div>
             <InputNumber
               value={config.drc_critical_max}
@@ -379,7 +386,7 @@ const WMSSettingsPage = () => {
             size="large"
             style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
           >
-            Lưu cấu hình
+            Lưu cấu hình (máy này)
           </Button>
         </Space>
       </Row>

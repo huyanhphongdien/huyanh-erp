@@ -3,66 +3,55 @@
 // File: src/pages/finance/FinanceReceivablePage.tsx
 // ============================================================================
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Card, Table, Button, Typography, Modal, Form, Input, InputNumber, DatePicker,
   Select, Space, message, Popconfirm, Row, Col, Statistic, Badge, Drawer, Tooltip, Segmented, Alert,
 } from 'antd'
-import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, PaperClipOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, PaperClipOutlined, UndoOutlined, RightOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
-  receivableService, AR_ALERT_LABEL, AR_ALERT_COLOR, AGING_LABEL,
+  receivableService, AR_ALERT_LABEL, AR_ALERT_COLOR, AGING_LABEL, AGING_COLOR,
   type FinReceivableComputed, type AgingBucket,
 } from '../../services/finance/receivableService'
 import { attachmentService } from '../../services/finance/attachmentService'
 import FinanceAttachments from './FinanceAttachments'
 import { useAuthStore } from '../../stores/authStore'
+import { fmtMoney, fmtUsd, fmtDate, vndInputProps, usdInputProps } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
+import { stdPagination } from '../../components/common/tableDefaults'
+import { pill, hanText } from './finUi'
 
 const { Title, Text } = Typography
-const fmtMoney = (n?: number | null, ccy = 'USD') => {
-  const v = Number(n) || 0
-  return ccy === 'VND' ? v.toLocaleString('vi-VN') + ' đ' : '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-const fmtUsd = (n: number) => '$' + (n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })
-const fDate = (s?: string | null) => (s ? dayjs(s).format('DD/MM/YYYY') : '—')
-const numFmt = (v?: number | string) => `${v ?? ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-const numParse = (v?: string) => (v || '').replace(/\./g, '')
-// Props nhập tiền theo đồng tiền (mẫu vndInputProps của salesMoney.ts):
-// VND chấm nghìn (không lẻ); USD phẩy nghìn + GIỮ dấu chấm thập phân (nhập được cent).
-const vndMoneyInput = { formatter: numFmt, parser: numParse as any }
-const usdFmt = (v?: number | string) => {
-  const [i, dec] = `${v ?? ''}`.split('.')
-  const int = i.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-  return dec !== undefined ? `${int}.${dec}` : int
-}
-const usdMoneyInput = { formatter: usdFmt, parser: ((v?: string) => (v || '').replace(/,/g, '')) as any, step: 0.01 }
-const pill = (bg: string, txt: string) => (
-  <span style={{ display: 'inline-block', background: bg, color: '#fff', fontWeight: 700, fontSize: 12, padding: '2px 9px', borderRadius: 5, whiteSpace: 'nowrap' }}>{txt}</span>
-)
+// Dòng phải thu giữ cent (fmtMoney USD 2 số lẻ); thẻ KPI / tuổi nợ làm tròn đô (fmtUsd 0 số lẻ).
+// Ô nhập tiền theo đồng tiền: VND chấm ngăn nghìn; USD phẩy ngăn nghìn + chấm thập phân (nhập được cent).
 const BUCKETS: AgingBucket[] = ['current', 'd1_30', 'd31_60', 'd61_90', 'd90p']
-const BUCKET_COLOR: Record<AgingBucket, string> = { current: '#475569', d1_30: '#ca8a04', d31_60: '#ea580c', d61_90: '#dc2626', d90p: '#991b1b' }
 
 export default function FinanceReceivablePage() {
+  const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const actorId = user?.employee_id || user?.id || null
   const [rows, setRows] = useState<FinReceivableComputed[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [filter, setFilter] = useState('open')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<FinReceivableComputed | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
   const formCurrency = Form.useWatch('currency', form)
-  const moneyInput = formCurrency === 'VND' ? vndMoneyInput : usdMoneyInput
+  const moneyInput = formCurrency === 'VND' ? vndInputProps : usdInputProps
   const [attach, setAttach] = useState<FinReceivableComputed | null>(null)
   const [attachCounts, setAttachCounts] = useState<Map<string, number>>(new Map())
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setLoading(true); setLoadError(null)
     try {
       const data = await receivableService.list()
       setRows(data)
       try { setAttachCounts(await attachmentService.countFor('receivable', data.map((x) => x.id))) } catch { /* chưa migrate file */ }
-    } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
+    } catch (e) { setLoadError(e) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
@@ -119,18 +108,26 @@ export default function FinanceReceivablePage() {
       if (editing) await receivableService.update(editing.id, payload)
       else await receivableService.create({ ...payload, created_by: actorId })
       message.success('Đã lưu phải thu'); setOpen(false); load()
-    } catch (e: any) { if (e?.errorFields) return; message.error('Lỗi lưu: ' + (e?.message || e)) }
+    } catch (e: any) { if (e?.errorFields) return; message.error(dichLoiHeThong(e, 'Lưu phải thu thất bại')) }
     finally { setSaving(false) }
   }
   const handleDelete = async (r: FinReceivableComputed) => {
     try { await receivableService.remove(r.id); message.success('Đã xoá'); load() }
-    catch (e: any) { message.error('Lỗi xoá: ' + (e?.message || e)) }
+    catch (e) { message.error(dichLoiHeThong(e, 'Xoá phải thu thất bại')) }
   }
+  // Đánh dấu ĐÃ THU ĐỦ (hôm nay) — luôn qua Popconfirm; có đường lùi "Bỏ đã thu" bên dưới
   const markReceived = async (r: FinReceivableComputed) => {
     try {
-      await receivableService.update(r.id, { status: 'received', received_date: dayjs().format('YYYY-MM-DD'), amount_received: r.amount } as any)
+      await receivableService.update(r.id, { status: 'received', received_date: dayjs().format('YYYY-MM-DD'), amount_received: r.amount })
       message.success('Đã ghi nhận đã thu'); load()
-    } catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) }
+    } catch (e) { message.error(dichLoiHeThong(e, 'Ghi nhận đã thu thất bại')) }
+  }
+  // computeAR coi là đã thu khi status 'received' HOẶC có ngày tiền về HOẶC còn lại ≤ 0 → phải gỡ cả 3 mới quay lại được
+  const unmarkReceived = async (r: FinReceivableComputed) => {
+    try {
+      await receivableService.update(r.id, { status: 'pending', received_date: null, amount_received: 0 })
+      message.success('Đã đưa về CHƯA THU'); load()
+    } catch (e) { message.error(dichLoiHeThong(e, 'Bỏ đã thu thất bại')) }
   }
 
   const columns = [
@@ -139,19 +136,31 @@ export default function FinanceReceivablePage() {
     { title: 'Hàng', dataIndex: 'commodity', width: 90, render: (v: string) => v || '—' },
     { title: 'Giá trị', dataIndex: 'amount', width: 120, align: 'right' as const, render: (v: number, r: FinReceivableComputed) => <b>{fmtMoney(v, r.currency)}</b> },
     { title: 'Còn thu', dataIndex: 'remaining', width: 120, align: 'right' as const, render: (v: number, r: FinReceivableComputed) => v > 0 ? <b style={{ color: '#1677ff' }}>{fmtMoney(v, r.currency)}</b> : <Text type="secondary">—</Text> },
-    { title: 'ETD/ATD', key: 'etd', width: 100, render: (_: any, r: FinReceivableComputed) => <span style={{ fontSize: 12 }}>{fDate(r.atd || r.etd)}</span> },
+    { title: 'ETD/ATD', key: 'etd', width: 100, render: (_: any, r: FinReceivableComputed) => <span style={{ fontSize: 12 }}>{fmtDate(r.atd || r.etd)}</span> },
     { title: 'Hạn thu', dataIndex: 'effective_due', width: 110, render: (v: string, r: FinReceivableComputed) => (
-      <span><b>{fDate(v)}</b>{r.alert !== 'received' && r.days_to_due < 0 ? <div style={{ fontSize: 11, color: '#dc2626' }}>quá {-r.days_to_due}d</div> : (r.alert !== 'received' && r.days_to_due <= 30 ? <div style={{ fontSize: 11, color: '#ca8a04' }}>còn {r.days_to_due}d</div> : null)}</span>) },
-    { title: 'Trạng thái', key: 'al', width: 120, align: 'center' as const, render: (_: any, r: FinReceivableComputed) => (
-      <span>{pill(AR_ALERT_COLOR[r.alert], AR_ALERT_LABEL[r.alert])}{r.received_date ? <div style={{ fontSize: 11, color: '#9ca3af' }}>về {fDate(r.received_date)}</div> : null}</span>) },
+      <span><b>{fmtDate(v)}</b>{r.alert !== 'received' && r.days_to_due < 0 ? <div style={{ fontSize: 11, color: '#dc2626' }}>{hanText(r.days_to_due)}</div> : (r.alert !== 'received' && r.days_to_due <= 30 ? <div style={{ fontSize: 11, color: '#ca8a04' }}>{hanText(r.days_to_due)}</div> : null)}</span>) },
+    { title: 'Trạng thái', key: 'al', width: 175, align: 'center' as const, render: (_: any, r: FinReceivableComputed) => (
+      <span>{pill(AR_ALERT_COLOR[r.alert], AR_ALERT_LABEL[r.alert])}{r.received_date ? <div style={{ fontSize: 11, color: '#9ca3af' }}>về {fmtDate(r.received_date)}</div> : null}</span>) },
     { title: '', key: 'act', width: 140, fixed: 'right' as const, render: (_: any, r: FinReceivableComputed) => (
       <Space size={0}>
-        {r.alert !== 'received' && <Tooltip title="Đánh dấu đã thu đủ"><Button type="text" size="small" icon={<DownloadOutlined style={{ color: '#16a34a' }} />} onClick={() => markReceived(r)} /></Tooltip>}
+        {r.alert !== 'received'
+          ? (
+            <Popconfirm title="Đánh dấu ĐÃ THU ĐỦ?" description={`${fmtMoney(r.remaining, r.currency)} của ${r.buyer_name} — ngày tiền về = hôm nay.`}
+              okText="Đã thu đủ" cancelText="Huỷ" onConfirm={() => markReceived(r)}>
+              <Tooltip title="Đánh dấu đã thu đủ"><Button type="text" size="small" icon={<DownloadOutlined style={{ color: '#16a34a' }} />} /></Tooltip>
+            </Popconfirm>
+          ) : (
+            <Popconfirm title="Bỏ đánh dấu đã thu?" description="Đưa về CHƯA THU: xoá ngày tiền về, số đã thu về 0 (thu một phần thì sửa lại ở nút bút)."
+              okText="Bỏ đã thu" cancelText="Không" okButtonProps={{ danger: true }} onConfirm={() => unmarkReceived(r)}>
+              <Tooltip title="Bỏ đã thu"><Button type="text" size="small" icon={<UndoOutlined />} /></Tooltip>
+            </Popconfirm>
+          )}
         <Tooltip title="Bộ chứng từ"><Badge count={attachCounts.get(r.id) || 0} size="small" offset={[-2, 2]}>
           <Button type="text" size="small" icon={<PaperClipOutlined style={{ color: '#1E3A5F' }} />} onClick={() => setAttach(r)} />
         </Badge></Tooltip>
         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
-        <Popconfirm title="Xoá phải thu này?" okText="Xoá" cancelText="Huỷ" onConfirm={() => handleDelete(r)}>
+        <Popconfirm title="Xoá phải thu này?" description="Xoá hẳn dòng khỏi sổ phải thu, không hoàn tác được."
+          okText="Xoá" cancelText="Huỷ" okButtonProps={{ danger: true }} onConfirm={() => handleDelete(r)}>
           <Button type="text" size="small" danger icon={<DeleteOutlined />} />
         </Popconfirm>
       </Space>) },
@@ -167,10 +176,15 @@ export default function FinanceReceivablePage() {
         </Space>
       </div>
 
+      {/* Hai sổ phải thu chạy song song — chỉ dẫn chiếu, KHÔNG gộp dữ liệu (fin_receivables tay ≠ v_ar_aging_rows tự động) */}
+      <Alert type="info" showIcon style={{ marginBottom: 12 }}
+        message={<span>Sổ này theo dõi <b>TAY</b> bộ chứng từ xuất khẩu (DHL, ngày tàu, hạn thanh toán). Công nợ <b>TỰ ĐỘNG</b> theo đơn hàng bán (thu tiền theo lô) nằm ở màn Công nợ khách — hai sổ <b>không</b> tự đồng bộ với nhau.</span>}
+        action={<Button size="small" type="link" onClick={() => navigate('/sales/ar-aging')}>Công nợ khách <RightOutlined /></Button>} />
+
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         <Col xs={12} md={6}><Card size="small"><Statistic title="Tổng phải thu (USD)" value={fmtUsd(k.total)} valueStyle={{ color: '#1677ff', fontWeight: 800, fontSize: 20 }} />
           {k.totalVnd > 0 && <Text type="secondary" style={{ fontSize: 11 }}>+ {fmtMoney(k.totalVnd, 'VND')}</Text>}</Card></Col>
-        <Col xs={12} md={6}><Card size="small" style={{ background: k.overdueN ? '#fef2f2' : undefined }}><Statistic title={`Quá hạn (${k.overdueN})`} value={fmtUsd(k.overdue)} valueStyle={{ color: '#dc2626', fontWeight: 800, fontSize: 20 }} />
+        <Col xs={12} md={6}><Card size="small" style={{ background: k.overdueN ? '#fef2f2' : undefined }}><Statistic title={`Quá hạn (${k.overdueN})`} value={fmtUsd(k.overdue)} valueStyle={{ color: k.overdueN ? AR_ALERT_COLOR.overdue : AR_ALERT_COLOR.received, fontWeight: 800, fontSize: 20 }} />
           {k.overdueVnd > 0 && <Text type="secondary" style={{ fontSize: 11 }}>+ {fmtMoney(k.overdueVnd, 'VND')}</Text>}</Card></Col>
         <Col xs={12} md={6}><Card size="small"><Statistic title="Sắp về ≤30 ngày" value={fmtUsd(k.soon)} valueStyle={{ color: '#ea580c', fontWeight: 800, fontSize: 20 }} />
           {k.soonVnd > 0 && <Text type="secondary" style={{ fontSize: 11 }}>+ {fmtMoney(k.soonVnd, 'VND')}</Text>}</Card></Col>
@@ -178,14 +192,14 @@ export default function FinanceReceivablePage() {
       </Row>
 
       {/* Tuổi nợ */}
-      <Card size="small" style={{ marginBottom: 12 }} title="Tuổi nợ (aging) — số còn phải thu (USD)">
+      <Card size="small" style={{ marginBottom: 12 }} title="Tuổi nợ — số còn phải thu (USD)">
         <Row gutter={8}>
           {BUCKETS.map((b) => (
             <Col key={b} xs={12} md={24 / 5 as any} style={{ flex: 1 }}>
-              <div style={{ textAlign: 'center', padding: '6px 4px', borderRadius: 8, background: (k.aging[b] || k.agingVnd[b]) ? BUCKET_COLOR[b] + '14' : '#f8fafc' }}>
-                <div style={{ fontSize: 12, color: BUCKET_COLOR[b], fontWeight: 600 }}>{AGING_LABEL[b]}</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: (k.aging[b] || k.agingVnd[b]) ? BUCKET_COLOR[b] : '#cbd5e1' }}>{fmtUsd(k.aging[b])}</div>
-                {k.agingVnd[b] > 0 && <div style={{ fontSize: 11, color: BUCKET_COLOR[b] }}>+ {fmtMoney(k.agingVnd[b], 'VND')}</div>}
+              <div style={{ textAlign: 'center', padding: '6px 4px', borderRadius: 8, background: (k.aging[b] || k.agingVnd[b]) ? AGING_COLOR[b] + '14' : '#f8fafc' }}>
+                <div style={{ fontSize: 12, color: AGING_COLOR[b], fontWeight: 600 }}>{AGING_LABEL[b]}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: (k.aging[b] || k.agingVnd[b]) ? AGING_COLOR[b] : '#cbd5e1' }}>{fmtUsd(k.aging[b])}</div>
+                {k.agingVnd[b] > 0 && <div style={{ fontSize: 11, color: AGING_COLOR[b] }}>+ {fmtMoney(k.agingVnd[b], 'VND')}</div>}
               </div>
             </Col>
           ))}
@@ -207,9 +221,11 @@ export default function FinanceReceivablePage() {
               { label: 'Tất cả', value: 'all' },
             ]} />
         </div>
+        <PageState error={loadError} onRetry={load}>
         <Table rowKey="id" size="small" loading={loading} columns={columns as any} dataSource={view}
-          pagination={{ pageSize: 30, showSizeChanger: false }} scroll={{ x: 1180 }}
-          locale={{ emptyText: 'Chưa có phải thu. Bấm "Thêm phải thu" hoặc import từ Excel.' }} />
+          pagination={stdPagination(50)} scroll={{ x: 1240 }}
+          locale={{ emptyText: 'Chưa có phải thu. Bấm "Thêm phải thu".' }} />
+        </PageState>
       </Card>
 
       <Modal title={editing ? 'Sửa phải thu' : 'Thêm phải thu khách hàng'} open={open} onCancel={() => setOpen(false)}
@@ -220,13 +236,13 @@ export default function FinanceReceivablePage() {
             <Form.Item name="buyer_name" label="Khách hàng (Buyer)" rules={[{ required: true }]} style={{ gridColumn: '1 / 3' }}><Input placeholder="vd: JIANGSU…" /></Form.Item>
             <Form.Item name="commodity" label="Mặt hàng"><Input placeholder="SVR / RSS…" /></Form.Item>
             <Form.Item name="contract_no" label="Số hợp đồng" style={{ gridColumn: '1 / 3' }}><Input placeholder="vd: HA2026… / LTC2025/PD-…" /></Form.Item>
-            <Form.Item name="bank" label="Bank xử lý"><Input placeholder="VTB / Eximbank…" /></Form.Item>
+            <Form.Item name="bank" label="NH xử lý chứng từ"><Input placeholder="VTB / Eximbank…" /></Form.Item>
             <Form.Item name="currency" label="Tiền tệ"><Select options={[{ value: 'USD', label: 'USD' }, { value: 'VND', label: 'VND' }]} /></Form.Item>
             <Form.Item name="amount" label="Giá trị hóa đơn" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} {...moneyInput} /></Form.Item>
             <Form.Item name="amount_received" label="Đã thu"><InputNumber min={0} style={{ width: '100%' }} {...moneyInput} /></Form.Item>
             <Form.Item name="etd" label="ETD (dự kiến)"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="atd" label="ATD (tàu chạy thực)"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
-            <Form.Item name="term_days" label="Term (ngày)" tooltip="Số ngày thanh toán kể từ ATD/ETD"><InputNumber min={0} style={{ width: '100%' }} placeholder="90" /></Form.Item>
+            <Form.Item name="term_days" label="Hạn thanh toán (ngày)" tooltip="Số ngày thanh toán (term) kể từ ATD/ETD"><InputNumber min={0} style={{ width: '100%' }} placeholder="90" /></Form.Item>
             <Form.Item name="due_date" label="Hạn thu (để trống = tự tính)"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="doc_sent_date" label="Ngày gửi BCT (DHL)"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="doc_tracking" label="Số DHL"><Input placeholder="55 7671…" /></Form.Item>

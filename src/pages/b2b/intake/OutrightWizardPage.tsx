@@ -14,6 +14,8 @@ import { useNavigate } from 'react-router-dom'
 import { executeOutrightIntake } from '../../../services/b2b/intakeOutrightService'
 import { supabase } from '../../../lib/supabase'
 import { useAuthStore } from '../../../stores/authStore'
+import { fmtVnd, vndInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 
@@ -50,12 +52,13 @@ export default function OutrightWizardPage() {
       if (res.success) {
         setResult(res)
         setStep(3)
-        message.success(`Đã tạo deal ${res.deal_number} + chi tiền ${res.total_amount_vnd.toLocaleString('vi-VN')} VNĐ`)
+        message.success(`Đã tạo deal ${res.deal_number} + chi tiền ${fmtVnd(res.total_amount_vnd)}`)
       } else {
-        message.error(res.error || 'Lỗi không xác định')
+        message.error(dichLoiHeThong(res.error, 'Lỗi không xác định'))
       }
     } catch (e: any) {
-      message.error(e.message || 'Validate failed')
+      if (e?.errorFields) { message.warning('Còn ô bắt buộc chưa điền — kiểm tra lại'); return }
+      message.error(dichLoiHeThong(e, 'Không chi tiền được'))
     } finally {
       setSubmitting(false)
     }
@@ -65,9 +68,9 @@ export default function OutrightWizardPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <Title level={3}>🅰️ Mua đứt (Outright)</Title>
+      <Title level={3}>🅰️ Mua đứt</Title>
       <Text type="secondary">
-        Bypass QC sample + BGĐ duyệt. Chi tiền ngay tại cân. DRC cáp kinh nghiệm.
+        Bỏ qua bước QC đo mẫu + BGĐ duyệt. Chi tiền ngay tại cân. DRC cáp theo kinh nghiệm.
       </Text>
 
       <Steps
@@ -129,17 +132,16 @@ export default function OutrightWizardPage() {
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item name="unit_price" label="Đơn giá VNĐ/kg" rules={[{ required: true }]}>
+                  <Form.Item name="unit_price" label="Đơn giá ₫/kg" rules={[{ required: true }]}>
                     <InputNumber<number> min={0} step={1000}
-                      formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                      parser={v => Number(String(v).replace(/\D/g, '')) || 0}
+                      {...vndInputProps}
                       style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item label="Preview">
+                  <Form.Item label="Xem trước">
                     <Text strong style={{ fontSize: 16, color: '#1B4D3E' }}>
-                      {previewAmount.toLocaleString('vi-VN')} VNĐ (×qty)
+                      {fmtVnd(previewAmount)} (× KL)
                     </Text>
                   </Form.Item>
                 </Col>
@@ -154,7 +156,7 @@ export default function OutrightWizardPage() {
           {step === 1 && (
             <>
               <Alert type="info" showIcon style={{ marginBottom: 16 }}
-                message="Bước 2: Cân xe tại weighbridge" />
+                message="Bước 2: Cân xe tại trạm cân" />
 
               <Row gutter={16}>
                 <Col span={8}>
@@ -197,18 +199,18 @@ export default function OutrightWizardPage() {
           {step === 2 && (
             <>
               <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-                message="Bước 3: Xem lại — click 'Chi tiền' sẽ tạo deal + settled ngay" />
+                message="Bước 3: Xem lại — bấm 'Chi tiền' sẽ tạo deal và quyết toán ngay" />
 
               <Card size="small" title="Thông tin deal">
                 <Row>
-                  <Col span={8}>qty: {form.getFieldValue('quantity_kg')} kg</Col>
+                  <Col span={8}>KL: {form.getFieldValue('quantity_kg')?.toLocaleString('vi-VN')} kg</Col>
                   <Col span={8}>DRC: {form.getFieldValue('drc_percent')}%</Col>
-                  <Col span={8}>Giá: {form.getFieldValue('unit_price')?.toLocaleString('vi-VN')} VNĐ/kg</Col>
+                  <Col span={8}>Giá: {form.getFieldValue('unit_price')?.toLocaleString('vi-VN')} ₫/kg</Col>
                 </Row>
                 <Row style={{ marginTop: 8 }}>
                   <Col span={24}>
                     <Text strong style={{ fontSize: 20, color: '#1B4D3E' }}>
-                      Tổng chi: {previewAmount.toLocaleString('vi-VN')} VNĐ
+                      Tổng chi: {fmtVnd(previewAmount)}
                     </Text>
                   </Col>
                 </Row>
@@ -234,8 +236,8 @@ export default function OutrightWizardPage() {
               title={`Hoàn tất ${result.deal_number}`}
               subTitle={
                 <Space direction="vertical">
-                  <Text>Đã chi: <strong>{result.total_amount_vnd.toLocaleString('vi-VN')} VNĐ</strong></Text>
-                  <Text>Ticket: <strong>{result.ticket_code}</strong></Text>
+                  <Text>Đã chi: <strong>{fmtVnd(result.total_amount_vnd)}</strong></Text>
+                  <Text>Phiếu cân: <strong>{result.ticket_code}</strong></Text>
                 </Space>
               }
               extra={[

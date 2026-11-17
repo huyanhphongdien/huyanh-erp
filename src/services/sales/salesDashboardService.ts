@@ -7,6 +7,41 @@
 
 import { supabase } from '../../lib/supabase'
 import type { SalesOrderStatus } from './salesTypes'
+import { ORDER_STATUS_LABELS } from './salesTypes'
+import { toDateStrVN } from '../../utils/dateVN'
+
+export type DashboardPeriod = 'month' | 'quarter' | 'year'
+
+/**
+ * Mốc kỳ (chuỗi 'YYYY-MM-DD' theo GIỜ VN) — dùng chung cho KPI và Top khách hàng để hai widget
+ * cùng một kỳ. Trước 17/11/2026 dùng toISOString() (UTC) → ngày 1 của tháng thành ngày cuối tháng
+ * trước (UTC+7), KPI "tháng này" ăn lấn sang tháng trước 1 ngày.
+ */
+function periodRange(dateRange: DashboardPeriod): { start: string; lastStart: string; lastEnd: string } {
+  const now = new Date()
+  let periodStart: Date
+  let lastPeriodStart: Date
+  let lastPeriodEnd: Date
+  if (dateRange === 'month') {
+    periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    lastPeriodStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    lastPeriodEnd = new Date(now.getFullYear(), now.getMonth(), 0)
+  } else if (dateRange === 'quarter') {
+    const q = Math.floor(now.getMonth() / 3)
+    periodStart = new Date(now.getFullYear(), q * 3, 1)
+    lastPeriodStart = new Date(now.getFullYear(), (q - 1) * 3, 1)
+    lastPeriodEnd = new Date(now.getFullYear(), q * 3, 0)
+  } else {
+    periodStart = new Date(now.getFullYear(), 0, 1)
+    lastPeriodStart = new Date(now.getFullYear() - 1, 0, 1)
+    lastPeriodEnd = new Date(now.getFullYear() - 1, 11, 31)
+  }
+  return {
+    start: toDateStrVN(periodStart),
+    lastStart: toDateStrVN(lastPeriodStart),
+    lastEnd: toDateStrVN(lastPeriodEnd),
+  }
+}
 
 // ============================================================================
 // TYPES
@@ -60,8 +95,8 @@ export const salesDashboardService = {
       const year = d.getFullYear()
       const month = d.getMonth()
 
-      const firstDay = new Date(year, month, 1).toISOString().split('T')[0]
-      const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0]
+      const firstDay = toDateStrVN(new Date(year, month, 1))
+      const lastDay = toDateStrVN(new Date(year, month + 1, 0))
 
       const { data } = await supabase
         .from('sales_orders')
@@ -128,11 +163,15 @@ export const salesDashboardService = {
   // TOP CUSTOMERS — Top khách hàng theo doanh thu
   // ==========================================================================
 
-  async getTopCustomers(limit: number = 5): Promise<TopCustomer[]> {
-    const { data } = await supabase
+  /** `dateRange` có thì chỉ tính đơn đặt TRONG KỲ (cùng mốc với getKPIs) — tiêu đề widget ghi "Top KH tháng này". */
+  async getTopCustomers(limit: number = 5, dateRange?: DashboardPeriod): Promise<TopCustomer[]> {
+    let q = supabase
       .from('sales_orders')
       .select('customer_id, total_value_usd, customer:sales_customers!customer_id(name, country)')
       .neq('status', 'cancelled')
+    if (dateRange) q = q.gte('order_date', periodRange(dateRange).start)
+    const { data, error } = await q
+    if (error) throw error
 
     if (!data || data.length === 0) return []
 
@@ -168,15 +207,11 @@ export const salesDashboardService = {
   // ==========================================================================
 
   async getPipeline(): Promise<PipelineStage[]> {
-    const stages: { status: SalesOrderStatus; label: string }[] = [
-      { status: 'draft', label: 'Nháp' },
-      { status: 'confirmed', label: 'Xác nhận' },
-      { status: 'producing', label: 'Sản xuất' },
-      { status: 'ready', label: 'Sẵn sàng' },
-      { status: 'shipped', label: 'Đã xuất' },
-      { status: 'delivered', label: 'Đã giao' },
-      { status: 'paid', label: 'Đã TT' },
-    ]
+    // ĐỦ 9 trạng thái sống (trừ cancelled) — bản cũ thiếu 'packing' + 'invoiced' nên đơn đang đóng
+    // gói / đã lập HĐ biến mất khỏi phễu, tổng cột không khớp tổng đơn. Nhãn lấy ORDER_STATUS_LABELS.
+    const stages: { status: SalesOrderStatus; label: string }[] = (
+      ['draft', 'confirmed', 'producing', 'ready', 'packing', 'shipped', 'delivered', 'invoiced', 'paid'] as SalesOrderStatus[]
+    ).map((status) => ({ status, label: ORDER_STATUS_LABELS[status] }))
 
     const results: PipelineStage[] = []
 
@@ -219,29 +254,7 @@ export const salesDashboardService = {
     processingOrders: number
     onTimeRate: number
   }> {
-    const now = new Date()
-    let periodStart: Date
-    let lastPeriodStart: Date
-    let lastPeriodEnd: Date
-
-    if (dateRange === 'month') {
-      periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      lastPeriodStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      lastPeriodEnd = new Date(now.getFullYear(), now.getMonth(), 0)
-    } else if (dateRange === 'quarter') {
-      const q = Math.floor(now.getMonth() / 3)
-      periodStart = new Date(now.getFullYear(), q * 3, 1)
-      lastPeriodStart = new Date(now.getFullYear(), (q - 1) * 3, 1)
-      lastPeriodEnd = new Date(now.getFullYear(), q * 3, 0)
-    } else {
-      periodStart = new Date(now.getFullYear(), 0, 1)
-      lastPeriodStart = new Date(now.getFullYear() - 1, 0, 1)
-      lastPeriodEnd = new Date(now.getFullYear() - 1, 11, 31)
-    }
-
-    const periodStartStr = periodStart.toISOString().split('T')[0]
-    const lastPeriodStartStr = lastPeriodStart.toISOString().split('T')[0]
-    const lastPeriodEndStr = lastPeriodEnd.toISOString().split('T')[0]
+    const { start: periodStartStr, lastStart: lastPeriodStartStr, lastEnd: lastPeriodEndStr } = periodRange(dateRange)
 
     // Current period orders
     const { data: currentOrders } = await supabase

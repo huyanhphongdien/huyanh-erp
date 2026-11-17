@@ -117,7 +117,9 @@ export async function countUnread(employeeId: string): Promise<number> {
 }
 
 /**
- * Lấy danh sách thông báo
+ * Lấy danh sách thông báo.
+ * Lỗi thì THROW (17/11/2026, Đợt 3 audit UI): trước đây trả [] → trang Thông báo (đã có khối lỗi + Thử lại
+ * qua useQuery.error) không bao giờ thấy lỗi, mất mạng/RLS hiện thành "Không có thông báo".
  */
 export async function getNotifications(employeeId: string, limit = 50): Promise<any[]> {
   const { data, error } = await supabase
@@ -126,21 +128,24 @@ export async function getNotifications(employeeId: string, limit = 50): Promise<
     .eq('employee_id', employeeId)
     .order('created_at', { ascending: false })
     .limit(limit)
-  if (error) return []
+  if (error) throw error
   return data || []
 }
 
 /**
- * Đánh dấu đã đọc
+ * Đánh dấu đã đọc / xoá — lỗi thì THROW để thao tác không "thành công giả" (mutation báo lỗi được).
  */
 export async function markRead(notificationId: string): Promise<void> {
-  await supabase.from('notifications').update({ is_read: true }).eq('id', notificationId)
+  const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', notificationId)
+  if (error) throw error
 }
 
 export async function markAllRead(employeeId: string): Promise<void> {
-  await supabase.from('notifications').update({ is_read: true }).eq('employee_id', employeeId).eq('is_read', false)
+  const { error } = await supabase.from('notifications').update({ is_read: true }).eq('employee_id', employeeId).eq('is_read', false)
+  if (error) throw error
 }
 
 export async function deleteNotification(notificationId: string): Promise<void> {
-  await supabase.from('notifications').delete().eq('id', notificationId)
+  const { error } = await supabase.from('notifications').delete().eq('id', notificationId)
+  if (error) throw error
 }

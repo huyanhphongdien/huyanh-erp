@@ -3,6 +3,8 @@
 // File: src/services/finance/receivableService.ts
 // ============================================================================
 import { supabase } from '../../lib/supabase'
+import { addDaysStr } from '../../utils/dateVN'
+import { FIN_LIGHT } from './finLight'
 
 export type ARStatus = 'pending' | 'received'
 export type ARAlert = 'received' | 'overdue' | 'due' | 'soon' | 'ok'
@@ -39,14 +41,19 @@ export interface FinReceivableComputed extends FinReceivable {
   aging: AgingBucket         // tuổi nợ (theo ngày quá hạn)
 }
 
+// 2 mức "sắp" phân biệt bằng CHỮ, không chỉ bằng con số trong ngoặc (trước: "Sắp về (≤7d)" / "Sắp về (≤30d)")
 export const AR_ALERT_LABEL: Record<ARAlert, string> = {
-  received: 'Đã thu', overdue: 'QUÁ HẠN', due: 'Sắp về (≤7d)', soon: 'Sắp về (≤30d)', ok: 'Trong hạn',
+  received: 'Đã thu', overdue: 'QUÁ HẠN', due: 'Tới hạn (≤7 ngày)', soon: 'Sắp tới hạn (≤30 ngày)', ok: 'Trong hạn',
 }
 export const AR_ALERT_COLOR: Record<ARAlert, string> = {
-  received: '#16a34a', overdue: '#dc2626', due: '#ea580c', soon: '#ca8a04', ok: '#475569',
+  received: FIN_LIGHT.ok, overdue: FIN_LIGHT.overdue, due: FIN_LIGHT.due, soon: FIN_LIGHT.soon, ok: '#475569',
 }
 export const AGING_LABEL: Record<AgingBucket, string> = {
-  current: 'Trong hạn', d1_30: 'Quá 1–30', d31_60: 'Quá 31–60', d61_90: 'Quá 61–90', d90p: 'Quá >90',
+  current: 'Trong hạn', d1_30: 'Quá 1–30 ngày', d31_60: 'Quá 31–60 ngày', d61_90: 'Quá 61–90 ngày', d90p: 'Quá >90 ngày',
+}
+/** Thang nhiệt tuổi nợ: càng quá lâu càng đậm (chuyển từ FinanceReceivablePage về đây — một nguồn). */
+export const AGING_COLOR: Record<AgingBucket, string> = {
+  current: '#475569', d1_30: FIN_LIGHT.soon, d31_60: FIN_LIGHT.due, d61_90: FIN_LIGHT.overdue, d90p: '#991b1b',
 }
 
 const WARN_DUE = 7
@@ -55,11 +62,8 @@ const WARN_SOON = 30
 function dDiff(a: Date, b: Date): number {
   return Math.round((Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()) - Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())) / 86_400_000)
 }
-function addDays(s: string, n: number): string {
-  const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n)
-  // Định dạng theo lịch ĐỊA PHƯƠNG (toISOString lệch -1 ngày ở UTC+7)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+// Cộng ngày theo lịch ĐỊA PHƯƠNG (toISOString lệch -1 ngày ở UTC+7) — dùng chung utils/dateVN
+const addDays = addDaysStr
 
 export function computeAR(r: FinReceivable, today = new Date()): FinReceivableComputed {
   const remaining = Math.max(0, (Number(r.amount) || 0) - (Number(r.amount_received) || 0))

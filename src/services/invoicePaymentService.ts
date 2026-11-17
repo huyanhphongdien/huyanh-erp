@@ -5,6 +5,8 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
+import { addDaysStr, todayVN, toDateStrVN } from '../utils/dateVN';
+import { fmtVnd, fmtDate } from '../utils/format';
 
 // ============================================================================
 // TYPES
@@ -145,11 +147,58 @@ export const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Chuyển khoản', icon: '🏦' },
 ] as const;
 
-export const PAYMENT_STATUS_MAP: Record<string, { label: string; color: string; bgColor: string }> = {
-  unpaid: { label: 'Chưa thanh toán', color: 'text-red-700', bgColor: 'bg-red-100' },
-  partial: { label: 'Thanh toán một phần', color: 'text-yellow-700', bgColor: 'bg-yellow-100' },
-  paid: { label: 'Đã thanh toán', color: 'text-green-700', bgColor: 'bg-green-100' },
+/** Nhãn phương thức chi — viết ĐỦ chữ (trước đây bảng ghi tắt 'CK'/'TM', người dùng phải đoán). */
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'Tiền mặt',
+  bank_transfer: 'Chuyển khoản',
 };
+
+/**
+ * Trạng thái thanh toán của HÓA ĐƠN NCC — MỘT nguồn nhãn + màu (Đợt 3 audit UI 17/11/2026).
+ * Trước đó 4 màn ghi 4 kiểu: 'Chưa TT' / 'TT một phần' / 'Đã TT' / 'Đã TT đủ'…
+ * Màu theo luật dòng tiền (CLAUDE.md): vàng/cam = chờ chi · xanh lá = đã chi đủ (đỏ dành cho huỷ/quá hạn).
+ */
+export const INVOICE_PAYMENT_STATUS_LABELS: Record<string, string> = {
+  unpaid: 'Chưa thanh toán',
+  partial: 'Thanh toán một phần',
+  paid: 'Đã thanh toán đủ',
+};
+
+/** Màu antd (EnumTag) cho trạng thái thanh toán hóa đơn */
+export const INVOICE_PAYMENT_STATUS_COLORS: Record<string, string> = {
+  unpaid: 'gold',
+  partial: 'orange',
+  paid: 'green',
+};
+
+/** Bản Tailwind của cùng map (màn kit tay): nhãn lấy từ INVOICE_PAYMENT_STATUS_LABELS */
+export const PAYMENT_STATUS_MAP: Record<string, { label: string; color: string; bgColor: string }> = {
+  unpaid: { label: INVOICE_PAYMENT_STATUS_LABELS.unpaid, color: 'text-amber-700', bgColor: 'bg-amber-100' },
+  partial: { label: INVOICE_PAYMENT_STATUS_LABELS.partial, color: 'text-orange-700', bgColor: 'bg-orange-100' },
+  paid: { label: INVOICE_PAYMENT_STATUS_LABELS.paid, color: 'text-green-700', bgColor: 'bg-green-100' },
+};
+
+/**
+ * Hóa đơn QUÁ HẠN = hạn thanh toán (ngày lịch) đã qua hôm nay — cùng luật `due_date < today` của
+ * service/view. (Trước đây màn so `new Date(due) < new Date()` → hạn hôm nay đã báo "Quá hạn 1 ngày" từ 7h sáng.)
+ */
+export function isInvoiceOverdue(dueDate?: string | null, paymentStatus?: string | null): boolean {
+  if (!dueDate || paymentStatus === 'paid') return false;
+  return dueDate.slice(0, 10) < todayVN();
+}
+
+/** Số ngày quá hạn tính theo NGÀY LỊCH (hôm nay − hạn), không âm. */
+export function invoiceDaysOverdue(dueDate?: string | null): number {
+  if (!dueDate) return 0;
+  const [y, m, d] = dueDate.slice(0, 10).split('-').map(Number);
+  const [ty, tm, td] = todayVN().split('-').map(Number);
+  if (!y || !m || !d) return 0;
+  const diff = Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d);
+  return Math.max(0, Math.round(diff / 86400000));
+}
+
+/** Cột được phép sắp xếp phía SERVER ở Lịch sử thanh toán */
+export type PaymentSortField = 'payment_date' | 'amount' | 'created_at';
 
 // ============================================================================
 // SERVICE
@@ -318,8 +367,10 @@ export const invoicePaymentService = {
     payment_method?: string;
     from_date?: string;
     to_date?: string;
+    /** Sắp xếp phía SERVER trên CẢ KỲ (trước đây trang tự sort 20 dòng đang xem → "lớn nhất" chỉ là lớn nhất trang 1) */
+    orderBy?: { field: PaymentSortField; ascending: boolean };
   }): Promise<PaginatedResponse<PaymentWithDetails>> {
-    const { page, pageSize, search, supplier_id, payment_method, from_date, to_date } = params;
+    const { page, pageSize, search, supplier_id, payment_method, from_date, to_date, orderBy } = params;
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
@@ -363,10 +414,12 @@ export const invoicePaymentService = {
       query = query.or(`reference_number.ilike.%${search}%,notes.ilike.%${search}%`);
     }
 
-    const { data, error, count } = await query
-      .order('payment_date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .range(from, to);
+    const sortField: PaymentSortField = orderBy?.field || 'payment_date';
+    const sortAsc = orderBy?.ascending ?? false;
+    query = query.order(sortField, { ascending: sortAsc });
+    if (sortField !== 'created_at') query = query.order('created_at', { ascending: false });
+
+    const { data, error, count } = await query.range(from, to);
 
     if (error) {
       console.error('❌ [paymentService] getAll error:', error);
@@ -474,8 +527,9 @@ export const invoicePaymentService = {
       if (iError) continue;
       if (!invoices?.length) continue;
 
-      const today = new Date().toLocaleDateString('sv-SE');
-      const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const today = todayVN();
+      // +7 ngày theo NGÀY LỊCH VN (toISOString trước 7h sáng lùi 1 ngày → "sắp đến hạn" hụt mất 1 ngày)
+      const sevenDaysLater = addDaysStr(today, 7);
 
       const summary: SupplierDebtSummary = {
         supplier_id: supplier.id,
@@ -578,8 +632,8 @@ export const invoicePaymentService = {
     }
 
     // 4. Tạo summary
-    const today = new Date().toLocaleDateString('sv-SE');
-    const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const today = todayVN();
+    const sevenDaysLater = addDaysStr(today, 7); // ngày lịch VN, không qua toISOString
     const invList = invoices || [];
 
     const summary: SupplierDebtSummary = {
@@ -767,7 +821,8 @@ export const invoicePaymentService = {
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
       const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-      const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // Last day
+      // Ngày cuối tháng theo giờ máy — toISOString() lùi về ngày áp chót (UTC+7) làm rơi các khoản chi ngày cuối tháng
+      const endDate = toDateStrVN(new Date(year, month, 0));
 
       const { data, error } = await supabase
         .from('invoice_payments')
@@ -836,27 +891,17 @@ export const invoicePaymentService = {
   },
 
   /**
-   * Format số tiền VND
+   * Format số tiền VND — giữ tên cũ, ruột đi qua utils/format
    */
-  formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      maximumFractionDigits: 0,
-    }).format(amount);
+  formatCurrency(amount: number | null | undefined): string {
+    return fmtVnd(amount);
   },
 
   /**
-   * Format ngày tháng
+   * Format ngày tháng 'DD/MM/YYYY' — giữ tên cũ, ruột đi qua utils/format
    */
   formatDate(dateStr: string): string {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    return fmtDate(dateStr);
   },
 };
 

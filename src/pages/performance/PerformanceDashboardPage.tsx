@@ -16,6 +16,7 @@ import {
   MonthlyTrend,
 } from '../../services/performanceService';
 import { attendancePerformanceService } from '../../services/attendancePerformanceService';
+import PageState from '../../components/common/PageState';
 
 // ============================================================================
 // CONSTANTS
@@ -254,6 +255,9 @@ export default function PerformanceDashboardPage() {
   const [deptComparison, setDeptComparison] = useState<DepartmentPerformance[]>([]);
   const [trend, setTrend] = useState<MonthlyTrend[]>([]);
   const [loading, setLoading] = useState(true);
+  // Lỗi tải: trước đây chỉ console.error → trang hiện 0 / "Chưa có dữ liệu" như thật
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Score mode: task-only vs combined (with attendance)
   const [scoreMode, setScoreMode] = useState<'task' | 'combined'>('task');
@@ -296,6 +300,7 @@ export default function PerformanceDashboardPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
+      setLoadError(null);
       try {
         const period = { month: selectedMonth, year: selectedYear };
 
@@ -316,12 +321,13 @@ export default function PerformanceDashboardPage() {
         setTrend(trendData);
       } catch (err) {
         console.error('Error loading performance data:', err);
+        setLoadError(err);
       } finally {
         setLoading(false);
       }
     }
     loadData();
-  }, [selectedMonth, selectedYear, effectiveDeptFilter]);
+  }, [selectedMonth, selectedYear, effectiveDeptFilter, reloadKey]);
 
   // Load attendance scores when combined mode is active
   useEffect(() => {
@@ -378,15 +384,11 @@ export default function PerformanceDashboardPage() {
   const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
   const yearOptions = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
 
-  if (loading) {
+  // Đang tải / lỗi: khối 3 trạng thái dùng chung (thay spinner tự chế bằng inline style + keyframes)
+  if (loading || loadError) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <div style={{
-          width: 40, height: 40, border: '4px solid #e5e7eb',
-          borderTopColor: PRIMARY, borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+        <PageState loading={loading} error={loadError} onRetry={() => setReloadKey(k => k + 1)} minHeight={400} />
       </div>
     );
   }
@@ -486,7 +488,7 @@ export default function PerformanceDashboardPage() {
         </div>
         {/* Task hoan thanh */}
         <div style={cardStyle}>
-          <div style={cardLabelStyle}>Task hoàn thành</div>
+          <div style={cardLabelStyle}>Việc hoàn thành</div>
           <div style={{ ...cardValueStyle, color: '#2563eb' }}>{kpis?.total_completed || 0}</div>
         </div>
         {/* Dung han */}
@@ -495,8 +497,8 @@ export default function PerformanceDashboardPage() {
           <div style={{ ...cardValueStyle, color: '#16a34a' }}>{kpis?.on_time_rate || 0}%</div>
           {(kpis?.tasks_with_deadline ?? 0) > 0 && (
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-              {kpis?.on_time_count ?? 0}/{kpis?.tasks_with_deadline} task có deadline
-              {(kpis?.no_deadline_count ?? 0) > 0 && ` · ${kpis?.no_deadline_count} task không có deadline`}
+              {kpis?.on_time_count ?? 0}/{kpis?.tasks_with_deadline} việc có hạn
+              {(kpis?.no_deadline_count ?? 0) > 0 && ` · ${kpis?.no_deadline_count} việc không có hạn`}
             </div>
           )}
         </div>
@@ -539,7 +541,7 @@ export default function PerformanceDashboardPage() {
                 <th style={thStyle}>#</th>
                 <th style={{ ...thStyle, textAlign: 'left' }}>Nhân viên</th>
                 <th style={{ ...thStyle, textAlign: 'left' }}>Phòng ban</th>
-                <th style={thStyle}>Task</th>
+                <th style={thStyle}>Số việc</th>
                 <th style={thStyle}>Hoàn thành</th>
                 <th style={thStyle}>Đúng hạn</th>
                 <th style={thStyle}>{scoreMode === 'combined' ? 'Công việc' : 'Điểm TB'}</th>
@@ -654,7 +656,7 @@ export default function PerformanceDashboardPage() {
                     <th style={{ ...thStyle, textAlign: 'left' }}>Phòng ban</th>
                     <th style={thStyle}>NV</th>
                     <th style={thStyle}>Điểm TB</th>
-                    <th style={thStyle}>Task</th>
+                    <th style={thStyle}>Số việc</th>
                     <th style={thStyle}>Hạng</th>
                   </tr>
                 </thead>

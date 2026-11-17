@@ -108,8 +108,9 @@ export async function changeTaskStatus(
 
     // 2. Validate nếu là công việc cha
     if (isParentTask) {
-      // 2a. Nếu chuyển sang Completed, kiểm tra tất cả con đã completed
-      if (newStatus === 'completed') {
+      // 2a. Nếu chuyển sang Hoàn thành, kiểm tra tất cả con đã xong
+      // (hệ status hiện hành kết thúc ở 'finished' — 'completed' giữ cho dữ liệu cũ)
+      if (newStatus === 'completed' || newStatus === 'finished') {
         const canComplete = await subtaskService.canParentComplete(taskId)
         
         if (!canComplete.canComplete) {
@@ -144,7 +145,7 @@ export async function changeTaskStatus(
     }
 
     // Auto set progress và completed_date
-    if (newStatus === 'completed') {
+    if (newStatus === 'completed' || newStatus === 'finished') {
       updateData.progress = 100
       updateData.completed_date = new Date().toISOString()
     }
@@ -216,8 +217,8 @@ export async function canChangeStatus(
   const subtaskCount = await subtaskService.getSubtaskCount(taskId)
   
   if (subtaskCount > 0) {
-    // Không cho completed nếu còn con chưa completed
-    if (newStatus === 'completed') {
+    // Không cho hoàn thành nếu còn con chưa xong ('finished' là trạng thái kết thúc hiện hành)
+    if (newStatus === 'completed' || newStatus === 'finished') {
       const result = await subtaskService.canParentComplete(taskId)
       if (!result.canComplete) {
         return { canChange: false, reason: result.reason }

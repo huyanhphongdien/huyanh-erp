@@ -15,27 +15,21 @@ import { useOpenTab } from '../../../hooks/useOpenTab'
 import { useFacilityFilter } from '../../../stores/facilityFilterStore'
 import { useActiveWarehouses } from '../../../hooks/useActiveWarehouses'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
+import { fmtDate, fmtKg } from '../../../utils/format'
+import {
+  STOCK_IN_SOURCE_LABELS as SOURCE_LABELS, STOCK_IN_SOURCE_COLORS as SOURCE_COLORS,
+  STOCK_IN_STATUS_LABELS as STATUS_LABELS, STOCK_IN_STATUS_COLORS as STATUS_COLORS,
+} from './stockInLabels'
 
 const { Text } = Typography
 
-const SOURCE_LABELS: Record<string, string> = {
-  production: 'Sản xuất', purchase: 'Mua hàng', blend: 'Phối trộn',
-  transfer: 'Chuyển kho', adjust: 'Điều chỉnh', return: 'Khách trả', repack: 'Đóng gói lại',
-}
-const SOURCE_COLORS: Record<string, string> = {
-  production: 'blue', purchase: 'purple', blend: 'cyan', transfer: 'orange',
-  adjust: 'default', return: 'magenta', repack: 'geekblue',
-}
 const TYPE_LABELS: Record<string, string> = { raw: 'NVL', finished: 'TP' }
 const TYPE_COLORS: Record<string, string> = { raw: 'orange', finished: 'green' }
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Nháp', confirmed: 'Xác nhận', cancelled: 'Đã hủy',
-}
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'default', confirmed: 'success', cancelled: 'error',
-}
 
-const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—'
+/** Trần tải một lần (getAll pageSize) — chạm trần thì AdvancedDataTable báo, không im lặng mất phiếu cũ */
+const LOAD_LIMIT = 500
+
+const formatDate = (d: string | null) => fmtDate(d)
 
 // Trích mã phiếu cân từ `notes` (format: "Nhập nhanh từ phiếu cân CX-YYYYMMDD-NNN")
 // Trả về null nếu notes không match pattern weighbridge origin.
@@ -61,10 +55,10 @@ export default function StockInListPage() {
     })
   }
 
-  const { data: orders = [], isLoading, refetch } = useQuery({
+  const { data: orders = [], isLoading, error, refetch } = useQuery({
     queryKey: ['stock-in-orders-all'],
     queryFn: async () => {
-      const result = await stockInService.getAll({ page: 1, pageSize: 500 })
+      const result = await stockInService.getAll({ page: 1, pageSize: LOAD_LIMIT })
       return result.data || []
     },
     staleTime: 60000,
@@ -109,8 +103,9 @@ export default function StockInListPage() {
       render: (_, r) => (r as any).warehouse?.name || '—',
       exportRender: (_, r) => (r as any).warehouse?.name || '' },
     { key: 'total_weight', title: 'Trọng lượng (kg)', dataIndex: 'total_weight', width: 140, align: 'right', sortable: true,
-      render: (v) => v ? <Text strong>{Number(v).toLocaleString('vi-VN')}</Text> : '—',
-      exportRender: (v) => v || 0 },
+      summary: 'sum',
+      render: (v) => v != null ? <Text strong>{fmtKg(Number(v))}</Text> : '—',
+      exportRender: (v) => (v == null ? '' : Number(v)) },
     { key: 'deal', title: 'Deal / NCC', dataIndex: ['deal', 'deal_number'], width: 160, ellipsis: true,
       render: (_, r) => (r as any).deal?.partner_name || (r as any).deal?.deal_number || '—',
       exportRender: (_, r) => (r as any).deal?.partner_name || (r as any).deal?.deal_number || '' },
@@ -119,14 +114,14 @@ export default function StockInListPage() {
       render: (v) => <Tag color={STATUS_COLORS[v]}>{STATUS_LABELS[v] || v}</Tag>,
       exportRender: (v) => STATUS_LABELS[v] || v },
     { key: 'created_at', title: 'Ngày tạo', dataIndex: 'created_at', width: 110, sortable: true,
-      render: (v) => formatDate(v), exportRender: (v) => v ? new Date(v).toLocaleDateString('vi-VN') : '' },
+      render: (v) => formatDate(v), exportRender: (v) => v ? fmtDate(v) : '' },
   ]
 
   const renderInlineDetail = (order: StockInOrder) => (
     <div style={{ padding: '4px 0' }}>
       <Row gutter={[16, 12]} style={{ marginBottom: 12 }}>
         <Col xs={8}><Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-          <Statistic title="Trọng lượng" value={order.total_weight || 0} suffix="kg" valueStyle={{ fontSize: 18, color: '#1B4D3E' }} formatter={v => Number(v).toLocaleString('vi-VN')} />
+          <Statistic title="Trọng lượng" value={order.total_weight || 0} suffix="kg" valueStyle={{ fontSize: 18, color: '#1B4D3E' }} formatter={v => fmtKg(Number(v))} />
         </Card></Col>
         <Col xs={8}><Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
           <Statistic title="Số lượng" value={order.total_quantity || 0} valueStyle={{ fontSize: 18, color: '#1890ff' }} />
@@ -137,8 +132,8 @@ export default function StockInListPage() {
       </Row>
       <Descriptions size="small" column={{ xs: 1, sm: 2, md: 3 }} labelStyle={{ fontWeight: 600 }}>
         <Descriptions.Item label="Mã phiếu">{order.code}</Descriptions.Item>
-        <Descriptions.Item label="Trạng thái"><Tag color={STATUS_COLORS[order.status]}>{STATUS_LABELS[order.status]}</Tag></Descriptions.Item>
-        <Descriptions.Item label="Nguồn"><Tag color={SOURCE_COLORS[order.source_type]}>{SOURCE_LABELS[order.source_type]}</Tag></Descriptions.Item>
+        <Descriptions.Item label="Trạng thái"><Tag color={STATUS_COLORS[order.status]}>{STATUS_LABELS[order.status] || order.status}</Tag></Descriptions.Item>
+        <Descriptions.Item label="Nguồn"><Tag color={SOURCE_COLORS[order.source_type]}>{SOURCE_LABELS[order.source_type] || order.source_type}</Tag></Descriptions.Item>
         <Descriptions.Item label="Kho">{(order as any).warehouse?.name || '—'}</Descriptions.Item>
         <Descriptions.Item label="Deal">{(order as any).deal?.deal_number || '—'}</Descriptions.Item>
         <Descriptions.Item label="Ngày tạo">{formatDate(order.created_at)}</Descriptions.Item>
@@ -173,12 +168,15 @@ export default function StockInListPage() {
         dataSource={filteredOrders}
         rowKey="id"
         loading={isLoading}
+        error={error}
+        loadLimit={LOAD_LIMIT}
         title="Phiếu nhập kho"
         dateRangeField="created_at"
         onRefresh={() => refetch()}
         expandedRowRender={renderInlineDetail}
         exportFileName="Phieu_Nhap_Kho"
         pageSize={50}
+        emptyText="Chưa có phiếu nhập kho nào"
       />
     </div>
   )

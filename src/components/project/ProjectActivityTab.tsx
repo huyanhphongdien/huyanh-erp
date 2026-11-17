@@ -21,6 +21,7 @@ import {
   Milestone as MilestoneIcon, ListTodo, X, CalendarDays,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import PageState from '../common/PageState'
 
 // ============================================================================
 // TYPES
@@ -61,8 +62,8 @@ interface ActionConfig {
 const ACTION_CONFIGS: Record<string, ActionConfig> = {
   // Status
   status_changed:      { icon: <ArrowUpDown className="w-3.5 h-3.5" />, bg: 'bg-blue-100',    color: 'text-blue-600',    label: 'Đổi trạng thái',     group: 'status' },
-  phase_started:       { icon: <Play className="w-3.5 h-3.5" />,        bg: 'bg-emerald-100', color: 'text-emerald-600', label: 'Bắt đầu phase',      group: 'status' },
-  phase_completed:     { icon: <CheckCircle2 className="w-3.5 h-3.5" />,bg: 'bg-green-100',   color: 'text-green-600',   label: 'Hoàn thành phase',   group: 'status' },
+  phase_started:       { icon: <Play className="w-3.5 h-3.5" />,        bg: 'bg-emerald-100', color: 'text-emerald-600', label: 'Bắt đầu giai đoạn',  group: 'status' },
+  phase_completed:     { icon: <CheckCircle2 className="w-3.5 h-3.5" />,bg: 'bg-green-100',   color: 'text-green-600',   label: 'Hoàn thành giai đoạn', group: 'status' },
   project_started:     { icon: <Play className="w-3.5 h-3.5" />,        bg: 'bg-emerald-100', color: 'text-emerald-600', label: 'Bắt đầu dự án',      group: 'status' },
   project_completed:   { icon: <CheckCircle2 className="w-3.5 h-3.5" />,bg: 'bg-green-100',   color: 'text-green-600',   label: 'Hoàn thành dự án',   group: 'status' },
   project_on_hold:     { icon: <PauseCircle className="w-3.5 h-3.5" />, bg: 'bg-amber-100',   color: 'text-amber-600',   label: 'Tạm dừng dự án',     group: 'status' },
@@ -73,17 +74,17 @@ const ACTION_CONFIGS: Record<string, ActionConfig> = {
   member_role_changed: { icon: <Users className="w-3.5 h-3.5" />,       bg: 'bg-purple-100',  color: 'text-purple-600',  label: 'Đổi vai trò',        group: 'member' },
 
   // Milestones
-  milestone_created:   { icon: <MilestoneIcon className="w-3.5 h-3.5" />,bg: 'bg-indigo-100', color: 'text-indigo-600',  label: 'Tạo milestone',      group: 'milestone' },
-  milestone_completed: { icon: <Flag className="w-3.5 h-3.5" />,        bg: 'bg-green-100',   color: 'text-green-600',   label: 'Milestone hoàn thành',group: 'milestone' },
-  milestone_overdue:   { icon: <AlertTriangle className="w-3.5 h-3.5" />,bg: 'bg-red-100',    color: 'text-red-500',     label: 'Milestone quá hạn',  group: 'milestone' },
+  milestone_created:   { icon: <MilestoneIcon className="w-3.5 h-3.5" />,bg: 'bg-indigo-100', color: 'text-indigo-600',  label: 'Tạo mốc',            group: 'milestone' },
+  milestone_completed: { icon: <Flag className="w-3.5 h-3.5" />,        bg: 'bg-green-100',   color: 'text-green-600',   label: 'Mốc hoàn thành',     group: 'milestone' },
+  milestone_overdue:   { icon: <AlertTriangle className="w-3.5 h-3.5" />,bg: 'bg-red-100',    color: 'text-red-500',     label: 'Mốc quá hạn',        group: 'milestone' },
 
   // Tasks
-  task_created:        { icon: <Plus className="w-3.5 h-3.5" />,        bg: 'bg-sky-100',     color: 'text-sky-600',     label: 'Tạo task',           group: 'task' },
-  task_completed:      { icon: <CheckCircle2 className="w-3.5 h-3.5" />,bg: 'bg-green-100',   color: 'text-green-600',   label: 'Task hoàn thành',    group: 'task' },
-  task_assigned:       { icon: <Target className="w-3.5 h-3.5" />,      bg: 'bg-sky-100',     color: 'text-sky-600',     label: 'Giao task',          group: 'task' },
+  task_created:        { icon: <Plus className="w-3.5 h-3.5" />,        bg: 'bg-sky-100',     color: 'text-sky-600',     label: 'Tạo công việc',      group: 'task' },
+  task_completed:      { icon: <CheckCircle2 className="w-3.5 h-3.5" />,bg: 'bg-green-100',   color: 'text-green-600',   label: 'Công việc hoàn thành', group: 'task' },
+  task_assigned:       { icon: <Target className="w-3.5 h-3.5" />,      bg: 'bg-sky-100',     color: 'text-sky-600',     label: 'Giao công việc',     group: 'task' },
 
   // Documents
-  document_uploaded:   { icon: <FileText className="w-3.5 h-3.5" />,    bg: 'bg-teal-100',    color: 'text-teal-600',    label: 'Upload tài liệu',   group: 'document' },
+  document_uploaded:   { icon: <FileText className="w-3.5 h-3.5" />,    bg: 'bg-teal-100',    color: 'text-teal-600',    label: 'Tải lên tài liệu',  group: 'document' },
   document_deleted:    { icon: <Trash2 className="w-3.5 h-3.5" />,      bg: 'bg-red-100',     color: 'text-red-500',     label: 'Xóa tài liệu',      group: 'document' },
 
   // Risks & Issues
@@ -117,8 +118,8 @@ const FILTER_GROUPS: { key: string; label: string; icon: React.ReactNode }[] = [
   { key: 'all',       label: 'Tất cả',      icon: <Activity className="w-3.5 h-3.5" /> },
   { key: 'status',    label: 'Trạng thái',   icon: <ArrowUpDown className="w-3.5 h-3.5" /> },
   { key: 'member',    label: 'Nhân sự',      icon: <Users className="w-3.5 h-3.5" /> },
-  { key: 'milestone', label: 'Milestone',    icon: <MilestoneIcon className="w-3.5 h-3.5" /> },
-  { key: 'task',      label: 'Task',         icon: <ListTodo className="w-3.5 h-3.5" /> },
+  { key: 'milestone', label: 'Mốc',          icon: <MilestoneIcon className="w-3.5 h-3.5" /> },
+  { key: 'task',      label: 'Công việc',    icon: <ListTodo className="w-3.5 h-3.5" /> },
   { key: 'document',  label: 'Tài liệu',    icon: <FolderOpen className="w-3.5 h-3.5" /> },
   { key: 'risk',      label: 'Rủi ro',       icon: <ShieldAlert className="w-3.5 h-3.5" /> },
   { key: 'general',   label: 'Khác',         icon: <Edit3 className="w-3.5 h-3.5" /> },
@@ -195,6 +196,8 @@ const ProjectActivityTab: React.FC<ProjectActivityTabProps> = ({ projectId }) =>
   const [hasMore, setHasMore] = useState(true)
   const [filterGroup, setFilterGroup] = useState('all')
   const [totalCount, setTotalCount] = useState(0)
+  // Lỗi tải trang đầu: trước đây chỉ console.error rồi hiện "Chưa có hoạt động nào" như thật
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   // ==========================================================================
   // LOAD DATA
@@ -202,7 +205,7 @@ const ProjectActivityTab: React.FC<ProjectActivityTabProps> = ({ projectId }) =>
 
   const loadActivities = useCallback(async (append = false) => {
     if (append) setLoadingMore(true)
-    else setLoading(true)
+    else { setLoading(true); setLoadError(null) }
 
     try {
       const offset = append ? activities.length : 0
@@ -248,6 +251,8 @@ const ProjectActivityTab: React.FC<ProjectActivityTabProps> = ({ projectId }) =>
       setHasMore(items.length === PAGE_SIZE)
     } catch (err) {
       console.error('[ActivityTab] Load failed:', err)
+      // Chỉ lần tải đầu mới thay cả danh sách bằng khối lỗi; "Xem thêm" lỗi thì giữ phần đã tải
+      if (!append) setLoadError(err || 'Không tải được nhật ký hoạt động')
     } finally {
       setLoading(false)
       setLoadingMore(false)
@@ -304,8 +309,8 @@ const ProjectActivityTab: React.FC<ProjectActivityTabProps> = ({ projectId }) =>
           {[
             { key: 'status',    label: 'Trạng thái', color: 'bg-blue-500' },
             { key: 'member',    label: 'Nhân sự',    color: 'bg-purple-500' },
-            { key: 'task',      label: 'Task',        color: 'bg-sky-500' },
-            { key: 'milestone', label: 'Milestone',   color: 'bg-indigo-500' },
+            { key: 'task',      label: 'Công việc',   color: 'bg-sky-500' },
+            { key: 'milestone', label: 'Mốc',         color: 'bg-indigo-500' },
           ].map(s => (
             <div key={s.key} className="text-center">
               <div className="text-[16px] font-bold text-gray-800 font-mono">{groupCounts[s.key] || 0}</div>
@@ -342,14 +347,12 @@ const ProjectActivityTab: React.FC<ProjectActivityTabProps> = ({ projectId }) =>
       </div>
 
       {/* LOADING */}
-      {loading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-        </div>
+      {(loading || !!loadError) && (
+        <PageState loading={loading} error={loadError} onRetry={() => loadActivities(false)} minHeight={200} />
       )}
 
       {/* EMPTY */}
-      {!loading && filtered.length === 0 && (
+      {!loading && !loadError && filtered.length === 0 && (
         <div className="bg-white rounded-xl border border-gray-100 py-16 text-center">
           <Activity className="w-14 h-14 text-gray-200 mx-auto mb-3" />
           <p className="text-[14px] text-gray-500 font-medium">
@@ -370,7 +373,7 @@ const ProjectActivityTab: React.FC<ProjectActivityTabProps> = ({ projectId }) =>
       )}
 
       {/* TIMELINE — grouped by date */}
-      {!loading && dateGroups.map((group, gi) => (
+      {!loading && !loadError && dateGroups.map((group, gi) => (
         <div key={gi}>
           {/* Date group header */}
           <div className="flex items-center gap-2 mb-2 mt-1">

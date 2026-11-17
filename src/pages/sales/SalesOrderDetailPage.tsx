@@ -19,7 +19,6 @@ import {
   Empty,
   Breadcrumb,
   message,
-  Checkbox,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -40,7 +39,7 @@ import { supabase } from '../../lib/supabase'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { getSalesRole, salesPermissions, getVisibleTabs, isTabEditable } from '../../services/sales/salesPermissionService'
 import FinanceTabV4 from './components/FinanceTabV4'
-import DocumentChecklistTab from './components/DocumentChecklistTab'
+import DocumentsTabPanel from './components/DocumentsTabPanel'
 import SalesOrderStatusTimeline from './components/SalesOrderStatusTimeline'
 import StageOwnershipCard from './components/StageOwnershipCard'
 import BookingTableSection from './components/BookingTableSection'
@@ -62,39 +61,25 @@ import type {
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
-  PORT_OF_LOADING_OPTIONS,
   SVR_GRADE_OPTIONS,
   COUNTRY_OPTIONS,
   soDisplayCode,
 } from '../../services/sales/salesTypes'
+import { fmtMoney, isVnd, orderTotalInCurrency } from '../../services/sales/salesMoney'
+import { fmtDate } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
 
 const { Title, Text } = Typography
 
 // ============================================================================
 // HELPERS
 // ============================================================================
+// Bỏ formatCurrency / formatVND (' đ', "1.23 tỷ" chấm kiểu Mỹ, 0 → '-') — không còn chỗ dùng.
+// Tiền theo đồng tiền của đơn: fmtMoney (salesMoney). Ngày: fmtDate (utils/format).
 
-const formatCurrency = (value: number | null | undefined, currency = 'USD'): string => {
-  if (!value) return '-'
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value)
-}
-
-const formatVND = (value: number | null | undefined): string => {
-  if (!value) return '-'
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)} tỷ`
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} tr`
-  return new Intl.NumberFormat('vi-VN').format(value) + ' đ'
-}
-
-const formatDate = (d: string | null | undefined): string => {
-  if (!d) return '-'
-  return new Date(d).toLocaleDateString('vi-VN')
-}
+/** Thẻ thư mục ở widget Tài liệu (OrderFilesWidget) trỏ key không có tab thật → quy về tab Chứng từ. */
+const TAB_ALIASES: Record<string, string> = { cert: 'documents', weighbridge: 'documents', other: 'documents' }
 
 // ============================================================================
 // COMPONENT
@@ -114,9 +99,20 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
   const { user } = useAuthStore()
   const salesRole = getSalesRole(user)
   const visibleTabs = getVisibleTabs(salesRole)
+  // Tab có thật với vai trò hiện tại (khớp điều kiện dựng `items` bên dưới). Key lạ — từ widget con
+  // gọi onNavigateTab hoặc ?tab= gõ tay — mà set thẳng vào activeKey thì antd không chọn pane nào:
+  // trang trắng nội dung. Quy về alias / tab "Thông tin".
+  const isTabAvailable = (k: string) =>
+    ['info', 'quality', 'progress', 'chat'].includes(k)
+    || (k === 'history' ? salesRole === 'admin' : visibleTabs.includes(k))
+  const normalizeTab = (raw: string) => {
+    const k = TAB_ALIASES[raw] ?? raw
+    return isTabAvailable(k) ? k : 'info'
+  }
   // Controlled active tab — cho phép Timeline component navigate giữa tabs
-  const [activeTab, setActiveTab] = useState(initialTab)
-  const handleTabChange = (key: string) => {
+  const [activeTab, setActiveTab] = useState(() => normalizeTab(initialTab))
+  const handleTabChange = (raw: string) => {
+    const key = normalizeTab(raw)
     setActiveTab(key)
     const next = new URLSearchParams(searchParams)
     next.set('tab', key)
@@ -125,6 +121,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   // (Production + Packing tab: chuyển sang component gọn + trang riêng.
   //  Container/lot quản lý ở <PackingTabPanel /> → /sales/orders/:id/packing,
@@ -135,11 +132,15 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
     if (!orderId) return
     try {
       setLoading(true)
+      setLoadError(null)
       const o = await salesOrderService.getById(orderId)
       setOrder(o)
     } catch (err) {
+      // Lỗi tải ≠ "Không tìm thấy đơn hàng" — chưa có đơn thì hiện khối lỗi + Thử lại; nạp lại (sau khi
+      // lưu) mà hỏng thì toast để người dùng biết đang xem bản cũ.
       console.error(err)
-      message.error('Không thể tải thông tin đơn hàng')
+      setLoadError(err)
+      message.error(dichLoiHeThong(err, 'Không thể tải thông tin đơn hàng'))
     } finally {
       setLoading(false)
     }
@@ -158,6 +159,14 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
     )
   }
 
+  if (loadError && !order) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState error={loadError} onRetry={loadOrder} />
+      </div>
+    )
+  }
+
   if (!order) {
     return (
       <div style={{ padding: 24 }}>
@@ -172,11 +181,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
   // ── Derived data ──
   const gradeLabel =
     SVR_GRADE_OPTIONS.find((g) => g.value === order.grade)?.label || order.grade
-  const polLabel =
-    PORT_OF_LOADING_OPTIONS.find((p) => p.value === order.port_of_loading)?.label ||
-    order.port_of_loading ||
-    '-'
-  const customerName = order.customer?.name || '-'
+  const customerName = order.customer?.name || '—'
   const customerCountry =
     COUNTRY_OPTIONS.find((c) => c.value === order.customer?.country)?.label ||
     order.customer?.country ||
@@ -212,64 +217,6 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
 
 
 
-
-  // ══════════════════════════════════════════════════════════════
-  // TAB: CHỨNG TỪ
-  // ══════════════════════════════════════════════════════════════
-
-  const renderDocumentsTab = () => {
-    const docs = [
-      {
-        key: 'coa',
-        label: 'COA (Certificate of Analysis)',
-        done: order.coa_generated,
-      },
-      {
-        key: 'packing_list',
-        label: 'Packing List',
-        done: order.packing_list_generated,
-      },
-      {
-        key: 'invoice',
-        label: 'Invoice',
-        done: order.invoice_generated,
-      },
-      {
-        key: 'bl',
-        label: 'Bill of Lading (B/L)',
-        done: order.bl_received,
-      },
-    ]
-
-    return (
-      <div>
-        {/* Sinh chứng từ (COA, PL, Invoice) */}
-        <Card title="Sinh chứng từ" size="small" style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {docs.map((doc) => (
-              <div key={doc.key}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', border: '1px solid #f0f0f0', borderRadius: 8, background: doc.done ? '#f6ffed' : '#fff' }}>
-                <Space>
-                  <Checkbox checked={doc.done} disabled />
-                  <Text strong={doc.done}>{doc.label}</Text>
-                </Space>
-                <Button size="small" type="link" onClick={() => navigate(`/sales/orders/${order.id}/documents`)}>
-                  {doc.done ? 'Xem' : 'Tạo'}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* ★ Upload + Checklist chứng từ gốc */}
-        <DocumentChecklistTab
-          orderId={order.id}
-          orderCode={soDisplayCode(order)}
-          readonly={['draft', 'cancelled'].includes(order.status)}
-        />
-      </div>
-    )
-  }
 
   // ══════════════════════════════════════════════════════════════
   // MAIN RENDER
@@ -359,7 +306,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
         <Col xs={12} sm={4}>
           <Card size="small">
             <Statistic
-              title="Grade"
+              title="Loại hàng (Grade)"
               value={gradeLabel}
               valueStyle={{ fontSize: 14, color: '#1890ff' }}
             />
@@ -372,19 +319,25 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
         </Col>
         <Col xs={12} sm={5}>
           <Card size="small">
+            {/* Theo ĐỒNG TIỀN của đơn (đơn VNĐ trước đây hiện số USD quy đổi kèm "$" làm số chính,
+                lệch với tab Thông tin ngay dưới). Đơn VNĐ thêm dòng phụ ≈ USD quy đổi. */}
             <Statistic
               title="Giá trị"
-              value={order.total_value_usd || 0}
-              precision={0}
-              prefix="$"
+              value={fmtMoney(orderTotalInCurrency(order), order.currency, { decimals: 0 })}
+              valueStyle={{ fontSize: isVnd(order.currency) ? 18 : 22 }}
             />
+            {isVnd(order.currency) && order.total_value_usd ? (
+              <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                ≈ {fmtMoney(order.total_value_usd, 'USD', { decimals: 0 })} (quy đổi)
+              </div>
+            ) : null}
           </Card>
         </Col>
         <Col xs={12} sm={5}>
           <Card size="small">
             <Statistic
               title="Ngày giao"
-              value={formatDate(order.delivery_date)}
+              value={fmtDate(order.delivery_date)}
               valueStyle={{ fontSize: 14 }}
             />
           </Card>
@@ -458,7 +411,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                 <TruckOutlined /> Vận chuyển
               </span>
             ),
-            children: <ShippingTab order={order} salesRole={salesRole} editable={!!salesRole && salesPermissions.canEditBooking(salesRole)} onSaved={loadOrder} />,
+            children: <ShippingTab order={order} salesRole={salesRole} editable={!!salesRole && salesPermissions.canEditBooking(salesRole)} onSaved={loadOrder} onNavigateTab={handleTabChange} />,
           }] : []),
           ...(visibleTabs.includes('documents') ? [{
             key: 'documents',
@@ -467,7 +420,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                 <FileDoneOutlined /> Chứng từ
               </span>
             ),
-            children: renderDocumentsTab(),
+            children: <DocumentsTabPanel order={order} />,
           }] : []),
           ...(visibleTabs.includes('finance') ? [{
             key: 'finance',

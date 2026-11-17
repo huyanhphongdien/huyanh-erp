@@ -46,8 +46,8 @@ import {
   PRIORITY_COLORS,
   PRODUCT_TYPE_NAMES,
 } from '../../../services/b2b/demandService'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import { fmtDate, fmtNum } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 
@@ -55,24 +55,17 @@ const { Title, Text } = Typography
 // HELPER FUNCTIONS
 // ============================================
 
-const formatDate = (dateStr: string | null): string => {
-  if (!dateStr) return '-'
-  return format(new Date(dateStr), 'dd/MM/yyyy', { locale: vi })
-}
+// Ngày / số dùng chung src/utils/format.ts (vi-VN: "12,5 tấn" — không "12.5")
+const formatDate = (dateStr: string | null): string => fmtDate(dateStr)
 
 const isDeadlinePast = (dateStr: string | null): boolean => {
   if (!dateStr) return false
   return new Date(dateStr) < new Date()
 }
 
-const formatQuantityTons = (kg: number): string => {
-  return (kg / 1000).toFixed(1)
-}
+const formatQuantityTons = (kg: number): string => fmtNum((kg || 0) / 1000, 1)
 
-const formatPrice = (value: number | null): string => {
-  if (!value) return '-'
-  return value.toLocaleString('vi-VN')
-}
+const formatPrice = (value: number | null): string => (value ? fmtNum(value) : '—')
 
 // ============================================
 // MAIN COMPONENT
@@ -119,7 +112,7 @@ const DemandListPage = () => {
       setTotal(response.total)
     } catch (error) {
       console.error('Error fetching demands:', error)
-      message.error('Không thể tải danh sách nhu cầu')
+      message.error(dichLoiHeThong(error, 'Không thể tải danh sách nhu cầu'))
     } finally {
       setLoading(false)
     }
@@ -131,6 +124,8 @@ const DemandListPage = () => {
       setStats(result)
     } catch (error) {
       console.error('Error fetching stats:', error)
+      // Thẻ đếm hiện 0 vì LỖI — báo rõ
+      message.error(dichLoiHeThong(error, 'Không tải được thống kê nhu cầu'))
     }
   }, [])
 
@@ -250,14 +245,14 @@ const DemandListPage = () => {
         if (record.price_min && record.price_max) {
           return (
             <Text style={{ color: '#1B4D3E' }}>
-              {formatPrice(record.price_min)} - {formatPrice(record.price_max)} đ/kg
+              {formatPrice(record.price_min)} - {formatPrice(record.price_max)} ₫/kg
             </Text>
           )
         }
         if (record.price_min) {
-          return <Text style={{ color: '#1B4D3E' }}>&ge; {formatPrice(record.price_min)} đ/kg</Text>
+          return <Text style={{ color: '#1B4D3E' }}>&ge; {formatPrice(record.price_min)} ₫/kg</Text>
         }
-        return <Text style={{ color: '#1B4D3E' }}>&le; {formatPrice(record.price_max)} đ/kg</Text>
+        return <Text style={{ color: '#1B4D3E' }}>&le; {formatPrice(record.price_max)} ₫/kg</Text>
       },
     },
     {

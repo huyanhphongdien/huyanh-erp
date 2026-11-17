@@ -9,6 +9,10 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { TASK_STATUS_LABELS } from '../../types'
+
+// Nhãn trạng thái để GHI vào dòng hoạt động (tab Hoạt động in thẳng mô tả) — mã thô vẫn tra được qua entity_id
+const statusText = (s?: string | null) => (s ? (TASK_STATUS_LABELS[s] ?? s) : '—')
 
 // ============================================================================
 // TYPES
@@ -22,6 +26,11 @@ export type TaskStatus =
   | 'completed'
   | 'cancelled'
   | 'overdue'
+  // Mã THẬT của bảng tasks (module Công việc dùng chung bảng này) — trước đây thiếu nên việc "Chờ duyệt"
+  // (pending_review) / đã duyệt xong (finished) / tạm dừng (paused) bị hiện sai nhãn hoặc rơi khỏi Kanban
+  | 'pending_review'
+  | 'finished'
+  | 'paused'
 
 export type TaskPriority = 'urgent' | 'high' | 'medium' | 'low'
 
@@ -368,7 +377,7 @@ export const projectTaskService = {
 
     // Log activity
     await this._logActivity(input.project_id, 'task_created', 'task', data.id,
-      `Task "${input.name}" được tạo`, input.created_by)
+      `Công việc "${input.name}" được tạo`, input.created_by)
 
     const lookups = await buildLookups([data])
     return enrichTasks([data], lookups)[0]
@@ -396,7 +405,7 @@ export const projectTaskService = {
     if (current?.project_id && updates.status && updates.status !== current.status) {
       await this._logActivity(
         current.project_id, 'task_status_changed', 'task', id,
-        `Task "${current.name}" chuyển trạng thái: ${current.status} → ${updates.status}`,
+        `Công việc "${current.name}" chuyển trạng thái: ${statusText(current.status)} → ${statusText(updates.status)}`,
         actor_id
       )
     }
@@ -405,7 +414,7 @@ export const projectTaskService = {
         && updates.progress !== current.progress) {
       await this._logActivity(
         current.project_id, 'task_progress_updated', 'task', id,
-        `Task "${current.name}" tiến độ: ${current.progress}% → ${updates.progress}%`,
+        `Công việc "${current.name}" tiến độ: ${current.progress}% → ${updates.progress}%`,
         actor_id
       )
     }
@@ -642,7 +651,8 @@ export const projectTaskService = {
       completed: rawTasks.filter(t => DONE_STATUSES.includes(t.status)).length,
       in_progress: rawTasks.filter(t => t.status === 'in_progress').length,
       todo: rawTasks.filter(t => t.status === 'draft' || t.status === 'pending').length,
-      review: rawTasks.filter(t => t.status === 'review').length,
+      // Mã thật của "chờ duyệt" là 'pending_review' (progressService đặt khi việc đạt 100%); 'review' là mã cũ
+      review: rawTasks.filter(t => t.status === 'review' || t.status === 'pending_review').length,
       overdue: rawTasks.filter(t =>
         t.due_date && t.due_date < today && !EXCLUDED_OVERDUE.includes(t.status)
       ).length,

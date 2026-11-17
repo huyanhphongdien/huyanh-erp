@@ -5,6 +5,7 @@
 
 import { Building2, Package } from 'lucide-react'
 import { formatCurrency, type PurchaseOrderItem } from '../../../../../services/purchaseOrderService'
+import { fmtNum } from '../../../../../utils/format'
 
 // ===== TYPES =====
 
@@ -98,7 +99,7 @@ export function SupplierGroupDetail({ items, grandTotal }: SupplierGroupDetailPr
     const suppId = item.supplier_id
     if (!acc[suppId]) {
       acc[suppId] = {
-        supplier: item.supplier || { id: suppId, name: 'N/A', code: '' },
+        supplier: item.supplier || { id: suppId, name: 'Chưa rõ NCC', code: '' },
         items: [],
         subtotal: 0,
         vat: 0,
@@ -129,7 +130,7 @@ export function SupplierGroupDetail({ items, grandTotal }: SupplierGroupDetailPr
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
               <Building2 className="w-4 h-4 text-blue-500" />
-              {group.supplier?.name || 'N/A'}
+              {group.supplier?.name || 'Chưa rõ NCC'}
               <span className="text-xs font-normal text-gray-400">
                 ({group.supplier?.code}) • {group.items.length} vật tư
               </span>
@@ -165,7 +166,7 @@ export function SupplierGroupDetail({ items, grandTotal }: SupplierGroupDetailPr
                     </td>
                     <td className="px-3 py-2.5 text-center text-xs text-gray-500">{item.unit}</td>
                     <td className="px-3 py-2.5 text-right text-sm text-gray-900">
-                      {item.quantity.toLocaleString('vi-VN')}
+                      {fmtNum(item.quantity, 3)}
                     </td>
                     <td className="px-3 py-2.5 text-right text-sm text-gray-900">
                       {formatCurrency(item.unit_price)}
@@ -233,7 +234,7 @@ function groupBySupplier(items: FormItemLike[], suppliers: Supplier[]): Supplier
       map.set(suppId, {
         supplier: {
           id: suppId,
-          name: sup?.short_name || sup?.name || item.supplier_name || 'N/A',
+          name: sup?.short_name || sup?.name || item.supplier_name || 'Chưa rõ NCC',
           code: sup?.code || item.supplier_code || '',
         },
         items: [],

@@ -13,25 +13,29 @@ import {
 import { ledgerService, AgingItem, BalanceSummary } from '../../../services/b2b/ledgerService'
 import { exportLedgerReport } from '../../../utils/b2bLedgerExportExcel'
 import { B2BSectionTabs, LEDGER_TABS } from '../../../components/b2b/B2BSectionTabs'
+import { TIER_LABELS, TIER_COLORS } from '../../../services/b2b/partnerService'
+import EnumTag from '../../../components/common/EnumTag'
+import PageState from '../../../components/common/PageState'
+import { fmtVndNum } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 
-const TIER_COLORS: Record<string, string> = { diamond: 'purple', gold: 'gold', silver: 'default', bronze: 'orange', new: 'cyan' }
-
-const formatCurrency = (value: number | null): string => {
-  if (!value) return '0'
-  return new Intl.NumberFormat('vi-VN').format(value)
-}
+// Số tiền không ký hiệu (thẻ đã có hậu tố ₫, cột tuổi nợ là VND) — rỗng in "0" như cũ
+const formatCurrency = (value: number | null): string => fmtVndNum(value ?? 0)
 
 const LedgerReportPage = () => {
   const [summary, setSummary] = useState<BalanceSummary | null>(null)
   const [agingData, setAgingData] = useState<AgingItem[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "không có công nợ" (audit 17/11/2026)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState<number | undefined>(new Date().getMonth() + 1)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const [balanceSummary, agingReport] = await Promise.all([
         ledgerService.getBalanceSummary(selectedYear, selectedMonth),
@@ -40,7 +44,8 @@ const LedgerReportPage = () => {
       setSummary(balanceSummary)
       setAgingData(agingReport)
     } catch (error) {
-      message.error('Không thể tải dữ liệu báo cáo công nợ')
+      setLoadError(error)
+      message.error(dichLoiHeThong(error, 'Không thể tải dữ liệu báo cáo công nợ'))
     } finally {
       setLoading(false)
     }
@@ -75,9 +80,7 @@ const LedgerReportPage = () => {
           <Space size={4}>
             <Text type="secondary" style={{ fontSize: 12 }}>{record.partner_code}</Text>
             {record.partner_tier && (
-              <Tag color={TIER_COLORS[record.partner_tier] || 'default'} style={{ fontSize: 11 }}>
-                {record.partner_tier.toUpperCase()}
-              </Tag>
+              <EnumTag value={record.partner_tier} labels={TIER_LABELS} colors={TIER_COLORS} style={{ fontSize: 11 }} />
             )}
           </Space>
         </Space>
@@ -188,8 +191,10 @@ const LedgerReportPage = () => {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}>
           <Card style={{ borderRadius: 12 }}>
+            {/* Chiều sổ: Nợ = phát sinh nhà máy phải trả đại lý (quyết toán duyệt, giao mủ); Có = đã chi / tạm ứng.
+                Nhãn cũ "phải thu / phải trả" đọc ngược chiều từ phía nhà máy (audit 17/11/2026). */}
             <Statistic
-              title="Tổng nợ phải thu"
+              title="Tổng Nợ (phát sinh phải trả đại lý)"
               value={summary?.total_debit ?? 0}
               precision={0}
               valueStyle={{ color: 'red' }}
@@ -202,7 +207,7 @@ const LedgerReportPage = () => {
         <Col span={6}>
           <Card style={{ borderRadius: 12 }}>
             <Statistic
-              title="Tổng nợ phải trả"
+              title="Tổng Có (đã chi + tạm ứng)"
               value={summary?.total_credit ?? 0}
               precision={0}
               valueStyle={{ color: 'green' }}
@@ -215,7 +220,7 @@ const LedgerReportPage = () => {
         <Col span={6}>
           <Card style={{ borderRadius: 12 }}>
             <Statistic
-              title="Số dư ròng"
+              title="Số dư ròng (Nợ − Có)"
               value={summary?.net_balance ?? 0}
               precision={0}
               valueStyle={{ color: '#1B4D3E' }}
@@ -247,6 +252,7 @@ const LedgerReportPage = () => {
         }
         style={{ borderRadius: 12 }}
       >
+        <PageState error={!loading && loadError} onRetry={fetchData}>
         <Table<AgingItem>
           columns={agingColumns}
           dataSource={agingData}
@@ -293,6 +299,7 @@ const LedgerReportPage = () => {
             )
           }}
         />
+        </PageState>
       </Card>
     </div>
   )

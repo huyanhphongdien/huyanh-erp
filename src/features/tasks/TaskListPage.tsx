@@ -28,6 +28,11 @@ import { taskService } from '../../services/taskService'
 import { useTaskPermissions } from './utils/useTaskPermissions'
 import type { TaskForPermission } from './utils/taskPermissions'
 import { isTaskOverdue as _isTaskOverdue, isTaskDueToday as _isTaskDueToday, getDaysOverdue } from '../../utils/taskUtils'
+import { Modal } from 'antd'
+import PageState from '../../components/common/PageState'
+import { fmtDate } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { TASK_STATUS_LABELS } from '../../types'
 
 // ============ TAB TYPES ============
 type TabType = 'list' | 'overview'
@@ -149,14 +154,7 @@ export function TaskListPage() {
     }
   }, [assignSuccess])
 
-  const formatDate = (dateString?: string | null) => {
-    if (!dateString) return '-'
-    try {
-      return new Date(dateString).toLocaleDateString('vi-VN')
-    } catch {
-      return '-'
-    }
-  }
+  const formatDate = fmtDate
 
   const getTaskTitle = (task: any) => task.title || task.name || 'Không có tiêu đề'
 
@@ -199,11 +197,20 @@ export function TaskListPage() {
       }
     }
 
-    const confirmMessage = task.is_self_assigned 
-      ? `Xác nhận bắt đầu công việc "${getTaskTitle(task)}"?`
-      : `Giao công việc "${getTaskTitle(task)}" cho nhân viên?`
-    
-    if (!window.confirm(confirmMessage)) return
+    // Modal antd thay window.confirm (nút OK/Cancel hệ thống) — nói rõ hệ quả, nút tiếng Việt
+    const confirmed = await new Promise<boolean>(resolve => {
+      Modal.confirm({
+        title: task.is_self_assigned ? 'Bắt đầu công việc?' : 'Giao công việc?',
+        content: task.is_self_assigned
+          ? `"${getTaskTitle(task)}" sẽ chuyển sang "${TASK_STATUS_LABELS.in_progress}".`
+          : `"${getTaskTitle(task)}" sẽ được giao cho ${task.assignee?.full_name || 'người phụ trách'} và chuyển sang "${TASK_STATUS_LABELS.in_progress}" — người nhận thấy việc ngay.`,
+        okText: task.is_self_assigned ? 'Bắt đầu' : 'Giao việc',
+        cancelText: 'Không',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      })
+    })
+    if (!confirmed) return
 
     setAssigningTaskId(task.id)
     setAssignError(null)
@@ -217,7 +224,7 @@ export function TaskListPage() {
       setAssignSuccess(successMessage)
       refetch()
     } catch (err: any) {
-      setAssignError(err.message || 'Có lỗi khi giao việc')
+      setAssignError(dichLoiHeThong(err, 'Có lỗi khi giao việc'))
     } finally {
       setAssigningTaskId(null)
     }
@@ -266,7 +273,7 @@ export function TaskListPage() {
     filter.created_date_from || filter.created_date_to,
   ].filter(Boolean).length
 
-  const permissionLabel = isAdmin ? 'Admin' : isExecutive ? 'Ban Giám đốc' : isManager ? 'Quản lý' : 'Nhân viên'
+  const permissionLabel = isAdmin ? 'Quản trị' : isExecutive ? 'Ban Giám đốc' : isManager ? 'Quản lý' : 'Nhân viên'
   const permissionBadgeColor = isAdmin ? 'bg-red-100 text-red-700' 
     : isExecutive ? 'bg-purple-100 text-purple-700'
     : isManager ? 'bg-blue-100 text-blue-700'
@@ -277,9 +284,8 @@ export function TaskListPage() {
   if (error) {
     return (
       <div className="p-4 md:p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm sm:text-base">
-          Lỗi: {(error as Error).message}
-        </div>
+        {/* Lỗi tải: câu tiếng Việt + nút Thử lại (trước đây in thẳng error.message tiếng Anh, không có đường thử lại) */}
+        <PageState error={error} onRetry={() => refetch()} />
       </div>
     )
   }
@@ -502,7 +508,7 @@ export function TaskListPage() {
                                 {formatDate(task.due_date)}
                               </span>
                               {overdue && <span className="text-xs text-red-500 mt-0.5">{daysOverdue} ngày trước</span>}
-                              {dueToday && <span className="text-xs text-amber-500 mt-0.5">Deadline hôm nay</span>}
+                              {dueToday && <span className="text-xs text-amber-500 mt-0.5">Hạn hôm nay</span>}
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -725,15 +731,20 @@ export function TaskListPage() {
           {deleteId && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-lg p-5 sm:p-6 max-w-sm w-full">
-                <h3 className="text-lg font-semibold mb-3 sm:mb-4">Xác nhận xóa?</h3>
-                <p className="text-gray-600 mb-4 text-sm sm:text-base">Bạn có chắc muốn xóa công việc này?</p>
+                <h3 className="text-lg font-semibold mb-3 sm:mb-4">Xóa công việc nháp?</h3>
+                <p className="text-gray-600 mb-4 text-sm sm:text-base">Công việc sẽ bị xóa hẳn khỏi danh sách, không khôi phục được.</p>
                 <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
                   <button onClick={() => setDeleteId(null)} className="px-4 py-2 border rounded hover:bg-gray-50 text-sm sm:text-base">
                     Hủy
                   </button>
                   <button
                     onClick={async () => {
-                      await deleteMutation.mutateAsync(deleteId)
+                      try {
+                        await deleteMutation.mutateAsync(deleteId)
+                      } catch (e) {
+                        // Trước đây lỗi xoá bị nuốt (promise bị bỏ rơi) — hộp thoại đứng im không lời giải thích
+                        setAssignError(dichLoiHeThong(e, 'Xóa công việc thất bại'))
+                      }
                       setDeleteId(null)
                     }}
                     disabled={deleteMutation.isPending}

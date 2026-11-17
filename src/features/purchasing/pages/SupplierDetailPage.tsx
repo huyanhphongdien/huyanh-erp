@@ -31,9 +31,18 @@ import {
 } from 'lucide-react';
 
 // Import paths cho cấu trúc: src/features/purchasing/pages/
-import { supplierService, type Supplier } from '../../../services/supplierService';
+import {
+  supplierService,
+  type Supplier,
+  SUPPLIER_STATUS_LABELS,
+  SUPPLIER_TYPE_LABELS,
+  SUPPLIER_GROUP_LABELS,
+} from '../../../services/supplierService';
 import { SupplierContacts } from './components/suppliers/SupplierContacts';
 import { SupplierQuotations } from './components/suppliers/SupplierQuotations';
+import { App as AntdApp } from 'antd';
+import { fmtVnd as formatCurrency, fmtDate, fmtNum } from '../../../utils/format';
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -64,15 +73,16 @@ const TABS: TabConfig[] = [
 
 // Status Badge
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const config: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
-    active: { label: 'Hoạt động', className: 'bg-green-100 text-green-800', icon: <CheckCircle size={16} /> },
-    inactive: { label: 'Tạm ngừng', className: 'bg-yellow-100 text-yellow-800', icon: <XCircle size={16} /> },
-    blocked: { label: 'Đã khóa', className: 'bg-red-100 text-red-800', icon: <Ban size={16} /> }
+  // Nhãn từ SUPPLIER_STATUS_LABELS (service) — ở đây chỉ giữ màu + icon
+  const config: Record<string, { className: string; icon: React.ReactNode }> = {
+    active: { className: 'bg-green-100 text-green-800', icon: <CheckCircle size={16} /> },
+    inactive: { className: 'bg-yellow-100 text-yellow-800', icon: <XCircle size={16} /> },
+    blocked: { className: 'bg-red-100 text-red-800', icon: <Ban size={16} /> }
   };
-  const { label, className, icon } = config[status] || config.inactive;
+  const { className, icon } = config[status] || config.inactive;
   return (
     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${className}`}>
-      {icon}{label}
+      {icon}{SUPPLIER_STATUS_LABELS[status] || status}
     </span>
   );
 };
@@ -143,7 +153,7 @@ const RatingDisplay: React.FC<{ rating: number }> = ({ rating }) => (
         />
       ))}
     </div>
-    <span className="text-lg font-medium text-gray-700">{rating.toFixed(1)}</span>
+    <span className="text-lg font-medium text-gray-700">{fmtNum(rating, 1)}</span>
   </div>
 );
 
@@ -152,9 +162,7 @@ const RatingDisplay: React.FC<{ rating: number }> = ({ rating }) => (
 // ============================================================================
 
 const InfoTab: React.FC<{ supplier: Supplier }> = ({ supplier }) => {
-  const formatCurrency = (value: number) => 
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
-
+  // formatCurrency = fmtVnd (utils/format) — bản tự viết cũ đã xoá
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Left Column - Basic Info */}
@@ -169,11 +177,8 @@ const InfoTab: React.FC<{ supplier: Supplier }> = ({ supplier }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
             <InfoRow icon={<FileText size={18} />} label="Mã NCC" value={supplier.code} />
             <InfoRow icon={<FileText size={18} />} label="Mã số thuế" value={supplier.tax_code} />
-            <InfoRow icon={<Building2 size={18} />} label="Loại" value={supplier.supplier_type === 'company' ? 'Công ty' : 'Cá nhân'} />
-            <InfoRow icon={<Star size={18} />} label="Nhóm" value={
-              supplier.supplier_group === 'primary' ? 'NCC Chính' :
-              supplier.supplier_group === 'secondary' ? 'NCC Phụ' : 'Dịch vụ'
-            } />
+            <InfoRow icon={<Building2 size={18} />} label="Loại" value={SUPPLIER_TYPE_LABELS[supplier.supplier_type] || supplier.supplier_type} />
+            <InfoRow icon={<Star size={18} />} label="Nhóm" value={SUPPLIER_GROUP_LABELS[supplier.supplier_group] || supplier.supplier_group} />
           </div>
         </div>
 
@@ -292,11 +297,7 @@ const InfoTab: React.FC<{ supplier: Supplier }> = ({ supplier }) => {
           <div className="bg-white rounded-lg border p-6">
             <h3 className="font-semibold text-gray-900 mb-2">Đơn hàng gần nhất</h3>
             <p className="text-gray-600">
-              {new Date(supplier.last_order_date).toLocaleDateString('vi-VN', {
-                day: '2-digit',
-                month: '2-digit', 
-                year: 'numeric'
-              })}
+              {fmtDate(supplier.last_order_date)}
             </p>
           </div>
         )}
@@ -309,14 +310,21 @@ const InfoTab: React.FC<{ supplier: Supplier }> = ({ supplier }) => {
 // TAB: ĐƠN HÀNG (PLACEHOLDER)
 // ============================================================================
 
-const OrdersTab: React.FC<{ supplierId: string }> = ({ supplierId }) => (
+// Chưa có danh sách đơn theo NCC trên màn này — nói thật + dẫn sang Sổ đơn đặt hàng
+// (bản cũ hứa "Phase 3" đã qua và in thẳng UUID của NCC ra màn hình)
+const OrdersTab: React.FC<{ onOpenOrders: () => void }> = ({ onOpenOrders }) => (
   <div className="bg-white rounded-lg border p-8 text-center">
     <ShoppingCart className="mx-auto h-12 w-12 text-gray-400 mb-4" />
     <h3 className="text-lg font-medium text-gray-900 mb-2">Lịch sử đơn hàng</h3>
     <p className="text-gray-500 mb-4">
-      Tính năng này sẽ được phát triển trong Phase 3 - Quản lý đơn hàng
+      Màn này chưa liệt kê đơn hàng theo từng nhà cung cấp. Xem và lọc đơn ở Sổ đơn đặt hàng.
     </p>
-    <p className="text-sm text-gray-400">Supplier ID: {supplierId}</p>
+    <button
+      onClick={onOpenOrders}
+      className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+    >
+      Mở Sổ đơn đặt hàng
+    </button>
   </div>
 );
 
@@ -328,8 +336,11 @@ export const SupplierDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const { message } = AntdApp.useApp();
 
   const [supplier, setSupplier] = useState<Supplier | null>(null);
+  // Lỗi tải (mạng/quyền) mới có nút Thử lại; "không tìm thấy" thì không
+  const [loadFailed, setLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('info');
@@ -356,6 +367,7 @@ export const SupplierDetailPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      setLoadFailed(false);
       const data = await supplierService.getById(id);
       if (!data) {
         setError('Không tìm thấy nhà cung cấp');
@@ -364,7 +376,8 @@ export const SupplierDetailPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Load supplier error:', err);
-      setError('Không thể tải thông tin nhà cung cấp');
+      setError(dichLoiHeThong(err, 'Không thể tải thông tin nhà cung cấp'));
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -403,7 +416,7 @@ export const SupplierDetailPage: React.FC = () => {
       });
     } catch (err) {
       console.error('Delete supplier error:', err);
-      alert('Không thể xóa nhà cung cấp');
+      message.error(dichLoiHeThong(err, 'Không thể xóa nhà cung cấp'));
     } finally {
       setDeleting(false);
       setDeleteConfirm(false);
@@ -434,11 +447,19 @@ export const SupplierDetailPage: React.FC = () => {
           <div className="p-4 bg-red-50 rounded-full w-16 h-16 mx-auto flex items-center justify-center mb-4">
             <AlertCircle className="text-red-500" size={32} />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Lỗi</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">{loadFailed ? 'Không tải được dữ liệu' : 'Không tìm thấy'}</h2>
           <p className="text-gray-600 mb-6">{error || 'Không tìm thấy nhà cung cấp'}</p>
+          {loadFailed && (
+            <button
+              onClick={loadSupplier}
+              className="px-4 py-2 mr-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Thử lại
+            </button>
+          )}
           <button
             onClick={() => navigate('/purchasing/suppliers')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className={loadFailed ? 'px-4 py-2 border rounded-lg hover:bg-gray-50' : 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700'}
           >
             Quay lại danh sách
           </button>
@@ -559,7 +580,7 @@ export const SupplierDetailPage: React.FC = () => {
       {activeTab === 'info' && <InfoTab supplier={supplier} />}
       {activeTab === 'contacts' && <SupplierContacts supplierId={supplier.id} />}
       {activeTab === 'quotations' && <SupplierQuotations supplierId={supplier.id} />}
-      {activeTab === 'orders' && <OrdersTab supplierId={supplier.id} />}
+      {activeTab === 'orders' && <OrdersTab onOpenOrders={() => navigate('/purchasing/orders')} />}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
@@ -572,7 +593,7 @@ export const SupplierDetailPage: React.FC = () => {
             <p className="text-gray-600 mb-6">
               Bạn có chắc muốn xóa nhà cung cấp <strong>{supplier.name}</strong>?
               <br />
-              <span className="text-sm text-gray-500">Hành động này không thể hoàn tác.</span>
+              <span className="text-sm text-gray-500">NCC sẽ bị gỡ khỏi danh sách và chuyển sang Tạm ngừng. Đơn hàng, hóa đơn đã ghi vẫn giữ nguyên.</span>
             </p>
             <div className="flex justify-end gap-3">
               <button

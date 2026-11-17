@@ -182,7 +182,7 @@ export const laoFundTransferService = {
       .limit(1)
 
     if (linked && linked.length > 0) {
-      throw new Error('Không thể xoá: đã có shipment liên kết')
+      throw new Error('Không thể xoá: đã có chuyến xuất hàng Lào liên kết')
     }
 
     const { error } = await supabase.from('lao_fund_transfers').delete().eq('id', id)

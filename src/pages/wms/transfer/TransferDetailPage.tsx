@@ -19,34 +19,16 @@ import { useOpenTab } from '../../../hooks/useOpenTab'
 import transferService, { type TransferStatus } from '../../../services/wms/transferService'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import type { RubberGrade } from '../../../services/wms/wms.types'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtDateTime, fmtKg, fmtNum } from '../../../utils/format'
+import { TRANSFER_STATUS_LABELS as STATUS_LABELS, TRANSFER_STATUS_COLORS as STATUS_COLORS } from './transferLabels'
 
 const { Title, Text } = Typography
 const PRIMARY = '#1B4D3E'
 
-const STATUS_LABELS: Record<TransferStatus, string> = {
-  draft: 'Nháp',
-  picking: 'Đang lấy',
-  picked: 'Đã lấy',
-  in_transit: 'Đang vận chuyển',
-  arrived: 'Đã đến',
-  received: 'Hoàn tất',
-  cancelled: 'Hủy',
-  rejected: 'Từ chối',
-}
-
-const STATUS_COLORS: Record<TransferStatus, string> = {
-  draft: 'default',
-  picking: 'processing',
-  picked: 'cyan',
-  in_transit: 'warning',
-  arrived: 'gold',
-  received: 'success',
-  cancelled: 'default',
-  rejected: 'error',
-}
-
-const formatDateTime = (d: string | null | undefined) =>
-  d ? new Date(d).toLocaleString('vi-VN') : '—'
+// Chuẩn ngày-giờ toàn hệ 'DD/MM HH:mm' (trước: toLocaleString đầy đủ kèm giây, lệch Sổ chuyển kho)
+const formatDateTime = (d: string | null | undefined) => fmtDateTime(d)
 
 interface Props {
   id?: string  // truyền qua tab system, fallback URL params
@@ -67,14 +49,16 @@ export default function TransferDetailPage({ id: propId }: Props) {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
-  const { data: transfer, isLoading, refetch } = useQuery({
+  const { data: transfer, isLoading, error: loadError, refetch } = useQuery({
     queryKey: ['transfer', id],
     queryFn: () => transferService.getById(id!),
     enabled: !!id,
     staleTime: 10000,
   })
 
-  if (isLoading) return <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
+  if (isLoading) return <div style={{ padding: 24 }}><PageState loading minHeight={240} /></div>
+  // Lỗi tải (mạng/quyền) ≠ "không tìm thấy phiếu" — hiện khối lỗi + Thử lại
+  if (loadError) return <div style={{ padding: 24 }}><PageState error={loadError} onRetry={() => refetch()} /></div>
   if (!transfer) return <Empty description="Không tìm thấy phiếu chuyển" />
 
   const stepIndex: Record<TransferStatus, number> = {
@@ -107,7 +91,7 @@ export default function TransferDetailPage({ id: propId }: Props) {
       queryClient.invalidateQueries({ queryKey: ['transfer', id] })
       queryClient.invalidateQueries({ queryKey: ['transfers-all'] })
     } catch (err: any) {
-      message.error('Lỗi duyệt: ' + (err.message || ''))
+      message.error(dichLoiHeThong(err, 'Lỗi duyệt phiếu chuyển'))
     }
   }
 
@@ -125,8 +109,9 @@ export default function TransferDetailPage({ id: propId }: Props) {
       setRejectOpen(false)
       setRejectReason('')
       queryClient.invalidateQueries({ queryKey: ['transfer', id] })
+      queryClient.invalidateQueries({ queryKey: ['transfers-all'] })
     } catch (err: any) {
-      message.error('Lỗi: ' + (err.message || ''))
+      message.error(dichLoiHeThong(err, 'Lỗi từ chối phiếu chuyển'))
     }
   }
 
@@ -136,8 +121,9 @@ export default function TransferDetailPage({ id: propId }: Props) {
       message.success('Đã hủy phiếu')
       setCancelOpen(false)
       queryClient.invalidateQueries({ queryKey: ['transfer', id] })
+      queryClient.invalidateQueries({ queryKey: ['transfers-all'] })
     } catch (err: any) {
-      message.error('Lỗi: ' + (err.message || ''))
+      message.error(dichLoiHeThong(err, 'Lỗi hủy phiếu chuyển'))
     }
   }
 
@@ -146,8 +132,9 @@ export default function TransferDetailPage({ id: propId }: Props) {
       await transferService.markArrived(transfer.id, user?.employee_id || undefined)
       message.success('Đã đánh dấu xe đến NM nhận')
       queryClient.invalidateQueries({ queryKey: ['transfer', id] })
+      queryClient.invalidateQueries({ queryKey: ['transfers-all'] })
     } catch (err: any) {
-      message.error('Lỗi: ' + (err.message || ''))
+      message.error(dichLoiHeThong(err, 'Lỗi đánh dấu xe đã đến'))
     }
   }
 
@@ -164,9 +151,9 @@ export default function TransferDetailPage({ id: propId }: Props) {
           {STATUS_LABELS[transfer.status]}
         </Tag>
         {transfer.needs_approval && transfer.status === 'arrived' && (
-          <Tag color="red" icon={<WarningOutlined />}>Cần BGD duyệt</Tag>
+          <Tag color="red" icon={<WarningOutlined />}>Cần BGĐ duyệt</Tag>
         )}
-        <Button icon={<ReloadOutlined />} onClick={() => refetch()} />
+        <Button icon={<ReloadOutlined />} onClick={() => refetch()} title="Tải lại" />
       </Space>
 
       {/* Timeline 5 bước */}
@@ -192,12 +179,12 @@ export default function TransferDetailPage({ id: propId }: Props) {
           showIcon
           icon={<WarningOutlined />}
           style={{ marginBottom: 16 }}
-          message={`Hao hụt ${transfer.loss_pct?.toFixed(2)}% vượt ngưỡng ${transfer.loss_threshold_pct}% — cần BGD duyệt`}
+          message={`Hao hụt ${fmtNum(transfer.loss_pct, 2)}% vượt ngưỡng ${fmtNum(transfer.loss_threshold_pct, 2)}% — cần BGĐ duyệt`}
           description={
             <Space>
-              <Text>Cân xuất: <Text strong>{transfer.weight_out_kg?.toLocaleString('vi-VN')} kg</Text></Text>
-              <Text>→ Cân nhận: <Text strong>{transfer.weight_in_kg?.toLocaleString('vi-VN')} kg</Text></Text>
-              <Text>Hao hụt: <Text strong type="danger">{transfer.loss_kg?.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg</Text></Text>
+              <Text>Cân xuất: <Text strong>{fmtKg(transfer.weight_out_kg)} kg</Text></Text>
+              <Text>→ Cân nhận: <Text strong>{fmtKg(transfer.weight_in_kg)} kg</Text></Text>
+              <Text>Hao hụt: <Text strong type="danger">{fmtKg(transfer.loss_kg)} kg</Text></Text>
             </Space>
           }
           action={
@@ -356,7 +343,7 @@ export default function TransferDetailPage({ id: propId }: Props) {
       </Card>
 
       {/* Items */}
-      <Card title={`📦 Hàng chuyển (${transfer.items?.length || 0} batch)`} size="small" style={{ marginBottom: 16, borderRadius: 10 }}>
+      <Card title={`📦 Hàng chuyển (${transfer.items?.length || 0} lô)`} size="small" style={{ marginBottom: 16, borderRadius: 10 }}>
         <Table
           size="small"
           rowKey="id"
@@ -370,7 +357,7 @@ export default function TransferDetailPage({ id: propId }: Props) {
               width: 90,
               render: (_, r: any) => <GradeBadge grade={(r.source_batch?.rubber_grade as RubberGrade) || null} size="small" />,
             },
-            { title: 'Batch nguồn', dataIndex: ['source_batch', 'batch_no'], width: 140, render: (_, r: any) => r.source_batch?.batch_no ? <Text code>{r.source_batch.batch_no}</Text> : '—' },
+            { title: 'Lô nguồn', dataIndex: ['source_batch', 'batch_no'], width: 140, render: (_, r: any) => r.source_batch?.batch_no ? <Text code>{r.source_batch.batch_no}</Text> : '—' },
             {
               title: 'Dự kiến',
               dataIndex: 'quantity_planned',
@@ -396,7 +383,7 @@ export default function TransferDetailPage({ id: propId }: Props) {
               ) : '—',
             },
             {
-              title: 'Batch nhận',
+              title: 'Lô nhận',
               key: 'destination_batch',
               width: 200,
               render: (_, r: any) => r.destination_batch?.batch_no
@@ -430,7 +417,7 @@ export default function TransferDetailPage({ id: propId }: Props) {
         okText="Duyệt + Hoàn tất"
         cancelText="Đóng"
       >
-        <Text>Hao hụt {transfer.loss_pct?.toFixed(2)}% — vượt ngưỡng {transfer.loss_threshold_pct}%.</Text>
+        <Text>Hao hụt {fmtNum(transfer.loss_pct, 2)}% — vượt ngưỡng {fmtNum(transfer.loss_threshold_pct, 2)}%.</Text>
         <Input.TextArea
           rows={3}
           placeholder="Ghi chú duyệt (lý do chấp nhận hao hụt...)"

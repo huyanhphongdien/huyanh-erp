@@ -6,10 +6,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, XCircle, Camera, Loader2, Clock, LogOut } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, XCircle, Camera, Loader2, Clock, LogOut, AlertTriangle } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { getDeviceType, getDeviceInfo } from '../../utils/deviceDetect'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 // ============================================================================
 // CONSTANTS
@@ -52,29 +53,32 @@ export default function QRCheckInPage() {
   const [cameraError, setCameraError] = useState('')
   const [todayRecord, setTodayRecord] = useState<{ checkIn: string | null; checkOut: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
+  // Không đọc được bản ghi hôm nay ≠ chưa chấm công: báo rõ để công nhân không quét lại / lo mất công
+  const [loadError, setLoadError] = useState(false)
 
   const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
 
   // ── Load today's attendance ──
-  useEffect(() => {
-    const load = async () => {
-      if (!user?.employee_id) return
-      try {
-        const { data } = await supabase
-          .from('attendance')
-          .select('check_in_time, check_out_time')
-          .eq('employee_id', user.employee_id)
-          .eq('date', todayStr)
-          .order('check_in_time', { ascending: true })
-          .limit(1)
-        if (data && data.length > 0) {
-          setTodayRecord({ checkIn: data[0].check_in_time, checkOut: data[0].check_out_time })
-        }
-      } catch {}
-      setLoading(false)
+  const loadToday = useCallback(async () => {
+    if (!user?.employee_id) { setLoading(false); return }
+    setLoadError(false)
+    try {
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('check_in_time, check_out_time')
+        .eq('employee_id', user.employee_id)
+        .eq('date', todayStr)
+        .order('check_in_time', { ascending: true })
+        .limit(1)
+      if (error) throw error
+      setTodayRecord(data && data.length > 0 ? { checkIn: data[0].check_in_time, checkOut: data[0].check_out_time } : null)
+    } catch {
+      setLoadError(true)
     }
-    load()
+    setLoading(false)
   }, [user?.employee_id, todayStr])
+
+  useEffect(() => { loadToday() }, [loadToday])
 
   // ── Start camera ──
   const startCamera = useCallback(async () => {
@@ -94,7 +98,7 @@ export default function QRCheckInPage() {
     } catch (err: any) {
       setCameraError(err.name === 'NotAllowedError'
         ? 'Vui lòng cho phép truy cập camera để quét QR'
-        : 'Không thể mở camera: ' + err.message)
+        : dichLoiHeThong(err, 'Không thể mở camera'))
     }
   }, [])
 
@@ -186,12 +190,13 @@ export default function QRCheckInPage() {
       const gps = deviceType === 'desktop' ? undefined : await getGps()
       const dev = { deviceType, deviceInfo: getDeviceInfo() }
 
-      // Check existing today
-      const { data: existing } = await supabase
+      // Check existing today — đọc lỗi thì DỪNG, không đoán là "chưa chấm" rồi gọi vào ca
+      const { data: existing, error: existingErr } = await supabase
         .from('attendance')
         .select('id, check_in_time, check_out_time')
         .eq('employee_id', user.employee_id)
         .eq('date', todayStr)
+      if (existingErr) throw existingErr
 
       if (existing && existing.length > 0) {
         const lastRecord = existing[existing.length - 1]
@@ -206,8 +211,9 @@ export default function QRCheckInPage() {
         await attendanceService.checkOut(user.employee_id, { gps, ...dev })
 
         setStatus('success')
-        setMessage(`Check-out thành công lúc ${timeStr}`)
+        setMessage(`Ra ca thành công lúc ${timeStr}`)
         setTodayRecord({ checkIn: lastRecord.check_in_time, checkOut: nowISO })
+        setLoadError(false)
         return
       }
 
@@ -215,11 +221,12 @@ export default function QRCheckInPage() {
       await attendanceService.checkIn(user.employee_id, { gps, ...dev })
 
       setStatus('success')
-      setMessage(`Check-in thành công lúc ${timeStr}`)
+      setMessage(`Vào ca thành công lúc ${timeStr}`)
       setTodayRecord({ checkIn: nowISO, checkOut: null })
+      setLoadError(false)
     } catch (err: any) {
       setStatus('error')
-      setMessage('Lỗi: ' + (err.message || 'Không thể chấm công'))
+      setMessage(dichLoiHeThong(err, 'Không thể chấm công'))
     }
   }
 
@@ -261,14 +268,27 @@ export default function QRCheckInPage() {
             <Clock size={14} className="inline mr-1" />
             Hôm nay ({new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' })})
           </p>
-          {todayRecord?.checkIn ? (
+          {loadError ? (
+            <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5">
+              <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <span className="text-[14px] text-amber-800 font-medium flex-1">
+                Không kiểm tra được chấm công hôm nay (mất mạng?)
+              </span>
+              <button
+                onClick={loadToday}
+                className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-[13px] font-semibold active:bg-amber-700"
+              >
+                Thử lại
+              </button>
+            </div>
+          ) : todayRecord?.checkIn ? (
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
               <span className="text-[13px] text-gray-600">
                 Vào: <strong>{fmtTime(todayRecord.checkIn)}</strong>
                 {todayRecord.checkOut
                   ? <> — Ra: <strong>{fmtTime(todayRecord.checkOut)}</strong></>
-                  : <span className="text-amber-600 ml-2">• Chưa check-out</span>}
+                  : <span className="text-amber-600 ml-2">• Chưa ra ca</span>}
               </span>
             </div>
           ) : (
@@ -288,7 +308,7 @@ export default function QRCheckInPage() {
               style={{ background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.secondary})` }}
             >
               <Camera size={24} className="inline mr-2" />
-              {todayRecord?.checkIn && !todayRecord.checkOut ? 'Quét QR để Check-out' : 'Quét QR để Check-in'}
+              {todayRecord?.checkIn && !todayRecord.checkOut ? 'Quét QR để Ra ca' : 'Quét QR để Vào ca'}
             </button>
             {cameraError && (
               <p className="text-red-500 text-[13px] bg-red-50 rounded-xl px-4 py-3">{cameraError}</p>
@@ -337,7 +357,7 @@ export default function QRCheckInPage() {
                 <button onClick={reset}
                   className="flex-1 py-3 rounded-xl border-2 text-[14px] font-semibold"
                   style={{ borderColor: BRAND.primary, color: BRAND.primary }}>
-                  <LogOut size={14} className="inline mr-1" /> Check-out
+                  <LogOut size={14} className="inline mr-1" /> Ra ca
                 </button>
               )}
             </div>

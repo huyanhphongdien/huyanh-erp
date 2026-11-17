@@ -29,39 +29,19 @@ import {
   Advance,
   ADVANCE_STATUS_LABELS,
   ADVANCE_STATUS_COLORS,
+  PAYMENT_METHOD_LABELS,
 } from '../../services/b2b/advanceService'
-import { Deal } from '../../services/b2b/dealService'
+import { Deal, DEAL_STATUS_LABELS } from '../../services/b2b/dealService'
 import { dealChatActionsService } from '../../services/b2b/dealChatActionsService'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import AddAdvanceModal, { AddAdvanceFormData } from './AddAdvanceModal'
 import type { DealCardMetadata } from '../../types/b2b.types'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import PageState from '../common/PageState'
+import { fmtDate, fmtVnd, fmtVndNum } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text } = Typography
-
-// ============================================
-// HELPERS
-// ============================================
-
-const formatCurrency = (value: number | null): string => {
-  if (!value && value !== 0) return '-'
-  return new Intl.NumberFormat('vi-VN', {
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
-const formatDate = (dateStr: string | null): string => {
-  if (!dateStr) return '-'
-  return format(new Date(dateStr), 'dd/MM/yyyy', { locale: vi })
-}
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  cash: 'Tiền mặt',
-  bank_transfer: 'Chuyển khoản',
-  check: 'Séc',
-}
 
 // ============================================
 // COMPONENT
@@ -74,6 +54,7 @@ interface DealAdvancesTabProps {
 
 const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [advances, setAdvances] = useState<Advance[]>([])
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -82,10 +63,12 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
   const loadData = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const data = await advanceService.getAdvancesByDeal(dealId)
       setAdvances(data)
     } catch (error) {
       console.error('Load DealAdvancesTab error:', error)
+      setLoadError(error)
     } finally {
       setLoading(false)
     }
@@ -136,12 +119,12 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
       })
 
       message.success(
-        `Đã ứng thêm ${result.amount.toLocaleString('vi-VN')} VNĐ (${result.advance_number})`
+        `Đã ứng thêm ${fmtVnd(result.amount)} (${result.advance_number})`
       )
       setAddModalOpen(false)
       await loadData()
     } catch (err: any) {
-      message.error(err?.message || 'Không thể tạo tạm ứng')
+      message.error(dichLoiHeThong(err, 'Không thể tạo tạm ứng'))
     } finally {
       setSubmitting(false)
     }
@@ -149,6 +132,11 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>
+  }
+
+  // Lỗi tải xét TRƯỚC — nếu không, tổng "Đã tạm ứng" hiện 0 ₫ giả
+  if (loadError) {
+    return <PageState error={loadError} onRetry={loadData} />
   }
 
   // Calculate totals
@@ -180,8 +168,8 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
         <Col xs={8}>
           <Statistic
             title="Giá trị Deal"
-            value={formatCurrency(dealValue)}
-            suffix="VNĐ"
+            value={fmtVndNum(dealValue)}
+            suffix="₫"
             prefix={<DollarOutlined />}
             valueStyle={{ color: '#1B4D3E' }}
           />
@@ -189,8 +177,8 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
         <Col xs={8}>
           <Statistic
             title="Đã tạm ứng"
-            value={formatCurrency(totalAdvanced)}
-            suffix="VNĐ"
+            value={fmtVndNum(totalAdvanced)}
+            suffix="₫"
             prefix={<WalletOutlined />}
             valueStyle={{ color: '#52c41a' }}
           />
@@ -198,8 +186,8 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
         <Col xs={8}>
           <Statistic
             title="Còn lại"
-            value={formatCurrency(balanceDue)}
-            suffix="VNĐ"
+            value={fmtVndNum(balanceDue)}
+            suffix="₫"
             valueStyle={{ color: balanceDue > 0 ? '#cf1322' : '#52c41a' }}
           />
         </Col>
@@ -216,7 +204,7 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
         <Tooltip
           title={
             !canAddAdvance
-              ? `Chỉ được tạm ứng khi deal đã DUYỆT. Hiện: "${deal.status}"`
+              ? `Chỉ được tạm ứng khi deal đã DUYỆT. Hiện: "${DEAL_STATUS_LABELS[deal.status] || deal.status}"`
               : 'Tạo phiếu tạm ứng mới cho đại lý'
           }
         >
@@ -252,7 +240,7 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
                 align: 'right' as const,
                 render: (_: number, record: Advance) => (
                   <Text strong style={{ color: '#1B4D3E' }}>
-                    {formatCurrency(record.amount_vnd || record.amount)} VNĐ
+                    {fmtVnd(record.amount_vnd || record.amount)}
                   </Text>
                 ),
               },
@@ -264,7 +252,7 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
               {
                 title: 'Ngày chi',
                 dataIndex: 'paid_at',
-                render: (d: string | null) => formatDate(d),
+                render: (d: string | null) => fmtDate(d),
               },
               {
                 title: 'Trạng thái',

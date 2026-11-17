@@ -25,6 +25,9 @@ import GradeBadge from '../../../components/wms/GradeBadge'
 import { QCBadge } from '../../../components/wms/QCInputForm'
 import type { RubberGrade } from '../../../services/wms/wms.types'
 import { RUBBER_GRADE_COLORS } from '../../../services/wms/wms.types'
+import PageState from '../../../components/common/PageState'
+import { stdPagination } from '../../../components/common/tableDefaults'
+import { fmtKg } from '../../../utils/format'
 
 const { Title, Text } = Typography
 
@@ -56,26 +59,38 @@ const QCDashboardPage = () => {
   const [gradeDistribution, setGradeDistribution] = useState<{ grade: string; count: number; weight: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  // Lỗi tải ≠ "chưa có lô" — đừng để Tổng quan QC hiện số 0 giả
+  const [loadError, setLoadError] = useState<unknown>(null)
+  // Phân bố Grade tải riêng: lỗi thì báo "không tải được", đừng hiện "Chưa có dữ liệu"
+  const [gradeError, setGradeError] = useState<unknown>(null)
   const [searchText, setSearchText] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
 
   const loadData = useCallback(async (refresh = false) => {
     try {
       if (refresh) setRefreshing(true); else setLoading(true)
+      setLoadError(null)
+      setGradeError(null)
       const [s, b] = await Promise.all([qcService.getDRCStats(), qcService.getDRCOverview()])
       setStats(s); setBatches(b)
       try {
-        const { data } = await supabase.from('stock_batches')
+        const { data, error } = await supabase.from('stock_batches')
           .select('rubber_grade, quantity_remaining').eq('status', 'active').gt('quantity_remaining', 0)
+        if (error) throw error
         if (data) {
           const map: Record<string, { count: number; weight: number }> = {}
           for (const b of data) { const g = (b as any).rubber_grade || 'unknown'; if (!map[g]) map[g] = { count: 0, weight: 0 }; map[g].count++; map[g].weight += (b as any).quantity_remaining || 0 }
           setGradeDistribution(Object.entries(map).map(([grade, d]) => ({ grade, ...d })).sort((a, b) => b.weight - a.weight))
         }
-      } catch (e) { console.error(e) }
-    } catch (err) { console.error(err) }
+      } catch (e) { console.error(e); setGradeError(e) }
+    } catch (err) { console.error(err); setLoadError(err) }
     finally { setLoading(false); setRefreshing(false) }
   }, [])
+
+  // Tải lỗi mà chưa có số liệu → KPI hiện '—' (trước đây vẽ 0 như thật dù đã có khối lỗi phía trên)
+  const kpiChuaCoSo = loadError != null && !stats
+  // Phân bố Grade chưa từng tải được (lỗi riêng, hoặc lần tải chính hỏng nên chưa tới bước này)
+  const gradeChuaCoSo = gradeDistribution.length === 0 && (gradeError != null || loadError != null)
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -86,14 +101,14 @@ const QCDashboardPage = () => {
   })
 
   const columns = [
-    { title: 'Lo', dataIndex: 'batch_no', key: 'batch_no', render: (v: string) => <Text strong style={{ fontFamily: "'JetBrains Mono'", fontSize: 12 }}>{v}</Text> },
+    { title: 'Mã lô', dataIndex: 'batch_no', key: 'batch_no', render: (v: string) => <Text strong style={{ fontFamily: "'JetBrains Mono'", fontSize: 12 }}>{v}</Text> },
     { title: 'Vật liệu', key: 'mat', render: (_: any, r: DRCOverviewItem) => <><Text style={{ fontSize: 13 }}>{r.material_name}</Text><br/><Text type="secondary" style={{ fontSize: 11 }}>{r.material_sku}</Text></> },
     { title: 'Grade', key: 'grade', render: (_: any, r: any) => <GradeBadge grade={r.rubber_grade} size="small" /> },
     { title: 'DRC', key: 'drc', render: (_: any, r: DRCOverviewItem) => <Space size={4}><Text type="secondary" style={{ fontSize: 11, fontFamily: "'JetBrains Mono'" }}>{r.initial_drc || '—'}%</Text><Text type="secondary">→</Text><Text strong style={{ fontSize: 13, fontFamily: "'JetBrains Mono'", color: '#1B4D3E' }}>{r.latest_drc || '—'}%</Text></Space> },
     { title: 'QC', dataIndex: 'qc_status', key: 'qc', render: (v: string) => <QCBadge result={v} size="sm" /> },
-    { title: 'Tái kiểm', key: 'recheck', render: (_: any, r: DRCOverviewItem) => { if (!r.next_recheck_date) return <Text type="secondary">—</Text>; const d = Math.ceil((new Date(r.next_recheck_date).getTime() - Date.now()) / 86400000); return <Tag color={d <= 0 ? 'red' : d <= 3 ? 'orange' : 'default'}>{d <= 0 ? `Quá hạn ${Math.abs(d)}d` : `${d}d`}</Tag> } },
+    { title: 'Tái kiểm', key: 'recheck', render: (_: any, r: DRCOverviewItem) => { if (!r.next_recheck_date) return <Text type="secondary">—</Text>; const d = Math.ceil((new Date(r.next_recheck_date).getTime() - Date.now()) / 86400000); return <Tag color={d <= 0 ? 'red' : d <= 3 ? 'orange' : 'default'}>{d <= 0 ? `Quá hạn ${Math.abs(d)} ngày` : `còn ${d} ngày`}</Tag> } },
     { title: 'Kho', key: 'wh', render: (_: any, r: DRCOverviewItem) => <Text type="secondary" style={{ fontSize: 11 }}>{r.warehouse_name}</Text> },
-    { title: 'SL', dataIndex: 'quantity_remaining', key: 'qty', align: 'right' as const, render: (v: number) => <Text style={{ fontFamily: "'JetBrains Mono'" }}>{v?.toLocaleString('vi-VN')}</Text> },
+    { title: 'SL', dataIndex: 'quantity_remaining', key: 'qty', align: 'right' as const, render: (v: number) => <Text style={{ fontFamily: "'JetBrains Mono'" }}>{fmtKg(v)}</Text> },
     {
       title: '',
       key: 'actions',
@@ -120,6 +135,12 @@ const QCDashboardPage = () => {
         <Col><Space><Button icon={<ReloadOutlined spin={refreshing} />} onClick={() => loadData(true)}>Làm mới</Button><Button icon={<SettingOutlined />} onClick={() => navigate('/wms/qc/standards')}>Ngưỡng QC</Button></Space></Col>
       </Row>
 
+      {loadError != null && (
+        <div style={{ marginBottom: 16 }}>
+          <PageState error={loadError} onRetry={() => loadData(true)} minHeight={120} />
+        </div>
+      )}
+
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {[
           { title: 'Tổng lô', value: stats?.totalBatches || 0, color: '#1B4D3E', icon: <ExperimentOutlined />, filter: 'all' },
@@ -130,8 +151,8 @@ const QCDashboardPage = () => {
         ].map((item, i) => (
           <Col xs={12} sm={8} lg={4} key={i}>
             <Card bodyStyle={{ padding: 16, cursor: item.filter ? 'pointer' : undefined }} onClick={item.filter ? () => setFilterStatus(item.filter!) : undefined}>
-              <Statistic title={item.title} value={item.value} suffix={(item as any).suffix}
-                valueStyle={{ color: item.color, fontFamily: "'JetBrains Mono'" }} prefix={(item as any).icon} />
+              <Statistic title={item.title} value={kpiChuaCoSo ? '—' : item.value} suffix={kpiChuaCoSo ? undefined : (item as any).suffix}
+                valueStyle={{ color: kpiChuaCoSo ? undefined : item.color, fontFamily: "'JetBrains Mono'" }} prefix={(item as any).icon} />
             </Card>
           </Col>
         ))}
@@ -140,7 +161,8 @@ const QCDashboardPage = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} lg={12}>
           <Card title={<Space><ExperimentOutlined /> Phân bố Grade</Space>} size="small">
-            {gradeDistribution.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có du lieu" /> :
+            {gradeChuaCoSo ? <Text type="danger" style={{ fontSize: 13 }}>Không tải được phân bố grade — bấm Làm mới để thử lại</Text> :
+              gradeDistribution.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có dữ liệu" /> :
               gradeDistribution.map(item => { const total = gradeDistribution.reduce((s, g) => s + g.weight, 0); const pct = total > 0 ? Math.round((item.weight / total) * 100) : 0; return (
                 <div key={item.grade} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                   <GradeBadge grade={item.grade as RubberGrade} size="small" />
@@ -164,12 +186,13 @@ const QCDashboardPage = () => {
         </Col>
       </Row>
 
-      <Card title="Danh sách lo" extra={<Space>
+      <Card title="Danh sách lô" extra={<Space>
         <Input.Search placeholder="Tìm lô..." value={searchText} onChange={e => setSearchText(e.target.value)} allowClear style={{ width: 200 }} size="small" />
         <Select value={filterStatus} onChange={setFilterStatus} size="small" style={{ width: 120 }} options={[{ value: 'all', label: 'Tất cả' }, { value: 'passed', label: 'Đạt' }, { value: 'warning', label: 'Cảnh báo' }, { value: 'needs_blend', label: 'Cần trộn' }, { value: 'pending', label: 'Chờ QC' }]} />
       </Space>}>
         <Table dataSource={filtered} columns={columns} rowKey="id" size="small"
-          pagination={{ showSizeChanger: true, showTotal: (t, r) => `${r[0]}-${r[1]} / ${t}` }}
+          pagination={stdPagination(20)}
+          locale={{ emptyText: loadError ? 'Không tải được danh sách lô' : 'Chưa có lô nào' }}
           onRow={r => ({ onClick: () => openBatchQC(r.id, (r as any).batch_no), style: { cursor: 'pointer' } })} />
       </Card>
     </div>

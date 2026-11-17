@@ -18,6 +18,7 @@ import {
   type OvertimeApproverInfo
 } from '../../services/overtimeRequestService'
 import { supabase } from '../../lib/supabase'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -169,7 +170,7 @@ export default function OvertimeRequestForm({ onClose, onSuccess }: Props) {
       })
       onSuccess()
     } catch (error: any) {
-      setSubmitError(error.message || 'Lỗi tạo phiếu tăng ca')
+      setSubmitError(dichLoiHeThong(error, 'Lỗi tạo phiếu tăng ca'))
     } finally {
       setSubmitting(false)
     }
@@ -312,7 +313,7 @@ export default function OvertimeRequestForm({ onClose, onSuccess }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Bắt đầu OT <span className="text-red-500">*</span>
+                  Giờ bắt đầu <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400 pointer-events-none" />
@@ -332,7 +333,7 @@ export default function OvertimeRequestForm({ onClose, onSuccess }: Props) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Kết thúc OT <span className="text-red-500">*</span>
+                  Giờ kết thúc <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-400 pointer-events-none" />
@@ -352,11 +353,11 @@ export default function OvertimeRequestForm({ onClose, onSuccess }: Props) {
               </div>
             </div>
 
-            {/* Tổng giờ OT */}
+            {/* Tổng giờ tăng ca */}
             <div className="flex items-center justify-between px-4 py-3.5 bg-amber-50 border border-amber-200 rounded-xl">
               <div className="flex items-center gap-2">
                 <Clock className="w-[18px] h-[18px] text-amber-600" />
-                <span className="text-sm text-amber-800">Tổng thời gian OT</span>
+                <span className="text-sm text-amber-800">Tổng thời gian tăng ca</span>
               </div>
               <span className="text-base font-bold text-amber-900">
                 {formatMinutes(formData.planned_minutes)}

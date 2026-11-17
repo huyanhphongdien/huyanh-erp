@@ -16,6 +16,8 @@ import { taskChecklistService, ChecklistItem } from '../../services/taskChecklis
 import { supabase } from '../../lib/supabase'
 import { compressImage } from '../../lib/imageCompress'
 import { useAuthStore } from '../../stores/authStore'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDateTime } from '../../utils/format'
 
 const { Text } = Typography
 
@@ -94,7 +96,7 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
       setItems(updated)
       setNewTitle('')
       notifyProgress(updated)
-    } catch (err: any) { message.error(err.message || 'Không thể thêm') }
+    } catch (err: any) { message.error(dichLoiHeThong(err, 'Không thể thêm')) }
     setAdding(false)
   }
 
@@ -104,7 +106,7 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
       const updated = items.filter(i => i.id !== id)
       setItems(updated)
       notifyProgress(updated)
-    } catch (err: any) { message.error(err.message || 'Không thể xóa') }
+    } catch (err: any) { message.error(dichLoiHeThong(err, 'Không thể xóa')) }
   }
 
   async function handleSaveEdit() {
@@ -114,7 +116,7 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
       setItems(items.map(i => i.id === editingId ? updated : i))
       setEditingId(null)
       setEditTitle('')
-    } catch (err: any) { message.error(err.message || 'Không thể cập nhật') }
+    } catch (err: any) { message.error(dichLoiHeThong(err, 'Không thể cập nhật')) }
   }
 
   // ── Evidence helpers ──
@@ -137,7 +139,7 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
       const newItems = items.map(i => i.id === item.id ? updated : i)
       setItems(newItems)
       notifyProgress(newItems)
-    } catch (err: any) { message.error(err.message || 'Không thể cập nhật') }
+    } catch (err: any) { message.error(dichLoiHeThong(err, 'Không thể cập nhật')) }
   }
 
   // ── File selection ──
@@ -223,7 +225,7 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
       setPendingFiles([])
       message.success(`Hoàn thành! Đã tải ${pendingFiles.length} file`)
     } catch (err: any) {
-      message.error(err.message || 'Lỗi tải lên')
+      message.error(dichLoiHeThong(err, 'Lỗi tải lên'))
     }
     setUploading(false)
     setUploadProgress(0)
@@ -287,7 +289,7 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
                     {item.is_completed && (item as any).completed_by_name && (
                       <Text type="secondary" style={{ fontSize: 11 }}>
                         ✓ {(item as any).completed_by_name}
-                        {item.completed_at && ` • ${new Date(item.completed_at).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
+                        {item.completed_at && ` • ${fmtDateTime(item.completed_at)}`}
                       </Text>
                     )}
                   </div>
@@ -340,10 +342,10 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
                               {meta ? (
                                 <div style={{ fontSize: 9, marginTop: 3, color: '#666', textAlign: 'center', width: '100%', lineHeight: 1.3 }}>
                                   <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {meta.uploaded_by_name?.split(' ').pop() || 'N/A'}
+                                    {meta.uploaded_by_name?.split(' ').pop() || '—'}
                                   </div>
                                   <div style={{ color: '#999' }}>
-                                    {new Date(meta.uploaded_at).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                    {fmtDateTime(meta.uploaded_at)}
                                   </div>
                                 </div>
                               ) : (

@@ -3,7 +3,7 @@
 // File: src/pages/sales/SalesOrderListPage.tsx
 // ============================================================================
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Card,
@@ -44,7 +44,7 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { supabase } from '../../lib/supabase'
-import { salesOrderService, SORTABLE_ORDER_COLUMNS } from '../../services/sales/salesOrderService'
+import { salesOrderService, SORTABLE_ORDER_COLUMNS, nextOrderStatuses } from '../../services/sales/salesOrderService'
 import type { SalesOrderStats, SalesOrderListParams, SortableOrderColumn } from '../../services/sales/salesOrderService'
 import { isVnd, fmtMoney } from '../../services/sales/salesMoney'
 import { dispatchService, deliveredTons, remainingTons, type LotProgress } from '../../services/logistics/dispatchService'
@@ -65,8 +65,12 @@ import {
   PACKING_TYPE_LABELS,
   type PackingType,
   soDisplayCode,
+  countryFlag,
 } from '../../services/sales/salesTypes'
 import { exportSalesOrdersExcel } from '../../services/sales/salesOrderExcel'
+import { fmtDate } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
 import GradeBadge from '../../components/wms/GradeBadge'
 import { useAuthStore } from '../../stores/authStore'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
@@ -81,36 +85,7 @@ import { userSavedViewsService, type SavedView } from '../../services/userSavedV
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
 
-// ============================================
-// COUNTRY FLAG HELPER
-// ============================================
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  JP: '\u{1F1EF}\u{1F1F5}',
-  CN: '\u{1F1E8}\u{1F1F3}',
-  IN: '\u{1F1EE}\u{1F1F3}',
-  DE: '\u{1F1E9}\u{1F1EA}',
-  US: '\u{1F1FA}\u{1F1F8}',
-  MY: '\u{1F1F2}\u{1F1FE}',
-  KR: '\u{1F1F0}\u{1F1F7}',
-  TW: '\u{1F1F9}\u{1F1FC}',
-  TR: '\u{1F1F9}\u{1F1F7}',
-  BR: '\u{1F1E7}\u{1F1F7}',
-  IT: '\u{1F1EE}\u{1F1F9}',
-  FR: '\u{1F1EB}\u{1F1F7}',
-  ES: '\u{1F1EA}\u{1F1F8}',
-  TH: '\u{1F1F9}\u{1F1ED}',
-  ID: '\u{1F1EE}\u{1F1E9}',
-  RU: '\u{1F1F7}\u{1F1FA}',
-  PK: '\u{1F1F5}\u{1F1F0}',
-  BD: '\u{1F1E7}\u{1F1E9}',
-  EG: '\u{1F1EA}\u{1F1EC}',
-}
-
-const getCountryFlag = (code?: string): string => {
-  if (!code) return ''
-  return COUNTRY_FLAGS[code] || '\u{1F3F3}\u{FE0F}'
-}
+// Cờ quốc gia: countryFlag() trong salesTypes (sinh từ mã ISO-2 — bỏ bảng tra 19 nước chép tay).
 
 // ============================================
 // FORMAT HELPERS
@@ -146,18 +121,14 @@ function sortFieldLabel(field: string): string {
   return SORT_FIELD_LABELS[field] || field
 }
 
-const formatCurrency = (value?: number): string => {
-  if (value == null) return '-'
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value)
-}
+// Tiền: fmtMoney(v, currency, { decimals: 0 }) — đơn USD và VND cùng cột đều có ký hiệu ($ / ₫).
+// Ngày: fmtDate (utils/format). Bỏ formatCurrency en-US không ký hiệu ("473,760" lẫn với cột tấn).
+/** Đơn giá /tấn: giữ số lẻ khi có (1.752,5) — bảng tiền khác làm tròn 0 số lẻ. */
+const fmtUnitPrice = (v: number, currency?: string | null): string =>
+  fmtMoney(v, currency, { decimals: Number.isInteger(v) ? 0 : 2 })
 
-const formatDate = (date?: string): string => {
-  if (!date) return '-'
-  return dayjs(date).format('DD/MM/YYYY')
-}
+/** Mục "Huỷ đơn…" trong ô đổi trạng thái — tách khỏi các bước đi tới. */
+const CANCEL_ORDER_KEY = '__cancel__'
 
 // ============================================
 // SẮP XẾP — bảng ánh xạ DUY NHẤT: key của cột → tên cột trong DB
@@ -272,6 +243,7 @@ const SalesOrderListPage = () => {
   // Khách lọc Grade=RSS rồi hỏi "còn thiếu bao nhiêu tấn" ⇒ tổng của 10 dòng là vô nghĩa.
   const [summary, setSummary] = useState<{ orders: number; qty: number; delivered: number; shortage: number; estimated: boolean; truncated: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [total, setTotal] = useState(0)
   const [stats, setStats] = useState<SalesOrderStats>({
     total: 0,
@@ -311,6 +283,8 @@ const SalesOrderListPage = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   // Filter "chỉ show đơn quá ETD" — set qua query param ?filter=overdue_etd
   const [overdueEtdOnly, setOverdueEtdOnly] = useState<boolean>(false)
+  // Lọc 1 ngày ETD — lịch giao ở Dashboard truyền ?etd=YYYY-MM-DD (lọc cột etd, KHÔNG phải ngày đặt)
+  const [etdDay, setEtdDay] = useState<string | null>(null)
 
   // Detail panel v4
   const [panelOrderId, setPanelOrderId] = useState<string | null>(null)
@@ -398,8 +372,11 @@ const SalesOrderListPage = () => {
     if (overdueEtdOnly) {
       chips.push({ key: 'overdue', label: '🚨 Quá ETD', onRemove: () => { setOverdueEtdOnly(false); setSearchParams({}) } })
     }
+    if (etdDay) {
+      chips.push({ key: 'etd', label: `ETD: ${fmtDate(etdDay)}`, onRemove: () => { setEtdDay(null); setSearchParams({}) } })
+    }
     return chips
-  }, [searchText, statusTab, customerFilter, gradeFilter, dateRange, overdueEtdOnly, customers, setSearchParams])
+  }, [searchText, statusTab, customerFilter, gradeFilter, dateRange, overdueEtdOnly, etdDay, customers, setSearchParams])
 
   const clearAllFilters = () => {
     setSearchText('')
@@ -408,6 +385,7 @@ const SalesOrderListPage = () => {
     setGradeFilter(undefined)
     setDateRange(null)
     setOverdueEtdOnly(false)
+    setEtdDay(null)
     setSearchParams({})
     setPagination(p => ({ ...p, current: 1 }))
   }
@@ -424,7 +402,24 @@ const SalesOrderListPage = () => {
   }, [])
 
   // M4-F: Realtime collab — subscribe sales_orders table changes
+  // Audit 17/11/2026: trước đây MỖI biến động (kể cả đơn ngoài trang) refetch cả trang ngay lập tức
+  // và toast "Đơn mới" cho mọi người; đang sửa inline thì dữ liệu dưới tay bị thay; callback còn giữ
+  // fetchOrders CŨ (deps [orders.length]) nên đổi bộ lọc xong có thể bị nạp lại theo bộ lọc cũ.
+  // Nay: gom sự kiện 3 giây, hoãn khi đang mở ô sửa inline, luôn gọi bản fetch MỚI NHẤT qua ref.
+  const ordersRef = useRef<SalesOrder[]>([])
+  const editingRef = useRef<{ rowId: string; key: string } | null>(null)
+  const refetchRef = useRef<() => void>(() => {})
+  const rtTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
+    const run = () => {
+      if (editingRef.current) { rtTimerRef.current = setTimeout(run, 3000); return }   // đang sửa → hoãn
+      rtTimerRef.current = null
+      refetchRef.current()
+    }
+    const scheduleRefetch = () => {
+      if (rtTimerRef.current) clearTimeout(rtTimerRef.current)
+      rtTimerRef.current = setTimeout(run, 3000)
+    }
     const channel = supabase
       .channel('sales-orders-list-realtime')
       .on(
@@ -433,27 +428,23 @@ const SalesOrderListPage = () => {
         (payload: any) => {
           const row = payload.new || payload.old
           const code = (row as any)?.contract_no || (row as any)?.code || ''
-          if (payload.eventType === 'INSERT') {
-            message.info(`📥 Đơn mới: ${code}`)
-          } else if (payload.eventType === 'UPDATE') {
-            // Chỉ refresh nếu đơn nằm trong danh sách đang hiện
-            if (orders.some(o => o.id === (row as any).id)) {
-              message.info(`✏️ Đơn ${code} vừa được cập nhật`)
-            }
-          } else if (payload.eventType === 'DELETE') {
-            if (orders.some(o => o.id === (row as any).id)) {
-              message.warning(`🗑 Đơn ${code} đã bị xóa`)
-            }
+          const visible = ordersRef.current.some(o => o.id === (row as any)?.id)
+          // INSERT: không toast cho mọi người — đơn mới hiện ở lần nạp lại nếu khớp bộ lọc.
+          if (payload.eventType === 'UPDATE' && visible) {
+            message.info(`✏️ Đơn ${code} vừa được cập nhật`)
+          } else if (payload.eventType === 'DELETE' && visible) {
+            message.warning(`🗑 Đơn ${code} đã bị xóa`)
           }
-          fetchOrders()
-          fetchStats()
+          scheduleRefetch()
         },
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders.length])
+    return () => {
+      if (rtTimerRef.current) clearTimeout(rtTimerRef.current)
+      supabase.removeChannel(channel)
+    }
+  }, [])
 
   const applyView = (v: SavedView) => {
     const f = v.filters || {}
@@ -463,6 +454,7 @@ const SalesOrderListPage = () => {
     setGradeFilter(f.gradeFilter || undefined)
     setDateRange(f.dateRange ? [dayjs(f.dateRange[0]), dayjs(f.dateRange[1])] : null)
     setOverdueEtdOnly(!!f.overdueEtdOnly)
+    setEtdDay(null)
     if (v.columns?.hiddenCols) {
       setHiddenCols(new Set(v.columns.hiddenCols))
     }
@@ -477,19 +469,19 @@ const SalesOrderListPage = () => {
         setSortBy(s)
       } else {
         setSortBy('created_at')
-        message.warning(`View "${v.name}" sắp xếp theo cột không còn dùng được — đã về mặc định.`)
+        message.warning(`Bộ lọc "${v.name}" sắp xếp theo cột không còn dùng được — đã về mặc định.`)
       }
       setSortOrder(v.sort.sortOrder || 'desc')
     }
     if (v.density && ['compact', 'normal', 'comfortable'].includes(v.density)) {
       setDensityAndSave(v.density as Density)
     }
-    message.success(`Đã áp dụng view: ${v.name}`)
+    message.success(`Đã áp dụng bộ lọc: ${v.name}`)
   }
 
   const handleSaveView = async () => {
     if (!newViewName.trim()) {
-      message.warning('Nhập tên view')
+      message.warning('Nhập tên bộ lọc')
       return
     }
     try {
@@ -508,9 +500,9 @@ const SalesOrderListPage = () => {
       setSavedViews(prev => [...prev, view])
       setSaveViewModalOpen(false)
       setNewViewName('')
-      message.success(`Đã lưu view: ${view.name}`)
+      message.success(`Đã lưu bộ lọc: ${view.name}`)
     } catch (e: any) {
-      message.error(e.message || 'Không lưu được view')
+      message.error(dichLoiHeThong(e, 'Không lưu được bộ lọc'))
     }
   }
 
@@ -518,9 +510,9 @@ const SalesOrderListPage = () => {
     try {
       await userSavedViewsService.delete(id)
       setSavedViews(prev => prev.filter(v => v.id !== id))
-      message.success('Đã xóa view')
+      message.success('Đã xóa bộ lọc đã lưu')
     } catch (e: any) {
-      message.error(e.message || 'Không xóa được')
+      message.error(dichLoiHeThong(e, 'Không xóa được'))
     }
   }
 
@@ -549,8 +541,9 @@ const SalesOrderListPage = () => {
     if (dateRange?.[0] && dateRange?.[1]) p.push(`Ngày đặt: ${dateRange[0].format('DD/MM/YYYY')} → ${dateRange[1].format('DD/MM/YYYY')}`)
     if (searchText) p.push(`Tìm: "${searchText}"`)
     if (overdueEtdOnly) p.push('Chỉ đơn quá ETD')
+    if (etdDay) p.push(`ETD: ${fmtDate(etdDay)}`)
     return p.join(' · ')
-  }, [statusTab, gradeFilter, customerFilter, dateRange, searchText, overdueEtdOnly, customers])
+  }, [statusTab, gradeFilter, customerFilter, dateRange, searchText, overdueEtdOnly, etdDay, customers])
 
   const handleExportSelected = async () => {
     if (selectedOrders.length === 0) return
@@ -569,7 +562,7 @@ const SalesOrderListPage = () => {
       message.success(`Đã xuất ${selectedOrders.length} đơn`)
     } catch (e: any) {
       console.error(e)
-      message.error(e?.message || 'Lỗi xuất Excel')
+      message.error(dichLoiHeThong(e, 'Lỗi xuất Excel'))
     }
   }
 
@@ -594,6 +587,8 @@ const SalesOrderListPage = () => {
           date_to: dateRange?.[1]?.format('YYYY-MM-DD') || undefined,
           sort_by: sortBy, sort_order: sortOrder,
           overdue_etd_only: overdueEtdOnly || undefined,
+          etd_from: etdDay || undefined,
+          etd_to: etdDay || undefined,
         })
         grand = res.total
         all.push(...res.data)
@@ -616,7 +611,7 @@ const SalesOrderListPage = () => {
       message.success(`Đã xuất ${all.length} đơn`)
     } catch (e: any) {
       console.error(e)
-      message.error(e?.message || 'Lỗi xuất Excel')
+      message.error(dichLoiHeThong(e, 'Lỗi xuất Excel'))
     } finally {
       setExportingAll(false)
     }
@@ -629,6 +624,7 @@ const SalesOrderListPage = () => {
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const params: SalesOrderListParams = {
         page: pagination.current,
         pageSize: pagination.pageSize,
@@ -641,6 +637,8 @@ const SalesOrderListPage = () => {
         sort_by: sortBy,
         sort_order: sortOrder,
         overdue_etd_only: overdueEtdOnly || undefined,
+        etd_from: etdDay || undefined,
+        etd_to: etdDay || undefined,
       }
       const response = await salesOrderService.getList(params)
       setOrders(response.data)
@@ -678,12 +676,13 @@ const SalesOrderListPage = () => {
         })
         .catch(() => setSummary(null))
     } catch (error) {
+      // Lỗi tải ≠ "không có đơn": hiện khối lỗi + Thử lại thay cho bảng (không để danh sách cũ/rỗng giả).
       console.error('Error fetching orders:', error)
-      message.error('Không thể tải danh sách đơn hàng')
+      setLoadError(error || new Error('Không thể tải danh sách đơn hàng'))
     } finally {
       setLoading(false)
     }
-  }, [pagination, searchText, statusTab, customerFilter, gradeFilter, dateRange, sortBy, sortOrder, overdueEtdOnly])
+  }, [pagination, searchText, statusTab, customerFilter, gradeFilter, dateRange, sortBy, sortOrder, overdueEtdOnly, etdDay])
 
   const fetchStats = useCallback(async () => {
     try {
@@ -707,6 +706,10 @@ const SalesOrderListPage = () => {
     fetchOrders()
   }, [fetchOrders])
 
+  // Realtime luôn gọi bản fetch MỚI NHẤT (đúng bộ lọc hiện tại) + biết danh sách đang hiện
+  ordersRef.current = orders
+  refetchRef.current = () => { fetchOrders(); fetchStats() }
+
   useEffect(() => {
     fetchStats()
     fetchCustomers()
@@ -721,12 +724,12 @@ const SalesOrderListPage = () => {
       setSortBy('etd')
       setSortOrder('asc')
     }
-    // Lịch giao trên Sales Dashboard truyền ?etd=YYYY-MM-DD → áp vào bộ lọc ngày
-    // (lưu ý: bộ lọc ngày hiện lọc theo order_date "Ngày đặt" — chip hiện rõ, gỡ được)
+    // Lịch giao trên Sales Dashboard truyền ?etd=YYYY-MM-DD → lọc đúng cột ETD (bản trước nhét vào
+    // bộ lọc NGÀY ĐẶT — bấm ô "ETD 20/11" lại ra các đơn đặt ngày 20/11). Chip "ETD: …" gỡ được.
     const etd = searchParams.get('etd')
-    if (etd) {
-      const d = dayjs(etd)
-      if (d.isValid()) setDateRange([d, d])
+    if (etd && /^\d{4}-\d{2}-\d{2}$/.test(etd) && dayjs(etd).isValid()) {
+      setEtdDay(etd)
+      setPagination((p) => ({ ...p, current: 1 }))
     }
   }, [searchParams])
 
@@ -809,39 +812,65 @@ const SalesOrderListPage = () => {
 
   const actor = { id: user?.employee_id || user?.id || null, name: user?.full_name || user?.email || null }
 
-  const handleConfirm = async (order: SalesOrder) => {
-    try {
-      await salesOrderService.updateStatus(order.id, 'confirmed', { actor })
-      message.success(`Đã xác nhận đơn hàng ${order.code}`)
-      fetchOrders()
-      fetchStats()
-    } catch (error) {
-      console.error('Confirm error:', error)
-      message.error('Không thể xác nhận đơn hàng')
-    }
+  // ── Đổi trạng thái inline (audit 17/11/2026, sev4) ──
+  // Chỉ cho chọn các bước đi TỚI theo đúng bảng luật của service (nextOrderStatuses = VALID_TRANSITIONS
+  // mà updateStatus dùng để chặn) + hỏi xác nhận như Kanban. KHÔNG dùng STAGE_RANK của Kanban: đó là
+  // trục "bộ phận" (current_stage), còn ô này đổi cột status.
+  const confirmStatusChange = (order: SalesOrder, to: SalesOrderStatus) => {
+    Modal.confirm({
+      title: `Chuyển ${soDisplayCode(order)} sang "${ORDER_STATUS_LABELS[to]}"?`,
+      content: `Trạng thái hiện tại: ${ORDER_STATUS_LABELS[order.status]}. Quy trình chỉ đi tới — muốn lùi lại phải nhờ admin.`
+        + (to === 'shipped' ? ' Chuyển "Đã xuất" sẽ chốt toàn bộ hàng đã phân bổ của đơn là đã rời kho.' : ''),
+      okText: 'Chuyển trạng thái',
+      cancelText: 'Để sau',
+      onOk: async () => {
+        try {
+          await salesOrderService.updateStatus(order.id, to, { actor })
+          message.success(`Đã chuyển ${soDisplayCode(order)} → ${ORDER_STATUS_LABELS[to]}`)
+          fetchOrders()
+          fetchStats()
+        } catch (e) {
+          message.error(dichLoiHeThong(e, 'Không đổi được trạng thái'))
+        }
+      },
+    })
   }
 
-  const handleCancel = async (order: SalesOrder) => {
+  // Huỷ đơn — PHẢI đi qua cancelOrder (bắt lý do + nhả phân bổ tồn kho), không đi updateStatus.
+  const [cancelTarget, setCancelTarget] = useState<SalesOrder | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelling, setCancelling] = useState(false)
+  const handleCancel = async () => {
+    if (!cancelTarget || !cancelReason.trim()) return
+    setCancelling(true)
     try {
-      await salesOrderService.cancelOrder(order.id, 'Hủy từ danh sách', actor)
-      message.success(`Đã hủy đơn hàng ${order.code}`)
+      await salesOrderService.cancelOrder(cancelTarget.id, cancelReason.trim(), actor)
+      message.success(`Đã hủy đơn hàng ${soDisplayCode(cancelTarget)}`)
+      setCancelTarget(null)
+      setCancelReason('')
       fetchOrders()
       fetchStats()
     } catch (error) {
       console.error('Cancel error:', error)
-      message.error('Không thể hủy đơn hàng')
+      message.error(dichLoiHeThong(error, 'Không thể hủy đơn hàng'))
+    } finally {
+      setCancelling(false)
     }
   }
 
-  // Delete — chỉ Admin
+  // Delete — chỉ Admin (đơn đã xác nhận trở đi phải gõ lại số HĐ mới xoá được)
+  const [deleteTarget, setDeleteTarget] = useState<SalesOrder | null>(null)
+  const [deleteTyped, setDeleteTyped] = useState('')
   const handleDelete = async (order: SalesOrder) => {
     try {
       await salesOrderService.deleteOrder(order.id)
-      message.success(`Đã xóa đơn hàng ${order.code}`)
+      message.success(`Đã xóa đơn hàng ${soDisplayCode(order)}`)
+      setDeleteTarget(null)
+      setDeleteTyped('')
       fetchOrders()
       fetchStats()
     } catch (error: any) {
-      message.error(error.message || 'Không thể xóa đơn hàng')
+      message.error(dichLoiHeThong(error, 'Không thể xóa đơn hàng'))
     }
   }
 
@@ -926,7 +955,7 @@ const SalesOrderListPage = () => {
   const lcBadge = (d: string | undefined | null) => {
     if (!d) return gray(null)
     const days = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000)
-    const formatted = formatDate(d)
+    const formatted = fmtDate(d)
     if (days <= 0) return <Tag color="red" style={{ fontSize: 11 }}>{formatted}</Tag>
     if (days <= 7) return <Tag color="red" style={{ fontSize: 11 }}>{formatted}</Tag>
     if (days <= 20) return <Tag color="orange" style={{ fontSize: 11 }}>{formatted}</Tag>
@@ -956,15 +985,22 @@ const SalesOrderListPage = () => {
 
   // R4: Inline edit — click cell mở DatePicker/Input → blur/Enter để lưu
   const [editingCell, setEditingCell] = useState<{ rowId: string; key: string } | null>(null)
+  editingRef.current = editingCell   // realtime hoãn nạp lại khi đang mở ô sửa
 
-  const saveInlineField = async (orderId: string, field: keyof SalesOrder, value: any) => {
+  // `prev` = giá trị đang có: không đổi thì CHỈ đóng ô (trước đây click nhầm ô rồi click ra ngoài
+  // = 1 lần ghi DB + toast "Đã cập nhật" + nạp lại cả trang).
+  const saveInlineField = async (orderId: string, field: keyof SalesOrder, value: any, prev?: any) => {
+    if (String(value ?? '') === String(prev ?? '')) {
+      setEditingCell(null)
+      return
+    }
     try {
       await salesOrderService.updateFields(orderId, { [field]: value } as any)
       message.success('Đã cập nhật')
       setEditingCell(null)
       fetchOrders()
     } catch (e: any) {
-      message.error(e.message || 'Không lưu được')
+      message.error(dichLoiHeThong(e, 'Không lưu được'))
     }
   }
 
@@ -980,7 +1016,7 @@ const SalesOrderListPage = () => {
           size="small"
           defaultValue={value ? dayjs(value) : undefined}
           format="DD/MM/YYYY"
-          onChange={(d) => saveInlineField(orderId, field, d ? d.format('YYYY-MM-DD') : null)}
+          onChange={(d) => saveInlineField(orderId, field, d ? d.format('YYYY-MM-DD') : null, value)}
           onBlur={() => setEditingCell(null)}
           onClick={(e) => e.stopPropagation()}
           style={{ width: '100%' }}
@@ -993,13 +1029,13 @@ const SalesOrderListPage = () => {
         style={{ fontSize: 12, cursor: 'pointer', display: 'inline-block', padding: '2px 4px', borderRadius: 3 }}
         className="inline-edit-cell"
       >
-        {value ? formatDate(value) : <span style={{ color: '#d9d9d9' }}>—</span>}
+        {value ? fmtDate(value) : <span style={{ color: '#d9d9d9' }}>—</span>}
       </span>
     )
   }
 
-  // M4-E: Inline edit số (đơn giá, đặt cọc...)
-  const InlineNumberCell = ({ orderId, field, value }: { orderId: string; field: keyof SalesOrder; value?: number | null }) => {
+  // M4-E: Inline edit số (đơn giá, đặt cọc...) — `format` vẽ số theo đồng tiền (có $ / ₫)
+  const InlineNumberCell = ({ orderId, field, value, format }: { orderId: string; field: keyof SalesOrder; value?: number | null; format: (v: number) => string }) => {
     const isEditing = editingCell?.rowId === orderId && editingCell?.key === field
     const [tmp, setTmp] = useState<string>(value != null ? String(value) : '')
     useEffect(() => { setTmp(value != null ? String(value) : '') }, [value, isEditing])
@@ -1012,8 +1048,8 @@ const SalesOrderListPage = () => {
           type="number"
           value={tmp}
           onChange={(e) => setTmp(e.target.value)}
-          onPressEnter={() => saveInlineField(orderId, field, tmp ? Number(tmp) : null)}
-          onBlur={() => saveInlineField(orderId, field, tmp ? Number(tmp) : null)}
+          onPressEnter={() => saveInlineField(orderId, field, tmp ? Number(tmp) : null, value)}
+          onBlur={() => saveInlineField(orderId, field, tmp ? Number(tmp) : null, value)}
           onClick={(e) => e.stopPropagation()}
           style={{ fontFamily: 'monospace', textAlign: 'right' }}
         />
@@ -1025,49 +1061,63 @@ const SalesOrderListPage = () => {
         style={{ fontSize: 12, fontFamily: 'monospace', cursor: 'pointer', display: 'inline-block', padding: '2px 4px', borderRadius: 3 }}
         className="inline-edit-cell"
       >
-        {value ? formatCurrency(value) : <span style={{ color: '#d9d9d9' }}>—</span>}
+        {value ? format(value) : <span style={{ color: '#d9d9d9' }}>—</span>}
       </span>
     )
   }
 
-  // M4-E: Inline edit status (dropdown)
+  // M4-E: Inline edit status (dropdown) — chỉ các bước đi TỚI hợp lệ + mục "Huỷ đơn…" riêng
   const InlineStatusCell = ({ order }: { order: SalesOrder }) => {
     const isEditing = editingCell?.rowId === order.id && editingCell?.key === 'status'
+    const next = nextOrderStatuses(order.status)
+    const forward = next.filter((s) => s !== 'cancelled')
+    const canCancel = next.includes('cancelled')
+    const tag = (
+      <Tag color={ORDER_STATUS_COLORS[order.status]} style={{ margin: 0, fontSize: 11 }}>
+        {ORDER_STATUS_LABELS[order.status]}
+      </Tag>
+    )
+    if (next.length === 0) {
+      // Đã thanh toán / đã huỷ: không còn bước nào → không mở ô chọn
+      return <Tooltip title="Đơn đã kết thúc — không còn bước trạng thái nào để chuyển">{tag}</Tooltip>
+    }
     if (isEditing) {
       return (
         <Select
           autoFocus
           size="small"
-          defaultValue={order.status}
           open
-          onChange={async (val) => {
-            try {
-              await salesOrderService.updateStatus(order.id, val as SalesOrderStatus, { actor })
-              message.success(`Đã chuyển trạng thái → ${ORDER_STATUS_LABELS[val as SalesOrderStatus]}`)
-              setEditingCell(null)
-              fetchOrders()
-              fetchStats()
-            } catch (e: any) {
-              message.error(e.message || 'Không đổi được')
+          placeholder="Chuyển sang…"
+          popupMatchSelectWidth={false}
+          onChange={(val: string) => {
+            setEditingCell(null)
+            if (val === CANCEL_ORDER_KEY) {
+              setCancelReason('')
+              setCancelTarget(order)
+            } else {
+              confirmStatusChange(order, val as SalesOrderStatus)
             }
           }}
           onBlur={() => setEditingCell(null)}
           onClick={(e) => e.stopPropagation()}
           style={{ width: '100%' }}
-          options={Object.entries(ORDER_STATUS_LABELS).map(([k, v]) => ({ value: k, label: v }))}
+          options={[
+            ...forward.map((s) => ({ value: s, label: `→ ${ORDER_STATUS_LABELS[s]}` })),
+            ...(canCancel ? [{ value: CANCEL_ORDER_KEY, label: <span style={{ color: '#cf1322' }}>Huỷ đơn…</span> }] : []),
+          ]}
         />
       )
     }
     return (
-      <span
-        onClick={(e) => { e.stopPropagation(); setEditingCell({ rowId: order.id, key: 'status' }) }}
-        className="inline-edit-cell"
-        style={{ cursor: 'pointer', display: 'inline-block', padding: '2px 4px', borderRadius: 3 }}
-      >
-        <Tag color={ORDER_STATUS_COLORS[order.status]} style={{ margin: 0, fontSize: 11 }}>
-          {ORDER_STATUS_LABELS[order.status]}
-        </Tag>
-      </span>
+      <Tooltip title="Bấm để chuyển sang bước tiếp theo">
+        <span
+          onClick={(e) => { e.stopPropagation(); setEditingCell({ rowId: order.id, key: 'status' }) }}
+          className="inline-edit-cell"
+          style={{ cursor: 'pointer', display: 'inline-block', padding: '2px 4px', borderRadius: 3 }}
+        >
+          {tag}
+        </span>
+      </Tooltip>
     )
   }
 
@@ -1084,8 +1134,8 @@ const SalesOrderListPage = () => {
           value={tmp}
           placeholder={placeholder}
           onChange={(e) => setTmp(e.target.value)}
-          onPressEnter={() => saveInlineField(orderId, field, tmp || null)}
-          onBlur={() => saveInlineField(orderId, field, tmp || null)}
+          onPressEnter={() => saveInlineField(orderId, field, tmp || null, value)}
+          onBlur={() => saveInlineField(orderId, field, tmp || null, value)}
           onClick={(e) => e.stopPropagation()}
         />
       )
@@ -1145,7 +1195,8 @@ const SalesOrderListPage = () => {
       render: (_: unknown, r: SalesOrder) => {
         const c = r.customer
         if (!c) return gray(null)
-        return <span style={{ fontSize: 12 }}>{c.country ? getCountryFlag(c.country) + ' ' : ''}{c.short_name || c.name}</span>
+        const f = countryFlag(c.country)
+        return <span style={{ fontSize: 12 }}>{f ? f + ' ' : ''}{c.short_name || c.name}</span>
       },
     },
     {
@@ -1264,7 +1315,7 @@ const SalesOrderListPage = () => {
       width: 85,
       sorter: true,
       sortOrder: sortedColumn('ready_date'),
-      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
+      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{fmtDate(d)}</span> : gray(null),
     },
     {
       title: hdr('Incoterm'),
@@ -1304,10 +1355,7 @@ const SalesOrderListPage = () => {
       sorter: true,
       sortOrder: sortedColumn('unit_price'),
       render: (v: number, r: SalesOrder) => (
-        <>
-          <InlineNumberCell orderId={r.id} field="unit_price" value={v} />
-          {isVnd(r.currency) && <span style={{ fontSize: 10, color: '#999' }}>₫</span>}
-        </>
+        <InlineNumberCell orderId={r.id} field="unit_price" value={v} format={(n) => fmtUnitPrice(n, r.currency)} />
       ),
     },
     {
@@ -1326,7 +1374,7 @@ const SalesOrderListPage = () => {
                 {v ? <div style={{ fontSize: 10, color: '#999' }}>≈ {fmtMoney(v, 'USD', { decimals: 0 })}</div> : null}
               </span>
             : gray(null))
-        : (v ? <strong style={{ color: '#1B4D3E', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(v)}</strong> : gray(null)),
+        : (v ? <strong style={{ color: '#1B4D3E', fontFamily: 'monospace', fontSize: 12 }}>{fmtMoney(v, 'USD', { decimals: 0 })}</strong> : gray(null)),
     },
     {
       title: hdr('Đặt cọc'),
@@ -1336,7 +1384,8 @@ const SalesOrderListPage = () => {
       align: 'right',
       sorter: true,
       sortOrder: sortedColumn('deposit'),
-      render: (v: number, r: SalesOrder) => <InlineNumberCell orderId={r.id} field={'deposit_amount' as any} value={v} />,
+      // Đặt cọc / CK / Còn lại là số USD (form Vận chuyển ghi "Số tiền đặt cọc (USD)")
+      render: (v: number, r: SalesOrder) => <InlineNumberCell orderId={r.id} field={'deposit_amount' as any} value={v} format={(n) => fmtMoney(n, 'USD', { decimals: 0 })} />,
     },
     {
       title: hdr('CK'),
@@ -1346,7 +1395,7 @@ const SalesOrderListPage = () => {
       align: 'right',
       sorter: true,
       sortOrder: sortedColumn('discount'),
-      render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
+      render: (v: number) => v ? mono(fmtMoney(v, 'USD', { decimals: 0 })) : gray(null),
     },
     {
       title: hdr('NH CK'),
@@ -1368,7 +1417,7 @@ const SalesOrderListPage = () => {
       sortOrder: sortedColumn('remaining'),
       render: (v: number, r: SalesOrder) => {
         const remaining = v ?? ((r.total_value_usd || 0) - ((r as any).deposit_amount || 0) - ((r as any).discount_amount || 0) - ((r as any).bank_charges || 0))
-        return remaining ? <strong style={{ color: '#1677ff', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(remaining)}</strong> : gray(null)
+        return remaining ? <strong style={{ color: '#1677ff', fontFamily: 'monospace', fontSize: 12 }}>{fmtMoney(remaining, 'USD', { decimals: 0 })}</strong> : gray(null)
       },
     },
     {
@@ -1432,10 +1481,10 @@ const SalesOrderListPage = () => {
             <Button type="text" size="small" icon={<EyeOutlined />}
               onClick={(e) => { e.stopPropagation(); openOrderTab(record) }} />
           </Tooltip>
-          {canDelete && (
+          {canDelete && record.status === 'draft' && (
             <Popconfirm
               title={`Xóa ${soDisplayCode(record)}?`}
-              description={record.status === 'draft' ? 'Đơn nháp — sẽ xóa vĩnh viễn' : 'Sẽ xóa kèm tất cả items / containers / docs'}
+              description="Đơn nháp — sẽ xóa vĩnh viễn"
               onConfirm={() => handleDelete(record)}
               okText="Xóa"
               cancelText="Hủy"
@@ -1443,6 +1492,13 @@ const SalesOrderListPage = () => {
             >
               <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} />
             </Popconfirm>
+          )}
+          {/* Đơn đã xác nhận trở đi = đã ký với khách, dữ liệu thật → bắt gõ lại số HĐ (không còn 1 cú Popconfirm) */}
+          {canDelete && record.status !== 'draft' && (
+            <Tooltip title="Xóa vĩnh viễn (chỉ Admin)">
+              <Button type="text" size="small" danger icon={<DeleteOutlined />}
+                onClick={(e) => { e.stopPropagation(); setDeleteTyped(''); setDeleteTarget(record) }} />
+            </Tooltip>
           )}
         </Space>
         )
@@ -1464,12 +1520,12 @@ const SalesOrderListPage = () => {
       </div>
       <div style={{ fontSize: 13, color: '#6c6a64', marginBottom: 20 }}>
         {activeFilters.length > 0
-          ? `Bộ lọc hiện tại không có đơn nào khớp (${activeFilters.length} filter đang active).`
+          ? `Bộ lọc hiện tại không có đơn nào khớp (${activeFilters.length} bộ lọc đang bật).`
           : 'Chưa có đơn hàng nào trong tháng — bắt đầu tạo đơn đầu tiên.'}
       </div>
       <Space>
         {activeFilters.length > 0 && (
-          <Button onClick={clearAllFilters}>Xóa filter</Button>
+          <Button onClick={clearAllFilters}>Xóa bộ lọc</Button>
         )}
         <Button
           type="primary"
@@ -1522,13 +1578,13 @@ const SalesOrderListPage = () => {
               menu={{
                 items: [
                   ...(savedViews.length === 0
-                    ? [{ key: 'empty', label: <span style={{ color: '#999' }}>Chưa có view nào</span>, disabled: true }]
+                    ? [{ key: 'empty', label: <span style={{ color: '#999' }}>Chưa có bộ lọc nào được lưu</span>, disabled: true }]
                     : savedViews.map(v => ({
                         key: v.id,
                         label: (
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 200 }}>
                             <span onClick={() => applyView(v)}>⭐ {v.name}</span>
-                            <Popconfirm title={`Xóa view "${v.name}"?`} onConfirm={() => handleDeleteView(v.id)}>
+                            <Popconfirm title={`Xóa bộ lọc đã lưu "${v.name}"?`} okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }} onConfirm={() => handleDeleteView(v.id)}>
                               <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} />
                             </Popconfirm>
                           </div>
@@ -1537,30 +1593,33 @@ const SalesOrderListPage = () => {
                   { type: 'divider' as const },
                   {
                     key: 'save',
-                    label: <span style={{ color: '#1B4D3E' }}>💾 Lưu view hiện tại</span>,
+                    label: <span style={{ color: '#1B4D3E' }}>💾 Lưu bộ lọc hiện tại</span>,
                     onClick: () => setSaveViewModalOpen(true),
                   },
                 ],
               }}
             >
               <Button icon={<span style={{ fontSize: 14 }}>⭐</span>}>
-                Views ({savedViews.length})
+                Bộ lọc đã lưu ({savedViews.length})
               </Button>
             </Dropdown>
 
             {/* M4-C: Density toggle */}
-            <Tooltip title="Chế độ hiển thị (Compact / Normal / Comfortable)">
-              <Button.Group>
-                <Button size="small" type={density === 'compact' ? 'primary' : 'default'}
-                  onClick={() => setDensityAndSave('compact')}
-                  style={density === 'compact' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}>≡</Button>
-                <Button size="small" type={density === 'normal' ? 'primary' : 'default'}
-                  onClick={() => setDensityAndSave('normal')}
-                  style={density === 'normal' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}>≣</Button>
-                <Button size="small" type={density === 'comfortable' ? 'primary' : 'default'}
-                  onClick={() => setDensityAndSave('comfortable')}
-                  style={density === 'comfortable' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}>☰</Button>
-              </Button.Group>
+            {/* span: Tooltip cần con nhận được ref — Space.Compact/Button.Group thì không, tooltip không bao giờ hiện */}
+            <Tooltip title="Độ dày dòng (Gọn / Vừa / Thoáng)">
+              <span style={{ display: 'inline-flex' }}>
+                <Space.Compact>
+                  <Button size="small" aria-label="Dòng gọn" type={density === 'compact' ? 'primary' : 'default'}
+                    onClick={() => setDensityAndSave('compact')}
+                    style={density === 'compact' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}>≡</Button>
+                  <Button size="small" aria-label="Dòng vừa" type={density === 'normal' ? 'primary' : 'default'}
+                    onClick={() => setDensityAndSave('normal')}
+                    style={density === 'normal' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}>≣</Button>
+                  <Button size="small" aria-label="Dòng thoáng" type={density === 'comfortable' ? 'primary' : 'default'}
+                    onClick={() => setDensityAndSave('comfortable')}
+                    style={density === 'comfortable' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}>☰</Button>
+                </Space.Compact>
+              </span>
             </Tooltip>
 
             {/* Cmd+K trigger button — visible nút mở command palette (giống mock) */}
@@ -1586,7 +1645,7 @@ const SalesOrderListPage = () => {
             </Tooltip>
 
             {/* View mode toggle: Bảng (current default) | Split (Linear/Gmail-style) | Kanban */}
-            <Button.Group>
+            <Space.Compact>
               <Tooltip title="Bảng — danh sách đầy đủ cột">
                 <Button
                   size="middle"
@@ -1598,7 +1657,7 @@ const SalesOrderListPage = () => {
                   Bảng
                 </Button>
               </Tooltip>
-              <Tooltip title="Split — list trái + detail luôn hiện bên phải (J/K phím chuyển)">
+              <Tooltip title="Chia đôi — danh sách bên trái, chi tiết đơn luôn hiện bên phải (phím J/K để chuyển đơn)">
                 <Button
                   size="middle"
                   icon={<span style={{ fontSize: 14 }}>▤▥</span>}
@@ -1606,7 +1665,7 @@ const SalesOrderListPage = () => {
                   onClick={() => changeViewMode('split')}
                   style={viewMode === 'split' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
                 >
-                  Split
+                  Chia đôi
                 </Button>
               </Tooltip>
               <Tooltip title="Kanban — kéo thả theo công đoạn">
@@ -1618,7 +1677,7 @@ const SalesOrderListPage = () => {
                   Kanban
                 </Button>
               </Tooltip>
-            </Button.Group>
+            </Space.Compact>
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -1811,7 +1870,7 @@ const SalesOrderListPage = () => {
               showSearch
               optionFilterProp="label"
               options={customers.map((c) => ({
-                label: `${getCountryFlag(c.country)} ${c.name}`,
+                label: [countryFlag(c.country), c.name].filter(Boolean).join(' '),
                 value: c.id,
               }))}
             />
@@ -1885,7 +1944,7 @@ const SalesOrderListPage = () => {
             Xuất Excel ({selectedOrders.length})
           </Button>
           <span style={{ marginLeft: 'auto', color: '#666' }}>
-            Tổng giá trị: <strong>${selectedOrders.reduce((s: number, o: SalesOrder) => s + (o.total_value_usd || 0), 0).toLocaleString('vi-VN')}</strong>
+            Tổng giá trị (USD): <strong>{fmtMoney(selectedOrders.reduce((s: number, o: SalesOrder) => s + (o.total_value_usd || 0), 0), 'USD', { decimals: 0 })}</strong>
           </span>
         </div>
       )}
@@ -1923,8 +1982,11 @@ const SalesOrderListPage = () => {
         </div>
       )}
 
-      {/* Body: điện thoại → thẻ · máy tính → Split view HOẶC Table view tuỳ viewMode */}
-      {isPhone ? (
+      {/* Body: điện thoại → thẻ · máy tính → Split view HOẶC Table view tuỳ viewMode.
+          Tải lỗi → khối lỗi + Thử lại (không vẽ "Không tìm thấy đơn hàng nào" giả). */}
+      {loadError && !loading ? (
+        <PageState error={loadError} onRetry={fetchOrders} />
+      ) : isPhone ? (
         <SalesOrderPhoneList
           orders={orders}
           loading={loading}
@@ -2026,9 +2088,67 @@ const SalesOrderListPage = () => {
       </Card>
       )}
 
-      {/* M4-B: Modal lưu view */}
+      {/* Huỷ đơn — bắt lý do, đi qua cancelOrder (ghi lý do + nhả phân bổ tồn kho) */}
       <Modal
-        title="Lưu view hiện tại"
+        title={cancelTarget ? `Huỷ đơn ${soDisplayCode(cancelTarget)}?` : 'Huỷ đơn'}
+        open={!!cancelTarget}
+        onCancel={() => { if (!cancelling) { setCancelTarget(null); setCancelReason('') } }}
+        onOk={handleCancel}
+        confirmLoading={cancelling}
+        okText="Huỷ đơn"
+        cancelText="Không huỷ"
+        okButtonProps={{ danger: true, disabled: !cancelReason.trim() }}
+      >
+        <p style={{ marginBottom: 8, color: '#666', fontSize: 13 }}>
+          Đơn chuyển sang "Đã huỷ" (vẫn giữ lịch sử, không xoá). Hàng đã phân bổ cho đơn sẽ được trả về kho.
+          Đơn đã huỷ không đổi lại trạng thái được.
+        </p>
+        <Input.TextArea
+          autoFocus
+          rows={3}
+          maxLength={500}
+          placeholder="Lý do huỷ (bắt buộc) — VD: khách rút đơn, đổi sang HĐ mới…"
+          value={cancelReason}
+          onChange={(e) => setCancelReason(e.target.value)}
+        />
+      </Modal>
+
+      {/* Xoá vĩnh viễn đơn đã xác nhận trở đi — gõ lại số HĐ mới bấm được */}
+      <Modal
+        title={deleteTarget ? `Xóa vĩnh viễn ${soDisplayCode(deleteTarget)}?` : 'Xóa đơn'}
+        open={!!deleteTarget}
+        onCancel={() => { setDeleteTarget(null); setDeleteTyped('') }}
+        onOk={() => deleteTarget && handleDelete(deleteTarget)}
+        okText="Xóa vĩnh viễn"
+        cancelText="Không xóa"
+        okButtonProps={{ danger: true, disabled: !deleteTarget || deleteTyped.trim() !== soDisplayCode(deleteTarget) }}
+      >
+        {deleteTarget && (
+          <>
+            <p style={{ marginBottom: 8, fontSize: 13 }}>
+              Đơn đang ở trạng thái <b>{ORDER_STATUS_LABELS[deleteTarget.status]}</b> — đã ký với khách. Xóa sẽ mất
+              vĩnh viễn đơn cùng toàn bộ sản phẩm, container, chứng từ, hoá đơn gắn với đơn. <b>Không hoàn tác được.</b>
+            </p>
+            <p style={{ marginBottom: 8, fontSize: 13, color: '#666' }}>
+              Chỉ muốn dừng đơn? Dùng "Huỷ đơn" ở cột Trạng thái — giữ lại lịch sử.
+            </p>
+            <div style={{ fontSize: 13, marginBottom: 6 }}>
+              Gõ lại <b style={{ fontFamily: 'monospace' }}>{soDisplayCode(deleteTarget)}</b> để xác nhận:
+            </div>
+            <Input
+              autoFocus
+              value={deleteTyped}
+              placeholder={soDisplayCode(deleteTarget)}
+              onChange={(e) => setDeleteTyped(e.target.value)}
+              style={{ fontFamily: 'monospace' }}
+            />
+          </>
+        )}
+      </Modal>
+
+      {/* M4-B: Modal lưu bộ lọc (saved view) */}
+      <Modal
+        title="Lưu bộ lọc hiện tại"
         open={saveViewModalOpen}
         onCancel={() => { setSaveViewModalOpen(false); setNewViewName('') }}
         onOk={handleSaveView}
@@ -2036,7 +2156,7 @@ const SalesOrderListPage = () => {
         cancelText="Hủy"
       >
         <p style={{ marginBottom: 12, color: '#666', fontSize: 13 }}>
-          Đặt tên cho view này. View sẽ lưu toàn bộ filter + cột + sort + density hiện tại.
+          Đặt tên cho bộ lọc này. Sẽ lưu toàn bộ bộ lọc + cột + sắp xếp + độ dày dòng hiện tại.
         </p>
         <Input
           autoFocus
@@ -2046,7 +2166,7 @@ const SalesOrderListPage = () => {
           onPressEnter={handleSaveView}
         />
         <div style={{ marginTop: 12, fontSize: 12, color: '#999' }}>
-          {activeFilters.length} filter active · {HIDEABLE_COLUMNS.length - hiddenCols.size}/{HIDEABLE_COLUMNS.length} cột hiện · Density: {density}
+          {activeFilters.length} bộ lọc đang bật · {HIDEABLE_COLUMNS.length - hiddenCols.size}/{HIDEABLE_COLUMNS.length} cột hiện · Độ dày dòng: {{ compact: 'Gọn', normal: 'Vừa', comfortable: 'Thoáng' }[density]}
         </div>
       </Modal>
 

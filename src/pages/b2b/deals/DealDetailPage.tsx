@@ -65,9 +65,11 @@ import { autoSettlementService } from '../../../services/b2b/autoSettlementServi
 import { chatRoomService } from '../../../services/b2b/chatRoomService'
 import { useOpenTab } from '../../../hooks/useOpenTab'
 import { useOpenChatTab } from '../../../hooks/useB2BTabs'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
 import { PRODUCT_TYPE_LABELS } from '../../../constants/rubberProducts'
+import { TIER_LABELS, TIER_COLORS } from '../../../services/b2b/partnerService'
+import { DASH, fmtDate, fmtDateTime, fmtNum, fmtVnd, vndInputProps } from '../../../utils/format'
+import EnumTag from '../../../components/common/EnumTag'
+import PageState from '../../../components/common/PageState'
 import DealWmsTab from '../../../components/b2b/DealWmsTab'
 import DealQcTab from '../../../components/b2b/DealQcTab'
 import DealAdvancesTab from '../../../components/b2b/DealAdvancesTab'
@@ -82,40 +84,7 @@ import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
 
-// ============================================
-// CONSTANTS
-// ============================================
-
-const TIER_COLORS: Record<string, string> = {
-  diamond: 'purple',
-  gold: 'gold',
-  silver: 'default',
-  bronze: 'orange',
-  new: 'cyan',
-}
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-const formatCurrency = (value: number | null): string => {
-  if (!value) return '-'
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
-const formatDate = (dateStr: string | null): string => {
-  if (!dateStr) return '-'
-  return format(new Date(dateStr), 'dd/MM/yyyy', { locale: vi })
-}
-
-const formatDateTime = (dateStr: string | null): string => {
-  if (!dateStr) return '-'
-  return format(new Date(dateStr), 'dd/MM/yyyy HH:mm', { locale: vi })
-}
+// Định dạng tiền/ngày: dùng chung src/utils/format.ts (fmtVnd/fmtDate/fmtDateTime) — audit 17/11/2026
 
 // ============================================
 // STATUS ACTIONS COMPONENT
@@ -179,8 +148,8 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
           <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0' }}>
             <li>Trọng lượng thực: <strong>{actualWeight.toLocaleString('vi-VN')} kg</strong></li>
             {isDry && <li>DRC thực tế: <strong>{actualDrc}%</strong></li>}
-            <li>Đơn giá: <strong>{pricePerKg.toLocaleString('vi-VN')} đ/kg ({isDry ? 'khô' : 'ướt'})</strong></li>
-            <li>Giá trị ước tính: <strong>{finalValue.toLocaleString('vi-VN')} VNĐ</strong></li>
+            <li>Đơn giá: <strong>{pricePerKg.toLocaleString('vi-VN')} ₫/kg ({isDry ? 'khô' : 'ướt'})</strong></li>
+            <li>Giá trị ước tính: <strong>{fmtVnd(finalValue)}</strong></li>
           </ul>
           <p>Phiếu quyết toán sẽ ở trạng thái <strong>Nháp</strong>. Bạn có thể chỉnh sửa trước khi duyệt.</p>
         </div>
@@ -299,14 +268,13 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
         <Form form={form} layout="vertical">
           <Form.Item
             name="final_price"
-            label="Giá chốt cuối cùng (đ/kg)"
+            label="Giá chốt cuối cùng (₫/kg)"
             initialValue={deal.unit_price}
           >
             <InputNumber
               style={{ width: '100%' }}
               min={0}
-              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => value!.replace(/\$\s?|(,*)/g, '') as any}
+              {...vndInputProps}
               placeholder="Nhập giá chốt"
             />
           </Form.Item>
@@ -359,6 +327,8 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [settleLoading, setSettleLoading] = useState(false)
+  // Lỗi tải ≠ "Không tìm thấy giao dịch" (mất mạng từng hiện như deal không tồn tại) — audit 17/11/2026
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   // ============================================
   // DATA FETCHING
@@ -369,11 +339,13 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
 
     try {
       setLoading(true)
+      setLoadError(null)
       const data = await dealService.getDealById(dealId)
       setDeal(data)
     } catch (error) {
       console.error('Error fetching deal:', error)
-      message.error('Không thể tải thông tin giao dịch')
+      setLoadError(error)
+      message.error(dichLoiHeThong(error, 'Không thể tải thông tin giao dịch'))
     } finally {
       setLoading(false)
     }
@@ -465,8 +437,8 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
 
       message.success(
         `Đã tạo phiếu quyết toán ${result.settlement.code}. ` +
-        `Giá trị: ${result.summary.final_value.toLocaleString('vi-VN')} VNĐ, ` +
-        `Còn lại: ${result.summary.balance_due.toLocaleString('vi-VN')} VNĐ`
+        `Giá trị: ${fmtVnd(result.summary.final_value)}, ` +
+        `Còn lại: ${fmtVnd(result.summary.balance_due)}`
       )
 
       // Chuyển đến trang chi tiết settlement
@@ -487,6 +459,14 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
     return (
       <div style={{ padding: 24, textAlign: 'center' }}>
         <Spin size="large" />
+      </div>
+    )
+  }
+
+  if (loadError && !deal) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState error={loadError} onRetry={fetchDeal} />
       </div>
     )
   }
@@ -534,7 +514,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                   </Tag>
                 </Space>
                 <Text type="secondary">
-                  Tạo lúc: {formatDateTime(deal.created_at)}
+                  Tạo lúc: {fmtDateTime(deal.created_at)}
                 </Text>
               </div>
             </Space>
@@ -601,7 +581,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                       <Descriptions.Item label="Loại mủ">{deal.rubber_type ? (PRODUCT_TYPE_LABELS[deal.rubber_type] || deal.rubber_type) : (deal.product_code || '-')}</Descriptions.Item>
                       <Descriptions.Item label="Số lượng">
                         <Text strong style={{ color: '#1B4D3E', fontSize: 16 }}>
-                          {deal.quantity_tons?.toFixed(2) || '-'} tấn
+                          {deal.quantity_tons ? fmtNum(deal.quantity_tons, 2) : DASH} tấn
                         </Text>
                       </Descriptions.Item>
                       <Descriptions.Item label="DRC dự kiến">
@@ -610,18 +590,18 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                         ) : '-'}
                       </Descriptions.Item>
                       <Descriptions.Item label="Đơn giá">
-                        {deal.unit_price?.toLocaleString('vi-VN') || '-'} đ/kg
+                        {deal.unit_price?.toLocaleString('vi-VN') || DASH} ₫/kg
                       </Descriptions.Item>
                       <Descriptions.Item label="Giá chốt">
                         {deal.final_price ? (
                           <Text strong style={{ color: '#52c41a' }}>
-                            {deal.final_price.toLocaleString('vi-VN')} đ/kg
+                            {deal.final_price.toLocaleString('vi-VN')} ₫/kg
                           </Text>
                         ) : '-'}
                       </Descriptions.Item>
                       <Descriptions.Item label="Giá trị">
                         <Text strong style={{ color: '#1B4D3E', fontSize: 18 }}>
-                          {formatCurrency(deal.total_value_vnd)}
+                          {deal.total_value_vnd ? fmtVnd(deal.total_value_vnd) : DASH}
                         </Text>
                       </Descriptions.Item>
                       {(deal.source_region || deal.pickup_location_name) && (
@@ -646,7 +626,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                       )}
                       {deal.delivery_date && (
                         <Descriptions.Item label="Ngày giao dự kiến">
-                          {formatDate(deal.delivery_date)}
+                          {fmtDate(deal.delivery_date)}
                         </Descriptions.Item>
                       )}
                       {deal.lot_code && (
@@ -667,7 +647,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                       </Descriptions.Item>
                       {deal.processing_fee_per_ton && (
                         <Descriptions.Item label="Phí gia công">
-                          {deal.processing_fee_per_ton.toLocaleString('vi-VN')} đ/tấn
+                          {deal.processing_fee_per_ton.toLocaleString('vi-VN')} ₫/tấn
                         </Descriptions.Item>
                       )}
                       {deal.expected_output_rate && (
@@ -702,7 +682,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                               <Text strong>Tạo giao dịch</Text>
                               <br />
                               <Text type="secondary" style={{ fontSize: 12 }}>
-                                {formatDateTime(deal.created_at)}
+                                {fmtDateTime(deal.created_at)}
                               </Text>
                             </div>
                           ),
@@ -734,7 +714,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                                       <>
                                         <br />
                                         <Text type="secondary" style={{ fontSize: 12 }}>
-                                          Giá chốt: {deal.final_price.toLocaleString('vi-VN')} đ/kg
+                                          Giá chốt: {deal.final_price.toLocaleString('vi-VN')} ₫/kg
                                         </Text>
                                       </>
                                     )}
@@ -797,9 +777,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                     style={{ marginBottom: 24, borderRadius: 12 }}
                     extra={
                       deal.partner?.tier && (
-                        <Tag color={TIER_COLORS[deal.partner?.tier]}>
-                          {deal.partner?.tier?.toUpperCase()}
-                        </Tag>
+                        <EnumTag value={deal.partner?.tier} labels={TIER_LABELS} colors={TIER_COLORS} />
                       )
                     }
                   >
@@ -856,7 +834,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                     {deal.deal_type === 'processing' ? (
                       <Row gutter={[16, 16]}>
                         <Col span={12}>
-                          <Statistic title="Phí gia công" value={deal.processing_fee_per_ton || 0} suffix="đ/tấn"
+                          <Statistic title="Phí gia công" value={deal.processing_fee_per_ton || 0} suffix="₫/tấn"
                             formatter={v => `${Number(v).toLocaleString('vi-VN')}`} />
                         </Col>
                         <Col span={12}>
@@ -881,7 +859,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                           <Statistic
                             title="Đơn giá"
                             value={deal.unit_price || 0}
-                            suffix="đ/kg"
+                            suffix="₫/kg"
                             formatter={(value) => `${Number(value).toLocaleString('vi-VN')}`}
                           />
                         </Col>
@@ -890,7 +868,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                           <Statistic
                             title="Tổng giá trị"
                             value={deal.total_value_vnd || 0}
-                            suffix="VNĐ"
+                            suffix="₫"
                             valueStyle={{ color: '#1B4D3E', fontSize: 24 }}
                             formatter={(value) => `${Number(value).toLocaleString('vi-VN')}`}
                           />

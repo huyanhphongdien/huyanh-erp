@@ -12,6 +12,8 @@ import { X, FileText, AlertTriangle, Check } from 'lucide-react'
 
 import { supabase } from '../../../lib/supabase'
 import { bonusSettlementService, type QuarterlyBonusBundle } from '../../../services/b2b/bonusSettlementService'
+import { fmtVnd } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 interface QuarterlyBatchModalProps {
   year: number
@@ -61,9 +63,9 @@ export function QuarterlyBatchModal({ year, quarter, onClose, onCreated }: Quart
         const partnerCode = partnerMap[b.partner_id]?.code ?? b.partner_id.slice(0, 8)
         try {
           const r = await bonusSettlementService.createQuarterlySettlement(b, partnerCode)
-          out.push({ partner: partnerCode, ok: true, msg: `${r.settlement_code} — ${r.total_bonus_vnd.toLocaleString('vi-VN')}đ` })
+          out.push({ partner: partnerCode, ok: true, msg: `${r.settlement_code} — ${fmtVnd(r.total_bonus_vnd)}` })
         } catch (e: unknown) {
-          out.push({ partner: partnerCode, ok: false, msg: (e as Error).message })
+          out.push({ partner: partnerCode, ok: false, msg: dichLoiHeThong(e, 'Tạo phiếu chi thất bại') })
         }
         setProgress({ done: i + 1, total: bundles.length })
         setResults([...out])
@@ -81,8 +83,8 @@ export function QuarterlyBatchModal({ year, quarter, onClose, onCreated }: Quart
           <div>
             <h3 className="text-lg font-semibold">Tạo phiếu chi quý Q{quarter}/{year}</h3>
             <p className="text-xs text-slate-500">
-              Gom bonus đã <span className="font-medium">approved</span> → 1 phiếu chi/đại lý.
-              Phiếu chi tạo ở status <code className="bg-slate-100 px-1 rounded">draft</code> để BGĐ duyệt.
+              Gom các dòng thưởng <span className="font-medium">Đã duyệt</span> → 1 phiếu chi/đại lý.
+              Phiếu chi tạo ở trạng thái <span className="font-medium">Nháp</span> để BGĐ duyệt.
             </p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded">
@@ -91,14 +93,14 @@ export function QuarterlyBatchModal({ year, quarter, onClose, onCreated }: Quart
         </div>
 
         <div className="p-5 space-y-3">
-          {isLoading && <div className="text-slate-500 text-sm">Đang tải bonus của quý…</div>}
+          {isLoading && <div className="text-slate-500 text-sm">Đang tải thưởng của quý…</div>}
 
           {!isLoading && bundles.length === 0 && (
             <div className="border border-amber-200 bg-amber-50 rounded-md p-3 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
               <div className="text-sm text-amber-800">
-                Không có bonus nào đã <strong>approved + chưa tạo phiếu chi</strong> trong Q{quarter}/{year}.
-                Anh cần duyệt bonus ở list page trước.
+                Không có dòng thưởng nào <strong>Đã duyệt + chưa tạo phiếu chi</strong> trong Q{quarter}/{year}.
+                Cần duyệt thưởng ở danh sách thưởng trước.
               </div>
             </div>
           )}
@@ -108,10 +110,10 @@ export function QuarterlyBatchModal({ year, quarter, onClose, onCreated }: Quart
               <div className="bg-emerald-50 border border-emerald-200 rounded-md p-3 text-sm">
                 <div>
                   <strong>{bundles.length}</strong> đại lý — Tổng:{' '}
-                  <strong>{totalAmount.toLocaleString('vi-VN')}đ</strong>
+                  <strong>{fmtVnd(totalAmount)}</strong>
                 </div>
                 <div className="text-xs text-slate-600 mt-1">
-                  Sau khi tạo, kế toán sẽ thấy {bundles.length} phiếu mới ở module Settlement với prefix{' '}
+                  Sau khi tạo, kế toán sẽ thấy {bundles.length} phiếu mới ở mục Quyết toán với mã bắt đầu{' '}
                   <code className="bg-white px-1 rounded">BONUS-…</code>.
                 </div>
               </div>
@@ -214,12 +216,12 @@ function BundleRow({
       <td className="px-3 py-2 text-center text-xs">
         {bundle.bonuses.map((b) => (
           <div key={b.id}>
-            T{b.month} ({b.rubber_type === 'tap' ? 'tạp' : 'nước'}): {Number(b.total_bonus_vnd).toLocaleString('vi-VN')}đ
+            T{b.month} ({b.rubber_type === 'tap' ? 'tạp' : 'nước'}): {fmtVnd(Number(b.total_bonus_vnd))}
           </div>
         ))}
       </td>
       <td className="px-3 py-2 text-right font-medium">
-        {bundle.total_bonus_vnd.toLocaleString('vi-VN')}đ
+        {fmtVnd(bundle.total_bonus_vnd)}
       </td>
       <td className="px-3 py-2 text-center">
         {result?.ok && <Check className="w-4 h-4 text-emerald-600 inline" />}

@@ -38,7 +38,10 @@ import {
   type PaymentTerms,
   type PackingType,
   soDisplayCode,
+  polLabel,
 } from '../../../services/sales/salesTypes'
+import { fmtDate, usdInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
 import ContractFileSection from './ContractFileSection'
@@ -75,15 +78,11 @@ interface Props {
 // HELPERS
 // ============================================================================
 
-const fmtCurrency = (v: number | undefined | null, currency = 'USD') => {
-  if (!v) return '—'
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(v)
-}
+// (fmtCurrency / fmtDate cục bộ đã gỡ — tiền theo salesMoney.fmtMoney, ngày theo utils/format)
 
-const fmtDate = (d: string | undefined | null) => {
-  if (!d) return '—'
-  return dayjs(d).format('DD/MM/YYYY')
-}
+/** Nhãn điều khoản thanh toán của 1 dòng hàng (có thể nhiều mã "LC_30,TT_30") — không in mã thô. */
+const paymentTermsText = (v?: string | null): string =>
+  v ? v.split(',').map((pt) => PAYMENT_TERMS_LABELS[pt.trim() as PaymentTerms] || pt.trim()).join(' + ') : '—'
 
 // ============================================================================
 // COMPONENT
@@ -140,8 +139,8 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       message.success('Đã tạo phụ lục .docx — tải Word về kiểm + ký')
       setAnnexOpen(false)
     } catch (e: unknown) {
-      if ((e as { errorFields?: unknown }).errorFields) return
-      message.error('Tạo phụ lục thất bại: ' + (e instanceof Error ? e.message : String(e)))
+      if ((e as { errorFields?: unknown })?.errorFields) return
+      message.error(dichLoiHeThong(e, 'Tạo phụ lục thất bại'))
     } finally {
       setAnnexGenerating(false)
     }
@@ -337,8 +336,8 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       setEditing(false)
       onSaved()
     } catch (e: any) {
-      if (e.errorFields) return // validation error
-      message.error(e.message || 'Lỗi cập nhật')
+      if (e?.errorFields) return // validation error
+      message.error(dichLoiHeThong(e, 'Lỗi cập nhật hợp đồng'))
     } finally {
       setSaving(false)
     }
@@ -461,7 +460,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                           placeholder={isVnd(order.currency) ? 'vd: 35.000.000' : 'vd: 2150'}
                           value={it.unit_price}
                           style={{ width: '100%' }}
-                          {...(isVnd(order.currency) ? vndInputProps : {})}
+                          {...(isVnd(order.currency) ? vndInputProps : usdInputProps)}
                           onChange={(v) => {
                             const next = [...editItems]; next[idx] = { ...it, unit_price: Number(v) || 0 }; setEditItems(next)
                           }}
@@ -759,7 +758,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         <Descriptions.Item label="Đơn giá">{fmtMoney(order.unit_price, order.currency)}/tấn</Descriptions.Item>
         <Descriptions.Item label="Tổng giá trị">
           <strong style={{ color: '#1B4D3E' }}>{fmtMoney(orderTotalInCurrency(order), order.currency)}</strong>
-          {isVnd(order.currency) && totalValueUSD ? <span style={{ fontSize: 11, color: '#999', marginLeft: 6 }}>≈ {fmtCurrency(totalValueUSD)}</span> : null}
+          {isVnd(order.currency) && totalValueUSD ? <span style={{ fontSize: 11, color: '#999', marginLeft: 6 }}>≈ {fmtMoney(totalValueUSD, 'USD', { decimals: 0 })}</span> : null}
         </Descriptions.Item>
         <Descriptions.Item label="KL bành">{order.bale_weight_kg || 33.33} kg</Descriptions.Item>
         <Descriptions.Item label="Tổng bành">{totalBales}</Descriptions.Item>
@@ -803,8 +802,9 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                       ? fmtMoney((item.quantity_tons || 0) * (item.unit_price || 0), 'VND')
                       : fmtMoney(item.total_value_usd, 'USD', { decimals: 0 })}
                   </td>
-                  <td style={{ padding: '6px 10px', fontSize: 11 }}>{item.packing_type?.replace('_', ' ') || '—'}</td>
-                  <td style={{ padding: '6px 10px', fontSize: 11 }}>{item.payment_terms ? item.payment_terms.split(',').join(' + ') : '—'}</td>
+                  {/* Nhãn từ map chung — trước đây in mã thô ('sw plastic_pallet', 'LC_30 + TT_30') */}
+                  <td style={{ padding: '6px 10px', fontSize: 11 }}>{item.packing_type ? (PACKING_TYPE_LABELS[item.packing_type as PackingType] || item.packing_type) : '—'}</td>
+                  <td style={{ padding: '6px 10px', fontSize: 11 }}>{paymentTermsText(item.payment_terms)}</td>
                 </tr>
               ))}
             </tbody>
@@ -826,13 +826,13 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
             : PAYMENT_TERMS_LABELS[order.payment_terms as PaymentTerms] || order.payment_terms || '—'}
         </Descriptions.Item>
         <Descriptions.Item label="Cảng xếp hàng">
-          {PORT_OF_LOADING_OPTIONS.find(p => p.value === order.port_of_loading)?.label || order.port_of_loading || '—'}
+          {polLabel(order.port_of_loading)}
         </Descriptions.Item>
         <Descriptions.Item label="Cảng đích">{order.port_of_destination || '—'}</Descriptions.Item>
         <Descriptions.Item label="Ngày giao">{fmtDate(order.delivery_date)}</Descriptions.Item>
         <Descriptions.Item label="Hoa hồng">
           {commissionAmt > 0
-            ? `${fmtCurrency(commissionAmt)} (${(order.commission_usd_per_mt || 0) > 0
+            ? `${fmtMoney(commissionAmt, 'USD')} (${(order.commission_usd_per_mt || 0) > 0
                 ? `$${order.commission_usd_per_mt}/MT`
                 : `${order.commission_pct || 0}%`})`
             : '—'}

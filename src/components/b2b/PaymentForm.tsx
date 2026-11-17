@@ -19,6 +19,8 @@ import {
 } from 'antd'
 import dayjs from 'dayjs'
 import { paymentService, PaymentCreateData, PAYMENT_METHOD_LABELS } from '../../services/b2b/paymentService'
+import { fmtVnd, vndInputProps } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { TextArea } = Input
 const { Text } = Typography
@@ -29,10 +31,6 @@ interface PaymentFormProps {
   createdBy: string
   onSuccess?: () => void
   onCancel?: () => void
-}
-
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('vi-VN').format(value)
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({
@@ -50,9 +48,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     try {
       setLoading(true)
 
+      // "Trả đủ": số nhập lệch số còn lại DƯỚI 1 ₫ (ô điền sẵn đã làm tròn đồng) → ghi ĐÚNG số còn lại,
+      // để _recalcSettlementPaid thấy đã trả đủ → 'paid'. Không thì kẹt phần lẻ < 1 ₫ không trả nổi
+      // (ô min 1 ₫, trần = số còn lại). Số ghi vẫn không bao giờ vượt maxAmount.
+      const amount = maxAmount > 0 && Math.abs(Number(values.amount) - maxAmount) < 1 ? maxAmount : values.amount
+
       const paymentData: PaymentCreateData = {
         settlement_id: settlementId,
-        amount: values.amount,
+        amount,
         payment_date: values.payment_date?.format('YYYY-MM-DD'),
         payment_method: values.payment_method,
         recipient_name: values.recipient_name,
@@ -71,7 +74,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       form.resetFields()
       onSuccess?.()
     } catch (error: any) {
-      message.error(error.message || 'Lỗi khi ghi nhận thanh toán')
+      message.error(dichLoiHeThong(error, 'Lỗi khi ghi nhận thanh toán'))
     } finally {
       setLoading(false)
     }
@@ -90,12 +93,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       initialValues={{
         payment_date: dayjs(),
         payment_method: 'bank_transfer',
-        amount: maxAmount > 0 ? maxAmount : undefined,
+        // Điền sẵn TRÒN ĐỒNG: remaining_amount = kg × đơn giá có thể lẻ (vd 80.928.711,5) — vndInputProps nay
+        // hiện cả phần lẻ. Lấy phần nguyên (= Math.round khi không vượt trần): Math.round(…,5) lên TRÊN số còn
+        // lại → ô đỏ + validator chặn "vượt quá". max giữ nguyên; phần lẻ < 1 ₫ được bù lúc lưu (handleSubmit).
+        amount: maxAmount > 0 ? Math.floor(maxAmount) : undefined,
       }}
     >
       <div style={{ marginBottom: 16, padding: '8px 12px', background: '#f5f5f5', borderRadius: 6 }}>
         <Text type="secondary">Số tiền còn lại: </Text>
-        <Text strong style={{ color: '#1B4D3E' }}>{formatCurrency(maxAmount)} ₫</Text>
+        <Text strong style={{ color: '#1B4D3E' }}>{fmtVnd(maxAmount)}</Text>
       </div>
 
       <Form.Item
@@ -117,8 +123,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           style={{ width: '100%' }}
           min={1}
           max={maxAmount}
-          formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-          parser={v => Number(v?.replace(/,/g, '') || 0)}
+          {...vndInputProps}
           suffix="₫"
           placeholder="Nhập số tiền"
         />

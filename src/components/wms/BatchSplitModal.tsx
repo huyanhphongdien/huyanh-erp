@@ -1,5 +1,5 @@
 // ============================================================================
-// BATCH SPLIT MODAL — Tach lo thanh nhieu lo nho
+// BATCH SPLIT MODAL — Tách lô thành nhiều lô nhỏ
 // File: src/components/wms/BatchSplitModal.tsx
 // Phase 6: Batch Split/Merge
 // ============================================================================
@@ -14,6 +14,8 @@ import {
 } from '@ant-design/icons'
 import { batchService } from '../../services/wms/batchService'
 import type { StockBatch } from '../../services/wms/wms.types'
+import { fmtKg, fmtPct } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text } = Typography
 
@@ -87,7 +89,7 @@ const BatchSplitModal: React.FC<BatchSplitModalProps> = ({ open, batch, onClose,
 
   const handleSubmit = async () => {
     if (!isValid) {
-      message.warning('Vui long kiem tra lai khoi luong tach')
+      message.warning('Vui lòng kiểm tra lại khối lượng tách')
       return
     }
 
@@ -102,12 +104,12 @@ const BatchSplitModal: React.FC<BatchSplitModalProps> = ({ open, batch, onClose,
           yard_col: s.yard_col,
         }))
       )
-      message.success(`Da tach thanh ${result.length} lo moi`)
+      message.success(`Đã tách thành ${result.length} lô mới`)
       onSuccess(result)
       onClose()
     } catch (err: any) {
       console.error('Split batch error:', err)
-      message.error(err?.message || 'Loi khi tach lo')
+      message.error(dichLoiHeThong(err, 'Lỗi khi tách lô'))
     } finally {
       setSaving(false)
     }
@@ -127,7 +129,7 @@ const BatchSplitModal: React.FC<BatchSplitModalProps> = ({ open, batch, onClose,
       ),
     },
     {
-      title: 'Khoi luong (kg)',
+      title: 'Khối lượng (kg)',
       key: 'weight',
       render: (_: any, record: SplitRow) => (
         <InputNumber
@@ -142,7 +144,7 @@ const BatchSplitModal: React.FC<BatchSplitModalProps> = ({ open, batch, onClose,
       ),
     },
     {
-      title: 'Khu vuc bai',
+      title: 'Khu vực bãi',
       key: 'zone',
       width: 100,
       render: (_: any, record: SplitRow) => (
@@ -181,14 +183,14 @@ const BatchSplitModal: React.FC<BatchSplitModalProps> = ({ open, batch, onClose,
       title={
         <Space>
           <ScissorOutlined />
-          <span>Tach lo {batch.batch_no}</span>
+          <span>Tách lô {batch.batch_no}</span>
         </Space>
       }
       open={open}
       onCancel={onClose}
       width={600}
       footer={[
-        <Button key="cancel" onClick={onClose}>Huy</Button>,
+        <Button key="cancel" onClick={onClose}>Hủy</Button>,
         <Button
           key="submit"
           type="primary"
@@ -197,7 +199,7 @@ const BatchSplitModal: React.FC<BatchSplitModalProps> = ({ open, batch, onClose,
           disabled={!isValid}
           style={{ background: BRAND_COLOR, borderColor: BRAND_COLOR }}
         >
-          <ScissorOutlined /> Xac nhan tach lo
+          <ScissorOutlined /> Xác nhận tách lô
         </Button>,
       ]}
       styles={{ body: { maxHeight: '70vh', overflow: 'auto' } }}
@@ -205,15 +207,15 @@ const BatchSplitModal: React.FC<BatchSplitModalProps> = ({ open, batch, onClose,
       {/* Original Batch Info */}
       <Card size="small" style={{ marginBottom: 16, background: '#fafafa', borderRadius: 8 }}>
         <Descriptions size="small" column={3}>
-          <Descriptions.Item label="Ma lo">
+          <Descriptions.Item label="Mã lô">
             <Text strong style={{ fontFamily: "'JetBrains Mono'" }}>{batch.batch_no}</Text>
           </Descriptions.Item>
-          <Descriptions.Item label="Khoi luong">
-            <Text strong>{originalWeight.toLocaleString('vi-VN')} kg</Text>
+          <Descriptions.Item label="Khối lượng">
+            <Text strong>{fmtKg(originalWeight)} kg</Text>
           </Descriptions.Item>
           <Descriptions.Item label="DRC">
             <Text strong style={{ color: BRAND_COLOR }}>
-              {batch.latest_drc ? `${batch.latest_drc}%` : '---'}
+              {batch.latest_drc ? fmtPct(batch.latest_drc, 2) : '—'}
             </Text>
           </Descriptions.Item>
         </Descriptions>
@@ -236,7 +238,7 @@ const BatchSplitModal: React.FC<BatchSplitModalProps> = ({ open, batch, onClose,
         onClick={addSplit}
         style={{ marginBottom: 16 }}
       >
-        Them phan tach
+        Thêm phần tách
       </Button>
 
       {/* Weight Summary */}
@@ -246,16 +248,16 @@ const BatchSplitModal: React.FC<BatchSplitModalProps> = ({ open, batch, onClose,
             percent={usagePercent}
             status={totalSplitWeight > originalWeight ? 'exception' : 'active'}
             strokeColor={totalSplitWeight > originalWeight ? '#DC2626' : BRAND_COLOR}
-            format={() => `${totalSplitWeight.toLocaleString('vi-VN')} / ${originalWeight.toLocaleString('vi-VN')} kg`}
+            format={() => `${fmtKg(totalSplitWeight)} / ${fmtKg(originalWeight)} kg`}
           />
         </Col>
         <Col span={8} style={{ textAlign: 'right' }}>
           {remainingWeight >= 0 ? (
             <Tag color={remainingWeight === 0 ? 'success' : 'blue'}>
-              Con lai: {remainingWeight.toLocaleString('vi-VN')} kg
+              Còn lại: {fmtKg(remainingWeight)} kg
             </Tag>
           ) : (
-            <Tag color="error">Vuot qua: {Math.abs(remainingWeight).toLocaleString('vi-VN')} kg</Tag>
+            <Tag color="error">Vượt quá: {fmtKg(Math.abs(remainingWeight))} kg</Tag>
           )}
         </Col>
       </Row>

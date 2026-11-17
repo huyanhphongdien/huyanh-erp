@@ -26,38 +26,18 @@ import { ExperimentOutlined, EditOutlined, CheckOutlined } from '@ant-design/ico
 import {
   dealWmsService,
   DealBatchSummary,
+  QC_STATUS_LABELS,
+  QC_STATUS_COLORS,
 } from '../../services/b2b/dealWmsService'
 import { Deal, dealService } from '../../services/b2b/dealService'
 import { useAuthStore } from '../../stores/authStore'
 import DrcVarianceCard from './DrcVarianceCard'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import PageState from '../common/PageState'
+import { fmtDate, fmtKg } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text } = Typography
 const { TextArea } = Input
-
-// ============================================
-// HELPERS
-// ============================================
-
-const formatDate = (dateStr: string | null): string => {
-  if (!dateStr) return '-'
-  return format(new Date(dateStr), 'dd/MM/yyyy', { locale: vi })
-}
-
-const QC_STATUS_COLORS: Record<string, string> = {
-  passed: 'green',
-  warning: 'orange',
-  failed: 'red',
-  pending: 'default',
-}
-
-const QC_STATUS_LABELS: Record<string, string> = {
-  passed: 'Đạt',
-  warning: 'Cảnh báo',
-  failed: 'Không đạt',
-  pending: 'Chờ kiểm tra',
-}
 
 // ============================================
 // COMPONENT
@@ -72,6 +52,7 @@ const DealQcTab = ({ dealId, deal: initialDeal }: DealQcTabProps) => {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [batches, setBatches] = useState<DealBatchSummary[]>([])
   const [deal, setDeal] = useState<Deal>(initialDeal)
   const [editModal, setEditModal] = useState(false)
@@ -87,10 +68,12 @@ const DealQcTab = ({ dealId, deal: initialDeal }: DealQcTabProps) => {
   const loadData = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const data = await dealWmsService.getBatchesByDeal(dealId)
       setBatches(data)
     } catch (error) {
       console.error('Load DealQcTab error:', error)
+      setLoadError(error)
     } finally {
       setLoading(false)
     }
@@ -124,13 +107,13 @@ const DealQcTab = ({ dealId, deal: initialDeal }: DealQcTabProps) => {
           : (deal.notes ?? undefined),
       })
 
-      message.success(`Đã cập nhật QC: DRC ${values.actual_drc}%, trạng thái "${values.qc_status}"`)
+      message.success(`Đã cập nhật QC: DRC ${values.actual_drc}%, kết luận "${QC_STATUS_LABELS[values.qc_status] || values.qc_status}"`)
       setDeal(updated)
       setEditModal(false)
       await loadData()
     } catch (err: any) {
       if (err?.errorFields) return
-      message.error(err?.message || 'Không thể cập nhật QC')
+      message.error(dichLoiHeThong(err, 'Không thể cập nhật QC'))
     } finally {
       setSubmitting(false)
     }
@@ -184,21 +167,23 @@ const DealQcTab = ({ dealId, deal: initialDeal }: DealQcTabProps) => {
         </div>
       )}
 
-      {/* Batches Table */}
-      {batches.length === 0 ? (
-        <Empty description="Chưa có batch QC nào" />
+      {/* Batches Table — lỗi tải xét TRƯỚC trống (đừng báo "chưa có lô" khi thật ra tải hỏng) */}
+      {loadError ? (
+        <PageState error={loadError} onRetry={loadData} minHeight={120} />
+      ) : batches.length === 0 ? (
+        <Empty description="Chưa có lô QC nào" />
       ) : (
         <>
           <Text strong style={{ fontSize: 15, marginBottom: 12, display: 'block' }}>
             <ExperimentOutlined style={{ marginRight: 8 }} />
-            Danh sách Batches ({batches.length})
+            Danh sách lô ({batches.length})
           </Text>
           <Table
             dataSource={batches}
             rowKey="batch_id"
             columns={[
               {
-                title: 'Batch',
+                title: 'Mã lô',
                 dataIndex: 'batch_no',
                 render: (v: string) => <Text strong>{v}</Text>,
               },
@@ -233,12 +218,12 @@ const DealQcTab = ({ dealId, deal: initialDeal }: DealQcTabProps) => {
                 title: 'SL còn (kg)',
                 dataIndex: 'quantity_remaining',
                 align: 'right' as const,
-                render: (v: number) => v ? v.toLocaleString('vi-VN') : '-',
+                render: (v: number) => fmtKg(v, 3),
               },
               {
                 title: 'Ngày nhận',
                 dataIndex: 'received_date',
-                render: (d: string) => formatDate(d),
+                render: (d: string) => fmtDate(d),
               },
               {
                 title: '',

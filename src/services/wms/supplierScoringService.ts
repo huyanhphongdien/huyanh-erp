@@ -7,6 +7,10 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
+
+/** created_at (timestamptz, trả về theo UTC) → 'YYYY-MM-DD' NGÀY VN. Cắt chuỗi UTC thì lô nhập trước 7h sáng lùi một ngày. */
+const ngayVN = (ts: string | null | undefined): string => (ts ? toDateStrVN(new Date(ts)) : '')
 
 // ============================================================================
 // TYPES
@@ -182,14 +186,14 @@ export const supplierScoringService = {
       drc: Number(b.latest_drc || b.initial_drc) || null,
       qc_status: b.qc_status || 'pending',
       weight: Number(b.current_weight || b.quantity_remaining) || 0,
-      date: b.created_at ? b.created_at.substring(0, 10) : '',
+      date: ngayVN(b.created_at),
     }))
 
     // DRC trend (ordered by date ascending)
     const drcTrend: Array<{ date: string; drc: number }> = []
     for (const b of [...batches].reverse()) {
       const drc = Number((b as any).latest_drc || (b as any).initial_drc)
-      const date = (b as any).created_at ? (b as any).created_at.substring(0, 10) : ''
+      const date = ngayVN((b as any).created_at)
       if (drc && drc > 0 && date) {
         drcTrend.push({ date, drc })
       }
@@ -198,9 +202,9 @@ export const supplierScoringService = {
     // Monthly volume
     const monthMap: Record<string, number> = {}
     for (const b of batches) {
-      const date = (b as any).created_at as string
+      const date = ngayVN((b as any).created_at as string)
       if (!date) continue
-      const month = date.substring(0, 7) // YYYY-MM
+      const month = date.substring(0, 7) // YYYY-MM (tháng VN)
       const weight = Number((b as any).current_weight || (b as any).quantity_remaining) || 0
       monthMap[month] = (monthMap[month] || 0) + weight
     }

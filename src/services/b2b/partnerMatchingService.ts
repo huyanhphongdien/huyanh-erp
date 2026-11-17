@@ -5,6 +5,9 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { TIER_LABELS, type PartnerTier } from './partnerService'
+import { PRODUCT_TYPE_LABELS } from '../../constants/rubberProducts'
+import { fmtNum } from '../../utils/format'
 
 export interface MatchCriteria {
   product_type?: string      // 'mu_tap', 'mu_nuoc', ...
@@ -40,9 +43,14 @@ const WEIGHTS = {
   volume: 0.10,
 }
 
+// Hạng cao nhất của đại lý là 'diamond' (partnerService.PartnerTier). Bản cũ ghi
+// 'platinum' (không có hạng này) → đại lý Kim cương rơi về điểm 20 như đại lý mới.
 const TIER_SCORE: Record<string, number> = {
-  platinum: 100, gold: 80, silver: 60, bronze: 40, new: 20,
+  diamond: 100, gold: 80, silver: 60, bronze: 40, new: 20,
 }
+
+const tierLabel = (tier: string) => TIER_LABELS[tier as PartnerTier] || tier
+const productLabel = (code: string) => PRODUCT_TYPE_LABELS[code] || code
 
 export const partnerMatchingService = {
 
@@ -94,7 +102,7 @@ export const partnerMatchingService = {
       if (productMatch) {
         const count = s.productCounts[criteria.product_type!] || 0
         productScore = Math.min(100, count * 20)
-        reasons.push(`Đã giao ${count} deal ${criteria.product_type}`)
+        reasons.push(`Đã giao ${count} deal ${productLabel(criteria.product_type!)}`)
       } else if (s.totalDeals > 0) {
         productScore = 30 // Has deals but different product
       }
@@ -104,10 +112,10 @@ export const partnerMatchingService = {
       if (avgDrc != null && criteria.min_drc) {
         if (avgDrc >= criteria.min_drc) {
           drcScore = 100
-          reasons.push(`DRC avg: ${avgDrc}% ≥ ${criteria.min_drc}%`)
+          reasons.push(`DRC TB: ${avgDrc}% ≥ ${criteria.min_drc}%`)
         } else {
           drcScore = Math.max(0, 100 - (criteria.min_drc - avgDrc) * 10)
-          reasons.push(`DRC avg: ${avgDrc}% (yêu cầu ${criteria.min_drc}%)`)
+          reasons.push(`DRC TB: ${avgDrc}% (yêu cầu ${criteria.min_drc}%)`)
         }
       }
 
@@ -123,13 +131,13 @@ export const partnerMatchingService = {
 
       // Tier score
       const tierScore = TIER_SCORE[p.tier || 'new'] || 20
-      if (p.tier && p.tier !== 'new') reasons.push(`Hạng: ${p.tier}`)
+      if (p.tier && p.tier !== 'new') reasons.push(`Hạng: ${tierLabel(p.tier)}`)
 
       // Volume score (0-100)
       let volumeScore = 0
       if (totalTons > 0) {
         volumeScore = Math.min(100, totalTons / (criteria.quantity_tons || 50) * 100)
-        reasons.push(`${totalTons} tấn (${s.totalDeals} deals)`)
+        reasons.push(`${fmtNum(totalTons, 1)} tấn (${s.totalDeals} deal)`)
       }
 
       // Weighted total

@@ -33,6 +33,9 @@ import {
   EnvironmentOutlined,
 } from '@ant-design/icons';
 import { colors } from '../../config/antdTheme';
+import { BOOKING_STATUS_LABELS, BOOKING_STATUS_COLORS } from '../../services/b2b/chatMessageService';
+import { PRODUCT_TYPE_LABELS } from '../../constants/rubberProducts';
+import { fmtDate, fmtDateTime, fmtVnd, fmtVndNum, vndInputProps } from '../../utils/format';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -89,43 +92,22 @@ export interface BookingCardProps {
 }
 
 // ==========================================
-// STATUS CONFIG
+// STATUS CONFIG — nhãn + màu Tag lấy từ chatMessageService (MỘT nguồn),
+// chỉ giữ màu NỀN thẻ ở đây (trình bày riêng của thẻ).
 // ==========================================
 
-const statusConfig = {
-  pending: {
-    label: 'Chờ xác nhận',
-    color: 'orange',
-    bgColor: '#fff9e6',
-  },
-  confirmed: {
-    label: 'Đã xác nhận',
-    color: 'green',
-    bgColor: '#f6ffed',
-  },
-  negotiating: {
-    label: 'Đang thương lượng',
-    color: 'blue',
-    bgColor: '#e6f7ff',
-  },
-  rejected: {
-    label: 'Đã từ chối',
-    color: 'red',
-    bgColor: '#fff2f0',
-  },
+const STATUS_BG: Record<string, string> = {
+  pending: '#fff9e6',
+  confirmed: '#f6ffed',
+  negotiating: '#e6f7ff',
+  rejected: '#fff2f0',
 };
 
-// ==========================================
-// PRODUCT TYPE CONFIG
-// ==========================================
-
-const productTypeLabels: Record<string, string> = {
-  mu_nuoc: 'Mủ nước',
-  mu_tap: 'Mủ tạp',
-  mu_dong: 'Mủ đông',
-  mu_chen: 'Mủ chén',
-  mu_to: 'Mủ tờ',
-};
+const statusConfigOf = (status: string) => ({
+  label: BOOKING_STATUS_LABELS[status] || BOOKING_STATUS_LABELS.pending,
+  color: BOOKING_STATUS_COLORS[status] || BOOKING_STATUS_COLORS.pending,
+  bgColor: STATUS_BG[status] || STATUS_BG.pending,
+});
 
 // ==========================================
 // COUNTDOWN (deadline thương lượng)
@@ -141,7 +123,7 @@ const NegotiationCountdown: React.FC<{ expiresAt: string }> = ({ expiresAt }) =>
   if (diff <= 0) {
     return (
       <div style={{ marginTop: 6, fontSize: 11, color: '#ff4d4f', fontWeight: 600 }}>
-        ⏰ Hết hạn thương lượng — vui lòng confirm hoặc reject
+        ⏰ Hết hạn thương lượng — vui lòng xác nhận hoặc từ chối
       </div>
     )
   }
@@ -194,7 +176,7 @@ const NegotiationModal: React.FC<NegotiationModalProps> = ({
       <Form form={form} layout="vertical" initialValues={{ counterPrice: currentPrice }}>
         <Form.Item
           name="counterPrice"
-          label="Giá đề xuất (đ/kg)"
+          label="Giá đề xuất (₫/kg)"
           rules={[
             { required: true, message: 'Vui lòng nhập giá đề xuất' },
             // Cận trên: 2x giá gốc — chống nhập nhầm số quá lớn
@@ -203,12 +185,12 @@ const NegotiationModal: React.FC<NegotiationModalProps> = ({
                 if (!currentPrice || !v) return Promise.resolve()
                 if (v > currentPrice * 2) {
                   return Promise.reject(new Error(
-                    `Giá đề xuất quá cao (>${(currentPrice * 2).toLocaleString('vi-VN')} đ/kg = 2× giá gốc). Vui lòng kiểm tra lại.`,
+                    `Giá đề xuất quá cao (>${fmtVndNum(currentPrice * 2)} ₫/kg = 2× giá gốc). Vui lòng kiểm tra lại.`,
                   ))
                 }
                 if (v < currentPrice * 0.5) {
                   return Promise.reject(new Error(
-                    `Giá đề xuất quá thấp (<${(currentPrice * 0.5).toLocaleString('vi-VN')} đ/kg = 50% giá gốc). Vui lòng kiểm tra lại.`,
+                    `Giá đề xuất quá thấp (<${fmtVndNum(currentPrice * 0.5)} ₫/kg = 50% giá gốc). Vui lòng kiểm tra lại.`,
                   ))
                 }
                 return Promise.resolve()
@@ -220,9 +202,8 @@ const NegotiationModal: React.FC<NegotiationModalProps> = ({
             style={{ width: '100%' }}
             min={0}
             step={500}
-            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-            parser={(value) => Number(value!.replace(/,/g, '')) || 0 as any}
-            addonAfter="đ/kg"
+            {...vndInputProps}
+            addonAfter="₫/kg"
           />
         </Form.Item>
         <Form.Item
@@ -243,9 +224,9 @@ const NegotiationModal: React.FC<NegotiationModalProps> = ({
         </Form.Item>
         {currentPrice && (
           <div style={{ color: colors.textSecondary, fontSize: 13 }}>
-            Giá gốc: <strong>{currentPrice.toLocaleString('vi-VN')} đ/kg</strong>
+            Giá gốc: <strong>{fmtVndNum(currentPrice)} ₫/kg</strong>
             <br />
-            Cho phép: {(currentPrice * 0.5).toLocaleString('vi-VN')} → {(currentPrice * 2).toLocaleString('vi-VN')} đ/kg
+            Cho phép: {fmtVndNum(currentPrice * 0.5)} → {fmtVndNum(currentPrice * 2)} ₫/kg
           </div>
         )}
       </Form>
@@ -293,8 +274,8 @@ const BookingCard: React.FC<BookingCardProps> = ({
     negotiation_notes,
   } = metadata;
 
-  const statusConf = statusConfig[status] || statusConfig.pending;
-  const productLabel = productTypeLabels[product_type || ''] || product_type || 'Mủ cao su';
+  const statusConf = statusConfigOf(status);
+  const productLabel = PRODUCT_TYPE_LABELS[product_type || ''] || product_type || 'Mủ cao su';
   // Logic hiện action buttons (Xác nhận / Thương lượng / Từ chối):
   //
   // 1. status='pending' (chưa ai phản hồi):
@@ -325,18 +306,6 @@ const BookingCard: React.FC<BookingCardProps> = ({
     return false; // confirmed / rejected
   })();
   const waitingForOther = status === 'negotiating' && !showActions;
-
-  // Format currency
-  const formatCurrency = (value?: number) => {
-    if (!value) return '—';
-    return value.toLocaleString('vi-VN') + ' VNĐ';
-  };
-
-  // Format date
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('vi-VN');
-  };
 
   return (
     <>
@@ -397,7 +366,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
             <div style={{ fontWeight: 500 }}>
               {/* Live update: khi negotiating, hiện counter_price (giá đề xuất mới
                   nhất). Khi pending/confirmed/rejected, hiện price_per_kg gốc. */}
-              {(status === 'negotiating' && counter_price ? counter_price : price_per_kg)?.toLocaleString('vi-VN') || '—'} đ/kg
+              {fmtVndNum(status === 'negotiating' && counter_price ? counter_price : price_per_kg)} ₫/kg
             </div>
           </div>
         </div>
@@ -466,11 +435,11 @@ const BookingCard: React.FC<BookingCardProps> = ({
                         {h.actor_name || h.actor_id.substring(0, 8)}
                       </strong>
                       <Text type="secondary" style={{ marginLeft: 'auto', fontSize: 10 }}>
-                        {new Date(h.ts).toLocaleString('vi-VN')}
+                        {fmtDateTime(h.ts)}
                       </Text>
                     </div>
                     <div style={{ marginLeft: 4 }}>
-                      💰 <strong style={{ color: '#1890ff' }}>{h.counter_price.toLocaleString('vi-VN')} đ/kg</strong>
+                      💰 <strong style={{ color: '#1890ff' }}>{fmtVndNum(h.counter_price)} ₫/kg</strong>
                     </div>
                     {h.notes && (
                       <div style={{
@@ -506,9 +475,9 @@ const BookingCard: React.FC<BookingCardProps> = ({
                 const isDry = price_unit === 'dry'
                 const drcMul = isDry ? ((drc_percent || 0) / 100) : 1
                 const recomputed = Math.round(quantity_tons * 1000 * drcMul * effectivePrice)
-                return formatCurrency(recomputed)
+                return fmtVnd(recomputed)
               }
-              return formatCurrency(estimated_value)
+              return fmtVnd(estimated_value)
             })()}
           </Text>
         </div>
@@ -517,7 +486,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
         {delivery_date && (
           <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between' }}>
             <Text type="secondary" style={{ fontSize: 12 }}>Ngày giao</Text>
-            <Text style={{ fontSize: 12 }}>{formatDate(delivery_date)}</Text>
+            <Text style={{ fontSize: 12 }}>{fmtDate(delivery_date)}</Text>
           </div>
         )}
 

@@ -18,13 +18,13 @@ import { useRawRole } from '../../../hooks/useRawRole'
 import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type RawLotBalance } from '../../../services/wms/rawLotService'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { fmtKg, fmtPct, fmtDate, fmtDateShort } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 
-const fmtKg = (n: number | null | undefined, digits = 0) =>
-  n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: digits, minimumFractionDigits: digits })
+// Thẻ KPI "tấn": cố ý luôn 1 số lẻ cho thẳng cột (format.ts không ép số lẻ) — giữ riêng
 const fmtT = (kg: number) => (kg / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1, minimumFractionDigits: 1 })
-const fmtPct = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' %')
 
 const ALERT_COLOR: Record<RawAlert['muc'], string> = { cao: 'red', vua: 'orange', thap: 'default' }
 const ALERT_LABEL: Record<RawAlert['loai'], string> = {
@@ -67,7 +67,7 @@ export default function RawOverviewPage() {
       await rawLotService.layHoacTao(facilityId, ma)
       message.success(`Đã tạo mã ${ma} (trạng thái Chưa có hàng) — chọn được ở Hàng chèn (Bắt đầu lệnh) và sổ ca`)
       setMaMoi(''); taiMa()
-    } catch (e: any) { message.error(e?.message || 'Không tạo được mã') }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Không tạo được mã')) }
     finally { setTaoBusy(false) }
   }
 
@@ -84,7 +84,7 @@ export default function RawOverviewPage() {
       ])
       setByType(bt); setAlerts(al); setFlow(fl); setBatches(ba); setStats(st); setSettings(se)
     } catch (e: any) {
-      setError(e?.message || 'Không tải được dữ liệu kho nguyên liệu')
+      setError(dichLoiHeThong(e, 'Không tải được dữ liệu kho nguyên liệu'))
     } finally { setLoading(false) }
   }, [facilityId])
 
@@ -145,7 +145,7 @@ export default function RawOverviewPage() {
           <Col>
             <Title level={3} style={{ margin: 0 }}>Kho nguyên liệu mủ</Title>
             <Text type="secondary">
-              Sổ kho khô · kg khô = kg ướt × DRC · mở sổ từ {settings.ngay_mo_so ? settings.ngay_mo_so.split('-').reverse().join('/') : '—'} · ngưỡng tuổi lô {settings.tuoi_lo_canh_bao_ngay} ngày, cân lại mỗi {settings.chu_ky_can_lai_ngay} ngày
+              Sổ kho khô · kg khô = kg ướt × DRC · mở sổ từ {fmtDate(settings.ngay_mo_so)} · ngưỡng tuổi lô {settings.tuoi_lo_canh_bao_ngay} ngày, cân lại mỗi {settings.chu_ky_can_lai_ngay} ngày
               {!rawRole.perms.co_thu_kho && ' · chưa chỉ định thủ kho, bước "nhận" đang mở'}
             </Text>
           </Col>
@@ -159,7 +159,8 @@ export default function RawOverviewPage() {
           </Col>
         </Row>
 
-        {error && <Alert type="error" showIcon message={error} description="Kiểm tra đã chạy migration wms_nvl_p1_* trong Supabase chưa." />}
+        {error && <Alert type="error" showIcon message={error} description="Nếu vẫn lỗi sau khi thử lại, chụp màn hình gửi quản trị."
+          action={<Button size="small" onClick={load}>Thử lại</Button>} />}
 
         <Spin spinning={loading}>
           <Row gutter={[12, 12]}>
@@ -185,9 +186,9 @@ export default function RawOverviewPage() {
                   { title: 'Mã', dataIndex: 'ma', key: 'ma', render: (v) => <Text code strong>{v}</Text> },
                   { title: 'Loại', dataIndex: 'rubber_type_name', key: 't' },
                   { title: 'Xe', dataIndex: 'so_xe_con_hang', key: 'x', align: 'right' },
-                  { title: 'Ướt', dataIndex: 'wet_kg', key: 'w', align: 'right', render: (v: number) => v.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) },
-                  { title: 'Khô', dataIndex: 'dry_kg', key: 'd', align: 'right', render: (v: number) => <Text strong>{v.toLocaleString('vi-VN', { maximumFractionDigits: 0 })}</Text> },
-                  { title: 'DRC', dataIndex: 'drc_pct', key: 'drc', align: 'right', render: (v) => (v === null ? '—' : `${v} %`) },
+                  { title: 'Ướt', dataIndex: 'wet_kg', key: 'w', align: 'right', render: (v: number) => fmtKg(v) },
+                  { title: 'Khô', dataIndex: 'dry_kg', key: 'd', align: 'right', render: (v: number) => <Text strong>{fmtKg(v)}</Text> },
+                  { title: 'DRC', dataIndex: 'drc_pct', key: 'drc', align: 'right', render: (v) => fmtPct(v) },
                   { title: 'Tuổi', dataIndex: 'tuoi_ngay', key: 'age', align: 'right', render: (v) => (v === null ? '—' : `${v} ng`) },
                   { title: 'Trạng thái', dataIndex: 'trang_thai', key: 's', render: (v: RawLotBalance['trang_thai']) => <Tag color={v === 'dang_chay' ? 'gold' : v === 'san_sang' ? 'green' : 'default'}>{RAW_LOT_TRANG_THAI_LABELS[v]}</Tag> },
                 ]} />
@@ -241,13 +242,13 @@ export default function RawOverviewPage() {
             {flow.map((f) => {
               const inKg = f.nhap_kho_kg + f.mo_so_kho_kg
               return (
-                <Tooltip key={f.txn_date} title={`${f.txn_date} · nhập ${fmtKg(inKg)} kg · xuất ${fmtKg(f.xuat_kho_kg)} kg`}>
+                <Tooltip key={f.txn_date} title={`${fmtDate(f.txn_date)} · nhập ${fmtKg(inKg)} kg · xuất ${fmtKg(f.xuat_kho_kg)} kg`}>
                   <div style={{ flex: '1 1 0', minWidth: 28, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 140 }}>
                       <div style={{ width: 12, height: Math.max(2, (inKg / maxFlow) * 140), background: '#1B4D3E', borderRadius: '3px 3px 0 0' }} />
                       <div style={{ width: 12, height: Math.max(2, (f.xuat_kho_kg / maxFlow) * 140), background: '#E8A838', borderRadius: '3px 3px 0 0' }} />
                     </div>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{f.txn_date.slice(8, 10)}/{f.txn_date.slice(5, 7)}</Text>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{fmtDateShort(f.txn_date)}</Text>
                   </div>
                 </Tooltip>
               )

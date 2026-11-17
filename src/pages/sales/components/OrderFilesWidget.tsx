@@ -25,13 +25,17 @@ interface FolderConfig {
   tabKey: string
 }
 
+// tabKey PHẢI là key tab có thật ở cả 2 dạng xem (info/contract/production/quality/packing/shipping/
+// documents/finance/progress/chat/history). Chứng từ / Phiếu cân / Khác đều hiện ở checklist tab
+// "Chứng từ" (DocumentChecklistTab: mọi doc_type trừ 'contract') — audit 17/11/2026: trước đây trỏ
+// 'cert'/'weighbridge'/'other' không tồn tại → full page trắng, drawer rơi về Thông tin.
 const FOLDERS: FolderConfig[] = [
   { doc_type: 'contract',    icon: '📋', name: 'Hợp đồng',     bg: '#f6ffed', color: '#389e0d', tabKey: 'contract' },
   { doc_type: 'shipping',    icon: '🚢', name: 'Vận chuyển',   bg: '#e6f4ff', color: '#1677ff', tabKey: 'shipping' },
-  { doc_type: 'cert',        icon: '📑', name: 'Chứng từ',     bg: '#f9f0ff', color: '#531dab', tabKey: 'cert' },
+  { doc_type: 'cert',        icon: '📑', name: 'Chứng từ',     bg: '#f9f0ff', color: '#531dab', tabKey: 'documents' },
   { doc_type: 'finance',     icon: '💰', name: 'Tài chính',    bg: '#fff7e6', color: '#d46b08', tabKey: 'finance' },
-  { doc_type: 'weighbridge', icon: '🚛', name: 'Phiếu cân',    bg: '#e0f7fa', color: '#06b6d4', tabKey: 'weighbridge' },
-  { doc_type: 'other',       icon: '📦', name: 'Khác',         bg: '#f5f5f5', color: '#595959', tabKey: 'other' },
+  { doc_type: 'weighbridge', icon: '🚛', name: 'Phiếu cân',    bg: '#e0f7fa', color: '#06b6d4', tabKey: 'documents' },
+  { doc_type: 'other',       icon: '📦', name: 'Khác',         bg: '#f5f5f5', color: '#595959', tabKey: 'documents' },
 ]
 
 interface FolderStat {
@@ -59,18 +63,24 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
   const [stats, setStats] = useState<Record<string, FolderStat>>({})
   const [contractSub, setContractSub] = useState<Record<string, SubFolderStat>>({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [totalSize, setTotalSize] = useState(0)
 
   useEffect(() => {
     let mounted = true
     const load = async () => {
+      setLoading(true)
+      setLoadError(false)
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('sales_order_documents')
           .select('doc_type, doc_sub_type, file_name, file_size')
           .eq('sales_order_id', salesOrderId)
           .not('file_url', 'is', null)
         if (!mounted) return
+        // Lỗi tải ≠ "0 file": báo lỗi thay vì hiện các thư mục rỗng giả
+        if (error) { setLoadError(true); return }
         const map: Record<string, FolderStat> = {}
         const subMap: Record<string, SubFolderStat> = {}
         let total = 0
@@ -103,13 +113,15 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
         setStats(map)
         setContractSub(subMap)
         setTotalSize(total)
+      } catch {
+        if (mounted) setLoadError(true)
       } finally {
         if (mounted) setLoading(false)
       }
     }
     void load()
     return () => { mounted = false }
-  }, [salesOrderId])
+  }, [salesOrderId, reloadKey])
 
   const totalCount = Object.values(stats).reduce((s, f) => s + f.count, 0)
   const fmtSize = (b: number) => {
@@ -124,9 +136,16 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
         <span style={{ fontSize: 14, fontWeight: 700, color: PRIMARY }}>
           📁 Tài liệu đính kèm
         </span>
-        <span style={totalBadge}>
-          {loading ? <Spin size="small" /> : `${totalCount} file · ${fmtSize(totalSize)}`}
-        </span>
+        {loadError && !loading ? (
+          <span style={{ ...totalBadge, background: '#FEF2F2', color: '#B91C1C' }}>
+            Không tải được danh sách file ·{' '}
+            <a onClick={() => setReloadKey((k) => k + 1)} style={{ color: '#B91C1C', textDecoration: 'underline' }}>Thử lại</a>
+          </span>
+        ) : (
+          <span style={totalBadge}>
+            {loading ? <Spin size="small" /> : `${totalCount} file · ${fmtSize(totalSize)}`}
+          </span>
+        )}
       </div>
 
       <div style={folderGrid}>

@@ -62,7 +62,7 @@ export async function getCurrentPrice(
     .limit(1)
     .maybeSingle()
 
-  if (error) throw new Error(`Get current price failed: ${error.message}`)
+  if (error) throw new Error(`Không tải được giá hiện hành: ${error.message}`)
   return data as DailyPrice | null
 }
 
@@ -80,7 +80,7 @@ export async function listPriceHistory(
     .order('effective_from', { ascending: false })
     .limit(limit)
 
-  if (error) throw new Error(`List history failed: ${error.message}`)
+  if (error) throw new Error(`Không tải được lịch sử giá: ${error.message}`)
   return (data || []) as DailyPrice[]
 }
 
@@ -96,7 +96,7 @@ export async function listCurrentAll(): Promise<DailyPrice[]> {
     .or(`effective_to.is.null,effective_to.gt.${nowIso}`)
     .order('product_code')
 
-  if (error) throw new Error(`List current failed: ${error.message}`)
+  if (error) throw new Error(`Không tải được bảng giá hiện hành: ${error.message}`)
   return (data || []) as DailyPrice[]
 }
 
@@ -128,10 +128,10 @@ export async function createPrice(input: CreatePriceInput): Promise<DailyPrice> 
     if (error.message.includes('no_overlap_price_range')) {
       throw new Error(
         `Đã có giá khả dụng cho ${input.product_code} trong khoảng thời gian này. ` +
-        `Dùng setNewPrice() để tự động close giá cũ trước.`
+        `Hãy đóng giá cũ (đặt ngày hết hiệu lực) trước khi tạo giá mới.`
       )
     }
-    throw new Error(`Create price failed: ${error.message}`)
+    throw new Error(`Tạo giá thất bại: ${error.message}`)
   }
   return data as DailyPrice
 }
@@ -165,7 +165,7 @@ export async function updatePrice(id: string, changes: Partial<CreatePriceInput>
     .select()
     .single()
 
-  if (error) throw new Error(`Update price failed: ${error.message}`)
+  if (error) throw new Error(`Sửa giá thất bại: ${error.message}`)
   return data as DailyPrice
 }
 
@@ -177,7 +177,7 @@ export async function deletePrice(id: string): Promise<void> {
     .from(PRICE_VIEW)
     .delete()
     .eq('id', id)
-  if (error) throw new Error(`Delete price failed: ${error.message}`)
+  if (error) throw new Error(`Xoá giá thất bại: ${error.message}`)
 }
 
 export default {

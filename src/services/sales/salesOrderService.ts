@@ -6,7 +6,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
-import { isVnd, orderTotals, toUsdEquivalent } from './salesMoney'
+import { isVnd, orderTotals, toUsdEquivalent, vndRateError } from './salesMoney'
 import { balesFromTons, containersFromBales, defaultBalesPerContainer } from './baleMath'
 import type {
   SalesOrder,
@@ -18,6 +18,7 @@ import type {
   PaymentTerms,
   SalesOrderStatusLog,
 } from './salesTypes'
+import { ORDER_STATUS_LABELS } from './salesTypes'
 
 // ============================================================================
 // TYPES
@@ -155,6 +156,9 @@ export interface SalesOrderListParams {
   sort_by?: string
   sort_order?: 'asc' | 'desc'
   overdue_etd_only?: boolean   // chỉ show đơn quá ETD chưa giao
+  /** Lọc theo ETD (ngày tàu chạy) 'YYYY-MM-DD' — lịch giao ở Dashboard truyền ?etd=… (KHÁC date_from/to = ngày đặt) */
+  etd_from?: string
+  etd_to?: string
 }
 
 export interface SalesOrderStats {
@@ -200,6 +204,16 @@ const VALID_TRANSITIONS: Record<SalesOrderStatus, SalesOrderStatus[]> = {
   cancelled: [],
 }
 
+/**
+ * Các trạng thái được phép chuyển TỚI từ `from` — CÙNG bảng luật updateStatus dùng để chặn.
+ * UI (đổi trạng thái inline ở Sổ đơn) lọc lựa chọn theo đây, đừng tự chép bảng khác.
+ */
+export function nextOrderStatuses(from: SalesOrderStatus): SalesOrderStatus[] {
+  return VALID_TRANSITIONS[from] ?? []
+}
+
+const statusVi = (s: string): string => ORDER_STATUS_LABELS[s as SalesOrderStatus] ?? s
+
 // ============================================================================
 // SERVICE
 // ============================================================================
@@ -217,6 +231,8 @@ function applyListFilters<T>(query: T, params: SalesOrderListParams): T {
   if (grade) q = q.eq('grade', grade)
   if (date_from) q = q.gte('order_date', date_from)
   if (date_to) q = q.lte('order_date', date_to)
+  if (params.etd_from) q = q.gte('etd', params.etd_from)
+  if (params.etd_to) q = q.lte('etd', params.etd_to)
   if (params.overdue_etd_only) {
     const today = new Date().toLocaleDateString('sv-SE')
     q = q.lt('etd', today).not('status', 'in', '(delivered,invoiced,paid,cancelled)')
@@ -420,8 +436,9 @@ export const salesOrderService = {
     // Đơn VND phải có tỷ giá để có số USD quy đổi cho công nợ/báo cáo.
     const currency = (input.currency || 'USD').toUpperCase()
     const exchangeRate = input.exchange_rate || 0
-    if (isVnd(currency) && exchangeRate <= 0) {
-      throw new Error('Đơn bán nội địa (VNĐ) phải nhập tỷ giá VND/USD để quy đổi báo cáo')
+    const rateErr = isVnd(currency) ? vndRateError(exchangeRate) : null
+    if (rateErr) {
+      throw new Error(rateErr)
     }
     const { total_value_usd: totalValueUsd, total_value_vnd: totalValueVnd } =
       orderTotals(currency, input.quantity_tons, input.unit_price, exchangeRate)
@@ -609,7 +626,7 @@ export const salesOrderService = {
 
     if (!['draft', 'confirmed'].includes(existing.status)) {
       throw new Error(
-        `Không thể chỉnh sửa đơn hàng ở trạng thái "${existing.status}". Chỉ được sửa khi ở trạng thái Nháp hoặc Đã xác nhận.`,
+        `Không thể chỉnh sửa đơn hàng ở trạng thái "${statusVi(existing.status)}". Chỉ được sửa khi ở trạng thái Nháp hoặc Đã xác nhận.`,
       )
     }
 
@@ -638,6 +655,8 @@ export const salesOrderService = {
       // dù 630 bành × 33,33 kg = 21 t/cont, tức 10 cont.
       const balesPerContainer = (input.bales_per_container ?? existing.bales_per_container) || defaultBalesPerContainer(baleWeight, containerType)
       const containerCount = containersFromBales(totalBales, balesPerContainer)
+      const rateErr = isVnd(currency) ? vndRateError(exchangeRate) : null
+      if (rateErr) throw new Error(rateErr)
       const totals = orderTotals(currency, quantityTons, unitPrice, exchangeRate)
 
       recalculated.quantity_kg = quantityKg
@@ -690,7 +709,7 @@ export const salesOrderService = {
 
     if (!allowed || !allowed.includes(newStatus)) {
       throw new Error(
-        `Không thể chuyển trạng thái từ "${currentStatus}" sang "${newStatus}". Vui lòng kiểm tra lại quy trình.`,
+        `Không thể chuyển trạng thái từ "${statusVi(currentStatus)}" sang "${statusVi(newStatus)}". Vui lòng kiểm tra lại quy trình.`,
       )
     }
 
@@ -760,7 +779,7 @@ export const salesOrderService = {
     const nonCancellable: SalesOrderStatus[] = ['paid', 'shipped', 'delivered']
     if (nonCancellable.includes(existing.status)) {
       throw new Error(
-        `Không thể hủy đơn hàng ở trạng thái "${existing.status}". Đơn hàng đã xuất/giao/thanh toán không được phép hủy.`,
+        `Không thể hủy đơn hàng ở trạng thái "${statusVi(existing.status)}". Đơn hàng đã xuất/giao/thanh toán không được phép hủy.`,
       )
     }
 

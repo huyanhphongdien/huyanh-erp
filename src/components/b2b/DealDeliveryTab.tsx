@@ -24,8 +24,14 @@ import {
   type DeliveryPlanStatus,
 } from '../../services/b2b/dealDeliveryPlanService'
 import { useAuthStore } from '../../stores/authStore'
+import PageState from '../common/PageState'
+import { fmtNum } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text } = Typography
+
+// kg → tấn, 2 số lẻ, dấu phẩy thập phân kiểu Việt ("12,5 tấn" thay vì "12.50")
+const tons = (kg: number) => fmtNum(kg / 1000, 2)
 
 interface DealDeliveryTabProps {
   dealId: string
@@ -42,6 +48,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
   const { user } = useAuthStore()
   const [plans, setPlans] = useState<DeliveryPlan[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<DeliveryPlan | null>(null)
   const [form] = Form.useForm()
@@ -49,6 +56,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
   const load = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const data = await dealDeliveryPlanService.getByDeal(dealId)
       setPlans(data)
       if (onTotalsChange) {
@@ -60,7 +68,8 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
         })
       }
     } catch (e: any) {
-      message.error(e?.message || 'Không tải được kế hoạch giao hàng')
+      // Giữ lỗi để hiện khối "Không tải được" — trước đây bảng hiện "Chưa có xe nào" giả
+      setLoadError(e)
     } finally {
       setLoading(false)
     }
@@ -111,7 +120,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
       setModalOpen(false)
       await load()
     } catch (e: any) {
-      if (!e?.errorFields) message.error(e?.message || 'Lỗi')
+      if (!e?.errorFields) message.error(dichLoiHeThong(e, 'Lưu kế hoạch giao hàng thất bại'))
     }
   }
 
@@ -121,7 +130,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
       message.success('Đã xóa')
       await load()
     } catch (e: any) {
-      message.error(e?.message || 'Không xóa được')
+      message.error(dichLoiHeThong(e, 'Không xóa được'))
     }
   }
 
@@ -130,11 +139,16 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
       await dealDeliveryPlanService.setStatus(id, status)
       await load()
     } catch (e: any) {
-      message.error(e?.message || 'Không đổi trạng thái')
+      message.error(dichLoiHeThong(e, 'Không đổi được trạng thái'))
     }
   }
 
   const summary = dealDeliveryPlanService.summarize(plans)
+
+  // Lỗi tải xét TRƯỚC trống: thống kê + bảng đều là 0 giả nếu tải hỏng
+  if (loadError) {
+    return <PageState error={loadError} onRetry={load} />
+  }
 
   const columns = [
     {
@@ -158,7 +172,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
       title: 'KL khai báo',
       dataIndex: 'declared_kg',
       align: 'right' as const,
-      render: (v: number) => <Text strong>{(v / 1000).toFixed(2)} tấn</Text>,
+      render: (v: number) => <Text strong>{tons(v)} tấn</Text>,
     },
     {
       title: 'KL cân thực',
@@ -166,7 +180,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
       align: 'right' as const,
       render: (v: number | null) => (
         v != null ? (
-          <Text strong style={{ color: '#1B4D3E' }}>{(v / 1000).toFixed(2)} tấn</Text>
+          <Text strong style={{ color: '#1B4D3E' }}>{tons(v)} tấn</Text>
         ) : (
           <Text type="secondary" italic>Chưa cân</Text>
         )
@@ -185,9 +199,9 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
         return (
           <Tooltip title={abs > VARIANCE_WARN_PCT ? 'Chênh lệch vượt ngưỡng 5% — kiểm tra' : ''}>
             <span style={{ color, fontWeight: 600 }}>
-              {sign}{(v / 1000).toFixed(2)} tấn
+              {sign}{tons(v)} tấn
               <Text style={{ color, fontSize: 11, marginLeft: 4 }}>
-                ({sign}{pct.toFixed(1)}%)
+                ({sign}{fmtNum(pct, 1)}%)
               </Text>
             </span>
           </Tooltip>
@@ -214,7 +228,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
                 onClick={() => setStatus(row.id, 'no_show')}
                 title="Đánh dấu không đến"
               />
-              <Popconfirm title="Xóa kế hoạch này?" onConfirm={() => remove(row.id)}>
+              <Popconfirm title="Xóa xe dự kiến này khỏi kế hoạch?" okText="Xoá" okButtonProps={{ danger: true }} onConfirm={() => remove(row.id)}>
                 <Button size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>
             </>
@@ -251,7 +265,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
           <Card size="small">
             <Statistic
               title="Tổng khai báo"
-              value={(summary.total_declared_kg / 1000).toFixed(2)}
+              value={tons(summary.total_declared_kg)}
               suffix="tấn"
             />
           </Card>
@@ -260,7 +274,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
           <Card size="small">
             <Statistic
               title="Chênh lệch (đã cân)"
-              value={(summary.total_variance_kg / 1000).toFixed(2)}
+              value={tons(summary.total_variance_kg)}
               suffix="tấn"
               valueStyle={{
                 color: Math.abs(summary.avg_variance_pct || 0) > VARIANCE_WARN_PCT

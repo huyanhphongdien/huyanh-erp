@@ -31,6 +31,10 @@ import {
   isAllowedFileType,
   ATTACHMENT_CONFIG,
 } from '../../../services/taskAttachmentService';
+import { Modal, message } from 'antd';
+import PageState from '../../../components/common/PageState';
+import { fmtDate } from '../../../utils/format';
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -154,7 +158,7 @@ const ImagePreviewModal: React.FC<{
 const AttachmentItem: React.FC<{
   attachment: TaskAttachment;
   canDelete: boolean;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | Promise<void>;
   onPreview: (attachment: TaskAttachment) => void;
 }> = ({ attachment, canDelete, onDelete, onPreview }) => {
   const [downloading, setDownloading] = useState(false);
@@ -165,7 +169,7 @@ const AttachmentItem: React.FC<{
     try {
       const { url, error } = await taskAttachmentService.getDownloadUrl(attachment.file_path);
       if (error || !url) {
-        alert('Lỗi tải file: ' + (error?.message || 'Không thể tạo link download'));
+        message.error(dichLoiHeThong(error, 'Lỗi tải file — không tạo được đường tải xuống'));
         return;
       }
       // Open in new tab or trigger download
@@ -181,10 +185,24 @@ const AttachmentItem: React.FC<{
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm(`Xóa file "${attachment.file_name}"?`)) return;
-    setDeleting(true);
-    onDelete(attachment.id);
+  // Modal antd thay confirm() hệ thống: nêu hệ quả, nút đỏ tiếng Việt
+  const handleDelete = () => {
+    Modal.confirm({
+      title: 'Xóa file đính kèm?',
+      content: `"${attachment.file_name}" sẽ bị gỡ khỏi công việc này.`,
+      okText: 'Xóa file',
+      cancelText: 'Không',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setDeleting(true);
+        try {
+          await onDelete(attachment.id);
+        } finally {
+          // Xoá thành công thì dòng này biến mất; thất bại thì nhả nút (trước đây kẹt spinner mãi)
+          setDeleting(false);
+        }
+      },
+    });
   };
 
   const isImage = isImageFile(attachment.file_type);
@@ -210,13 +228,7 @@ const AttachmentItem: React.FC<{
             </>
           )}
           <span>•</span>
-          <span>
-            {new Date(attachment.uploaded_at).toLocaleDateString('vi-VN', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            })}
-          </span>
+          <span>{fmtDate(attachment.uploaded_at)}</span>
         </div>
         {attachment.description && (
           <p className="text-sm text-gray-600 mt-1 truncate" title={attachment.description}>
@@ -336,7 +348,7 @@ const UploadArea: React.FC<{
       <Upload className={`w-10 h-10 mx-auto mb-3 ${dragActive ? 'text-blue-500' : 'text-gray-400'}`} />
 
       <p className="text-sm font-medium text-gray-700">
-        {dragActive ? 'Thả file vào đây' : 'Kéo thả file hoặc click để chọn'}
+        {dragActive ? 'Thả file vào đây' : 'Kéo thả file hoặc bấm để chọn'}
       </p>
       <p className="text-xs text-gray-500 mt-1">
         PDF, Word, Excel, Hình ảnh, ZIP (tối đa {formatFileSize(ATTACHMENT_CONFIG.MAX_FILE_SIZE)}/file)
@@ -405,6 +417,8 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
     canUpload: true,
   });
   const [loading, setLoading] = useState(true);
+  // Lỗi tải danh sách — service trả { data: [], error } chứ không ném, trước đây bị bỏ qua → "Chưa có file" giả
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
   const [previewAttachment, setPreviewAttachment] = useState<TaskAttachment | null>(null);
   const [expanded, setExpanded] = useState(true);
@@ -419,8 +433,10 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
       ]);
       setAttachments(attachmentsRes.data);
       setStats(statsRes);
+      setLoadError(attachmentsRes.error || null);
     } catch (error) {
       console.error('Error loading attachments:', error);
+      setLoadError(error);
     } finally {
       setLoading(false);
     }
@@ -438,11 +454,11 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
     const validFiles: File[] = [];
     for (const file of fileArray) {
       if (!isAllowedFileType(file.type)) {
-        alert(`File "${file.name}" không được hỗ trợ`);
+        message.warning(`File "${file.name}" không được hỗ trợ`);
         continue;
       }
       if (file.size > ATTACHMENT_CONFIG.MAX_FILE_SIZE) {
-        alert(`File "${file.name}" quá lớn (max ${formatFileSize(ATTACHMENT_CONFIG.MAX_FILE_SIZE)})`);
+        message.warning(`File "${file.name}" quá lớn (tối đa ${formatFileSize(ATTACHMENT_CONFIG.MAX_FILE_SIZE)})`);
         continue;
       }
       validFiles.push(file);
@@ -452,7 +468,7 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
 
     // Check total count
     if (stats.count + validFiles.length > stats.maxCount) {
-      alert(`Chỉ có thể upload thêm ${stats.maxCount - stats.count} file`);
+      message.warning(`Chỉ có thể tải lên thêm ${stats.maxCount - stats.count} file`);
       return;
     }
 
@@ -478,7 +494,7 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
           setUploading((prev) =>
             prev.map((u) =>
               u.id === item.id
-                ? { ...u, status: 'error' as const, error: error?.message || 'Lỗi upload' }
+                ? { ...u, status: 'error' as const, error: dichLoiHeThong(error, 'Lỗi tải lên') }
                 : u
             )
           );
@@ -531,7 +547,7 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
         canUpload: true,
       }));
     } else {
-      alert('Lỗi xóa file: ' + (error?.message || 'Không xác định'));
+      message.error(dichLoiHeThong(error, 'Lỗi xóa file'));
     }
   };
 
@@ -603,6 +619,8 @@ export const AttachmentSection: React.FC<AttachmentSectionProps> = ({
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
             </div>
+          ) : loadError ? (
+            <PageState error={loadError} onRetry={loadAttachments} />
           ) : attachments.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <Paperclip className="w-10 h-10 mx-auto mb-2 text-gray-300" />

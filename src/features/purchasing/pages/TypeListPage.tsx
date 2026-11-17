@@ -24,6 +24,8 @@ import materialTypeService, { type MaterialType } from '../../../services/materi
 import materialCategoryService, { type MaterialCategory } from '../../../services/materialCategoryService'
 
 import TypeForm from './components/materials/TypeForm'
+import { useDebounce } from '../../../hooks/useDebounce'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 export default function TypeListPage() {
   // ============================================
@@ -32,7 +34,9 @@ export default function TypeListPage() {
   const [types, setTypes] = useState<MaterialType[]>([])
   const [categories, setCategories] = useState<MaterialCategory[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null) // lỗi THAO TÁC (tự ẩn sau 5s)
+  // Lỗi TẢI danh sách — không tự ẩn, bảng hiện lỗi + Thử lại thay vì "Chưa có loại vật tư nào"
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
   // Pagination
@@ -43,6 +47,7 @@ export default function TypeListPage() {
 
   // Filters
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 400) // gõ xong 400ms mới bắn query
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<boolean | 'all'>('all')
 
@@ -70,12 +75,12 @@ export default function TypeListPage() {
   const fetchTypes = useCallback(async () => {
     try {
       setLoading(true)
-      setError(null)
+      setLoadError(null)
 
       const response = await materialTypeService.getAll({
         page,
         pageSize,
-        search: search.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
         category_id: categoryFilter || undefined,
         is_active: statusFilter,
       })
@@ -92,11 +97,11 @@ export default function TypeListPage() {
       setTypeCounts(counts)
     } catch (err) {
       console.error('Error fetching types:', err)
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
+      setLoadError(dichLoiHeThong(err, 'Không thể tải dữ liệu'))
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, search, categoryFilter, statusFilter])
+  }, [page, pageSize, debouncedSearch, categoryFilter, statusFilter])
 
   useEffect(() => {
     fetchCategories()
@@ -109,7 +114,7 @@ export default function TypeListPage() {
   // Reset page khi filter thay đổi
   useEffect(() => {
     setPage(1)
-  }, [search, categoryFilter, statusFilter])
+  }, [debouncedSearch, categoryFilter, statusFilter])
 
   // Auto ẩn thông báo
   useEffect(() => {
@@ -147,7 +152,7 @@ export default function TypeListPage() {
       setDeleteConfirm(null)
       fetchTypes()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể xóa loại')
+      setError(dichLoiHeThong(err, 'Không thể xóa loại'))
     }
   }
 
@@ -157,7 +162,7 @@ export default function TypeListPage() {
       setSuccess(`Đã ${type.is_active ? 'vô hiệu hóa' : 'kích hoạt'} loại "${type.name}"`)
       fetchTypes()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái')
+      setError(dichLoiHeThong(err, 'Không thể cập nhật trạng thái'))
     }
   }
 
@@ -311,6 +316,20 @@ export default function TypeListPage() {
                     Đang tải...
                   </td>
                 </tr>
+              ) : loadError ? (
+                // Lỗi tải xét TRƯỚC trống (không hiện "Chưa có loại vật tư nào" giả)
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center bg-red-50">
+                    <p className="font-semibold text-red-700">Không tải được dữ liệu</p>
+                    <p className="text-sm text-red-600">{loadError}</p>
+                    <button
+                      onClick={fetchTypes}
+                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-100"
+                    >
+                      <RefreshCw className="w-4 h-4" /> Thử lại
+                    </button>
+                  </td>
+                </tr>
               ) : types.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
@@ -351,7 +370,7 @@ export default function TypeListPage() {
                       {/* Nhóm */}
                       <td className="px-4 py-3">
                         <span className="text-sm text-gray-600">
-                          {type.category_name || catInfo?.name || 'N/A'}
+                          {type.category_name || catInfo?.name || '—'}
                         </span>
                       </td>
 

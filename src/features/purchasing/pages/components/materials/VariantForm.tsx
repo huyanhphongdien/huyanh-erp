@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Save, Loader2, Package } from 'lucide-react'
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong'
+import { vndToInputText, vndInputToNumber } from '../../../moneyInput'
 import { 
   materialVariantService, 
   MaterialVariant,
@@ -84,7 +86,7 @@ const VariantForm: React.FC<VariantFormProps> = ({ materialId, materialName, var
       onSuccess()
     } catch (err: any) {
       console.error('Error saving variant:', err)
-      setError(err.message || 'Có lỗi xảy ra khi lưu biến thể')
+      setError(dichLoiHeThong(err, 'Có lỗi xảy ra khi lưu biến thể'))
     } finally {
       setLoading(false)
     }
@@ -168,7 +170,9 @@ const VariantForm: React.FC<VariantFormProps> = ({ materialId, materialName, var
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Giá tham khảo (VNĐ)</label>
-                <input type="number" name="reference_price" value={formData.reference_price || ''} onChange={handleChange} min="0" step="1000" placeholder="0"
+                {/* Ô tiền: chấm ngăn nghìn khi gõ */}
+                <input type="text" inputMode="numeric" name="reference_price" value={vndToInputText(formData.reference_price || undefined)}
+                  onChange={(e) => setFormData(prev => ({ ...prev, reference_price: vndInputToNumber(e.target.value) }))} placeholder="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
               </div>
             </div>

@@ -8,14 +8,18 @@
 // ============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { App } from 'antd'
 import {
   Plus, ShieldAlert, AlertTriangle, Bug, ChevronDown, ChevronUp,
   Loader2, X, Save, Edit3, Trash2, ArrowUpCircle, CheckCircle2,
   User, Calendar, Filter, BarChart3, Zap, Shield, Target,
 } from 'lucide-react'
-import { riskService } from '../../services/project/riskService'
-import { issueService } from '../../services/project/issueService'
+import { riskService, RISK_STATUS_LABELS, RISK_CATEGORY_LABELS } from '../../services/project/riskService'
+import { issueService, ISSUE_STATUS_LABELS, ISSUE_SEVERITY_LABELS } from '../../services/project/issueService'
 import { supabase } from '../../lib/supabase'
+import PageState from '../../components/common/PageState'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate } from '../../utils/format'
 import { sendNotificationEmail } from '../../services/emailService'
 import { useAuthStore } from '../../stores/authStore'
 import type {
@@ -29,36 +33,37 @@ import type {
 // CONSTANTS
 // ============================================================================
 
+// Lớp màu + icon là của màn này; CHỮ đọc từ riskService / issueService (một nguồn — Đợt 3 audit UI 17/11/2026)
 const RISK_STATUS_CFG: Record<RiskStatus, { label: string; color: string; bg: string }> = {
-  identified:  { label: 'Đã nhận diện', color: 'text-blue-700',    bg: 'bg-blue-50' },
-  analyzing:   { label: 'Đang phân tích', color: 'text-amber-700', bg: 'bg-amber-50' },
-  mitigating:  { label: 'Đang xử lý',  color: 'text-orange-700',  bg: 'bg-orange-50' },
-  resolved:    { label: 'Đã giải quyết', color: 'text-emerald-700',bg: 'bg-emerald-50' },
-  accepted:    { label: 'Chấp nhận',    color: 'text-gray-600',    bg: 'bg-gray-100' },
-  closed:      { label: 'Đã đóng',      color: 'text-gray-500',    bg: 'bg-gray-50' },
+  identified:  { label: RISK_STATUS_LABELS.identified, color: 'text-blue-700',    bg: 'bg-blue-50' },
+  analyzing:   { label: RISK_STATUS_LABELS.analyzing,  color: 'text-amber-700', bg: 'bg-amber-50' },
+  mitigating:  { label: RISK_STATUS_LABELS.mitigating, color: 'text-orange-700',  bg: 'bg-orange-50' },
+  resolved:    { label: RISK_STATUS_LABELS.resolved,   color: 'text-emerald-700',bg: 'bg-emerald-50' },
+  accepted:    { label: RISK_STATUS_LABELS.accepted,   color: 'text-gray-600',    bg: 'bg-gray-100' },
+  closed:      { label: RISK_STATUS_LABELS.closed,     color: 'text-gray-500',    bg: 'bg-gray-50' },
 }
 
 const CATEGORY_CFG: Record<RiskCategory, { label: string; icon: React.ReactNode }> = {
-  technical:  { label: 'Kỹ thuật',    icon: <Zap className="w-3 h-3" /> },
-  schedule:   { label: 'Tiến độ',     icon: <Calendar className="w-3 h-3" /> },
-  resource:   { label: 'Nguồn lực',   icon: <User className="w-3 h-3" /> },
-  external:   { label: 'Bên ngoài',   icon: <Shield className="w-3 h-3" /> },
-  financial:  { label: 'Tài chính',   icon: <BarChart3 className="w-3 h-3" /> },
+  technical:  { label: RISK_CATEGORY_LABELS.technical, icon: <Zap className="w-3 h-3" /> },
+  schedule:   { label: RISK_CATEGORY_LABELS.schedule,  icon: <Calendar className="w-3 h-3" /> },
+  resource:   { label: RISK_CATEGORY_LABELS.resource,  icon: <User className="w-3 h-3" /> },
+  external:   { label: RISK_CATEGORY_LABELS.external,  icon: <Shield className="w-3 h-3" /> },
+  financial:  { label: RISK_CATEGORY_LABELS.financial, icon: <BarChart3 className="w-3 h-3" /> },
 }
 
 const SEVERITY_CFG: Record<IssueSeverity, { label: string; color: string; bg: string }> = {
-  critical: { label: 'Nghiêm trọng', color: 'text-red-700',    bg: 'bg-red-50' },
-  high:     { label: 'Cao',          color: 'text-orange-700',  bg: 'bg-orange-50' },
-  medium:   { label: 'Trung bình',   color: 'text-amber-700',  bg: 'bg-amber-50' },
-  low:      { label: 'Thấp',         color: 'text-gray-600',    bg: 'bg-gray-100' },
+  critical: { label: ISSUE_SEVERITY_LABELS.critical, color: 'text-red-700',    bg: 'bg-red-50' },
+  high:     { label: ISSUE_SEVERITY_LABELS.high,     color: 'text-orange-700',  bg: 'bg-orange-50' },
+  medium:   { label: ISSUE_SEVERITY_LABELS.medium,   color: 'text-amber-700',  bg: 'bg-amber-50' },
+  low:      { label: ISSUE_SEVERITY_LABELS.low,      color: 'text-gray-600',    bg: 'bg-gray-100' },
 }
 
 const ISSUE_STATUS_CFG: Record<IssueStatus, { label: string; color: string; bg: string }> = {
-  open:        { label: 'Mở',          color: 'text-blue-700',    bg: 'bg-blue-50' },
-  in_progress: { label: 'Đang xử lý', color: 'text-amber-700',  bg: 'bg-amber-50' },
-  resolved:    { label: 'Đã giải quyết',color: 'text-emerald-700',bg: 'bg-emerald-50' },
-  closed:      { label: 'Đã đóng',     color: 'text-gray-500',    bg: 'bg-gray-50' },
-  escalated:   { label: 'Leo thang',   color: 'text-red-700',     bg: 'bg-red-50' },
+  open:        { label: ISSUE_STATUS_LABELS.open,        color: 'text-blue-700',    bg: 'bg-blue-50' },
+  in_progress: { label: ISSUE_STATUS_LABELS.in_progress, color: 'text-amber-700',  bg: 'bg-amber-50' },
+  resolved:    { label: ISSUE_STATUS_LABELS.resolved,    color: 'text-emerald-700',bg: 'bg-emerald-50' },
+  closed:      { label: ISSUE_STATUS_LABELS.closed,      color: 'text-gray-500',    bg: 'bg-gray-50' },
+  escalated:   { label: ISSUE_STATUS_LABELS.escalated,   color: 'text-red-700',     bg: 'bg-red-50' },
 }
 
 /** Zone color for risk matrix */
@@ -118,7 +123,7 @@ const RiskMatrix: React.FC<{ cells: RiskMatrixCell[]; onCellClick?: (cell: RiskM
                     className={`w-full aspect-square rounded-md flex flex-col items-center justify-center transition-all
                       ${getZoneColor(score)} ${count > 0 ? 'cursor-pointer hover:scale-105 ring-1 ring-white/30' : 'opacity-70'}
                     `}
-                    title={count > 0 ? cell!.risks.map(r => `${r.code}: ${r.title}`).join('\n') : `Score: ${score}`}
+                    title={count > 0 ? cell!.risks.map(r => `${r.code}: ${r.title}`).join('\n') : `Điểm: ${score}`}
                   >
                     <span className="text-[10px] font-bold">{score}</span>
                     {count > 0 && (
@@ -156,6 +161,7 @@ interface ProjectRiskPageProps {
 
 const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = [] }) => {
   const { user } = useAuthStore()
+  const { message, modal } = App.useApp()
 
   // Tab: risks | issues
   const [activeTab, setActiveTab] = useState<'risks' | 'issues'>('risks')
@@ -188,6 +194,8 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
   const [riskStats, setRiskStats] = useState<RiskStats | null>(null)
   const [issueStats, setIssueStats] = useState<IssueStats | null>(null)
   const [loading, setLoading] = useState(true)
+  // Lỗi tải: trước đây chỉ console.error rồi hiện "Chưa có rủi ro nào" như thật
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   // Modals
   const [showRiskForm, setShowRiskForm] = useState(false)
@@ -203,6 +211,7 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const [risksData, issuesData, matrixData, rStats, iStats] = await Promise.all([
         riskService.getByProject(projectId, { sort_by: 'risk_score', sort_order: 'desc' }),
         issueService.getByProject(projectId, { sort_by: 'created_at', sort_order: 'desc' }),
@@ -217,6 +226,7 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
       setIssueStats(iStats)
     } catch (err) {
       console.error('[ProjectRiskPage] Load error:', err)
+      setLoadError(err || 'Không tải được rủi ro / vấn đề')
     } finally {
       setLoading(false)
     }
@@ -225,35 +235,83 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
   useEffect(() => { loadData() }, [loadData])
 
   // ========================================================================
-  // HANDLERS
+  // HANDLERS — xác nhận bằng modal antd (thay confirm() hệ thống), lỗi báo bằng message
   // ========================================================================
 
-  const handleDeleteRisk = async (id: string) => {
-    if (!confirm('Xóa rủi ro này?')) return
-    await riskService.delete(id)
-    await loadData()
+  const handleDeleteRisk = (id: string) => {
+    modal.confirm({
+      title: 'Xoá rủi ro này?',
+      content: 'Rủi ro sẽ bị xoá khỏi sổ rủi ro của dự án, không hoàn tác được.',
+      okText: 'Xoá rủi ro',
+      cancelText: 'Thôi',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await riskService.delete(id)
+          await loadData()
+        } catch (err) {
+          console.error('Delete risk failed:', err)
+          message.error(dichLoiHeThong(err, 'Xoá rủi ro thất bại'))
+        }
+      },
+    })
   }
 
   const handleRiskStatusChange = async (id: string, status: RiskStatus) => {
-    await riskService.updateStatus(id, status)
-    await loadData()
+    try {
+      await riskService.updateStatus(id, status)
+      await loadData()
+    } catch (err) {
+      console.error('Update risk status failed:', err)
+      message.error(dichLoiHeThong(err, 'Không đổi được trạng thái rủi ro'))
+    }
   }
 
-  const handleDeleteIssue = async (id: string) => {
-    if (!confirm('Xóa vấn đề này?')) return
-    await issueService.delete(id)
-    await loadData()
+  const handleDeleteIssue = (id: string) => {
+    modal.confirm({
+      title: 'Xoá vấn đề này?',
+      content: 'Vấn đề sẽ bị xoá khỏi danh sách theo dõi của dự án, không hoàn tác được.',
+      okText: 'Xoá vấn đề',
+      cancelText: 'Thôi',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await issueService.delete(id)
+          await loadData()
+        } catch (err) {
+          console.error('Delete issue failed:', err)
+          message.error(dichLoiHeThong(err, 'Xoá vấn đề thất bại'))
+        }
+      },
+    })
   }
 
-  const handleEscalate = async (id: string) => {
-    if (!confirm('Leo thang vấn đề này?')) return
-    await issueService.escalate(id)
-    await loadData()
+  const handleEscalate = (id: string) => {
+    modal.confirm({
+      title: 'Leo thang vấn đề này?',
+      content: 'Vấn đề sẽ chuyển sang trạng thái "Leo thang".',
+      okText: 'Leo thang',
+      cancelText: 'Thôi',
+      onOk: async () => {
+        try {
+          await issueService.escalate(id)
+          await loadData()
+        } catch (err) {
+          console.error('Escalate issue failed:', err)
+          message.error(dichLoiHeThong(err, 'Leo thang vấn đề thất bại'))
+        }
+      },
+    })
   }
 
   const handleIssueStatusChange = async (id: string, status: IssueStatus) => {
-    await issueService.update(id, { status })
-    await loadData()
+    try {
+      await issueService.update(id, { status })
+      await loadData()
+    } catch (err) {
+      console.error('Update issue status failed:', err)
+      message.error(dichLoiHeThong(err, 'Không đổi được trạng thái vấn đề'))
+    }
   }
 
   // ========================================================================
@@ -317,7 +375,7 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-[14px] font-bold text-gray-800 flex items-center gap-1.5">
           <ShieldAlert className="w-4 h-4 text-[#1B4D3E]" />
-          Risk Register
+          Sổ rủi ro
         </h3>
         <button
           onClick={() => { setEditingRisk(null); setShowRiskForm(true) }}
@@ -338,11 +396,11 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
                 <tr className="bg-gray-50 border-b">
                   <th className="text-left text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-16">Mã</th>
                   <th className="text-left text-[11px] font-semibold text-gray-500 uppercase px-3 py-2">Tên</th>
-                  <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-20">P×I</th>
-                  <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-16">Score</th>
+                  <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-20" title="Xác suất × Tác động">XS×TĐ</th>
+                  <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-16">Điểm</th>
                   <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-28">Trạng thái</th>
-                  <th className="text-left text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-28">Owner</th>
-                  <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-20">Actions</th>
+                  <th className="text-left text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-28">Phụ trách</th>
+                  <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-20">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -435,7 +493,7 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-[14px] font-bold text-gray-800 flex items-center gap-1.5">
           <Bug className="w-4 h-4 text-orange-600" />
-          Issue Tracker
+          Theo dõi vấn đề
         </h3>
         <button
           onClick={() => { setEditingIssue(null); setShowIssueForm(true) }}
@@ -468,7 +526,7 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
                       {issue.assignee && <span>👤 {issue.assignee.full_name}</span>}
                       {issue.due_date && (
                         <span className={isOverdue ? 'text-red-600 font-medium' : ''}>
-                          📅 {new Date(issue.due_date).toLocaleDateString('vi-VN')}
+                          📅 {fmtDate(issue.due_date)}
                           {isOverdue && ' ⚠'}
                         </span>
                       )}
@@ -567,6 +625,7 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
         await loadData()
       } catch (err) {
         console.error('Save risk failed:', err)
+        message.error(dichLoiHeThong(err, 'Lưu rủi ro thất bại'))
       } finally {
         setSaving(false)
       }
@@ -611,7 +670,7 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
 
             {/* Score preview */}
             <div className="flex items-center gap-3">
-              <span className="text-[12px] text-gray-500">Risk Score:</span>
+              <span className="text-[12px] text-gray-500">Điểm rủi ro:</span>
               <span className={`w-10 h-10 rounded-lg flex items-center justify-center text-[16px] font-bold ${getZoneColor(score)}`}>
                 {score}
               </span>
@@ -757,6 +816,7 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
         await loadData()
       } catch (err) {
         console.error('Save issue failed:', err)
+        message.error(dichLoiHeThong(err, 'Lưu vấn đề thất bại'))
       } finally {
         setSaving(false)
       }
@@ -846,6 +906,9 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
         await issueService.resolve(resolveIssueId, resolution.trim())
         setResolveIssueId(null)
         await loadData()
+      } catch (err) {
+        console.error('Resolve issue failed:', err)
+        message.error(dichLoiHeThong(err, 'Không đánh dấu được đã giải quyết'))
       } finally {
         setSaving(false)
       }
@@ -880,13 +943,9 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
   // MAIN RENDER
   // ========================================================================
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 animate-spin text-[#1B4D3E]" />
-        <span className="ml-2 text-[14px] text-gray-500">Đang tải...</span>
-      </div>
-    )
+  if (loading || loadError) {
+    // Khối 3 trạng thái dùng chung (trước đây Loader2 tự vẽ + nuốt lỗi tải thành danh sách trống)
+    return <PageState loading={loading} error={loadError} onRetry={loadData} minHeight={240} />
   }
 
   return (

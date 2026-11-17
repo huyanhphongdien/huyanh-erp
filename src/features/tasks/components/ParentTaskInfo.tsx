@@ -20,18 +20,18 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { subtaskService } from '../../../services/subtaskService'
+import { taskStatusLabel, taskStatusTone } from '../taskUi'
+import { fmtDate } from '../../../utils/format'
 
 // ============================================================================
 // STATUS CONFIG
+// Nhãn + màu: MỘT nguồn TASK_STATUS_* (types/index.ts) qua taskUi. Bản chép cũ THIẾU 'finished'
+// → việc cha / việc anh em đã xong hiện "Nháp".
 // ============================================================================
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  draft: { label: 'Nháp', color: 'text-gray-600', bg: 'bg-gray-100' },
-  in_progress: { label: 'Đang làm', color: 'text-blue-600', bg: 'bg-blue-100' },
-  pending_review: { label: 'Chờ duyệt', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  completed: { label: 'Hoàn thành', color: 'text-green-600', bg: 'bg-green-100' },
-  cancelled: { label: 'Đã hủy', color: 'text-red-600', bg: 'bg-red-100' },
-  paused: { label: 'Tạm dừng', color: 'text-orange-600', bg: 'bg-orange-100' },
+const statusCfg = (status: string) => {
+  const tone = taskStatusTone(status)
+  return { label: taskStatusLabel(status), color: tone.text, bg: tone.bg }
 }
 
 // ============================================================================
@@ -123,7 +123,7 @@ export function ParentTaskInfo({ parentTaskId, currentTaskId }: ParentTaskInfoPr
     )
   }
 
-  const parentStatus = STATUS_CONFIG[parent.status] || STATUS_CONFIG.draft
+  const parentStatus = statusCfg(parent.status)
 
   return (
     <div className="bg-blue-50 rounded-lg border border-blue-200 overflow-hidden">
@@ -169,12 +169,12 @@ export function ParentTaskInfo({ parentTaskId, currentTaskId }: ParentTaskInfoPr
               <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
                 {parent.start_date && (
                   <span>
-                    Bắt đầu: {new Date(parent.start_date).toLocaleDateString('vi-VN')}
+                    Bắt đầu: {fmtDate(parent.start_date)}
                   </span>
                 )}
                 {parent.due_date && (
                   <span>
-                    Hạn: {new Date(parent.due_date).toLocaleDateString('vi-VN')}
+                    Hạn: {fmtDate(parent.due_date)}
                   </span>
                 )}
               </div>
@@ -231,7 +231,7 @@ export function ParentTaskInfo({ parentTaskId, currentTaskId }: ParentTaskInfoPr
           ) : (
             <div className="divide-y divide-gray-100">
               {siblings.map((sibling) => {
-                const sibStatus = STATUS_CONFIG[sibling.status] || STATUS_CONFIG.draft
+                const sibStatus = statusCfg(sibling.status)
                 return (
                   <Link
                     key={sibling.id}

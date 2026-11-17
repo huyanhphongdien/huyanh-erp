@@ -21,18 +21,12 @@ import {
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import { B2BSectionTabs, MUA_HANG_TABS } from '../../../components/b2b/B2BSectionTabs'
+import { AUCTION_STATUS_MAP } from './auctionStatus'
 
 const { Title, Text } = Typography
 
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  draft: { label: 'Nháp', color: 'default' },
-  upcoming: { label: 'Sắp diễn ra', color: 'blue' },
-  active: { label: 'Đang đấu giá', color: 'green' },
-  extended: { label: 'Gia hạn', color: 'orange' },
-  ended: { label: 'Đã kết thúc', color: 'default' },
-  awarded: { label: 'Đã chọn winner', color: 'purple' },
-  cancelled: { label: 'Đã hủy', color: 'error' },
-}
+// Nhãn + màu trạng thái: một map chung với AuctionDetailPage (auctionStatus.ts) — không chép riêng
+const STATUS_MAP = AUCTION_STATUS_MAP
 
 export default function AuctionListPage() {
   const navigate = useNavigate()
@@ -121,7 +115,7 @@ export default function AuctionListPage() {
       },
     },
     {
-      title: 'Bids',
+      title: 'Lượt trả giá',
       key: 'bids',
       align: 'center' as const,
       render: (_: any, r: any) => (
@@ -132,7 +126,7 @@ export default function AuctionListPage() {
       ),
     },
     {
-      title: 'Status',
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       render: (v: string) => {
@@ -141,7 +135,7 @@ export default function AuctionListPage() {
       },
     },
     {
-      title: 'Winner',
+      title: 'Người thắng',
       key: 'winner',
       render: (_: any, r: any) => r.winner ? (
         <div>
@@ -180,12 +174,12 @@ export default function AuctionListPage() {
         </Col>
         <Col xs={8}>
           <Card size="small" style={{ borderRadius: 12 }}>
-            <Statistic title="Tổng bids" value={totalBids} prefix={<DollarOutlined style={{ color: '#1890ff' }} />} valueStyle={{ color: '#1890ff' }} />
+            <Statistic title="Tổng lượt trả giá" value={totalBids} prefix={<DollarOutlined style={{ color: '#1890ff' }} />} valueStyle={{ color: '#1890ff' }} />
           </Card>
         </Col>
         <Col xs={8}>
           <Card size="small" style={{ borderRadius: 12 }}>
-            <Statistic title="Đã chọn winner" value={awardedCount} prefix={<TrophyOutlined style={{ color: '#722ed1' }} />} valueStyle={{ color: '#722ed1' }} />
+            <Statistic title="Đã chọn người thắng" value={awardedCount} prefix={<TrophyOutlined style={{ color: '#722ed1' }} />} valueStyle={{ color: '#722ed1' }} />
           </Card>
         </Col>
       </Row>

@@ -544,8 +544,8 @@ const SupplierScoringPage = () => {
       {/* Header */}
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
+          {/* Trang sống trong tab "Chấm điểm NCC" của /wms/reports — bỏ nút Quay lại (chỉ bật về tab Tổng quan) */}
           <Space>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/reports')} type="text" />
             <div>
               <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
                 <TrophyOutlined style={{ marginRight: 8 }} />

@@ -2,6 +2,11 @@
    Huy Anh Ops — hệ thiết kế mobile (Material Design, xanh cao su + xanh chanh)
    Port từ mock_android.html. Mọi class prefix .ops- + biến scope .ops-root
    để KHÔNG đụng Tailwind/global của ERP. Tự đổi sáng/tối theo máy.
+   QUY ƯỚC SÁNG/TỐI (audit 17/11/2026): đây là chỗ DUY NHẤT của ERP có dark mode. Màn /m/* lấy màu
+   từ biến dưới đây (var(--g), var(--surf), var(--red)…), KHÔNG chép bảng hex vào trang (MachineQueue/
+   MachineReport từng chép rồi lệch, đứng ngoài dark mode). Màn /m/* nằm ngoài vỏ OpsShell/KhoShell phải
+   tự bọc <div className="ops-root"> + import file này. Desktop ERP light-only — không thêm `dark:` lẻ tẻ.
+   (.kho-root ở khoMix.css ghim bảng màu ERP sáng cho vỏ Kho.)
    ========================================================================== */
 .ops-root {
   --g:#0F5132; --g-d:#0A3A24; --g-dd:#062017; --lime:#52C41A; --lime-d:#3B9612;

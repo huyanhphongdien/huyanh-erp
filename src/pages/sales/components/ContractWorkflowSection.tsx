@@ -42,6 +42,8 @@ import {
   downloadContract,
   deriveKind,
 } from '../../../services/sales/contractGeneratorService'
+import { fmtDateTime } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Text } = Typography
 
@@ -69,8 +71,14 @@ const STATUS_META: Record<
   archived: { color: 'default', label: 'Lưu trữ', icon: <CheckCircleOutlined /> },
 }
 
-const fmtDate = (s?: string | null) =>
-  s ? new Date(s).toLocaleString('vi-VN') : '—'
+/** Nhãn tiếng Việt trạng thái HĐ workflow — dùng chung (vd thẻ Liên kết ở tab Tiến độ in thẳng 'reviewing').
+ *  (Nơi đúng về lâu dài là salesContractWorkflowService — ghi chú cho đợt sau.) */
+export const CONTRACT_STATUS_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(STATUS_META).map(([k, v]) => [k, v.label]),
+)
+
+// Mốc thời gian thao tác: chuẩn 'DD/MM HH:mm' (format.ts) — trước đây toLocaleString in cả giây
+const fmtDate = (s?: string | null) => fmtDateTime(s)
 
 export default function ContractWorkflowSection({ salesOrderId }: Props) {
   const navigate = useNavigate()
@@ -96,7 +104,7 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
     salesContractWorkflowService
       .listBySalesOrder(salesOrderId)
       .then(setRows)
-      .catch((e) => message.error(`Không tải được HĐ: ${e?.message || e}`))
+      .catch((e) => message.error(dichLoiHeThong(e, 'Không tải được HĐ')))
       .finally(() => setLoading(false))
   }, [salesOrderId])
 
@@ -120,8 +128,7 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
       )
       message.success(`Đã tải ${type} (rev #${contract.revision_no})`)
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      message.error(`Tải ${type} thất bại: ${msg}`)
+      message.error(dichLoiHeThong(e, `Tải ${type} thất bại`))
     } finally {
       setDocLoading(null)
     }
@@ -254,7 +261,7 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
                 onClick={() => {
                   Modal.confirm({
                     title: 'Lưu trữ HĐ?',
-                    content: `HĐ ${latest.form_data?.contract_no} (rev #${latest.revision_no}) sẽ chuyển sang archived. Không undo được.`,
+                    content: `HĐ ${latest.form_data?.contract_no} (rev #${latest.revision_no}) sẽ chuyển sang "Lưu trữ". Không hoàn tác được.`,
                     okText: 'Lưu trữ',
                     cancelText: 'Huỷ',
                     onOk: async () => {
@@ -265,8 +272,7 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
                         const updated = await salesContractWorkflowService.listBySalesOrder(salesOrderId)
                         setRows(updated)
                       } catch (e: unknown) {
-                        const msg = e instanceof Error ? e.message : String(e)
-                        message.error(`Lưu trữ thất bại: ${msg}`)
+                        message.error(dichLoiHeThong(e, 'Lưu trữ thất bại'))
                       } finally {
                         setArchiving(false)
                       }
@@ -474,8 +480,9 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
                   const updated = await salesContractWorkflowService.listBySalesOrder(salesOrderId)
                   setRows(updated)
                 } catch (e: unknown) {
-                  const msg = e instanceof Error ? e.message : String(e)
-                  message.error(`Trình lại thất bại: ${msg}`)
+                  // Lỗi kiểm tra form → antd tự tô đỏ ô thiếu, không toast "[object Object]"
+                  if (e && typeof e === 'object' && 'errorFields' in e) return
+                  message.error(dichLoiHeThong(e, 'Trình lại thất bại'))
                 } finally {
                   setResubmitting(false)
                 }

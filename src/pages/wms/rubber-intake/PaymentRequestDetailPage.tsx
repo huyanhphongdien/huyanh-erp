@@ -21,18 +21,16 @@ import {
 } from '../../../services/wms/paymentRequestService'
 import { useAuthStore } from '../../../stores/authStore'
 import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtDate, fmtKg } from '../../../utils/format'
 
-const CCY_SUFFIX: Record<PaymentCurrency, string> = { VND: 'đ', KIP: ' ₭', THB: ' ฿' }
+// Đa tiền tệ (VND/KIP/THB) nên giữ hàm riêng — VND theo chuẩn format.ts: ' ₫' (không 'đ').
+const CCY_SUFFIX: Record<PaymentCurrency, string> = { VND: ' ₫', KIP: ' ₭', THB: ' ฿' }
 function fmtCur(a?: number | null, ccy: PaymentCurrency = 'VND'): string {
   return (a || 0).toLocaleString('vi-VN') + CCY_SUFFIX[ccy]
 }
 // Làm tròn đến NGHÌN: phần lẻ ≥ 500 → lên 1.000, < 500 → về 000.
 function roundThousand(a?: number | null): number {
   return Math.round((a || 0) / 1000) * 1000
-}
-function fmtDate(s?: string | null): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 const STATUS_CFG: Record<PaymentRequestStatus, { label: string; cls: string }> = {
@@ -57,10 +55,13 @@ const PaymentRequestDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [acting, setActing] = useState(false)
+  // Lỗi tải (mạng/RLS) phải hiện là LỖI + Thử lại, không được thành "Không tìm thấy đề nghị"
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   const load = useCallback(async () => {
     if (!id) return
     setLoading(true)
+    setLoadError(null)
     try {
       const res = await paymentRequestService.getById(id)
       if (res) {
@@ -69,6 +70,7 @@ const PaymentRequestDetailPage: React.FC = () => {
       }
     } catch (e) {
       console.error('[PaymentRequestDetail] load error', e)
+      setLoadError(e || 'Không tải được đề nghị')
     }
     setLoading(false)
   }, [id])
@@ -208,6 +210,16 @@ const PaymentRequestDetailPage: React.FC = () => {
   if (loading) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 className="w-8 h-8 text-emerald-500 animate-spin" /></div>
   }
+  if (loadError && !req) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="text-red-600 font-semibold">Không tải được đề nghị</p>
+        <p className="text-[13px] text-gray-500">{dichLoiHeThong(loadError, 'Có lỗi khi tải')}</p>
+        <button onClick={load} className="px-4 py-2 rounded-xl bg-red-50 text-red-600 text-[13px] font-semibold">Thử lại</button>
+        <button onClick={() => navigate('/rubber/payment-requests')} className="text-emerald-600 font-semibold">← Về danh sách</button>
+      </div>
+    )
+  }
   if (!req) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3">
@@ -247,7 +259,7 @@ const PaymentRequestDetailPage: React.FC = () => {
           <div className="flex items-center gap-4 text-[12.5px] text-gray-500 flex-wrap">
             <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" />{fmtDate(req.request_date)}</span>
             {req.facility && <span className="flex items-center gap-1.5"><Building2 className="w-4 h-4" />{req.facility.name}</span>}
-            <span className="flex items-center gap-1.5"><Scale className="w-4 h-4" />{liveTotalWeight.toLocaleString('vi-VN')} kg</span>
+            <span className="flex items-center gap-1.5"><Scale className="w-4 h-4" />{fmtKg(liveTotalWeight, 2)} kg</span>
           </div>
           <div className="mt-2 pt-2 border-t border-gray-50 flex items-center justify-between">
             <span className="text-[13px] text-gray-400">Tổng chi ({lines.length} dòng · {req.currency}) <span className="text-amber-600">· đã làm tròn</span></span>
@@ -377,7 +389,7 @@ const PaymentRequestDetailPage: React.FC = () => {
                               placeholder="VD: 60000"
                               className={`w-full px-2 py-1 rounded-md border text-[12.5px] text-right font-mono ${lowPrice ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
                             />
-                            {lowPrice && <p className="mt-0.5 text-[9.5px] text-red-500 leading-tight">⚠ &lt;1.000đ — thiếu 0? →{((l.unit_price || 0) * 1000).toLocaleString('vi-VN')}</p>}
+                            {lowPrice && <p className="mt-0.5 text-[9.5px] text-red-500 leading-tight">⚠ &lt;1.000 ₫ — thiếu 0? →{((l.unit_price || 0) * 1000).toLocaleString('vi-VN')}</p>}
                           </>
                         ) : (
                           <span className="font-mono">{(l.unit_price || 0).toLocaleString('vi-VN')}</span>

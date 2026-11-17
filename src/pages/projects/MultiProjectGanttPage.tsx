@@ -32,6 +32,8 @@ import type {
   MultiProjectGanttResult,
 } from '../../services/project/ganttService'
 import { supabase } from '../../lib/supabase'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { PROJECT_STATUS_LABELS, PROJECT_PRIORITY_LABELS } from '../../services/project/project.types'
 
 // ============================================================================
 // TYPES
@@ -124,7 +126,7 @@ const MultiProjectGanttPage: React.FC = () => {
       } catch (err: any) {
         if (cancelled) return
         console.error('[MultiProjectGantt] Load error:', err)
-        setError('Không thể tải dữ liệu: ' + (err?.message || ''))
+        setError(dichLoiHeThong(err, 'Không tải được dữ liệu Gantt tổng hợp'))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -269,11 +271,9 @@ const MultiProjectGanttPage: React.FC = () => {
                 className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-[#1B4D3E] focus:border-transparent outline-none"
               >
                 <option value="all">Tất cả trạng thái</option>
-                <option value="planning">Lập kế hoạch</option>
-                <option value="approved">Đã duyệt</option>
-                <option value="in_progress">Đang thực hiện</option>
-                <option value="on_hold">Tạm dừng</option>
-                <option value="completed">Hoàn thành</option>
+                {(['planning', 'approved', 'in_progress', 'on_hold', 'completed'] as const).map(st => (
+                  <option key={st} value={st}>{PROJECT_STATUS_LABELS[st]}</option>
+                ))}
               </select>
             </div>
 
@@ -286,10 +286,9 @@ const MultiProjectGanttPage: React.FC = () => {
                 className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-[#1B4D3E] focus:border-transparent outline-none"
               >
                 <option value="all">Tất cả ưu tiên</option>
-                <option value="critical">Khẩn cấp</option>
-                <option value="high">Cao</option>
-                <option value="medium">Trung bình</option>
-                <option value="low">Thấp</option>
+                {(['critical', 'high', 'medium', 'low'] as const).map(pr => (
+                  <option key={pr} value={pr}>{PROJECT_PRIORITY_LABELS[pr]}</option>
+                ))}
               </select>
             </div>
 
@@ -315,11 +314,7 @@ const MultiProjectGanttPage: React.FC = () => {
                   )}
                   {filterStatus !== 'all' && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                      {filterStatus === 'planning' ? 'Lập kế hoạch' :
-                       filterStatus === 'approved' ? 'Đã duyệt' :
-                       filterStatus === 'in_progress' ? 'Đang thực hiện' :
-                       filterStatus === 'on_hold' ? 'Tạm dừng' :
-                       filterStatus === 'completed' ? 'Hoàn thành' : filterStatus}
+                      {(PROJECT_STATUS_LABELS as Record<string, string>)[filterStatus] ?? filterStatus}
                       <button onClick={() => setFilterStatus('all')} className="hover:text-red-600">
                         <X className="w-3 h-3" />
                       </button>
@@ -327,10 +322,7 @@ const MultiProjectGanttPage: React.FC = () => {
                   )}
                   {filterPriority !== 'all' && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full text-xs font-medium">
-                      {filterPriority === 'critical' ? 'Khẩn cấp' :
-                       filterPriority === 'high' ? 'Cao' :
-                       filterPriority === 'medium' ? 'Trung bình' :
-                       filterPriority === 'low' ? 'Thấp' : filterPriority}
+                      {(PROJECT_PRIORITY_LABELS as Record<string, string>)[filterPriority] ?? filterPriority}
                       <button onClick={() => setFilterPriority('all')} className="hover:text-red-600">
                         <X className="w-3 h-3" />
                       </button>
@@ -347,7 +339,7 @@ const MultiProjectGanttPage: React.FC = () => {
       <div className="px-4 md:px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard label="Tổng dự án" value={stats.total} color="#1B4D3E" />
-          <StatCard label="Đang chạy" value={stats.inProgress} color="#2563EB" />
+          <StatCard label={PROJECT_STATUS_LABELS.in_progress} value={stats.inProgress} color="#2563EB" />
           <StatCard label="Hoàn thành" value={stats.completed} color="#16A34A" />
           <StatCard label="Tạm dừng" value={stats.onHold} color="#F59E0B" />
         </div>

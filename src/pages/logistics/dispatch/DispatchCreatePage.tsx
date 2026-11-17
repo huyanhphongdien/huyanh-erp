@@ -15,7 +15,7 @@ import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined, ImportOu
 import dayjs from 'dayjs'
 import { fleetService, VEHICLE_KIND_LABELS, type FleetVehicle, type FleetDriver } from '../../../services/logistics/fleetService'
 import {
-  dispatchService, getGradeDangDung, isContainerTrip,
+  dispatchService, getGradeDangDung, isContainerTrip, SALES_ORDER_OPTION_LIMIT, FETCH_RUBBER_LABELS,
   TRIP_CARDS, TRIP_GROUP_META, tripCardFor,
   type TripType, type CargoKind, type TripVehicleGroup, type TripCard,
   type DispatchLineInput, type SalesOrderOption,
@@ -23,6 +23,11 @@ import {
 import { soDisplayCode } from '../../../services/sales/salesTypes'
 import { useAuthStore } from '../../../stores/authStore'
 import { useUnsavedWarning } from '../../../hooks/useUnsavedWarning'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { DASH } from '../../../utils/format'
+import { LimitNotice } from '../../../components/common/tableDefaults'
+import PageState from '../../../components/common/PageState'
+import { thousands } from '../costs/fleetCostUi'
 
 const { Title } = Typography
 
@@ -45,9 +50,8 @@ interface AttachedSo {
 let _keySeq = 1
 const newKey = () => `L${_keySeq++}`
 
-// Định dạng số có dấu chấm ngăn nghìn cho ô KL (gõ "20.160" hay "20160" đều ra 20160).
-const numFmt = (v?: number | string) => `${v ?? ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-const numParse = (v?: string) => (v || '').replace(/\./g, '')
+// Ô KL / cước dùng chung `thousands` (fleetCostUi): chấm ngăn nghìn — gõ "20.160" hay "20160" đều ra 20160,
+// xoá trắng vẫn là "chưa nhập" (null) chứ không thành 0. Trước 17/11/2026 là cặp numFmt/numParse chép tay.
 const BALE_KG = 35 // kg/bành chuẩn SVR — dùng để KL tự nhảy theo số kiện
 
 // Gợi ý chọn nhanh (vẫn gõ tự do được — AutoComplete)
@@ -102,6 +106,9 @@ export default function DispatchCreatePage() {
   const [origLineIds, setOrigLineIds] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(isEdit)
+  // Sửa lệnh mà tải hỏng → KHÔNG vẽ form trống (bấm Lưu sẽ ghi đè lệnh thật bằng ô trống) — báo lỗi + Thử lại.
+  const [editLoadErr, setEditLoadErr] = useState<unknown>(null)
+  const [reloadTick, setReloadTick] = useState(0)
   const [formDirty, setFormDirty] = useState(false)
   // Đóng tab / F5 khi lệnh đang nhập dở → trình duyệt hỏi lại (đang lưu thì thôi)
   useUnsavedWarning(formDirty && !saving)
@@ -130,7 +137,7 @@ export default function DispatchCreatePage() {
         ])
         setTractors(t); setTrailers(tr); setOthers(ot); setDrivers(d)
       } catch (e: any) {
-        message.error('Lỗi tải đội xe: ' + (e?.message || e))
+        message.error(dichLoiHeThong(e, 'Lỗi tải danh mục xe / tài xế'))
       }
     })()
   }, [])
@@ -140,6 +147,7 @@ export default function DispatchCreatePage() {
     if (!isEdit) return
     (async () => {
       setLoading(true)
+      setEditLoadErr(null)
       try {
         const res = await dispatchService.getById(id!)
         if (!res) { message.error('Không tìm thấy lệnh'); navigate('/logistics/dispatch'); return }
@@ -194,11 +202,11 @@ export default function DispatchCreatePage() {
           }])
         }
       } catch (e: any) {
-        message.error('Lỗi tải lệnh: ' + (e?.message || e))
+        setEditLoadErr(e)
       }
       setLoading(false)
     })()
-  }, [id])
+  }, [id, reloadTick])
 
   // ---- chọn xe (đầu kéo / xe con) → auto điền tài xế cố định nếu có ----
   const allDriveable = useMemo(() => [...tractors, ...others], [tractors, others])
@@ -214,10 +222,26 @@ export default function DispatchCreatePage() {
 
   // ---- lines helpers ----
   // Hàm ổn định (useCallback) → bảng dòng không re-tạo mỗi render → input giữ giá trị/focus ổn định.
-  const addLine = useCallback(() => setLines(prev => [...prev, { _key: newKey() }]), [])
-  const removeLineRow = useCallback((key: string) => setLines(prev => prev.filter(l => l._key !== key)), [])
-  const patchLine = useCallback((key: string, patch: Partial<LineRow>) =>
-    setLines(prev => prev.map(l => l._key === key ? { ...l, ...patch } : l)), [])
+  // Bảng dòng nằm NGOÀI antd Form (onValuesChange không thấy) → tự đánh dấu "đang nhập dở" để
+  // cảnh báo F5/đóng tab + nút Quay lại phủ cả phần container — phần nhập lâu nhất.
+  const addLine = useCallback(() => { setFormDirty(true); setLines(prev => [...prev, { _key: newKey() }]) }, [])
+  const removeLineRow = useCallback((key: string) => { setFormDirty(true); setLines(prev => prev.filter(l => l._key !== key)) }, [])
+  const patchLine = useCallback((key: string, patch: Partial<LineRow>) => {
+    setFormDirty(true)
+    setLines(prev => prev.map(l => l._key === key ? { ...l, ...patch } : l))
+  }, [])
+
+  // Rời trang khi đang nhập dở → hỏi lại (beforeunload chỉ chặn được F5 / đóng tab).
+  const leave = (to: string) => {
+    if (!formDirty || saving) { navigate(to); return }
+    Modal.confirm({
+      title: 'Rời trang khi lệnh chưa lưu?',
+      content: 'Thông tin chuyến và các dòng container vừa nhập sẽ mất.',
+      okText: 'Rời trang, bỏ phần đã nhập', okButtonProps: { danger: true },
+      cancelText: 'Ở lại nhập tiếp',
+      onOk: () => navigate(to),
+    })
+  }
 
   // ---- SO picker ----
   const openSoPicker = useCallback(async () => {
@@ -225,7 +249,7 @@ export default function DispatchCreatePage() {
     setPickerSo(null)   // mở ở bước 1 (danh sách đơn)
     setSoLoading(true)
     try { setSoOptions(await dispatchService.listSalesOrderOptions(soSearch || undefined)) }
-    catch (e: any) { message.error('Lỗi tải đơn hàng: ' + (e?.message || e)) }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi tải đơn hàng')) }
     setSoLoading(false)
   }, [soSearch])
 
@@ -257,7 +281,7 @@ export default function DispatchCreatePage() {
       setPickerChecked([])         // mặc định KHÔNG tích — user tự chọn cont đi hôm nay
       setPickerSo(so)
     } catch (e: any) {
-      message.error('Lỗi tải container: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi tải container'))
     }
   }
 
@@ -277,6 +301,7 @@ export default function DispatchCreatePage() {
     const chosen = pickerContainers.filter(c => pickerChecked.includes(c.sales_order_container_id as string))
     if (chosen.length === 0) { message.warning('Chưa tích container nào để thêm'); return }
     if (attachedSos.length === 0 && !form.getFieldValue('trip_type')) form.setFieldValue('trip_type', 'port')
+    setFormDirty(true)
     setLines(prev => [...prev, ...chosen.map(c => ({ ...c, _key: newKey() }))])
     upsertAttached(pickerSo, pickerHeader, chosen.map(c => c.sales_order_container_id as string))
     message.success(`Đã thêm ${chosen.length} container từ ${pickerSo.code}`)
@@ -309,6 +334,7 @@ export default function DispatchCreatePage() {
     if (!target) return
     const next = attachedSos.filter(s => s.id !== soId)
     setAttachedSos(next)
+    setFormDirty(true)
     setLines(prev => prev.filter(l =>
       !l.sales_order_container_id || !target.containerIds.includes(l.sales_order_container_id as string)))
     applyHeaderFromAttached(next)
@@ -375,7 +401,7 @@ export default function DispatchCreatePage() {
       }
     } catch (e: any) {
       if (e?.errorFields) { message.warning('Kiểm tra lại thông tin bắt buộc'); setSaving(false); return }
-      message.error('Lỗi lưu: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi lưu lệnh'))
     }
     setSaving(false)
   }
@@ -395,6 +421,7 @@ export default function DispatchCreatePage() {
   const activeCard = useMemo(() => tripCardFor(watchedTripType, watchedCargo), [watchedTripType, watchedCargo])
   const selectCard = useCallback((c: TripCard) => {
     form.setFieldsValue({ trip_type: c.trip_type, cargo_kind: c.cargo_kind })
+    setFormDirty(true)   // setFieldsValue không kích onValuesChange
   }, [form])
 
   // Ô xe chính LỌC THEO LOẠI CHUYẾN (phiếu):
@@ -436,12 +463,12 @@ export default function DispatchCreatePage() {
       ) },
       w: { title: 'KL net (kg)', key: 'w', width: 130, render: (_: any, r: LineRow) => (
         <InputNumber value={r.weight_kg || undefined} min={0} controls={false} style={{ width: '100%' }}
-          formatter={numFmt} parser={numParse as any} placeholder="0"
+          {...thousands} placeholder="0"
           onChange={v => patchLine(r._key, { weight_kg: (v as number) || 0 })} />
       ) },
       gw: { title: 'GW (kg)', key: 'gw', width: 130, render: (_: any, r: LineRow) => (
         <InputNumber value={r.gross_weight_kg ?? undefined} min={0} controls={false} style={{ width: '100%' }}
-          formatter={numFmt} parser={numParse as any} placeholder="net + bì"
+          {...thousands} placeholder="net + bì"
           onChange={v => patchLine(r._key, { gross_weight_kg: (v as number) ?? null })} />
       ) },
       note: { title: 'Ghi chú', key: 'note', width: 200, render: (_: any, r: LineRow) => (
@@ -453,22 +480,27 @@ export default function DispatchCreatePage() {
     return isPort
       ? [col.idx, col.route, col.lot, col.grade, col.cont, col.seal, col.pkg, col.w, col.gw, col.act]
       : [col.idx, col.route, col.grade, col.w, col.note, col.act]
-  }, [isPort, patchLine, removeLineRow])
+    // gradeOpts PHẢI có trong deps: nó nạp async sau lần render đầu — thiếu thì ô "Loại hàng" mãi chỉ
+    // gợi ý 4 giá trị GRADE_FALLBACK, mất tác dụng chống gõ ra cách viết mới (audit 17/11/2026).
+  }, [isPort, patchLine, removeLineRow, gradeOpts])
 
   const totalWeight = lines.reduce((s, l) => s + (l.weight_kg || 0), 0)
 
   return (
     <div style={{ padding: 20, maxWidth: 1680, margin: '0 auto', fontSize: 15 }}>
       <Breadcrumb style={{ marginBottom: 8, fontSize: 14 }} items={[
-        { title: <a onClick={() => navigate('/logistics/dispatch')}>Lệnh điều động</a> },
+        { title: <a onClick={() => leave('/logistics/dispatch')}>Lệnh điều động</a> },
         { title: isEdit ? 'Sửa lệnh' : 'Tạo lệnh' },
       ]} />
 
+      {isEdit && editLoadErr ? (
+        <Card><PageState error={editLoadErr} onRetry={() => setReloadTick(t => t + 1)} /></Card>
+      ) : (
       <Card loading={loading}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <Title level={4} style={{ margin: 0 }}>{isEdit ? 'Sửa lệnh điều động' : 'Tạo lệnh điều động'}</Title>
           <Space>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/logistics/dispatch')}>Quay lại</Button>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => leave('/logistics/dispatch')}>Quay lại</Button>
             <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={onSave}>Lưu lệnh</Button>
           </Space>
         </div>
@@ -548,7 +580,7 @@ export default function DispatchCreatePage() {
                 <Form.Item label="Loại chuyến này">
                   <Typography.Text type="secondary">
                     <b>Đi lấy mủ về PĐ</b> — khai <b>pallet mang đi</b> + chọn <b>nhà máy lấy mủ</b> (Tân Lâm / Lào).<br />
-                    App cân PĐ cân xe rỗng (lúc đi) + xe hàng (lúc về) → ra KL mủ. Không cần bảng chi tiết bên dưới.
+                    Cân ở CẢ 2 đầu: nhà máy lấy mủ cân xe rỗng → xe + mủ (lúc rời NM); PĐ cân xe + mủ (lúc về) → xe rỗng (sau khi dỡ) → 2 số KL mủ để đối chiếu. Không cần bảng chi tiết bên dưới.
                   </Typography.Text>
                 </Form.Item>
               ) : (
@@ -621,7 +653,7 @@ export default function DispatchCreatePage() {
               </Col>
               <Col xs={24} sm={8}>
                 <Form.Item name="hire_cost" label="Cước thuê (VNĐ)">
-                  <InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} placeholder="0" />
+                  <InputNumber min={0} style={{ width: '100%' }} {...thousands} placeholder="0" />
                 </Form.Item>
               </Col>
             </Row>
@@ -653,15 +685,10 @@ export default function DispatchCreatePage() {
                   <div style={{ fontWeight: 600, color: '#0369A1', marginBottom: 8 }}>🚚 Thông tin lấy mủ (app cân điền sẵn khi chọn lệnh)</div>
                   <Row gutter={12}>
                     <Col xs={24} sm={12}>
+                      {/* Một nguồn nhãn với chi tiết / in lệnh / app cân: FETCH_RUBBER_LABELS (dispatchService) */}
                       <Form.Item name="fetch_rubber_type" label="Loại mủ dự kiến" style={{ marginBottom: 8 }}>
                         <Select allowClear placeholder="Chọn loại mủ (nếu biết trước)"
-                          options={[
-                            { value: 'mu_tap', label: 'Mủ tạp' },
-                            { value: 'mu_nuoc', label: 'Mủ nước' },
-                            { value: 'mu_dong', label: 'Mủ đông' },
-                            { value: 'mu_to', label: 'Mủ tờ' },
-                            { value: 'mu_rss3', label: 'Mủ RSS3' },
-                          ]} />
+                          options={Object.entries(FETCH_RUBBER_LABELS).map(([value, label]) => ({ value, label }))} />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
@@ -684,7 +711,7 @@ export default function DispatchCreatePage() {
                     </Col>
                   </Row>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    Chọn lệnh này ở app cân PĐ → tự điền biển số + pallet + loại mủ + lô. Điểm bốc = Tân Lâm. Cân lần 1 = xe rỗng (đi), lần 2 = xe hàng (về).
+                    Chọn lệnh này ở app cân (nhà máy lấy mủ và PĐ) → tự điền biển số + pallet + loại mủ + lô. Nhà máy lấy mủ: lần 1 = xe rỗng (đến), lần 2 = xe + mủ (rời NM). PĐ: lần 1 = xe + mủ (về), lần 2 = xe rỗng (sau khi dỡ).
                   </Typography.Text>
                 </div>
               </Col>
@@ -714,7 +741,26 @@ export default function DispatchCreatePage() {
           locale={{ emptyText: <Empty description={isPort ? "Chưa có container — bấm 'Thêm dòng' hoặc 'Tạo từ Đơn hàng bán'" : "Đón khách thì bỏ trống cũng được; chở hàng thì bấm 'Thêm dòng'"} /> }} />
         <Button type="dashed" icon={<PlusOutlined />} onClick={addLine} style={{ marginTop: 12 }} block>{isPort ? 'Thêm dòng container' : 'Thêm dòng'}</Button>
         </>)}
+
+        {/* Thanh lưu dính đáy: form dài (thẻ loại chuyến → xe → chuyến → bảng container), nhập xong dòng
+            cuối không phải cuộn ngược lên đầu mới thấy nút Lưu; kèm tổng sống để đối chiếu. */}
+        <div style={{
+          position: 'sticky', bottom: 0, zIndex: 5, marginTop: 16, padding: '10px 0',
+          background: '#fff', borderTop: '1px solid #EDEFF2',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+        }}>
+          <span style={{ color: '#64748b', fontSize: 14 }}>
+            {isFetchMu
+              ? 'Đi lấy mủ — app cân ghi khối lượng ở cả 2 đầu: nhà máy lấy mủ (Tân Lâm / Lào) và Phong Điền'
+              : <>{isPort ? 'Container' : 'Dòng chi tiết'}: <b>{lines.length}</b> · tổng <b>{totalWeight.toLocaleString('vi-VN')}</b> kg</>}
+          </span>
+          <Space>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => leave('/logistics/dispatch')}>Quay lại</Button>
+            <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={onSave}>Lưu lệnh</Button>
+          </Space>
+        </div>
       </Card>
+      )}
 
       {/* SO picker — 2 BƯỚC: (1) chọn đơn → (2) tích container đi chuyến hôm nay */}
       <Modal
@@ -729,14 +775,15 @@ export default function DispatchCreatePage() {
       >
         {!pickerSo ? (
           <>
-            <Input.Search placeholder="Tìm mã đơn / số HĐ / grade" allowClear style={{ marginBottom: 12 }}
+            <Input.Search placeholder="Tìm mã đơn / số HĐ / loại hàng" allowClear style={{ marginBottom: 12 }}
               onSearch={(val) => { setSoSearch(val); openSoPicker() }} />
+            <LimitNotice shown={soOptions.length} limit={SALES_ORDER_OPTION_LIMIT} what="đơn" />
             <Table rowKey="id" size="small" loading={soLoading} dataSource={soOptions} pagination={{ pageSize: 8 }}
               columns={[
                 { title: 'Mã đơn', dataIndex: 'code', render: (_v: string, r: SalesOrderOption) => <span><b>{soDisplayCode(r)}</b>{r.contract_no && r.code && <Tag style={{ marginLeft: 6 }}>{r.code}</Tag>}</span> },
-                { title: 'Khách', dataIndex: 'customer_name', render: (v: string) => v || '–' },
-                { title: 'Grade', dataIndex: 'grade', width: 90, render: (v: string) => v || '–' },
-                { title: 'Cảng đến', dataIndex: 'port_of_destination', render: (v: string) => v || '–' },
+                { title: 'Khách', dataIndex: 'customer_name', render: (v: string) => v || DASH },
+                { title: 'Loại hàng', dataIndex: 'grade', width: 100, render: (v: string) => v || DASH },
+                { title: 'Cảng đến', dataIndex: 'port_of_destination', render: (v: string) => v || DASH },
                 { title: 'Cont', dataIndex: 'container_count', width: 60, align: 'center' as const },
                 { title: '', width: 96, render: (_: any, r: SalesOrderOption) => <Button size="small" type="primary" onClick={() => pickSo(r)}>Chọn →</Button> },
               ] as any} />
@@ -767,12 +814,12 @@ export default function DispatchCreatePage() {
               size="small" pagination={false} dataSource={pickerContainers} scroll={{ y: 360 }}
               rowSelection={{ selectedRowKeys: pickerChecked, onChange: (keys) => setPickerChecked(keys as string[]) }}
               columns={[
-                { title: 'Lô', dataIndex: 'lot_code', width: 64, render: (v: string) => v || '–' },
+                { title: 'Lô', dataIndex: 'lot_code', width: 64, render: (v: string) => v || DASH },
                 { title: 'Số container', dataIndex: 'container_no', render: (v: string) => v ? <b>{v}</b> : <Typography.Text type="warning">(chưa nhập số)</Typography.Text> },
-                { title: 'Số seal', dataIndex: 'seal_no', render: (v: string) => v || '–' },
-                { title: 'Loại hàng', dataIndex: 'grade', width: 108, render: (v: string) => v || '–' },
-                { title: 'Số kiện', dataIndex: 'package_count', width: 70, align: 'right' as const, render: (v: number) => v ?? '–' },
-                { title: 'KL (kg)', dataIndex: 'weight_kg', width: 92, align: 'right' as const, render: (v: number) => v ? v.toLocaleString('vi-VN') : '–' },
+                { title: 'Số seal', dataIndex: 'seal_no', render: (v: string) => v || DASH },
+                { title: 'Loại hàng', dataIndex: 'grade', width: 108, render: (v: string) => v || DASH },
+                { title: 'Số kiện', dataIndex: 'package_count', width: 70, align: 'right' as const, render: (v: number) => v ?? DASH },
+                { title: 'KL (kg)', dataIndex: 'weight_kg', width: 92, align: 'right' as const, render: (v: number) => v ? v.toLocaleString('vi-VN') : DASH },
               ] as any} />
             <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>Đã chọn {pickerChecked.length}/{pickerContainers.length} container.</div>
           </>

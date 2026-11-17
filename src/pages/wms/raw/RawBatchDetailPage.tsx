@@ -14,14 +14,18 @@ import { rawStockService, RAW_TXN_LABELS, type RawBatchBalance, type RawLedgerRo
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_LOT_SOURCE_LABELS, RAW_RUBBER_GROUP_LABELS, RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { usePhoneRedirect } from '../../../hooks/useIsPhone'
+import { EnumTag } from '../../../components/common/EnumTag'
+import { fmtKg, fmtPct, fmtSigned, fmtDate } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 
-const fmtKg = (n: number | null | undefined, digits = 0) =>
-  n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: digits, minimumFractionDigits: digits })
-const fmtPct = (n: number | null | undefined, digits = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: digits, minimumFractionDigits: digits }) + ' %')
-const fmtSigned = (n: number, digits = 0) => (n > 0 ? '+' : '') + fmtKg(n, digits)
-const fmtDate = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString('vi-VN') : '—')
+// Mã trạng thái lô (stock_batches) → nhãn Việt; trước đây in thẳng "pending"/"active" (finding #26).
+// TODO(owner): dời 2 map này vào services/wms/raw.types.ts cạnh RAW_LOT_SOURCE_LABELS (ngoài vùng sửa đợt này).
+const RAW_QC_STATUS_LABELS: Record<string, string> = { pending: 'Chờ QC', passed: 'Đạt', warning: 'Cảnh báo', failed: 'Không đạt', needs_blend: 'Cần phối trộn' }
+const RAW_QC_STATUS_COLORS: Record<string, string> = { pending: 'gold', passed: 'green', warning: 'orange', failed: 'red', needs_blend: 'purple' }
+const RAW_BATCH_STATUS_LABELS: Record<string, string> = { active: 'Đang dùng', depleted: 'Đã hết', expired: 'Hết hạn', quarantine: 'Tạm giữ (cách ly)' }
+const RAW_BATCH_STATUS_COLORS: Record<string, string> = { active: 'green', depleted: 'default', expired: 'red', quarantine: 'orange' }
 
 export default function RawBatchDetailPage() {
   const { batchId } = useParams<{ batchId: string }>()
@@ -41,7 +45,7 @@ export default function RawBatchDetailPage() {
       setBatch(b); setLedger(l)
       if (b) setSettings(await rawSettingsService.getForFacility(b.facility_id))
     } catch (e: any) {
-      setError(e?.message || 'Không tải được lô')
+      setError(dichLoiHeThong(e, 'Không tải được lô'))
     } finally { setLoading(false) }
   }, [batchId])
 
@@ -71,7 +75,7 @@ export default function RawBatchDetailPage() {
   ]
 
   if (loading) return <div style={{ padding: 48, textAlign: 'center' }}><Spin /></div>
-  if (error) return <div style={{ padding: 16 }}><Alert type="error" showIcon message={error} /></div>
+  if (error) return <div style={{ padding: 16 }}><Alert type="error" showIcon message={error} action={<Button size="small" onClick={load}>Thử lại</Button>} /></div>
   if (!batch) return <div style={{ padding: 16 }}><Empty description="Không tìm thấy lô trong sổ kho khô" /><Button style={{ marginTop: 12 }} onClick={() => navigate('/wms/nvl')}>Về tổng quan</Button></div>
 
   const qua_tuoi = batch.tuoi_ngay > settings.tuoi_lo_canh_bao_ngay
@@ -170,8 +174,8 @@ export default function RawBatchDetailPage() {
             <Descriptions.Item label="Nhà cung cấp">{batch.supplier_name || '—'}</Descriptions.Item>
             <Descriptions.Item label="Phiếu cân">{batch.weighbridge_ticket_id ? <a onClick={() => navigate(`/wms/weighbridge/${batch.weighbridge_ticket_id}`)}>mở phiếu{batch.ticket_line_no ? ` · dòng ${batch.ticket_line_no}` : ''}</a> : 'tồn đầu mở sổ'}</Descriptions.Item>
             <Descriptions.Item label="Ngày nhập">{fmtDate(batch.received_date)}</Descriptions.Item>
-            <Descriptions.Item label="QC">{batch.qc_status || '—'}</Descriptions.Item>
-            <Descriptions.Item label="Trạng thái lô">{batch.batch_status}</Descriptions.Item>
+            <Descriptions.Item label="QC"><EnumTag value={batch.qc_status} labels={RAW_QC_STATUS_LABELS} colors={RAW_QC_STATUS_COLORS} /></Descriptions.Item>
+            <Descriptions.Item label="Trạng thái lô"><EnumTag value={batch.batch_status} labels={RAW_BATCH_STATUS_LABELS} colors={RAW_BATCH_STATUS_COLORS} /></Descriptions.Item>
           </Descriptions>
         </Card>
       </Space>

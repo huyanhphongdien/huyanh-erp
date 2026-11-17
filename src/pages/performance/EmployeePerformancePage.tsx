@@ -10,6 +10,8 @@ import {
   performanceDashboardService,
   EmployeeDetail,
 } from '../../services/performanceService';
+import PageState from '../../components/common/PageState';
+import { fmtDate } from '../../utils/format';
 
 // ============================================================================
 // CONSTANTS
@@ -122,11 +124,15 @@ export default function EmployeePerformancePage() {
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [detail, setDetail] = useState<EmployeeDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  // Lỗi tải: trước đây chỉ console.error → "Không tìm thấy dữ liệu nhân viên" giả
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     async function load() {
       if (!employeeId) return;
       setLoading(true);
+      setLoadError(null);
       try {
         const data = await performanceDashboardService.getEmployeeDetail(
           employeeId,
@@ -135,12 +141,13 @@ export default function EmployeePerformancePage() {
         setDetail(data);
       } catch (err) {
         console.error('Error loading employee detail:', err);
+        setLoadError(err);
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [employeeId, selectedMonth, selectedYear]);
+  }, [employeeId, selectedMonth, selectedYear, reloadKey]);
 
   const perf = detail?.performance;
 
@@ -152,15 +159,11 @@ export default function EmployeePerformancePage() {
   const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
   const yearOptions = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
 
-  if (loading) {
+  // Đang tải / lỗi: khối 3 trạng thái dùng chung (thay spinner tự chế inline style + keyframes)
+  if (loading || loadError) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <div style={{
-          width: 40, height: 40, border: '4px solid #e5e7eb',
-          borderTopColor: PRIMARY, borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
+        <PageState loading={loading} error={loadError} onRetry={() => setReloadKey(k => k + 1)} minHeight={400} />
       </div>
     );
   }
@@ -277,7 +280,7 @@ export default function EmployeePerformancePage() {
           </div>
         </div>
         <div style={kpiCardStyle}>
-          <div style={kpiLabelStyle}>Task</div>
+          <div style={kpiLabelStyle}>Số việc</div>
           <div style={{ ...kpiValueStyle, color: '#2563eb' }}>{perf.total_tasks}</div>
         </div>
         <div style={kpiCardStyle}>
@@ -329,9 +332,7 @@ export default function EmployeePerformancePage() {
                   <td style={tdStyle}>{task.name}</td>
                   <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600 }}>{task.score}</td>
                   <td style={{ ...tdStyle, textAlign: 'center', color: '#6b7280' }}>
-                    {task.completed_date
-                      ? new Date(task.completed_date).toLocaleDateString('vi-VN')
-                      : '-'}
+                    {fmtDate(task.completed_date)}
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
                     <span style={{

@@ -1,21 +1,20 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { payrollService } from '../../services'
+import { App } from 'antd'
+import { payrollService, PAYROLL_PERIOD_STATUS_LABELS, PAYROLL_PERIOD_STATUS_COLORS } from '../../services'
 import { useAuthStore } from '../../stores/authStore'
 import { Button, Select, Card, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { PayrollPeriodForm } from './PayrollPeriodForm'
+import PageState from '../../components/common/PageState'
+import { EnumTag } from '../../components/common/EnumTag'
+import { fmtVnd } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import type { PayrollPeriod } from '../../types'
-
-const statusLabels: Record<string, { label: string; color: string }> = {
-  draft: { label: 'Nháp', color: 'bg-gray-100 text-gray-800' },
-  processing: { label: 'Đang xử lý', color: 'bg-yellow-100 text-yellow-800' },
-  confirmed: { label: 'Đã xác nhận', color: 'bg-green-100 text-green-800' },
-  paid: { label: 'Đã trả', color: 'bg-blue-100 text-blue-800' }
-}
 
 export function PayrollPeriodListPage() {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
+  const { modal, message } = App.useApp()
   const [page, setPage] = useState(1)
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear())
   const [statusFilter, setStatusFilter] = useState('')
@@ -23,7 +22,7 @@ export function PayrollPeriodListPage() {
   const [selectedItem, setSelectedItem] = useState<PayrollPeriod | null>(null)
   const [generateId, setGenerateId] = useState<string | null>(null)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['payroll-periods', page, yearFilter, statusFilter],
     queryFn: () => payrollService.getPeriods({ 
       page, 
@@ -36,12 +35,12 @@ export function PayrollPeriodListPage() {
   const generateMutation = useMutation({
     mutationFn: payrollService.generatePayslips,
     onSuccess: (count) => {
-      alert(`Đã tạo ${count} phiếu lương`)
+      message.success(`Đã tạo ${count} phiếu lương`)
       queryClient.invalidateQueries({ queryKey: ['payroll-periods'] })
       setGenerateId(null)
     },
     onError: (error: Error) => {
-      alert(`Lỗi: ${error.message}`)
+      message.error(dichLoiHeThong(error, 'Tạo phiếu lương thất bại'))
       setGenerateId(null)
     }
   })
@@ -50,12 +49,26 @@ export function PayrollPeriodListPage() {
     mutationFn: (id: string) => payrollService.confirmPeriod(id, user?.employee_id || ''),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll-periods'] })
+      message.success('Đã xác nhận kỳ lương')
+    },
+    // Bản cũ không có onError → bấm Xác nhận lỗi là im lặng
+    onError: (error: Error) => {
+      message.error(dichLoiHeThong(error, 'Xác nhận kỳ lương thất bại'))
     }
   })
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value)
+  // Xác nhận kỳ lương dính TIỀN → hỏi lại, nêu rõ tổng tiền + số NV
+  const askConfirmPeriod = (item: PayrollPeriod) => {
+    modal.confirm({
+      title: `Xác nhận kỳ lương ${item.code}?`,
+      content: `${item.name} — ${item.total_employees ?? 0} nhân viên, tổng ${fmtVnd(item.total_amount)}. Kỳ lương chuyển sang "${PAYROLL_PERIOD_STATUS_LABELS.confirmed}" và ghi tên bạn là người xác nhận.`,
+      okText: 'Xác nhận kỳ lương',
+      cancelText: 'Để sau',
+      onOk: () => confirmMutation.mutateAsync(item.id).catch(() => undefined),
+    })
   }
+
+  const formatCurrency = fmtVnd
 
   const yearOptions = Array.from({ length: 5 }, (_, i) => {
     const y = new Date().getFullYear() - i
@@ -84,10 +97,7 @@ export function PayrollPeriodListPage() {
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
             options={[
               { value: '', label: 'Tất cả trạng thái' },
-              { value: 'draft', label: 'Nháp' },
-              { value: 'processing', label: 'Đang xử lý' },
-              { value: 'confirmed', label: 'Đã xác nhận' },
-              { value: 'paid', label: 'Đã trả' }
+              ...Object.entries(PAYROLL_PERIOD_STATUS_LABELS).map(([value, label]) => ({ value, label }))
             ]}
             className="w-48"
           />
@@ -114,6 +124,12 @@ export function PayrollPeriodListPage() {
                     Đang tải...
                   </td>
                 </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={7} className="p-0">
+                    <PageState error={error} onRetry={() => refetch()} />
+                  </td>
+                </tr>
               ) : !data?.data?.length ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
@@ -122,7 +138,6 @@ export function PayrollPeriodListPage() {
                 </tr>
               ) : (
                 data.data.map((item) => {
-                  const statusInfo = statusLabels[item.status] || statusLabels.draft
                   return (
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium">{item.code}</td>
@@ -131,11 +146,9 @@ export function PayrollPeriodListPage() {
                         {String(item.month).padStart(2, '0')}/{item.year}
                       </td>
                       <td className="px-4 py-3 text-sm">{item.total_employees}</td>
-                      <td className="px-4 py-3 text-sm">{formatCurrency(item.total_amount ?? 0)}</td>
+                      <td className="px-4 py-3 text-sm">{formatCurrency(item.total_amount)}</td>
                       <td className="px-4 py-3 text-sm">
-                        <span className={`px-2 py-1 rounded text-xs ${statusInfo.color}`}>
-                          {statusInfo.label}
-                        </span>
+                        <EnumTag value={item.status} labels={PAYROLL_PERIOD_STATUS_LABELS} colors={PAYROLL_PERIOD_STATUS_COLORS} />
                       </td>
                       <td className="px-4 py-3 text-sm">
                         <div className="flex gap-1">
@@ -161,7 +174,7 @@ export function PayrollPeriodListPage() {
                             <Button 
                               size="sm" 
                               variant="primary" 
-                              onClick={() => confirmMutation.mutate(item.id)}
+                              onClick={() => askConfirmPeriod(item)}
                               disabled={confirmMutation.isPending}
                             >
                               Xác nhận
@@ -177,7 +190,7 @@ export function PayrollPeriodListPage() {
           </table>
         </div>
 
-        {data && data.totalPages > 1 && (
+        {!error && data && data.totalPages > 1 && (
           <div className="p-4 border-t">
             <Pagination 
               currentPage={page} 

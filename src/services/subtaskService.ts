@@ -12,6 +12,7 @@
 // ============================================================
 
 import { supabase } from '../lib/supabase'
+import { fmtDate } from '../utils/format'
 
 // ============================================================
 // LOCAL TYPES (để tránh dependency vào ../types)
@@ -110,10 +111,8 @@ const compareDates = (date1?: string | null, date2?: string | null): number => {
 /**
  * Format date cho hiển thị lỗi
  */
-const formatDateVN = (date?: string | null): string => {
-  if (!date) return 'N/A'
-  return new Date(date).toLocaleDateString('vi-VN')
-}
+// Ngày trong câu báo lỗi: chuẩn 'DD/MM/YYYY' của utils/format ('—' khi trống, thay 'N/A' tiếng Anh)
+const formatDateVN = (date?: string | null): string => fmtDate(date)
 
 // ============================================================
 // SERVICE
@@ -179,15 +178,18 @@ export const subtaskService = {
 
     const tasks = data || []
     const today = new Date().toLocaleDateString('sv-SE')
+    // Hệ status hiện hành kết thúc ở 'finished' — chỉ đếm 'completed' (cũ) thì "x/y hoàn thành"
+    // luôn ra 0 và việc đã xong vẫn bị đếm "quá hạn" (cùng lỗi SubtaskBadge, audit 17/11/2026)
+    const DONE_STATUSES = ['finished', 'completed']
 
     const summary: SubtaskSummary = {
       total: tasks.length,
-      completed: tasks.filter(t => t.status === 'completed').length,
+      completed: tasks.filter(t => DONE_STATUSES.includes(t.status)).length,
       inProgress: tasks.filter(t => t.status === 'in_progress').length,
-      overdue: tasks.filter(t => 
-        t.due_date && 
-        t.due_date < today && 
-        t.status !== 'completed' && 
+      overdue: tasks.filter(t =>
+        t.due_date &&
+        t.due_date < today &&
+        !DONE_STATUSES.includes(t.status) &&
         t.status !== 'cancelled'
       ).length,
       averageProgress: tasks.length > 0 
@@ -427,17 +429,26 @@ export const subtaskService = {
       return
     }
 
+    // Cha đã chốt (xong / đã duyệt / huỷ) thì không tính lại gì — bản cũ kéo cha đã duyệt về 'in_progress'
+    const { data: parent } = await supabase.from('tasks').select('status').eq('id', parentId).maybeSingle()
+    if (parent && ['finished', 'completed', 'cancelled'].includes(parent.status as string)) {
+      console.log('📝 [subtaskService.recalculateParent] Parent đã chốt, giữ nguyên')
+      return
+    }
+
     // Tính tiến độ trung bình
     const avgProgress = Math.round(
       children.reduce((sum, c) => sum + (c.progress || 0), 0) / children.length
     )
 
-    // Xác định trạng thái cha dựa trên con
-    let newStatus = 'draft'
+    // Trạng thái kết thúc hiện hành là 'finished' ('completed' là mã cũ). Bản cũ chỉ so 'completed' nên con xong
+    // hết vẫn rơi vào nhánh mặc định 'in_progress'. Con xong hết thì KHÔNG tự đóng cha — người làm tự bấm Hoàn
+    // thành (đi đúng luồng tự chấm/duyệt); tự đóng cha là quyết định nghiệp vụ chưa chốt.
+    const DONE = ['finished', 'completed', 'cancelled']
     const statuses = children.map(c => c.status)
-
-    if (statuses.every(s => s === 'completed')) {
-      newStatus = 'completed'
+    let newStatus: string | null
+    if (statuses.every(s => DONE.includes(s))) {
+      newStatus = null
     } else if (statuses.some(s => s === 'in_progress')) {
       newStatus = 'in_progress'
     } else if (statuses.some(s => s === 'paused')) {
@@ -451,15 +462,8 @@ export const subtaskService = {
     console.log('📊 [subtaskService.recalculateParent] New values:', { avgProgress, newStatus })
 
     // Cập nhật cha
-    const updateData: Record<string, unknown> = {
-      progress: avgProgress,
-      status: newStatus,
-    }
-
-    // Nếu hoàn thành, set completed_date
-    if (newStatus === 'completed') {
-      updateData.completed_date = new Date().toISOString()
-    }
+    const updateData: Record<string, unknown> = { progress: avgProgress }
+    if (newStatus) updateData.status = newStatus
 
     const { error: updateError } = await supabase
       .from('tasks')
@@ -715,8 +719,9 @@ export const subtaskService = {
       return { canComplete: true }
     }
 
-    // Tìm con chưa completed
-    const incompleteChildren = children.filter(c => c.status !== 'completed')
+    // Tìm con chưa xong — 'finished' là trạng thái kết thúc hiện hành (đếm mỗi 'completed' thì
+    // con đã xong vẫn bị tính "chưa hoàn thành" → cha không bao giờ hoàn thành được)
+    const incompleteChildren = children.filter(c => c.status !== 'completed' && c.status !== 'finished')
 
     if (incompleteChildren.length > 0) {
       return {

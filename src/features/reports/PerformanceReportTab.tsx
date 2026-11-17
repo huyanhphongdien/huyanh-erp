@@ -26,6 +26,9 @@ import type {
   OverdueTask
 } from '../../services/taskAnalyticsService'
 import { departmentService } from '../../services/departmentService'
+import { toDateStrVN } from '../../utils/dateVN'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate, fmtPct } from '../../utils/format'
 
 // ============================================================================
 // TYPES
@@ -45,10 +48,11 @@ const getDefaultDateRange = () => {
   const now = new Date()
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  
+
+  // toDateStrVN: toISOString() của nửa đêm giờ VN là hôm TRƯỚC (UTC) → "Tháng này" cũ ra 31/10 → 29/11
   return {
-    start_date: firstDay.toISOString().split('T')[0],
-    end_date: lastDay.toISOString().split('T')[0]
+    start_date: toDateStrVN(firstDay),
+    end_date: toDateStrVN(lastDay)
   }
 }
 
@@ -81,8 +85,8 @@ const getPresetDateRange = (preset: string) => {
   }
 
   return {
-    start_date: start_date.toISOString().split('T')[0],
-    end_date: end_date.toISOString().split('T')[0]
+    start_date: toDateStrVN(start_date),
+    end_date: toDateStrVN(end_date)
   }
 }
 
@@ -143,7 +147,7 @@ export default function PerformanceReportTab() {
       setMetrics(metricsData)
     } catch (error) {
       console.error('Error loading metrics:', error)
-      setErrors(prev => ({ ...prev, metrics: 'Không thể tải dữ liệu metrics' }))
+      setErrors(prev => ({ ...prev, metrics: dichLoiHeThong(error, 'Không tải được chỉ số hiệu suất') }))
     }
     
     // Load top performers
@@ -157,7 +161,7 @@ export default function PerformanceReportTab() {
       setTopPerformers(performersData)
     } catch (error) {
       console.error('Error loading top performers:', error)
-      setErrors(prev => ({ ...prev, performers: 'Không thể tải top performers' }))
+      setErrors(prev => ({ ...prev, performers: dichLoiHeThong(error, 'Không tải được danh sách nhân viên tiêu biểu') }))
     }
     
     // Load overdue tasks - handle error gracefully
@@ -171,9 +175,9 @@ export default function PerformanceReportTab() {
       setOverdueTasks(overdueData)
     } catch (error) {
       console.error('Error loading overdue tasks:', error)
-      // Don't show error for overdue - it might not be critical
       setOverdueTasks([])
-      setErrors(prev => ({ ...prev, overdue: 'Chức năng công việc quá hạn chưa khả dụng' }))
+      // Nói đúng lỗi (mất mạng / không có quyền…) thay vì luôn đổ cho "chức năng chưa khả dụng"
+      setErrors(prev => ({ ...prev, overdue: dichLoiHeThong(error, 'Không tải được danh sách công việc quá hạn') }))
     }
     
     setLoading(false)
@@ -348,14 +352,14 @@ export default function PerformanceReportTab() {
       },
       {
         label: 'Tỷ lệ hoàn thành',
-        value: `${metrics.completion_rate}%`,
+        value: fmtPct(metrics.completion_rate),
         icon: CheckCircle2,
         color: 'bg-green-500',
         textColor: 'text-green-600'
       },
       {
         label: 'Đúng hạn',
-        value: `${metrics.on_time_rate}%`,
+        value: fmtPct(metrics.on_time_rate),
         icon: Clock,
         color: 'bg-purple-500',
         textColor: 'text-purple-600'
@@ -394,7 +398,7 @@ export default function PerformanceReportTab() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
             <Trophy className="w-5 h-5 text-yellow-500" />
-            <h3 className="text-lg font-semibold text-gray-900">Top Performers</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Nhân viên tiêu biểu</h3>
           </div>
           <p className="text-yellow-600 text-sm">{errors.performers}</p>
         </div>
@@ -406,7 +410,7 @@ export default function PerformanceReportTab() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
             <Trophy className="w-5 h-5 text-yellow-500" />
-            <h3 className="text-lg font-semibold text-gray-900">Top Performers</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Nhân viên tiêu biểu</h3>
           </div>
           <div className="text-center py-8">
             <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -421,7 +425,7 @@ export default function PerformanceReportTab() {
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <Trophy className="w-5 h-5 text-yellow-500" />
-            <h3 className="text-lg font-semibold text-gray-900">Top 10 Performers</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Top 10 nhân viên tiêu biểu</h3>
           </div>
         </div>
         
@@ -473,11 +477,11 @@ export default function PerformanceReportTab() {
                           style={{ width: `${performer.completion_rate}%` }}
                         />
                       </div>
-                      <span className="text-sm text-gray-900">{performer.completion_rate}%</span>
+                      <span className="text-sm text-gray-900">{fmtPct(performer.completion_rate)}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span className="text-sm text-purple-600">{performer.on_time_rate}%</span>
+                    <span className="text-sm text-purple-600">{fmtPct(performer.on_time_rate)}</span>
                   </td>
                 </tr>
               ))}
@@ -500,7 +504,7 @@ export default function PerformanceReportTab() {
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-yellow-800 text-sm">{errors.overdue}</p>
             <p className="text-yellow-600 text-xs mt-2">
-              Vui lòng chạy SQL migration để kích hoạt tính năng này.
+              Bấm "Làm mới" ở bộ lọc để thử lại; vẫn lỗi thì báo IT (nội bộ 100).
             </p>
           </div>
         </div>
@@ -562,7 +566,7 @@ export default function PerformanceReportTab() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <span className="text-sm text-gray-600">
-                      {new Date(task.due_date).toLocaleDateString('vi-VN')}
+                      {fmtDate(task.due_date)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -592,7 +596,7 @@ export default function PerformanceReportTab() {
           <div>
             <p className="text-sm font-medium text-indigo-900">Phân tích hiệu suất</p>
             <p className="text-xs text-indigo-700 mt-1">
-              Đánh giá hiệu suất làm việc và top performers
+              Đánh giá hiệu suất làm việc và nhân viên tiêu biểu
             </p>
           </div>
         </div>

@@ -10,11 +10,11 @@ import { MailOutlined, SendOutlined } from '@ant-design/icons'
 import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type RawLotTongKet, type RawLotTongKetCa } from '../../services/wms/rawLotService'
 import { MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS } from '../../services/wms/mixService'
 import { guiMailKetThuc, nguoiNhanTuDong, taiPhieuAnh, type PhieuAnh } from '../../services/wms/maTongKetMail'
+// fmtKg chung (không làm tròn kg — chủ DN 31/10); trước đây chép đôi với khoCommon (finding #10)
+import { fmtKg, fmtDateShort as fmtD, fmtDateTime as fmtDt } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text, Title } = Typography
-const fmtKg = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: Math.max(d, 1), minimumFractionDigits: 0 }))   // không làm tròn kg (chủ DN 31/10): giữ số lẻ khi có
-const fmtD = (v: string | null | undefined) => (v ? new Date(v).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }) : '—')
-const fmtDt = (v: string | null | undefined) => (v ? new Date(v).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '—')
 const okEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
 
 export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onClose }: { rawLotId?: string | null; lenhId?: string | null; open: boolean; vuaKetThuc?: boolean; onClose: () => void }) {
@@ -31,7 +31,7 @@ export default function MaTongKetModal({ rawLotId, lenhId, open, vuaKetThuc, onC
     const req = lenhId ? rawLotService.tongKetLenh(lenhId) : rawLotService.tongKetMa(rawLotId ?? '')
     req
       .then((r) => { if (!alive) return; setTk(r); taiPhieuAnh(r).then((x) => { if (alive) setPhieu(x) }).catch(() => { if (alive) setPhieu([]) }) })
-      .catch((e: any) => { if (alive) setErr(e?.message || 'Không tổng kết được (cần chạy SQL p12 + p13)') })
+      .catch((e: any) => { if (alive) setErr(dichLoiHeThong(e, 'Không tổng kết được — hệ thống chưa sẵn sàng tính năng này, báo IT')) })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [open, rawLotId, lenhId])

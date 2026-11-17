@@ -16,7 +16,6 @@ import {
   Typography,
   Row,
   Col,
-  Tag,
   Statistic,
   message,
 } from 'antd'
@@ -27,38 +26,21 @@ import {
   ReloadOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
-import { ledgerService, PartnerBalance, ENTRY_TYPE_LABELS } from '../../../services/b2b/ledgerService'
+import { ledgerService, PartnerBalance } from '../../../services/b2b/ledgerService'
 import type { BalanceSummary } from '../../../services/b2b/ledgerService'
+import { TIER_LABELS, TIER_COLORS } from '../../../services/b2b/partnerService'
 import { exportPartnerBalances } from '../../../utils/b2bLedgerExportExcel'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import { DASH, fmtDate, fmtVndNum } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
+import EnumTag from '../../../components/common/EnumTag'
+import { stdPagination } from '../../../components/common/tableDefaults'
+import { palette } from '../../../theme/palette'
 
 const { Title, Text } = Typography
 
-// ============================================
-// CONSTANTS
-// ============================================
-
-const TIER_COLORS: Record<string, string> = {
-  diamond: 'purple',
-  gold: 'gold',
-  silver: 'default',
-  bronze: 'orange',
-  new: 'cyan',
-}
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-const formatCurrency = (value: number | null): string => {
-  if (!value) return '0'
-  return new Intl.NumberFormat('vi-VN').format(value)
-}
-
-const formatDate = (dateStr: string): string => {
-  return format(new Date(dateStr), 'dd/MM/yyyy', { locale: vi })
-}
+// Số tiền ở trang này in KHÔNG ký hiệu (cột/thẻ là "Tổng nợ/Tổng có/Số dư" VND) — 0 in "0".
+const formatCurrency = (value: number | null): string => fmtVndNum(value ?? 0)
 
 // ============================================
 // MAIN COMPONENT
@@ -72,6 +54,9 @@ const LedgerOverviewPage = () => {
   const [summary, setSummary] = useState<BalanceSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchText, setSearchText] = useState('')
+  // Lỗi tải: bảng hiện khối lỗi + Thử lại thay vì "không có đối tác" giả (audit 17/11/2026)
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [summaryError, setSummaryError] = useState(false)
 
   // ============================================
   // DATA FETCHING
@@ -80,11 +65,13 @@ const LedgerOverviewPage = () => {
   const fetchBalances = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const data = await ledgerService.getAllPartnerBalances()
       setBalances(data)
     } catch (error) {
       console.error('Error fetching balances:', error)
-      message.error('Không thể tải danh sách công nợ')
+      setLoadError(error)
+      message.error(dichLoiHeThong(error, 'Không thể tải danh sách công nợ'))
     } finally {
       setLoading(false)
     }
@@ -92,10 +79,14 @@ const LedgerOverviewPage = () => {
 
   const fetchSummary = useCallback(async () => {
     try {
+      setSummaryError(false)
       const data = await ledgerService.getBalanceSummary()
       setSummary(data)
     } catch (error) {
       console.error('Error fetching summary:', error)
+      // Thẻ tổng hiện '—' thay vì 0 giả khi không tải được
+      setSummary(null)
+      setSummaryError(true)
     }
   }, [])
 
@@ -169,9 +160,7 @@ const LedgerOverviewPage = () => {
               {record.partner_code}
             </Text>
             {record.partner_tier && (
-              <Tag color={TIER_COLORS[record.partner_tier]} style={{ fontSize: 10 }}>
-                {record.partner_tier.toUpperCase()}
-              </Tag>
+              <EnumTag value={record.partner_tier} labels={TIER_LABELS} colors={TIER_COLORS} style={{ fontSize: 10 }} />
             )}
           </Space>
         </Space>
@@ -184,7 +173,7 @@ const LedgerOverviewPage = () => {
       width: 150,
       align: 'right',
       render: (value) => (
-        <Text style={{ color: '#cf1322' }}>
+        <Text style={{ color: palette.danger }}>
           {formatCurrency(value)}
         </Text>
       ),
@@ -197,7 +186,7 @@ const LedgerOverviewPage = () => {
       width: 150,
       align: 'right',
       render: (value) => (
-        <Text style={{ color: '#389e0d' }}>
+        <Text style={{ color: palette.success }}>
           {formatCurrency(value)}
         </Text>
       ),
@@ -210,7 +199,7 @@ const LedgerOverviewPage = () => {
       width: 150,
       align: 'right',
       render: (value) => (
-        <Text strong style={{ color: value > 0 ? '#cf1322' : value < 0 ? '#389e0d' : undefined }}>
+        <Text strong style={{ color: value > 0 ? palette.danger : value < 0 ? palette.success : undefined }}>
           {formatCurrency(value)}
         </Text>
       ),
@@ -221,7 +210,7 @@ const LedgerOverviewPage = () => {
       dataIndex: 'last_entry_date',
       key: 'last_entry_date',
       width: 180,
-      render: (date) => (date ? formatDate(date) : '-'),
+      render: (date) => (date ? fmtDate(date) : DASH),
       sorter: (a, b) => {
         if (!a.last_entry_date) return -1
         if (!b.last_entry_date) return 1
@@ -282,8 +271,8 @@ const LedgerOverviewPage = () => {
             <Statistic
               title="Tổng nợ"
               value={summary?.total_debit || 0}
-              formatter={(value) => formatCurrency(value as number)}
-              valueStyle={{ color: '#cf1322' }}
+              formatter={(value) => (summaryError ? DASH : formatCurrency(value as number))}
+              valueStyle={{ color: palette.danger }}
             />
           </Card>
         </Col>
@@ -292,8 +281,8 @@ const LedgerOverviewPage = () => {
             <Statistic
               title="Tổng có"
               value={summary?.total_credit || 0}
-              formatter={(value) => formatCurrency(value as number)}
-              valueStyle={{ color: '#389e0d' }}
+              formatter={(value) => (summaryError ? DASH : formatCurrency(value as number))}
+              valueStyle={{ color: palette.success }}
             />
           </Card>
         </Col>
@@ -302,8 +291,8 @@ const LedgerOverviewPage = () => {
             <Statistic
               title="Số dư ròng"
               value={summary?.net_balance || 0}
-              formatter={(value) => formatCurrency(value as number)}
-              valueStyle={{ color: '#1B4D3E' }}
+              formatter={(value) => (summaryError ? DASH : formatCurrency(value as number))}
+              valueStyle={{ color: palette.brand }}
             />
           </Card>
         </Col>
@@ -312,7 +301,8 @@ const LedgerOverviewPage = () => {
             <Statistic
               title="Số đối tác"
               value={summary?.partner_count || 0}
-              valueStyle={{ color: '#1890ff' }}
+              formatter={(value) => (summaryError ? DASH : String(value))}
+              valueStyle={{ color: palette.info }}
             />
           </Card>
         </Col>
@@ -340,16 +330,16 @@ const LedgerOverviewPage = () => {
         </div>
 
         {/* Table */}
+        <PageState error={!loading && loadError} onRetry={fetchBalances}>
         <Table
           columns={columns}
           dataSource={filteredBalances}
           rowKey="partner_id"
           loading={loading}
-          pagination={{
-            showSizeChanger: true,
+          pagination={stdPagination(20, {
             showQuickJumper: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} đối tác`,
-          }}
+            showTotal: (total, range) => `${range[0]}–${range[1]} / ${total} đối tác`,
+          })}
           onRow={(record) => ({
             onClick: () => handleViewPartner(record.partner_id),
             style: { cursor: 'pointer' },
@@ -357,6 +347,7 @@ const LedgerOverviewPage = () => {
           scroll={{ x: 1080 }}
           style={{ padding: '0 24px 24px' }}
         />
+        </PageState>
       </Card>
     </div>
   )

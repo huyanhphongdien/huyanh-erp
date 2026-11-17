@@ -13,7 +13,8 @@
 import { Pagination, Skeleton, Tag } from 'antd'
 import dayjs from 'dayjs'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
-import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, soDisplayCode } from '../../../services/sales/salesTypes'
+import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, soDisplayCode, countryFlag } from '../../../services/sales/salesTypes'
+import { fmtNum, fmtDateShort } from '../../../utils/format'
 import { fmtMoney, isVnd } from '../../../services/sales/salesMoney'
 import { deliveredTons, remainingTons, type LotProgress } from '../../../services/logistics/dispatchService'
 import type { OrderLotMoney } from '../../../services/sales/salesOrderPaymentService'
@@ -38,15 +39,11 @@ const INK = '#111827'
 const SUB = '#6b7280'
 const BRAND = '#1B4D3E'
 
-const tons = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
-const date = (d?: string | null) => (d ? dayjs(d).format('DD/MM') : '—')
-
-/** Cờ từ mã nước ISO-2 (regional indicator) — không cần bảng tra như bản máy tính. */
-function flag(cc?: string | null): string {
-  const c = (cc || '').trim().toUpperCase()
-  if (!/^[A-Z]{2}$/.test(c)) return ''
-  return String.fromCodePoint(...[...c].map((ch) => 127397 + ch.charCodeAt(0)))
-}
+// Định dạng dùng chung (utils/format) — tấn vi-VN tối đa 2 số lẻ; ngày 'DD/MM' cho thẻ hẹp
+const tons = (n: number) => fmtNum(n, 2)
+const date = (d?: string | null) => fmtDateShort(d)
+// Cờ từ mã nước ISO-2: countryFlag (salesTypes) — bản gốc của hàm này nay dùng chung mọi màn
+const flag = countryFlag
 
 /** Viền trái: xanh = đã thanh toán · đỏ = quá hạn giao mà chưa xuất · xám = còn lại. */
 function accent(o: SalesOrder): string {

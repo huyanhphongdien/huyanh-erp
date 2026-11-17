@@ -17,6 +17,9 @@ import {
 import { supabase } from '../../../lib/supabase'
 import { useAuthStore } from '../../../stores/authStore'
 import { B2BSectionTabs, PARTNER_TABS } from '../../../components/b2b/B2BSectionTabs'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
+import { stdPagination } from '../../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -31,7 +34,7 @@ export default function PartnerRequestsPage() {
     partner_name: string; partner_code: string; phone: string; email: string; temp_password: string
   }>(null)
 
-  const { data: requests = [], isLoading } = useQuery({
+  const { data: requests = [], isLoading, error: loadError, refetch } = useQuery({
     queryKey: ['partner-requests'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -85,7 +88,7 @@ export default function PartnerRequestsPage() {
           verified_by_employee_id: user?.employee_id || null,
         },
       })
-      if (error) throw new Error(error.message || 'Edge function lỗi')
+      if (error) throw new Error(error.message || 'Lỗi máy chủ khi tạo tài khoản')
       if (!data?.ok) throw new Error(data?.error || 'Không tạo được tài khoản')
       return data as {
         ok: true; auth_user_id: string; email: string; temp_password: string;
@@ -103,7 +106,7 @@ export default function PartnerRequestsPage() {
         temp_password: res.temp_password,
       })
     },
-    onError: (err: Error) => message.error(err.message),
+    onError: (err: Error) => message.error(dichLoiHeThong(err, 'Duyệt đại lý thất bại')),
   })
 
   const rejectMutation = useMutation({
@@ -125,7 +128,7 @@ export default function PartnerRequestsPage() {
       setRejectReason('')
       queryClient.invalidateQueries({ queryKey: ['partner-requests'] })
     },
-    onError: (err: Error) => message.error(err.message),
+    onError: (err: Error) => message.error(dichLoiHeThong(err, 'Từ chối đại lý thất bại')),
   })
 
   const columns = [
@@ -244,15 +247,18 @@ export default function PartnerRequestsPage() {
       )}
 
       <Card style={{ borderRadius: 12 }}>
+        {/* Lỗi tải ≠ "Không có đại lý chờ duyệt" (audit 17/11/2026) */}
+        <PageState error={!isLoading && loadError} onRetry={() => refetch()}>
         <Table
           dataSource={requests}
           columns={columns}
           rowKey="id"
           loading={isLoading}
-          pagination={{ pageSize: 20 }}
+          pagination={stdPagination(20)}
           size="small"
           locale={{ emptyText: <Empty description="Không có đại lý chờ duyệt" /> }}
         />
+        </PageState>
       </Card>
 
       {/* Reject Modal */}

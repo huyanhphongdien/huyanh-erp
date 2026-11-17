@@ -18,7 +18,6 @@ import {
   Typography,
   Row,
   Col,
-  Tag,
   Alert,
   Statistic,
   Modal,
@@ -27,6 +26,7 @@ import {
   Result,
   Table,
   Descriptions,
+  DatePicker,
   message,
 } from 'antd'
 import {
@@ -39,9 +39,15 @@ import {
   ExperimentOutlined,
   PlayCircleOutlined,
 } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import { supabase } from '../../../lib/supabase'
 import productionService from '../../../services/wms/productionService'
 import GradeBadge from '../../../components/wms/GradeBadge'
+import EnumTag from '../../../components/common/EnumTag'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtDate } from '../../../utils/format'
+import { BATCH_QC_STATUS_LABELS, BATCH_QC_STATUS_COLORS } from '../qc/qcLabels'
 import type {
   ProductionFacility,
   ProductionMaterialSpec,
@@ -102,6 +108,9 @@ const ProductionCreatePage = () => {
   const [supervisors, setSupervisors] = useState<{ id: string; full_name: string }[]>([])
   const [rawBatches, setRawBatches] = useState<RawBatch[]>([])
   const [loadingBatches, setLoadingBatches] = useState(false)
+  // Lỗi tải lô NL ≠ "không có lô khả dụng" — hiện lỗi + Thử lại
+  const [batchErr, setBatchErr] = useState<unknown>(null)
+  const [batchReload, setBatchReload] = useState(0)
   const [loadingFacilities, setLoadingFacilities] = useState(true)
 
   // Submit
@@ -116,7 +125,10 @@ const ProductionCreatePage = () => {
       try {
         const facs = await productionService.getFacilities()
         setFacilities(facs)
-      } catch (err) { console.error(err) }
+      } catch (err) {
+        console.error(err)
+        message.error(dichLoiHeThong(err, 'Không tải được danh sách dây chuyền'))
+      }
 
       try {
         const { data } = await supabase
@@ -151,6 +163,7 @@ const ProductionCreatePage = () => {
     if (step !== 1) return
     const load = async () => {
       setLoadingBatches(true)
+      setBatchErr(null)
       try {
         const { data, error: err } = await supabase
           .from('stock_batches')
@@ -161,11 +174,11 @@ const ProductionCreatePage = () => {
           .order('created_at', { ascending: false })
         if (err) throw err
         setRawBatches((data || []) as RawBatch[])
-      } catch (err) { console.error(err) }
+      } catch (err) { console.error(err); setBatchErr(err) }
       setLoadingBatches(false)
     }
     load()
-  }, [step])
+  }, [step, batchReload])
 
   // Calculations
   const totalInputWeight = selectedBatches.reduce((s, b) => s + b.quantity, 0)
@@ -206,6 +219,8 @@ const ProductionCreatePage = () => {
   const handleSubmit = async (startProduction: boolean) => {
     setSaving(true)
     setError(null)
+    // Mã lệnh đã tạo — để báo đúng khi bước SAU (thêm NL / bắt đầu SX) lỗi: lệnh đã nằm trong sổ rồi
+    let maDaTao: string | null = null
     try {
       const formData: ProductionOrderFormData = {
         product_type: targetGrade || 'SVR',
@@ -220,6 +235,7 @@ const ProductionCreatePage = () => {
       }
 
       const order = await productionService.create(formData)
+      maDaTao = order.code
 
       // Add input batches
       for (const sb of selectedBatches) {
@@ -233,7 +249,11 @@ const ProductionCreatePage = () => {
 
       setSuccessCode(order.code)
     } catch (err: any) {
-      setError(err.message || 'Không thể tạo lệnh sản xuất')
+      const loi = dichLoiHeThong(err, 'Không tạo được lệnh sản xuất')
+      // Lệnh đã tạo mà bước sau lỗi → nói rõ, kẻo người dùng bấm lại và sinh lệnh TRÙNG
+      setError(maDaTao
+        ? `Đã tạo lệnh ${maDaTao} nhưng bước sau bị lỗi: ${loi}. Mở lệnh này trong danh sách Lệnh sản xuất để kiểm tra nguyên liệu — đừng bấm tạo lại (sẽ ra lệnh trùng).`
+        : loi)
     } finally {
       setSaving(false)
     }
@@ -249,8 +269,7 @@ const ProductionCreatePage = () => {
           subTitle={<Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18 }}>{successCode}</Text>}
           extra={[
             <Button key="list" onClick={() => navigate('/wms/production')}>Về danh sách</Button>,
-            <Button key="new" type="primary" onClick={() => window.location.reload()}
-              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
+            <Button key="new" type="primary" onClick={() => window.location.reload()}>
               Tạo lệnh mới
             </Button>,
           ]}
@@ -303,10 +322,8 @@ const ProductionCreatePage = () => {
       title: 'QC',
       dataIndex: 'qc_status',
       key: 'qc_status',
-      render: (v: string) => {
-        const color = v === 'passed' ? 'success' : v === 'failed' ? 'error' : 'default'
-        return <Tag color={color}>{v}</Tag>
-      },
+      // Nhãn QC của lô dùng chung (qcLabels) — trước đây in thô 'passed'/'failed'
+      render: (v: string) => <EnumTag value={v} labels={BATCH_QC_STATUS_LABELS} colors={BATCH_QC_STATUS_COLORS} />,
     },
     {
       title: '',
@@ -422,11 +439,12 @@ const ProductionCreatePage = () => {
           <Row gutter={24}>
             <Col span={8}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>Nhà máy</Text>
+                {/* production_facilities = dây chuyền sản xuất (không phải nhà máy PĐ/TL/Lào) */}
+                <Text strong>Dây chuyền</Text>
                 <Select
                   value={facilityId || undefined}
                   onChange={setFacilityId}
-                  placeholder="Chọn nhà máy"
+                  placeholder="Chọn dây chuyền"
                   style={{ width: '100%', marginTop: 4 }}
                   allowClear
                   loading={loadingFacilities}
@@ -458,10 +476,12 @@ const ProductionCreatePage = () => {
             <Col span={8}>
               <div style={{ marginBottom: 16 }}>
                 <Text strong>Ngày dự kiến</Text>
-                <Input
-                  type="date"
-                  value={scheduledDate}
-                  onChange={e => setScheduledDate(e.target.value)}
+                {/* DatePicker DD/MM/YYYY như sổ ca / sổ QC; state vẫn giữ 'YYYY-MM-DD' để lưu */}
+                <DatePicker
+                  value={scheduledDate ? dayjs(scheduledDate) : null}
+                  onChange={(d) => setScheduledDate(d ? d.format('YYYY-MM-DD') : '')}
+                  format="DD/MM/YYYY"
+                  placeholder="Chọn ngày"
                   style={{ width: '100%', marginTop: 4 }}
                   size="large"
                 />
@@ -500,7 +520,7 @@ const ProductionCreatePage = () => {
 
           <div style={{ textAlign: 'right' }}>
             <Button type="primary" size="large" onClick={() => setStep(1)} disabled={!canStep1}
-              icon={<ArrowRightOutlined />} style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
+              icon={<ArrowRightOutlined />}>
               Tiếp theo
             </Button>
           </div>
@@ -539,7 +559,7 @@ const ProductionCreatePage = () => {
                 </Col>
                 <Col span={8}>
                   <Card bodyStyle={{ padding: 12 }}>
-                    <Statistic title="Yield ước tính" value={estimatedYield.toFixed(1)} suffix="%"
+                    <Statistic title="Hiệu suất ước tính" value={estimatedYield.toFixed(1)} suffix="%"
                       valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'", color: '#E8A838' }} />
                   </Card>
                 </Col>
@@ -553,6 +573,8 @@ const ProductionCreatePage = () => {
           </Text>
           {loadingBatches ? (
             <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+          ) : batchErr ? (
+            <PageState error={batchErr} onRetry={() => setBatchReload((n) => n + 1)} />
           ) : availableBatches.length === 0 ? (
             <Empty description="Không có lô nguyên liệu khả dụng" style={{ padding: 40 }} />
           ) : (
@@ -569,7 +591,7 @@ const ProductionCreatePage = () => {
             <Space>
               <Button size="large" onClick={() => setStep(0)} icon={<ArrowLeftOutlined />}>Quay lại</Button>
               <Button type="primary" size="large" onClick={() => setStep(2)} disabled={!canStep2}
-                icon={<ArrowRightOutlined />} style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
+                icon={<ArrowRightOutlined />}>
                 Tiếp theo
               </Button>
             </Space>
@@ -589,7 +611,7 @@ const ProductionCreatePage = () => {
                 <Descriptions size="small" column={2} style={{ marginBottom: 16 }}>
                   <Descriptions.Item label="Lô">{selectedRawBatch.batch_no}</Descriptions.Item>
                   <Descriptions.Item label="Grade"><GradeBadge grade={selectedRawBatch.rubber_grade} size="small" /></Descriptions.Item>
-                  <Descriptions.Item label="DRC">{selectedRawBatch.latest_drc || selectedRawBatch.initial_drc || '—'}%</Descriptions.Item>
+                  <Descriptions.Item label="DRC">{(selectedRawBatch.latest_drc || selectedRawBatch.initial_drc) ? `${selectedRawBatch.latest_drc || selectedRawBatch.initial_drc}%` : '—'}</Descriptions.Item>
                   <Descriptions.Item label="Còn lại">{selectedRawBatch.quantity_remaining.toLocaleString('vi-VN')} kg</Descriptions.Item>
                 </Descriptions>
                 <Text strong style={{ display: 'block', marginBottom: 4 }}>Số lượng lấy (kg) *</Text>
@@ -625,14 +647,14 @@ const ProductionCreatePage = () => {
             <Descriptions.Item label="DRC mục tiêu">
               {drcMin && drcMax ? `${drcMin}% — ${drcMax}%` : '—'}
             </Descriptions.Item>
-            <Descriptions.Item label="Nhà máy">
+            <Descriptions.Item label="Dây chuyền">
               {facilities.find(f => f.id === facilityId)?.name || '—'}
             </Descriptions.Item>
             <Descriptions.Item label="Giám sát">
               {supervisors.find(s => s.id === supervisorId)?.full_name || '—'}
             </Descriptions.Item>
             <Descriptions.Item label="Ngày dự kiến">
-              {scheduledDate || '—'}
+              {fmtDate(scheduledDate)}
             </Descriptions.Item>
             {notes && <Descriptions.Item label="Ghi chú" span={2}>{notes}</Descriptions.Item>}
           </Descriptions>
@@ -659,7 +681,7 @@ const ProductionCreatePage = () => {
             </Col>
             <Col span={6}>
               <Card bodyStyle={{ padding: 12 }}>
-                <Statistic title="Yield ước tính" value={estimatedYield.toFixed(1)} suffix="%"
+                <Statistic title="Hiệu suất ước tính" value={estimatedYield.toFixed(1)} suffix="%"
                   valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'", color: '#E8A838' }} />
               </Card>
             </Col>
@@ -683,8 +705,7 @@ const ProductionCreatePage = () => {
             </Button>
             <Button type="primary" size="large" onClick={() => handleSubmit(true)} loading={saving}
               disabled={!canConfirm}
-              icon={<PlayCircleOutlined />}
-              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
+              icon={<PlayCircleOutlined />}>
               Xác nhận & Bắt đầu SX
             </Button>
           </Space>

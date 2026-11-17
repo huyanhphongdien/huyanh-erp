@@ -2,10 +2,13 @@
 // STOCK IN DETAIL PAGE — Ant Design + Rubber Info
 // File: src/pages/wms/stock-in/StockInDetailPage.tsx
 // Rewrite: Tailwind -> Ant Design v6, them rubber supplier/grade/dry weight
+// Đợt 3 audit UI (17/11/2026): nút "In phiếu" in thật (bản A4 @media print), nhãn/màu
+// trạng thái + nguồn nhập dùng chung stockInLabels, "Kho (kg)" → "KL khô (kg)" (dry_weight).
 // ============================================================================
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, type CSSProperties } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import dayjs from 'dayjs'
 import { useOpenDealTab } from '../../../hooks/useB2BTabs'
 import {
   Card,
@@ -43,6 +46,15 @@ import { useAuthStore } from '../../../stores/authStore'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import { QCBadge } from '../../../components/wms/QCInputForm'
 import { rubberGradeService } from '../../../services/wms/rubberGradeService'
+import { RUBBER_GRADE_LABELS, type RubberGrade } from '../../../services/wms/wms.types'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtDateTime, fmtKg, fmtNum, fmtVnd } from '../../../utils/format'
+import {
+  STOCK_IN_SOURCE_LABELS, STOCK_IN_STATUS_LABELS, STOCK_IN_STATUS_COLORS,
+} from './stockInLabels'
+import { BATCH_QC_STATUS_LABELS } from '../qc/qcLabels'
+import PhieuKhoPrintPortal from '../PhieuKhoPrintPortal'
+import PageState from '../../../components/common/PageState'
 
 const { Title, Text } = Typography
 
@@ -104,27 +116,15 @@ interface OrderData {
 // CONSTANTS
 // ============================================================================
 
-const SOURCE_LABELS: Record<string, string> = {
-  production: 'Sản xuất',
-  purchase: 'Mua hàng',
-  blend: 'Phối trộn',
-  transfer: 'Chuyển kho',
-  adjust: 'Điều chỉnh',
-}
-
-const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-  draft: { color: 'default', label: 'Nháp' },
-  confirmed: { color: 'success', label: 'Đã nhập kho' },
-  cancelled: { color: 'error', label: 'Đã hủy' },
-}
+// Một nguồn nhãn với Sổ nhập kho (bản cũ ở đây thiếu 'Khách trả' / 'Đóng gói lại' → hiện mã thô)
+const SOURCE_LABELS = STOCK_IN_SOURCE_LABELS
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-function formatDateTime(d: string): string {
-  return new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
+// Chuẩn ngày-giờ toàn hệ (format.ts): 'DD/MM HH:mm', thêm /YYYY khi khác năm nay
+const formatDateTime = (d: string): string => fmtDateTime(d)
 
 async function getEmployeeName(empId: string | null): Promise<string> {
   if (!empId) return '—'
@@ -156,6 +156,8 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
   const [confirming, setConfirming] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  // Gốc trang — PhieuKhoPrintPortal dựa vào nó để biết trang có đang hiện khi in
+  const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!id) return
@@ -248,7 +250,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
           })),
         })
       } catch (err: any) {
-        setError(err.message || 'Không thể tải du lieu')
+        setError(dichLoiHeThong(err, 'Không thể tải dữ liệu phiếu nhập'))
       } finally {
         setLoading(false)
       }
@@ -272,7 +274,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
           message.success(`Đã xác nhận nhập phiếu ${order.code}`)
           setReloadKey(k => k + 1)
         } catch (err: any) {
-          message.error(err?.message || 'Không thể xác nhận nhập kho')
+          message.error(dichLoiHeThong(err, 'Không thể xác nhận nhập kho'))
         } finally {
           setConfirming(false)
         }
@@ -296,7 +298,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
           message.success(`Đã huỷ phiếu ${order.code}`)
           setReloadKey(k => k + 1)
         } catch (err: any) {
-          message.error(err?.message || 'Không thể huỷ phiếu nhập kho')
+          message.error(dichLoiHeThong(err, 'Không thể huỷ phiếu nhập kho'))
         } finally {
           setCancelling(false)
         }
@@ -305,22 +307,28 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
   }
 
   if (loading) {
-    return <div style={{ padding: 24, textAlign: 'center', paddingTop: 100 }}><Spin size="large" /></div>
+    return <div style={{ padding: 24 }}><PageState loading minHeight={240} /></div>
   }
 
   if (!order) {
     return (
       <div style={{ padding: 24 }}>
-        {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon />}
-        <Empty description="Không tìm thấy phiếu nhập kho" />
+        {error && <Alert type="error" message="Không tải được phiếu nhập kho" description={error} style={{ marginBottom: 16 }} showIcon />}
+        {!error && <Empty description="Không tìm thấy phiếu nhập kho" />}
         <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <Button onClick={() => navigate('/wms/stock-in')}>Quay lại</Button>
+          <Space>
+            {error && <Button onClick={() => setReloadKey(k => k + 1)}>Thử lại</Button>}
+            <Button onClick={() => navigate('/wms/stock-in')}>Quay lại</Button>
+          </Space>
         </div>
       </div>
     )
   }
 
-  const statusCfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.draft
+  const statusCfg = {
+    color: STOCK_IN_STATUS_COLORS[order.status] || 'default',
+    label: STOCK_IN_STATUS_LABELS[order.status] || order.status,
+  }
   const totalDryWeight = order.details.reduce((s, d) => s + (d.dry_weight || 0), 0)
 
   // QC summary
@@ -336,7 +344,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
   // Detail table columns
   const detailColumns = [
     {
-      title: 'Lo',
+      title: 'Mã lô',
       dataIndex: 'batch_no',
       key: 'batch_no',
       render: (v: string) => <Text strong style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{v}</Text>,
@@ -365,7 +373,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
       align: 'right' as const,
       render: (v: number, r: OrderDetail) => (
         <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          {v.toLocaleString('vi-VN')} {r.unit}
+          {fmtNum(v)} {r.unit}
         </Text>
       ),
     },
@@ -374,8 +382,8 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
       dataIndex: 'weight',
       key: 'weight',
       align: 'right' as const,
-      render: (v: number | null) => v ? (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v.toLocaleString('vi-VN')}</Text>
+      render: (v: number | null) => v != null ? (
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmtKg(v)}</Text>
       ) : '—',
     },
     {
@@ -388,12 +396,13 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
       ) : '—',
     },
     {
-      title: 'Kho (kg)',
+      // dry_weight = khối lượng KHÔ (trước ghi "Kho (kg)" — đọc thành "khối lượng kho")
+      title: 'KL khô (kg)',
       dataIndex: 'dry_weight',
       key: 'dry_weight',
       align: 'right' as const,
-      render: (v: number | null) => v ? (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace", color: '#2D8B6E' }}>{v.toLocaleString('vi-VN')}</Text>
+      render: (v: number | null) => v != null ? (
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace", color: '#2D8B6E' }}>{fmtKg(v)}</Text>
       ) : '—',
     },
     {
@@ -411,7 +420,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
   ]
 
   return (
-    <div style={{ padding: 24 }}>
+    <div ref={rootRef} style={{ padding: 24 }}>
       {/* Header */}
       <Space style={{ marginBottom: 16 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/stock-in')}>
@@ -454,7 +463,8 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
                 </Button>
               </>
             )}
-            <Button icon={<PrinterOutlined />}>In phiếu</Button>
+            {/* In thật: bản A4 ở cuối trang, chỉ hiện khi in (trước đây nút không có onClick) */}
+            <Button icon={<PrinterOutlined />} onClick={() => window.print()}>In phiếu</Button>
           </Space>
         </Col>
       </Row>
@@ -502,7 +512,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
               </Space>
               {order.deal.quantity_kg && (
                 <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
-                  SL Deal: {(order.deal.quantity_kg / 1000).toFixed(1)} T · Don gia: {order.deal.unit_price?.toLocaleString('vi-VN')} d/kg
+                  SL Deal: {fmtNum(order.deal.quantity_kg / 1000, 1)} tấn · Đơn giá: {fmtVnd(order.deal.unit_price)}/kg
                 </Text>
               )}
             </Col>
@@ -529,24 +539,25 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
                 return units.length === 1 ? units[0] : 'đv'
               })()}
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }}
+              formatter={(v) => fmtNum(Number(v))}
             />
           </Card>
         </Col>
         <Col xs={6}>
           <Card bodyStyle={{ padding: 12 }}>
-            <Statistic title="Trọng lượng" value={((order.total_weight || 0) / 1000).toFixed(1)} suffix="T"
+            <Statistic title="Trọng lượng" value={fmtNum((order.total_weight || 0) / 1000, 1)} suffix="tấn"
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
         <Col xs={6}>
           <Card bodyStyle={{ padding: 12 }}>
-            <Statistic title="TL kho (dry)" value={(totalDryWeight / 1000).toFixed(1)} suffix="T"
+            <Statistic title="KL khô" value={fmtNum(totalDryWeight / 1000, 1)} suffix="tấn"
               valueStyle={{ fontSize: 18, color: '#2D8B6E', fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
         <Col xs={6}>
           <Card bodyStyle={{ padding: 12 }}>
-            <Statistic title="Số lô" value={order.details.length} suffix="lo"
+            <Statistic title="Số lô" value={order.details.length} suffix="lô"
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
@@ -559,10 +570,10 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
           message={
             <Space>
               <span>QC:</span>
-              {qcCounts.passed > 0 && <Tag color="success">{qcCounts.passed} dat</Tag>}
-              {qcCounts.warning > 0 && <Tag color="warning">{qcCounts.warning} canh bao</Tag>}
-              {qcCounts.failed > 0 && <Tag color="error">{qcCounts.failed} khong dat</Tag>}
-              {qcCounts.pending > 0 && <Tag>{qcCounts.pending} cho</Tag>}
+              {qcCounts.passed > 0 && <Tag color="green">{qcCounts.passed} đạt</Tag>}
+              {qcCounts.warning > 0 && <Tag color="gold">{qcCounts.warning} cảnh báo</Tag>}
+              {qcCounts.failed > 0 && <Tag color="red">{qcCounts.failed} không đạt</Tag>}
+              {qcCounts.pending > 0 && <Tag>{qcCounts.pending} chờ QC</Tag>}
             </Space>
           }
           showIcon
@@ -589,7 +600,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
               color: 'green',
               children: (
                 <div>
-                  <Text strong>Tạo phiếu nhap</Text>
+                  <Text strong>Tạo phiếu nhập</Text>
                   <br />
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     {formatDateTime(order.created_at)} — {order.created_by_name}
@@ -617,13 +628,147 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
               color: 'gray' as const,
               children: (
                 <div>
-                  <Text type="secondary">Cho xac nhan...</Text>
+                  <Text type="secondary">Chờ xác nhận…</Text>
                 </div>
               ),
             }] : []),
           ]}
         />
       </Card>
+
+      {/* ===== BẢN IN A4 — portal ra <body>, chỉ hiện khi in từ CHÍNH trang này ===== */}
+      <PhieuKhoPrintPortal rootRef={rootRef}><StockInPrintSheet order={order} /></PhieuKhoPrintPortal>
+    </div>
+  )
+}
+
+// ============================================================================
+// BẢN IN A4 — phiếu nhập kho (nội dung theo khuôn phiếu cân của WeighbridgeDetailPage — Đợt 1;
+// cơ chế in ở PhieuKhoPrintPortal)
+// ============================================================================
+
+const MONO = "'JetBrains Mono', monospace"
+const P_TD_LABEL: CSSProperties = { border: '1px solid #D1D5DB', background: '#F9FAFB', padding: '5px 8px', fontWeight: 600, color: '#374151', width: 110 }
+const P_TD_VALUE: CSSProperties = { border: '1px solid #D1D5DB', padding: '5px 8px' }
+const P_TH: CSSProperties = { border: '1px solid #9CA3AF', background: '#F3F4F6', padding: '5px 6px', fontWeight: 700, fontSize: 11.5, textAlign: 'center' }
+const P_TD: CSSProperties = { border: '1px solid #D1D5DB', padding: '4px 6px', fontSize: 12 }
+const P_NUM: CSSProperties = { ...P_TD, textAlign: 'right', fontFamily: MONO }
+// Giấy lưu trữ → LUÔN in đủ năm (fmtDateTime bỏ năm khi cùng năm nay, đọc lại năm sau là mất mốc)
+const fmtNgayGioIn = (v: string | Date | null | undefined): string => {
+  const d = v ? dayjs(v) : null
+  return d && d.isValid() ? d.format('DD/MM/YYYY HH:mm') : '—'
+}
+
+function StockInPrintSheet({ order }: { order: OrderData }) {
+  const totalQty = order.details.reduce((s, d) => s + (d.quantity || 0), 0)
+  const totalWeight = order.details.reduce((s, d) => s + (d.weight || 0), 0)
+  const totalDry = order.details.reduce((s, d) => s + (d.dry_weight || 0), 0)
+  return (
+    <div style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 13, color: '#111' }}>
+      {/* Header công ty */}
+      <div style={{ borderBottom: '2px solid #1B4D3E', paddingBottom: 8, marginBottom: 10 }}>
+        <div style={{ fontSize: 12, fontWeight: 600 }}>CÔNG TY TNHH MỘT THÀNH VIÊN</div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#1B4D3E' }}>CAO SU HUY ANH PHONG ĐIỀN</div>
+        <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>Khe Mạ, Phường Phong Điền, TP Huế · MST: 3301549896</div>
+      </div>
+
+      {/* Tiêu đề */}
+      <div style={{ textAlign: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 2 }}>PHIẾU NHẬP KHO</div>
+        <div style={{ fontSize: 13, marginTop: 2 }}>Số: <strong style={{ fontFamily: MONO, color: '#92400E' }}>{order.code}</strong></div>
+        <div style={{ fontSize: 12, color: '#6B7280' }}>Ngày tạo: {fmtNgayGioIn(order.created_at)}</div>
+        {order.status !== 'confirmed' && (
+          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: order.status === 'cancelled' ? '#DC2626' : '#B45309' }}>
+            ({STOCK_IN_STATUS_LABELS[order.status] || order.status})
+          </div>
+        )}
+      </div>
+
+      {/* Thông tin phiếu */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 10 }}>
+        <tbody>
+          <tr>
+            <td style={P_TD_LABEL}>Kho nhập</td>
+            <td style={P_TD_VALUE}>{order.warehouse_name}{order.warehouse_code ? ` (${order.warehouse_code})` : ''}</td>
+            <td style={P_TD_LABEL}>Nguồn nhập</td>
+            <td style={P_TD_VALUE}>{STOCK_IN_SOURCE_LABELS[order.source_type] || order.source_type}</td>
+          </tr>
+          <tr>
+            <td style={P_TD_LABEL}>Đại lý / NCC</td>
+            <td style={P_TD_VALUE}>{order.supplier_name || '—'}{order.supplier_region ? ` · ${order.supplier_region}` : ''}</td>
+            <td style={P_TD_LABEL}>Deal</td>
+            <td style={P_TD_VALUE}>{order.deal?.deal_number || '—'}</td>
+          </tr>
+          <tr>
+            <td style={P_TD_LABEL}>Người lập</td>
+            <td style={P_TD_VALUE}>{order.created_by_name}</td>
+            <td style={P_TD_LABEL}>Ngày nhập</td>
+            <td style={P_TD_VALUE}>{fmtNgayGioIn(order.confirmed_at)}</td>
+          </tr>
+          {order.notes && (
+            <tr>
+              <td style={P_TD_LABEL}>Ghi chú</td>
+              <td style={{ ...P_TD_VALUE, whiteSpace: 'pre-wrap' }} colSpan={3}>{order.notes}</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {/* Chi tiết lô nhập */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 10 }}>
+        <thead>
+          <tr>
+            <th style={{ ...P_TH, width: 28 }}>#</th>
+            <th style={P_TH}>Mã lô</th>
+            <th style={P_TH}>Vật liệu</th>
+            <th style={P_TH}>Grade</th>
+            <th style={P_TH}>Vị trí</th>
+            <th style={P_TH}>QC</th>
+            <th style={P_TH}>DRC</th>
+            <th style={P_TH}>Số lượng</th>
+            <th style={P_TH}>KL (kg)</th>
+            <th style={P_TH}>KL khô (kg)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {order.details.map((d, i) => (
+            <tr key={d.id}>
+              <td style={{ ...P_TD, textAlign: 'center' }}>{i + 1}</td>
+              <td style={{ ...P_TD, fontFamily: MONO }}>{d.batch_no}</td>
+              <td style={P_TD}>{d.material_sku ? `${d.material_sku} — ` : ''}{d.material_name}</td>
+              <td style={{ ...P_TD, textAlign: 'center' }}>{d.rubber_grade ? (RUBBER_GRADE_LABELS[d.rubber_grade as RubberGrade] || d.rubber_grade) : '—'}</td>
+              <td style={{ ...P_TD, textAlign: 'center' }}>{d.location_code || '—'}</td>
+              <td style={{ ...P_TD, textAlign: 'center' }}>{BATCH_QC_STATUS_LABELS[d.qc_status] || d.qc_status}</td>
+              <td style={P_NUM}>{d.drc_value != null ? `${fmtNum(d.drc_value, 1)}%` : '—'}</td>
+              <td style={P_NUM}>{fmtNum(d.quantity)} {d.unit}</td>
+              <td style={P_NUM}>{fmtKg(d.weight)}</td>
+              <td style={P_NUM}>{fmtKg(d.dry_weight)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td style={{ ...P_TD, fontWeight: 700 }} colSpan={7}>Tổng cộng ({order.details.length} lô)</td>
+            <td style={{ ...P_NUM, fontWeight: 700 }}>{fmtNum(totalQty)}</td>
+            <td style={{ ...P_NUM, fontWeight: 700 }}>{fmtKg(totalWeight)}</td>
+            <td style={{ ...P_NUM, fontWeight: 700 }}>{fmtKg(totalDry)}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      {/* Chữ ký */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28, textAlign: 'center', gap: 12, fontSize: 13 }}>
+        {['Người lập phiếu', 'Người giao hàng', 'Thủ kho'].map(t => (
+          <div key={t} style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, marginBottom: 56 }}>{t}</div>
+            <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: 11, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 12, textAlign: 'center', fontSize: 10, color: '#9CA3AF', borderTop: '1px solid #E5E7EB', paddingTop: 6 }}>
+        In từ hệ thống ERP Huy Anh — {fmtNgayGioIn(new Date())}
+      </div>
     </div>
   )
 }

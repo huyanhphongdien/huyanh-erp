@@ -8,23 +8,22 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import {
   getExceptionCounts, getOverdueTasks, getPendingApprovalTasks,
-  getPendingSelfEvalTasks, approveTasks, exemptOverdue, getJournal,
+  getPendingSelfEvalTasks, approveTasks, exemptOverdue, getJournal, remindOverdue, ddmmyyyy, workCategoryLabel,
   type ExcTask,
 } from '../../services/taskExceptionService'
+import { overdueDaysUntilToday, DEFAULT_MANAGER_STARS, starsToPoints, FORMULA_TEXT } from '../../services/taskScoring'
+import { TASK_STATUS_LABELS } from '../../types'
+import { getEvaluationStatusLabel } from '../../features/tasks/utils/taskPermissions'
+import { useAuthStore } from '../../stores/authStore'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 type Tab = 'overdue' | 'approval' | 'selfeval'
 
 const TABS: { key: Tab; label: string; hint: string }[] = [
-  { key: 'overdue', label: 'Trễ hạn', hint: 'Quá hạn mà chưa xong — cần nhắc hoặc miễn trễ' },
+  { key: 'overdue', label: 'Trễ hạn', hint: 'Quá hạn mà chưa xong — nhắc người làm hoặc miễn trễ' },
   { key: 'approval', label: 'Chờ duyệt', hint: 'Đã làm xong, chờ anh gật' },
   { key: 'selfeval', label: 'Kẹt tự đánh giá', hint: 'Thợ chưa tự chấm → luồng đang tắc' },
 ]
-
-function daysLate(due: string | null): number {
-  if (!due) return 0
-  const d = new Date(due + 'T00:00:00')
-  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000))
-}
 function firstOfMonth() {
   const n = new Date()
   return new Date(n.getFullYear(), n.getMonth(), 1).toLocaleDateString('en-CA')
@@ -35,10 +34,12 @@ function todayStr() {
 
 export default function TaskExceptionsPage() {
   const qc = useQueryClient()
+  const { user } = useAuthStore()
   const [tab, setTab] = useState<Tab>('overdue')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const [stars, setStars] = useState(DEFAULT_MANAGER_STARS)
   const [from, setFrom] = useState(firstOfMonth())
   const [to, setTo] = useState(todayStr())
 
@@ -58,18 +59,29 @@ export default function TaskExceptionsPage() {
   function toggleAll() {
     setSel(allChecked ? new Set() : new Set(rows.map(r => r.id)))
   }
-  async function act(kind: 'approve' | 'exempt') {
+  async function act(kind: 'approve' | 'exempt' | 'remind') {
     const ids = [...sel]
     if (!ids.length) return
     setBusy(true); setMsg(null)
     try {
-      const n = kind === 'approve' ? await approveTasks(ids) : await exemptOverdue(ids)
-      setMsg(`✅ Đã ${kind === 'approve' ? 'duyệt' : 'miễn trễ'} ${n} việc`)
-      setSel(new Set())
-      qc.invalidateQueries({ queryKey: ['task-exc-list'] })
-      qc.invalidateQueries({ queryKey: ['task-exc-counts'] })
+      if (kind === 'approve') {
+        const res = await approveTasks(ids, stars, user?.employee_id || '')
+        const fail = res.failed.length ? ` · ❌ ${res.failed.length} việc lỗi: ${dichLoiHeThong(res.failed[0].error, 'không duyệt được')}` : ''
+        setMsg(`✅ Đã duyệt ${res.ok.length} việc (QL ${stars}★, điểm cuối theo công thức chung)${fail}`)
+      } else if (kind === 'remind') {
+        const n = await remindOverdue(rows.filter(r => sel.has(r.id)), user?.employee_id)
+        setMsg(n ? `✅ Đã nhắc ${n} người làm` : '⚠ Các việc đã chọn chưa có người làm để nhắc')
+      } else {
+        const n = await exemptOverdue(ids)
+        setMsg(`✅ Đã miễn trễ ${n} việc`)
+      }
+      if (kind !== 'remind') {
+        setSel(new Set())
+        qc.invalidateQueries({ queryKey: ['task-exc-list'] })
+        qc.invalidateQueries({ queryKey: ['task-exc-counts'] })
+      }
     } catch (e: any) {
-      setMsg('❌ ' + (e?.message || 'Lỗi'))
+      setMsg('❌ ' + dichLoiHeThong(e, 'Thao tác thất bại'))
     } finally { setBusy(false) }
   }
 
@@ -179,15 +191,31 @@ export default function TaskExceptionsPage() {
         <div className="flex flex-wrap items-center gap-2 mb-3 p-3 bg-gray-50 border rounded-xl">
           <span className="text-sm font-semibold">Đã chọn {sel.size} việc</span>
           {tab === 'overdue' ? (
-            <button onClick={() => act('exempt')} disabled={busy}
-              className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold disabled:opacity-60">
-              Miễn trễ (chấp nhận ngoại lệ)
-            </button>
+            <>
+              <button onClick={() => act('remind')} disabled={busy}
+                className="px-3 py-1.5 rounded-lg bg-white border border-rose-300 text-rose-700 text-sm font-semibold disabled:opacity-60">
+                Nhắc người làm
+              </button>
+              <button onClick={() => act('exempt')} disabled={busy}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold disabled:opacity-60">
+                Miễn trễ (chấp nhận ngoại lệ)
+              </button>
+            </>
           ) : (
-            <button onClick={() => act('approve')} disabled={busy}
-              className="px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-sm font-semibold disabled:opacity-60">
-              Duyệt {sel.size} việc
-            </button>
+            <>
+              <span className="flex items-center gap-1 text-sm" title={FORMULA_TEXT}>
+                QL chấm
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button key={n} type="button" onClick={() => setStars(n)} aria-label={`${n} sao`}
+                    className={`text-lg leading-none px-0.5 ${n <= stars ? 'text-amber-500' : 'text-gray-300'}`}>★</button>
+                ))}
+                <span className="text-gray-500 tabular-nums">({starsToPoints(stars)}đ)</span>
+              </span>
+              <button onClick={() => act('approve')} disabled={busy}
+                className="px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-sm font-semibold disabled:opacity-60">
+                Duyệt {sel.size} việc
+              </button>
+            </>
           )}
           <button onClick={() => setSel(new Set())} className="px-3 py-1.5 rounded-lg border text-sm">Bỏ chọn</button>
         </div>
@@ -217,20 +245,24 @@ export default function TaskExceptionsPage() {
                 </td></tr>
               )}
               {rows.map((t: ExcTask) => {
-                const late = daysLate(t.due_date)
+                const late = overdueDaysUntilToday(t.due_date)
                 return (
                   <tr key={t.id} className="border-t hover:bg-gray-50">
                     <td className="p-3"><input type="checkbox" checked={sel.has(t.id)} onChange={() => toggle(t.id)} /></td>
                     <td className="p-3">
                       <div className="font-medium text-gray-900">{t.name}</div>
-                      <div className="text-[11px] text-gray-400">{t.code}{t.work_category ? ` · ${t.work_category}` : ''}</div>
+                      <div className="text-[11px] text-gray-400">{t.code}{t.work_category ? ` · ${workCategoryLabel(t.work_category)}` : ''}</div>
                     </td>
                     <td className="p-3 whitespace-nowrap">{t.assignee?.full_name || '—'}</td>
-                    <td className="p-3 whitespace-nowrap tabular-nums">{t.due_date || '—'}</td>
+                    <td className="p-3 whitespace-nowrap tabular-nums">{ddmmyyyy(t.due_date) || '—'}</td>
                     <td className="p-3 whitespace-nowrap">
                       {tab === 'overdue'
                         ? <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold">Trễ {late} ngày</span>
-                        : <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">{t.status}</span>}
+                        : <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
+                            {TASK_STATUS_LABELS[t.status] || t.status}
+                            {t.evaluation_status ? ` · ${getEvaluationStatusLabel(t.evaluation_status)}` : ''}
+                            {typeof t.self_score === 'number' ? ` · tự chấm ${t.self_score}` : ''}
+                          </span>}
                     </td>
                     <td className="p-3 text-right">
                       <Link to={`/tasks/${t.id}`} className="text-emerald-700 font-semibold hover:underline whitespace-nowrap">Xem ›</Link>

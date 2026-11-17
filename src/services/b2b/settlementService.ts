@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { fmtVnd } from '../../utils/format'
 
 // ============================================
 // TYPES
@@ -557,8 +558,8 @@ export const settlementService = {
     const totalAdvance = current.total_advance || 0
     if (totalAdvance > grossAmount && grossAmount > 0 && current.settlement_type !== 'processing') {
       throw new Error(
-        `Tổng tạm ứng (${totalAdvance.toLocaleString('vi-VN')} đ) lớn hơn giá trị quyết toán ` +
-        `(${grossAmount.toLocaleString('vi-VN')} đ). Không thể duyệt — vui lòng điều chỉnh advance hoặc amount.`,
+        `Tổng tạm ứng (${fmtVnd(totalAdvance)}) lớn hơn giá trị quyết toán ` +
+        `(${fmtVnd(grossAmount)}). Không thể duyệt — vui lòng điều chỉnh tạm ứng hoặc giá trị quyết toán.`,
       )
     }
 
@@ -612,7 +613,7 @@ export const settlementService = {
         deal_id: current.deal_id,
         settlement_id: id,
         title: `Phiếu quyết toán ${current.code} đã duyệt`,
-        message: `Giá trị: ${(current.gross_amount || 0).toLocaleString('vi-VN')} đ`,
+        message: `Giá trị: ${fmtVnd(current.gross_amount || 0)}`,
         created_by: approvedBy,
       })
     } catch (err) { console.error('B2B notification settlement approved:', err) }

@@ -20,7 +20,6 @@ import {
   Input,
   InputNumber,
   Switch,
-  Alert,
   message,
 } from 'antd'
 import {
@@ -33,7 +32,13 @@ import {
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import productionService from '../../../services/wms/productionService'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import type { ProductionFacility } from '../../../services/wms/wms.types'
+
+// ⚠ production_facilities = DÂY CHUYỀN sản xuất (seed LINE-01 "Dây chuyền 1"), KHÔNG phải bảng
+//   facilities (3 nhà máy PĐ/TL/Lào) — xem multi_facility_foundation.sql. Trang này vì thế gọi là
+//   "Dây chuyền sản xuất", cùng tên với menu "Dây chuyền" (audit 17/11/2026: trước có 3 tên cho 1 màn).
 
 const { Title, Text } = Typography
 
@@ -66,7 +71,7 @@ const ProductionFacilitiesPage = () => {
       if (err) throw err
       setFacilities((data || []) as ProductionFacility[])
     } catch (err: any) {
-      setError(err.message || 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không tải được danh sách dây chuyền'))
     } finally {
       setLoading(false)
     }
@@ -115,13 +120,13 @@ const ProductionFacilitiesPage = () => {
           .update(payload)
           .eq('id', editingId)
         if (err) throw err
-        message.success('Cập nhật nhà máy thành công')
+        message.success('Đã cập nhật dây chuyền')
       } else {
         const { error: err } = await supabase
           .from('production_facilities')
           .insert(payload)
         if (err) throw err
-        message.success('Thêm nhà máy thành công')
+        message.success('Đã thêm dây chuyền')
       }
 
       setShowModal(false)
@@ -130,17 +135,34 @@ const ProductionFacilitiesPage = () => {
       loadData()
     } catch (err: any) {
       if (err.errorFields) return
-      message.error(err.message || 'Không thể lưu')
+      message.error(dichLoiHeThong(err, 'Không lưu được dây chuyền'))
     } finally {
       setSaving(false)
     }
   }
 
+  // Dây chuyền đã có lệnh SX (production_orders.facility_id, FK không ON DELETE) thì KHÔNG xoá được —
+  // trước đây lỗi khoá ngoại Postgres hiện nguyên văn tiếng Anh. Giờ: bắt mã 23503 và mời Ngưng hoạt động.
+  const ngungHoatDong = async (facility: ProductionFacility) => {
+    try {
+      const { error: err } = await supabase
+        .from('production_facilities')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', facility.id)
+      if (err) throw err
+      message.success(`Đã ngưng hoạt động "${facility.name}"`)
+      loadData()
+    } catch (err: any) {
+      message.error(dichLoiHeThong(err, 'Không ngưng hoạt động được dây chuyền'))
+    }
+  }
+
   const handleDelete = (facility: ProductionFacility) => {
     Modal.confirm({
-      title: `Xóa nhà máy "${facility.name}"?`,
-      content: 'Hành động này không thể hoàn tác.',
-      okText: 'Xóa',
+      title: `Xoá dây chuyền "${facility.name}"?`,
+      content: 'Chỉ xoá được dây chuyền CHƯA có lệnh sản xuất nào, và không hoàn tác được. Dây chuyền đã dùng thì chuyển sang Ngưng hoạt động.',
+      okText: 'Xoá',
+      cancelText: 'Không xoá',
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
@@ -149,10 +171,24 @@ const ProductionFacilitiesPage = () => {
             .delete()
             .eq('id', facility.id)
           if (err) throw err
-          message.success('Đã xóa nhà máy')
+          message.success('Đã xoá dây chuyền')
           loadData()
         } catch (err: any) {
-          message.error(err.message || 'Không thể xóa')
+          if (err?.code === '23503') {
+            if (!facility.is_active) {
+              message.warning(`"${facility.name}" đã có lệnh sản xuất nên không xoá được — dây chuyền đang ở trạng thái Ngưng.`)
+              return
+            }
+            Modal.confirm({
+              title: `Không xoá được "${facility.name}"`,
+              content: 'Dây chuyền này đã có lệnh sản xuất nên phải giữ lại để truy xuất. Chuyển sang Ngưng hoạt động? Lệnh sản xuất mới sẽ không chọn được dây chuyền này nữa.',
+              okText: 'Ngưng hoạt động',
+              cancelText: 'Đóng',
+              onOk: () => ngungHoatDong(facility),
+            })
+            return
+          }
+          message.error(dichLoiHeThong(err, 'Không xoá được dây chuyền'))
         }
       },
     })
@@ -180,7 +216,7 @@ const ProductionFacilitiesPage = () => {
       render: (v: string | null) => <Text type="secondary">{v || '—'}</Text>,
     },
     {
-      title: 'Max batch (kg)',
+      title: 'Mẻ tối đa (kg)',
       dataIndex: 'max_batch_size_kg',
       key: 'max_batch_size_kg',
       align: 'right' as const,
@@ -201,8 +237,8 @@ const ProductionFacilitiesPage = () => {
       key: 'actions',
       render: (_: any, r: ProductionFacility) => (
         <Space>
-          <Button type="text" icon={<EditOutlined />} onClick={() => openEdit(r)} />
-          <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(r)} />
+          <Button type="text" icon={<EditOutlined />} onClick={() => openEdit(r)} title="Sửa" />
+          <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(r)} title="Xoá" />
         </Space>
       ),
     },
@@ -220,7 +256,7 @@ const ProductionFacilitiesPage = () => {
           </Space>
           <Title level={4} style={{ margin: '8px 0 0', color: '#1B4D3E' }}>
             <SettingOutlined style={{ marginRight: 8 }} />
-            Nhà máy sản xuất
+            Dây chuyền sản xuất
           </Title>
         </Col>
         <Col>
@@ -232,19 +268,18 @@ const ProductionFacilitiesPage = () => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={openCreate}
-              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
             >
-              Thêm nhà máy
+              Thêm dây chuyền
             </Button>
           </Space>
         </Col>
       </Row>
 
-      {error && (
-        <Alert type="error" message={error} closable onClose={() => setError(null)} style={{ marginBottom: 16, borderRadius: 8 }} showIcon />
-      )}
-
       <Card bodyStyle={{ padding: 0 }} style={{ borderRadius: 12 }}>
+        {/* Lỗi tải → khối lỗi + Thử lại, không để bảng hiện "trống" giả */}
+        {error ? (
+          <PageState error={error} onRetry={loadData} />
+        ) : (
         <Table
           dataSource={facilities}
           columns={columns}
@@ -252,30 +287,31 @@ const ProductionFacilitiesPage = () => {
           loading={loading}
           size="small"
           pagination={false}
+          locale={{ emptyText: 'Chưa có dây chuyền nào' }}
         />
+        )}
       </Card>
 
       {/* Add/Edit modal */}
       <Modal
-        title={editingId ? 'Cập nhật nhà máy' : 'Thêm nhà máy'}
+        title={editingId ? 'Cập nhật dây chuyền' : 'Thêm dây chuyền'}
         open={showModal}
         onCancel={() => { setShowModal(false); setEditingId(null) }}
         onOk={handleSave}
         okText={editingId ? 'Cập nhật' : 'Thêm'}
         confirmLoading={saving}
-        okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="code" label="Mã nhà máy" rules={[{ required: true, message: 'Nhập mã nhà máy' }]}>
-            <Input placeholder="VD: NM01" />
+          <Form.Item name="code" label="Mã dây chuyền" rules={[{ required: true, message: 'Nhập mã dây chuyền' }]}>
+            <Input placeholder="VD: LINE-01" />
           </Form.Item>
-          <Form.Item name="name" label="Tên nhà máy" rules={[{ required: true, message: 'Nhập tên nhà máy' }]}>
-            <Input placeholder="VD: Nhà máy 1 - Bình Phước" />
+          <Form.Item name="name" label="Tên dây chuyền" rules={[{ required: true, message: 'Nhập tên dây chuyền' }]}>
+            <Input placeholder="VD: Dây chuyền 1" />
           </Form.Item>
           <Form.Item name="description" label="Mô tả">
-            <Input.TextArea rows={2} placeholder="Mô tả nhà máy..." />
+            <Input.TextArea rows={2} placeholder="Mô tả dây chuyền..." />
           </Form.Item>
-          <Form.Item name="max_batch_size_kg" label="Công suất tối đa (kg/batch)"
+          <Form.Item name="max_batch_size_kg" label="Công suất tối đa (kg/mẻ)"
             rules={[{ required: true, message: 'Nhập công suất' }]}>
             <InputNumber min={0} placeholder="0" style={{ width: '100%' }} />
           </Form.Item>

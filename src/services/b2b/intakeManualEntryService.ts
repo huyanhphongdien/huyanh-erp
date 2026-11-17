@@ -132,7 +132,7 @@ export const intakeManualEntryService = {
     if (!input.raw_rubber_type || !RAW_TYPES_VALID.has(input.raw_rubber_type)) {
       throw new Error('Bắt buộc chọn loại mủ chi tiết (5 loại)')
     }
-    if (!input.net_weight_kg || input.net_weight_kg <= 0) throw new Error('Net weight phải > 0')
+    if (!input.net_weight_kg || input.net_weight_kg <= 0) throw new Error('KL tịnh (Net) phải > 0')
     if (!input.intake_date) throw new Error('Bắt buộc ngày cân')
 
     // Step 1: Insert row trước (status='draft') để có id cho upload ảnh.
@@ -257,9 +257,9 @@ export const intakeManualEntryService = {
 
       if (!partner_code) errors.push('Thiếu partner_code')
       if (!RAW_TYPES_VALID.has(raw_rubber_type)) {
-        errors.push(`rubber_type phải là 1 trong: mu_nuoc, mu_tap, mu_dong, mu_chen, mu_to (got: ${rubber_raw_value})`)
+        errors.push(`rubber_type phải là 1 trong: mu_nuoc, mu_tap, mu_dong, mu_chen, mu_to (đang ghi: ${rubber_raw_value})`)
       }
-      if (!intake_date || !/^\d{4}-\d{2}-\d{2}$/.test(intake_date)) errors.push(`intake_date format không hợp lệ (got: ${intake_date_raw})`)
+      if (!intake_date || !/^\d{4}-\d{2}-\d{2}$/.test(intake_date)) errors.push(`intake_date sai định dạng ngày (đang ghi: ${intake_date_raw})`)
       if (!net_weight || net_weight <= 0) errors.push('net_weight_kg phải > 0')
 
       return {

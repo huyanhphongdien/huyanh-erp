@@ -228,7 +228,7 @@ export const dealConfirmService = {
       // Gap #1 — race condition: 2 nhân viên cùng confirm → UNIQUE index chặn
       // PostgreSQL error code 23505 = unique_violation
       if ((dealError as any).code === '23505' || /duplicate|unique/i.test(dealError.message)) {
-        throw new Error('Phiếu chốt này vừa được xác nhận bởi người khác. Vui lòng refresh để xem Deal đã tạo.')
+        throw new Error('Phiếu chốt này vừa được xác nhận bởi người khác. Vui lòng tải lại trang để xem Deal đã tạo.')
       }
       throw new Error(`Không thể tạo Deal: ${dealError.message}`)
     }

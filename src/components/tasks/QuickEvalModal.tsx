@@ -4,6 +4,7 @@ import { StarFilled } from '@ant-design/icons'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { insertAutoApproval, type AutoApproveSource } from '../../services/approvalService'
+import { AUTO_COEF, computeAutoScore, evalTableRating, FORMULA_TEXT } from '../../services/taskScoring'
 
 const { Text, Title } = Typography
 const { TextArea } = Input
@@ -18,10 +19,11 @@ interface QuickEvalModalProps {
 const STAR_LABELS = ['', 'Chưa tốt', 'Cần cải thiện', 'Trung bình', 'Tốt', 'Xuất sắc']
 const STAR_TO_SCORE = [0, 20, 40, 60, 80, 100]
 
+// Hệ số tự duyệt đọc từ taskScoring.AUTO_COEF — MỘT nguồn với lúc lưu
 const SOURCE_INFO: Record<string, { label: string; coeff: number; color: string }> = {
-  self: { label: 'Tự giao', coeff: 0.85, color: '#1890ff' },
-  recurring: { label: 'Định kỳ', coeff: 0.8, color: '#722ed1' },
-  project: { label: 'Dự án', coeff: 0.9, color: '#fa8c16' },
+  self: { label: 'Tự giao', coeff: AUTO_COEF.self, color: '#1890ff' },
+  recurring: { label: 'Định kỳ', coeff: AUTO_COEF.recurring, color: '#722ed1' },
+  project: { label: 'Dự án', coeff: AUTO_COEF.project, color: '#fa8c16' },
   assigned: { label: 'Được giao', coeff: 1.0, color: '#52c41a' },
 }
 
@@ -43,7 +45,7 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
 
   const sourceInfo = SOURCE_INFO[taskSource] || SOURCE_INFO.assigned
   const isAutoApprove = ['self', 'recurring', 'project'].includes(taskSource)
-  const previewScore = stars > 0 ? Math.round(STAR_TO_SCORE[stars] * sourceInfo.coeff) : 0
+  const previewScore = stars > 0 && isAutoApprove ? computeAutoScore(taskSource as AutoApproveSource, STAR_TO_SCORE[stars]) : 0
 
   const isValid = stars > 0 && notes.trim().length >= 10
 
@@ -83,9 +85,8 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
       const source = taskData?.task_source || (taskData?.is_self_assigned ? 'self' : 'assigned')
 
       if (source === 'self' || source === 'recurring' || source === 'project') {
-        // AUTO APPROVE — no manager needed
-        const coefficient = source === 'self' ? 0.85 : source === 'project' ? 0.9 : 0.8 // self=85%, recurring=80%, project=90%
-        const finalScore = Math.round(score * coefficient)
+        // AUTO APPROVE — no manager needed (hệ số: taskScoring.AUTO_COEF)
+        const finalScore = computeAutoScore(source as AutoApproveSource, score)
 
         await supabase.from('tasks').update({
           status: 'finished',
@@ -96,14 +97,17 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
           evaluation_status: 'approved',
         }).eq('id', task.id)
 
-        // Create evaluation record
-        await supabase.from('task_evaluations').insert({
+        // Create evaluation record — employee_id là id HỒ SƠ NHÂN VIÊN (không phải auth id);
+        // rating qua evalTableRating vì CHECK của bảng không nhận 'below_average' (bị từ chối âm thầm)
+        const empId = user?.employee_id || (user as any)?.id
+        const { error: evErr } = await supabase.from('task_evaluations').upsert({
           task_id: task.id,
-          employee_id: user?.id || (user as any)?.employee_id,
-          evaluator_id: user?.id || (user as any)?.employee_id,
+          employee_id: empId,
+          evaluator_id: empId,
           score: finalScore,
-          rating: finalScore >= 90 ? 'excellent' : finalScore >= 75 ? 'good' : finalScore >= 60 ? 'average' : 'below_average',
-        })
+          rating: evalTableRating(finalScore),
+        }, { onConflict: 'task_id,evaluator_id' })
+        if (evErr) console.error('[QuickEval] task_evaluations:', evErr)
 
         // Insert task_approvals → trigger update_participant_scores_on_approval
         // lan tỏa shared_score cho mọi participant
@@ -114,6 +118,7 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
             approver_id: approverId,
             source: source as AutoApproveSource,
             self_score: score,
+            final_score: finalScore,
           })
         }
 
@@ -233,7 +238,7 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
                 📋 Công việc được giao — sẽ gửi cho Quản lý phê duyệt.
               </Text>
               <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-                Điểm cuối = Tự chấm ({STAR_TO_SCORE[stars]}đ) × 40% + QL chấm × 60%
+                Bạn tự chấm {STAR_TO_SCORE[stars]}đ. {FORMULA_TEXT}.
               </div>
             </div>
           )}

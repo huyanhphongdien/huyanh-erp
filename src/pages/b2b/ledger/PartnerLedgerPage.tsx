@@ -20,9 +20,11 @@ import {
   Tooltip,
 } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
 import dayjs, { Dayjs } from 'dayjs'
+import { DASH, fmtDate, fmtVnd, vndInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
+import { palette } from '../../../theme/palette'
 import {
   ledgerService,
   LedgerEntry,
@@ -35,9 +37,6 @@ import LedgerBalanceCard from '../../../components/b2b/LedgerBalanceCard'
 
 const { Title } = Typography
 const { RangePicker } = DatePicker
-
-const formatCurrency = (value: number) =>
-  `${new Intl.NumberFormat('vi-VN').format(value)} ₫`
 
 const entryTypeOptions = [
   { label: 'Tất cả', value: 'all' },
@@ -60,10 +59,13 @@ const PartnerLedgerPage: React.FC = () => {
   const [entryTypeFilter, setEntryTypeFilter] = useState<string>('all')
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // Lỗi tải sổ — hiện khối lỗi + Thử lại thay vì bảng trống giả (audit 17/11/2026)
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   const fetchEntries = useCallback(async () => {
     if (!partnerId) return
     setLoading(true)
+    setLoadError(null)
     try {
       const params: Record<string, any> = {
         partner_id: partnerId,
@@ -83,7 +85,8 @@ const PartnerLedgerPage: React.FC = () => {
       setEntries(res.data)
       setTotal(res.total)
     } catch (err) {
-      message.error('Không thể tải dữ liệu sổ cái')
+      setLoadError(err)
+      message.error(dichLoiHeThong(err, 'Không thể tải dữ liệu sổ cái'))
     } finally {
       setLoading(false)
     }
@@ -119,7 +122,7 @@ const PartnerLedgerPage: React.FC = () => {
       form.resetFields()
       fetchEntries()
     } catch (err) {
-      message.error('Tạo bút toán thất bại')
+      message.error(dichLoiHeThong(err, 'Tạo bút toán thất bại'))
     } finally {
       setSubmitting(false)
     }
@@ -127,20 +130,14 @@ const PartnerLedgerPage: React.FC = () => {
 
   const columns = [
     {
-      title: 'Ngay',
+      title: 'Ngày',
       dataIndex: 'entry_date',
       key: 'entry_date',
       width: 120,
-      render: (date: string) => {
-        try {
-          return format(new Date(date), 'dd/MM/yyyy', { locale: vi })
-        } catch {
-          return date
-        }
-      },
+      render: (date: string) => fmtDate(date),
     },
     {
-      title: 'Loai',
+      title: 'Loại',
       dataIndex: 'entry_type',
       key: 'entry_type',
       width: 140,
@@ -163,33 +160,33 @@ const PartnerLedgerPage: React.FC = () => {
       ellipsis: true,
     },
     {
-      title: 'No',
+      title: 'Nợ',
       dataIndex: 'debit',
       key: 'debit',
       width: 140,
       align: 'right' as const,
       render: (value: number) =>
         value > 0 ? (
-          <span style={{ color: '#f5222d', fontWeight: 500 }}>
-            {formatCurrency(value)}
+          <span style={{ color: palette.danger, fontWeight: 500 }}>
+            {fmtVnd(value)}
           </span>
         ) : (
-          '-'
+          DASH
         ),
     },
     {
-      title: 'Co',
+      title: 'Có',
       dataIndex: 'credit',
       key: 'credit',
       width: 140,
       align: 'right' as const,
       render: (value: number) =>
         value > 0 ? (
-          <span style={{ color: '#52c41a', fontWeight: 500 }}>
-            {formatCurrency(value)}
+          <span style={{ color: palette.success, fontWeight: 500 }}>
+            {fmtVnd(value)}
           </span>
         ) : (
-          '-'
+          DASH
         ),
     },
     {
@@ -199,7 +196,7 @@ const PartnerLedgerPage: React.FC = () => {
       width: 150,
       align: 'right' as const,
       render: (value: number) => (
-        <span style={{ fontWeight: 600 }}>{formatCurrency(value)}</span>
+        <span style={{ fontWeight: 600 }}>{fmtVnd(value)}</span>
       ),
     },
   ]
@@ -219,7 +216,7 @@ const PartnerLedgerPage: React.FC = () => {
               />
             </Tooltip>
             <Title level={3} style={{ margin: 0 }}>
-              So cai doi tac
+              Sổ cái đối tác
             </Title>
           </Space>
         </Col>
@@ -229,7 +226,7 @@ const PartnerLedgerPage: React.FC = () => {
             icon={<PlusOutlined />}
             onClick={() => setModalOpen(true)}
           >
-            Tao but toan
+            Tạo bút toán
           </Button>
         </Col>
       </Row>
@@ -276,6 +273,7 @@ const PartnerLedgerPage: React.FC = () => {
 
       {/* Table */}
       <Card style={{ borderRadius: 12 }}>
+        <PageState error={!loading && loadError} onRetry={fetchEntries}>
         <Table
           dataSource={entries}
           columns={columns}
@@ -286,11 +284,12 @@ const PartnerLedgerPage: React.FC = () => {
             pageSize: pagination.pageSize,
             total,
             showSizeChanger: true,
-            showTotal: (t) => `Tong ${t} but toan`,
+            showTotal: (t) => `Tổng ${t.toLocaleString('vi-VN')} bút toán`,
           }}
           onChange={handleTableChange}
           scroll={{ x: 900 }}
         />
+        </PageState>
       </Card>
 
       {/* Create Entry Modal */}
@@ -321,30 +320,31 @@ const PartnerLedgerPage: React.FC = () => {
               {
                 type: 'number',
                 min: 1,
-                message: 'So tien phai lon hon 0',
+                message: 'Số tiền phải lớn hơn 0',
               },
             ]}
           >
             <InputNumber
               style={{ width: '100%' }}
-              formatter={(value) =>
-                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-              }
-              parser={(value) => Number(value?.replace(/,/g, '') || 0) as any}
+              {...vndInputProps}
               placeholder="Nhập số tiền"
               suffix="₫"
               min={1}
             />
           </Form.Item>
 
+          {/* Chiều bút toán ghi rõ hệ quả — 'No'/'Co' trần từng đọc như tiếng Anh (audit 17/11/2026).
+              Theo đúng chiều sổ: DEBIT = nghĩa vụ nhà máy phải trả đối tác (quyết toán duyệt, giao mủ),
+              CREDIT = đã chi / khấu trừ (tạm ứng, thanh toán) — xem paymentRequestService "DEBIT (giao mủ)". */}
           <Form.Item
-            label="Loai"
+            label="Loại bút toán"
             name="type"
             rules={[{ required: true, message: 'Vui lòng chọn loại' }]}
+            extra="Số dư = Nợ − Có. Dương: nhà máy còn phải trả đối tác · Âm: đối tác đang nợ nhà máy (vd tạm ứng vượt)."
           >
             <Radio.Group>
-              <Radio value="debit">No</Radio>
-              <Radio value="credit">Co</Radio>
+              <Radio value="debit">Nợ — cộng cho đối tác (nhà máy phải trả thêm)</Radio>
+              <Radio value="credit">Có — trừ tiền đối tác (giảm số phải trả)</Radio>
             </Radio.Group>
           </Form.Item>
 
@@ -372,10 +372,10 @@ const PartnerLedgerPage: React.FC = () => {
                   form.resetFields()
                 }}
               >
-                Huy
+                Huỷ
               </Button>
               <Button type="primary" htmlType="submit" loading={submitting}>
-                Tao but toan
+                Tạo bút toán
               </Button>
             </Space>
           </Form.Item>

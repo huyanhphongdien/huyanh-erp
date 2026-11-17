@@ -53,6 +53,8 @@ import { rubberGradeService } from '../../services/wms/rubberGradeService'
 import type { SalesCustomer } from '../../services/sales/salesTypes'
 import { SALES_CURRENCY_OPTIONS, isVnd, priceUnitLabel, fmtMoney, vndInputProps } from '../../services/sales/salesMoney'
 import { useUnsavedWarning } from '../../hooks/useUnsavedWarning'
+import { usdInputProps } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import type { RubberGradeStandard } from '../../services/wms/wms.types'
 import {
   SVR_GRADE_OPTIONS,
@@ -148,7 +150,8 @@ function SalesOrderCreatePage() {
         setGradeStandards(standards)
       } catch (err) {
         console.error('Load data error:', err)
-        message.error('Không thể tải dữ liệu')
+        // Ô "Khách hàng" sẽ trống — nói rõ là LỖI TẢI, không phải chưa có khách
+        message.error(dichLoiHeThong(err, 'Không tải được danh sách khách hàng / grade — tải lại trang (F5)'), 6)
       }
     }
     loadData()
@@ -312,8 +315,7 @@ function SalesOrderCreatePage() {
         message.success(`Đã tải ${type} (${kind})`)
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      message.error(`Sinh ${type} thất bại: ${msg}`)
+      message.error(dichLoiHeThong(e, `Sinh ${type} thất bại`))
     } finally {
       setDocLoading(null)
     }
@@ -491,8 +493,7 @@ function SalesOrderCreatePage() {
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return null // form validation
       console.error(err)
-      const errMsg = err instanceof Error ? err.message : 'Không thể tạo đơn hàng'
-      message.error(errMsg)
+      message.error(dichLoiHeThong(err, 'Không thể tạo đơn hàng'))
       return null
     } finally {
       setLoading(false)
@@ -602,8 +603,7 @@ function SalesOrderCreatePage() {
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return // form validation
       console.error(err)
-      const errMsg = err instanceof Error ? err.message : 'Không thể trình kiểm tra'
-      message.error(errMsg)
+      message.error(dichLoiHeThong(err, 'Không thể trình kiểm tra'))
     } finally {
       setSubmittingReview(false)
     }
@@ -711,7 +711,7 @@ function SalesOrderCreatePage() {
                       {...vndInputProps}
                       onChange={(v) => updateItem(item.key, 'unit_price', v || 0)} />
                   ) : (
-                    <InputNumber value={item.unit_price || undefined} min={0} step={10} style={{ width: '100%' }} placeholder="1,924"
+                    <InputNumber value={item.unit_price || undefined} min={0} {...usdInputProps} step={10} style={{ width: '100%' }} placeholder="1,924"
                       onChange={(v) => updateItem(item.key, 'unit_price', v || 0)} />
                   )}
                 </Col>
@@ -1262,8 +1262,7 @@ function UploadFlowAction({ contractNoHint, loading, onBeforeSubmit, onUploaded 
       message.success(`Đã upload ${files.length} file + trình Phú LV duyệt`)
       onUploaded()
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Upload thất bại'
-      message.error(msg)
+      message.error(dichLoiHeThong(err, 'Upload thất bại'))
     } finally {
       setSubmitting(false)
     }

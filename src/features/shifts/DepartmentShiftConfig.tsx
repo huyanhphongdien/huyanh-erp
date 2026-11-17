@@ -5,7 +5,9 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { App } from 'antd';
 import { shiftService, departmentService } from '../../services';
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong';
 import { Save, Check, Loader2, Info, Building2 } from 'lucide-react';
 
 // ============================================================
@@ -56,6 +58,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export function DepartmentShiftConfig() {
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
   
   // State
   const [configMap, setConfigMap] = useState<ConfigMap>({});
@@ -171,7 +174,7 @@ export function DepartmentShiftConfig() {
       setTimeout(() => setSuccessDept(null), 2000);
     } catch (error) {
       console.error('Save error:', error);
-      alert('Lỗi lưu cấu hình');
+      message.error(dichLoiHeThong(error, 'Lỗi lưu cấu hình ca của phòng'));
     } finally {
       setSavingDept(null);
     }

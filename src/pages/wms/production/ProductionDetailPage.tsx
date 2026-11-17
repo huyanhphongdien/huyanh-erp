@@ -39,6 +39,12 @@ import {
 } from '@ant-design/icons'
 import productionService from '../../../services/wms/productionService'
 import GradeBadge from '../../../components/wms/GradeBadge'
+import EnumTag from '../../../components/common/EnumTag'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtDate, fmtDateTime, fmtKg } from '../../../utils/format'
+import { BATCH_QC_STATUS_LABELS, BATCH_QC_STATUS_COLORS } from '../qc/qcLabels'
+import { OUTPUT_BATCH_STATUS_LABELS, OUTPUT_BATCH_STATUS_COLORS } from './productionLabels'
 import type {
   ProductionOrder,
   ProductionStageProgress,
@@ -58,11 +64,6 @@ const { Title, Text } = Typography
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-function formatDateTime(d: string | null | undefined): string {
-  if (!d) return '—'
-  return new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
 
 function stageStatusColor(s: StageStatus): string {
   switch (s) {
@@ -109,7 +110,7 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
       const data = await productionService.getById(id)
       setOrder(data)
     } catch (err: any) {
-      setError(err.message || 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không tải được lệnh sản xuất'))
     } finally {
       setLoading(false)
     }
@@ -125,7 +126,7 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
       title: 'Bắt đầu sản xuất?',
       content: 'Lệnh sản xuất sẽ chuyển sang trạng thái "Đang SX" và tạo 5 công đoạn.',
       okText: 'Bắt đầu',
-      okButtonProps: { style: { background: '#1B4D3E', borderColor: '#1B4D3E' } },
+      cancelText: 'Đóng',
       onOk: async () => {
         setActionLoading(true)
         try {
@@ -133,7 +134,7 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
           message.success('Đã bắt đầu sản xuất')
           loadOrder()
         } catch (err: any) {
-          message.error(err.message || 'Không thể bắt đầu sản xuất')
+          message.error(dichLoiHeThong(err, 'Không bắt đầu được sản xuất'))
         } finally {
           setActionLoading(false)
         }
@@ -147,6 +148,8 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
       title: 'Hủy lệnh sản xuất?',
       content: 'Lệnh sản xuất sẽ bị hủy và không thể khôi phục.',
       okText: 'Hủy lệnh',
+      // Nút đóng KHÔNG được ghi "Hủy" (mặc định vi_VN) — đứng cạnh "Hủy lệnh" là hai nút cùng chữ
+      cancelText: 'Giữ lệnh',
       okButtonProps: { danger: true },
       onOk: async () => {
         setActionLoading(true)
@@ -155,7 +158,7 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
           message.success('Đã hủy lệnh sản xuất')
           loadOrder()
         } catch (err: any) {
-          message.error(err.message || 'Không thể hủy')
+          message.error(dichLoiHeThong(err, 'Không hủy được lệnh sản xuất'))
         } finally {
           setActionLoading(false)
         }
@@ -170,8 +173,10 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
   if (!order) {
     return (
       <div style={{ padding: 24 }}>
-        {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon />}
-        <Empty description="Không tìm thấy lệnh sản xuất" />
+        {/* Lỗi tải ≠ "không tìm thấy": lỗi thì hiện lỗi + Thử lại */}
+        {error
+          ? <PageState error={error} onRetry={loadOrder} />
+          : <Empty description="Không tìm thấy lệnh sản xuất" />}
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <Button onClick={() => navigate('/wms/production')}>Quay lại</Button>
         </div>
@@ -198,10 +203,10 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
         </Descriptions.Item>
         <Descriptions.Item label="SL thực tế">
           <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            {order.actual_quantity?.toLocaleString('vi-VN') || '—'} kg
+            {order.actual_quantity != null ? `${fmtKg(order.actual_quantity, 2)} kg` : '—'}
           </Text>
         </Descriptions.Item>
-        <Descriptions.Item label="Nhà máy">{order.facility?.name || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Dây chuyền">{order.facility?.name || '—'}</Descriptions.Item>
         <Descriptions.Item label="Giám sát">{order.supervisor?.full_name || '—'}</Descriptions.Item>
         <Descriptions.Item label="Công đoạn">
           {order.stage_current ? `${order.stage_current}/5 — ${STAGE_NAMES[order.stage_current]}` : '—'}
@@ -217,9 +222,10 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
         <Descriptions.Item label="Grade thực tế">
           {order.final_grade ? <GradeBadge grade={order.final_grade} size="small" /> : '—'}
         </Descriptions.Item>
-        <Descriptions.Item label="Ngày bắt đầu">{formatDateTime(order.actual_start_date)}</Descriptions.Item>
-        <Descriptions.Item label="Ngày hoàn thành">{formatDateTime(order.actual_end_date)}</Descriptions.Item>
-        <Descriptions.Item label="Ngày dự kiến">{order.scheduled_start_date || '—'}</Descriptions.Item>
+        {/* 3 cột này là kiểu DATE (p8_production_orders.sql) → in NGÀY 'DD/MM/YYYY', không bịa giờ 07:00 */}
+        <Descriptions.Item label="Ngày bắt đầu">{fmtDate(order.actual_start_date)}</Descriptions.Item>
+        <Descriptions.Item label="Ngày hoàn thành">{fmtDate(order.actual_end_date)}</Descriptions.Item>
+        <Descriptions.Item label="Ngày dự kiến">{fmtDate(order.scheduled_start_date)}</Descriptions.Item>
         {order.notes && <Descriptions.Item label="Ghi chú" span={3}>{order.notes}</Descriptions.Item>}
       </Descriptions>
 
@@ -239,7 +245,7 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
         </Col>
         <Col span={6}>
           <Card bodyStyle={{ padding: 12 }}>
-            <Statistic title="Yield" value={order.yield_percent?.toFixed(1) || '—'} suffix="%"
+            <Statistic title="Hiệu suất" value={order.yield_percent?.toFixed(1) || '—'} suffix="%"
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'", color: '#E8A838' }} />
           </Card>
         </Col>
@@ -290,11 +296,10 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
     {
       title: 'QC',
       key: 'qc',
-      render: (_: any, r: any) => {
-        const s = r.source_batch?.qc_status
-        const color = s === 'passed' ? 'success' : s === 'failed' ? 'error' : 'default'
-        return <Tag color={color}>{s || 'pending'}</Tag>
-      },
+      // QC của lô nguyên liệu — nhãn dùng chung (qcLabels), trước đây in thô 'passed'/'pending'
+      render: (_: any, r: any) => (
+        <EnumTag value={r.source_batch?.qc_status || 'pending'} labels={BATCH_QC_STATUS_LABELS} colors={BATCH_QC_STATUS_COLORS} />
+      ),
     },
   ]
 
@@ -342,12 +347,11 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
                       size="small"
                       onClick={() => openTab({
                         key: `production-${id}-stage-${stage.stage_number}`,
-                        title: `SX ${order?.code || ''} — Stage ${stage.stage_number}`,
+                        title: `SX ${order?.code || ''} — Công đoạn ${stage.stage_number}`,
                         componentId: 'production-stage',
                         props: { id, stageNumber: String(stage.stage_number) },
                         path: `/wms/production/${id}/stage/${stage.stage_number}`,
                       })}
-                      style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
                     >
                       Cập nhật
                     </Button>
@@ -367,13 +371,13 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
                   <Col span={4}>
                     <Text type="secondary" style={{ fontSize: 11 }}>NL vào</Text><br />
                     <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
-                      {stage.input_quantity?.toLocaleString('vi-VN') || '—'} kg
+                      {stage.input_quantity != null ? `${fmtKg(stage.input_quantity, 2)} kg` : '—'}
                     </Text>
                   </Col>
                   <Col span={4}>
                     <Text type="secondary" style={{ fontSize: 11 }}>NL ra</Text><br />
                     <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
-                      {stage.output_quantity?.toLocaleString('vi-VN') || '—'} kg
+                      {stage.output_quantity != null ? `${fmtKg(stage.output_quantity, 2)} kg` : '—'}
                     </Text>
                   </Col>
                   <Col span={4}>
@@ -453,18 +457,11 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
       render: (v: number | null) => v ?? '—',
     },
     {
-      title: 'QC',
+      // Trạng thái LÔ THÀNH PHẨM (gồm cả "Đã nhập kho") — map dùng chung với trang Thành phẩm
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      render: (v: string) => {
-        const colorMap: Record<string, string> = {
-          created: 'default', qc_pending: 'processing', qc_passed: 'success', qc_failed: 'error', stored: 'blue',
-        }
-        const labelMap: Record<string, string> = {
-          created: 'Mới', qc_pending: 'Chờ QC', qc_passed: 'Đạt', qc_failed: 'Không đạt', stored: 'Đã nhập kho',
-        }
-        return <Tag color={colorMap[v] || 'default'}>{labelMap[v] || v}</Tag>
-      },
+      render: (v: string) => <EnumTag value={v} labels={OUTPUT_BATCH_STATUS_LABELS} colors={OUTPUT_BATCH_STATUS_COLORS} />,
     },
   ]
 
@@ -481,7 +478,6 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
             props: { id },
             path: `/wms/production/${id}/output`,
           })}
-          style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
         >
           Quản lý thành phẩm
         </Button>
@@ -584,7 +580,7 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
             <GradeBadge grade={order.target_grade} size="small" />
           </Space>
           <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
-            {order.facility?.name || ''} · {formatDateTime(order.created_at)}
+            {order.facility?.name || ''} · {fmtDateTime(order.created_at)}
           </Text>
         </Col>
         <Col>
@@ -595,7 +591,6 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
                 icon={<PlayCircleOutlined />}
                 onClick={handleStartProduction}
                 loading={actionLoading}
-                style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
               >
                 Bắt đầu SX
               </Button>

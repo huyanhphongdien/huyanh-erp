@@ -39,13 +39,19 @@ import { materialCategoryService, type MaterialCategory } from '../../../service
 import { materialTypeService, type MaterialType } from '../../../services/materialTypeService'
 import MaterialForm from './components/materials/MaterialForm'
 import { useDebounce } from '../../../hooks/useDebounce'
+import { App as AntdApp } from 'antd'
+import { fmtVnd as formatCurrency, fmtNum } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const MaterialListPage: React.FC = () => {
   const navigate = useNavigate()
+  const { message } = AntdApp.useApp()
 
   // State
   const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải danh mục — trước đây nuốt im, bảng trống y như "chưa khai báo vật tư"
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 400) // gõ xong 400ms mới bắn query
   const [filterCategory, setFilterCategory] = useState<string>('')
@@ -108,6 +114,7 @@ const MaterialListPage: React.FC = () => {
   const fetchMaterials = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const params: MaterialPaginationParams = {
         page,
         pageSize,
@@ -123,6 +130,7 @@ const MaterialListPage: React.FC = () => {
       setTotal(result.total)
     } catch (error) {
       console.error('Error fetching materials:', error)
+      setLoadError(dichLoiHeThong(error, 'Không tải được danh mục vật tư'))
     } finally {
       setLoading(false)
     }
@@ -198,7 +206,7 @@ const MaterialListPage: React.FC = () => {
       fetchMaterials()
       fetchStats()
     } catch (error: any) {
-      alert(error.message || 'Có lỗi xảy ra')
+      message.error(dichLoiHeThong(error, 'Có lỗi xảy ra khi đổi trạng thái vật tư'))
     }
   }
 
@@ -206,10 +214,11 @@ const MaterialListPage: React.FC = () => {
     try {
       await materialService.delete(material.id)
       setShowDeleteConfirm(null)
+      message.success(`Đã xóa vật tư ${material.code}`)
       fetchMaterials()
       fetchStats()
     } catch (error: any) {
-      alert(error.message || 'Có lỗi xảy ra khi xóa')
+      message.error(dichLoiHeThong(error, 'Có lỗi xảy ra khi xóa'))
     }
   }
 
@@ -224,14 +233,7 @@ const MaterialListPage: React.FC = () => {
 
   const hasFilters = search || filterCategory || filterType || filterStatus !== 'all' || filterLowStock
 
-  // Format currency
-  const formatCurrency = (value?: number | null) => {
-    if (value == null) return '-'
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(value)
-  }
+  // formatCurrency = fmtVnd (utils/format, null → '—') — bản tự viết cũ đã xoá
 
   // Helper: Get stock value safely - FIX: chỉ dùng current_stock
   const getStock = (material: Material): number => {
@@ -412,15 +414,16 @@ const MaterialListPage: React.FC = () => {
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Mã</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tên vật tư</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nhóm / Loại</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">ĐVT</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700" title="Đơn vị tính">ĐVT</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Tồn kho</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Giá gần nhất</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Trạng thái</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
-              {loading ? (
+            {/* Spinner chỉ ở lần tải đầu; các lần sau giữ dòng cũ phủ mờ (không nháy trắng theo từng lần lọc) */}
+            <tbody className={`divide-y transition-opacity ${loading && materials.length > 0 ? 'opacity-50 pointer-events-none' : ''}`}>
+              {loading && materials.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center">
                     <div className="flex justify-center">
@@ -429,11 +432,26 @@ const MaterialListPage: React.FC = () => {
                     <p className="mt-2 text-gray-500">Đang tải...</p>
                   </td>
                 </tr>
+              ) : loadError ? (
+                // Lỗi xét TRƯỚC trống — không để thủ kho tưởng kho chưa khai báo vật tư
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center bg-red-50">
+                    <AlertTriangle className="w-10 h-10 text-red-400 mx-auto" />
+                    <p className="mt-2 font-semibold text-red-700">Không tải được dữ liệu</p>
+                    <p className="text-sm text-red-600">{loadError}</p>
+                    <button
+                      onClick={() => fetchMaterials()}
+                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-100"
+                    >
+                      <RefreshCw className="w-4 h-4" /> Thử lại
+                    </button>
+                  </td>
+                </tr>
               ) : materials.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center">
                     <Package className="w-12 h-12 text-gray-300 mx-auto" />
-                    <p className="mt-2 text-gray-500">Không có vật tư nào</p>
+                    <p className="mt-2 text-gray-500">{hasFilters ? 'Không tìm thấy vật tư phù hợp' : 'Không có vật tư nào'}</p>
                     <button
                       onClick={handleCreate}
                       className="mt-3 text-blue-600 hover:underline"
@@ -496,13 +514,13 @@ const MaterialListPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className={`font-medium ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>
-                          {stockValue.toLocaleString('vi-VN')}
+                          {fmtNum(stockValue, 3)}
                           {isLowStock && (
                             <AlertTriangle className="w-4 h-4 inline ml-1" />
                           )}
                         </div>
                         <div className="text-xs text-gray-500">
-                          Tối thiểu: {minStockValue.toLocaleString('vi-VN')}
+                          Tối thiểu: {fmtNum(minStockValue, 3)}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -519,7 +537,7 @@ const MaterialListPage: React.FC = () => {
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
                             <PowerOff className="w-3 h-3" />
-                            Ngưng
+                            Ngưng hoạt động
                           </span>
                         )}
                       </td>

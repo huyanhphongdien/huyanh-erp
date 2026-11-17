@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS } from './salesTypes'
 
 /**
  * SỔ LÔ — lô giao hàng của hợp đồng bán, kèm tình trạng thu tiền của TỪNG LÔ.
@@ -16,6 +17,25 @@ import { supabase } from '../../lib/supabase'
 
 export type LotPaymentStatus = 'unpaid' | 'partial' | 'paid' | 'unknown'
 export type LotStatus = 'planning' | 'packing' | 'shipped' | 'delivered' | 'cancelled'
+
+/** Trạng thái TIỀN của lô = 3 trạng thái thu tiền chung (PAYMENT_STATUS_LABELS) + 'unknown'. */
+export const LOT_PAYMENT_STATUS_LABELS: Record<LotPaymentStatus, string> = {
+  ...PAYMENT_STATUS_LABELS,
+  unknown: 'Chưa có trị giá',
+}
+export const LOT_PAYMENT_STATUS_COLORS: Record<LotPaymentStatus, string> = {
+  ...PAYMENT_STATUS_COLORS,
+  unknown: 'default',
+}
+
+/** Nhãn `lot_status` (số NHẬP TAY — "Ghi chú trạng thái"), KHÔNG phải tiến độ giao. */
+export const LOT_STATUS_LABELS: Record<LotStatus, string> = {
+  planning: 'Kế hoạch',
+  packing: 'Đang đóng',
+  shipped: 'Đã đi',
+  delivered: 'Đã giao',
+  cancelled: 'Đã huỷ',
+}
 
 /**
  * Tiến độ GIAO của lô, suy từ chứng cứ thật (container + dòng lệnh xe).

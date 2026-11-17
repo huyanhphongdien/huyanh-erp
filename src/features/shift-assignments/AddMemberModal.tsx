@@ -8,6 +8,7 @@ import {
   X, Search, UserPlus, Check, Loader2, Users, AlertCircle
 } from 'lucide-react'
 import type { ShiftTeam } from '../../services/shiftTeamService'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 interface UnassignedEmployee {
   id: string
@@ -81,7 +82,7 @@ export default function AddMemberModal({
       await onAddMembers(targetTeam.id, Array.from(selected))
       onClose()
     } catch (err: any) {
-      setError(err.message || 'Có lỗi xảy ra')
+      setError(dichLoiHeThong(err, 'Không thêm được nhân viên vào đội'))
     } finally {
       setIsSubmitting(false)
     }

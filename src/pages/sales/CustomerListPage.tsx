@@ -23,6 +23,7 @@ import {
   Tabs,
   Switch,
   Popconfirm,
+  InputNumber,
   message,
 } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
@@ -31,13 +32,17 @@ import {
   SearchOutlined,
   EyeOutlined,
   EditOutlined,
-  DeleteOutlined,
+  StopOutlined,
   UserOutlined,
   CheckCircleOutlined,
   StarOutlined,
   CrownOutlined,
 } from '@ant-design/icons'
-import { salesCustomerService } from '../../services/sales/salesCustomerService'
+import { salesCustomerService, customSpecsToRows, rowsToCustomSpecs } from '../../services/sales/salesCustomerService'
+import { usdInputProps } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
+import { CustomSpecsFormList } from './CustomerSpecsField'
 import { Hac13CodeDisplay } from '../../components/master-data/Hac13CodeDisplay'
 import {
   type SalesCustomer,
@@ -55,48 +60,16 @@ import {
   QUALITY_STANDARD_LABELS,
   SVR_GRADE_OPTIONS,
   COUNTRY_OPTIONS,
+  countryFlag,
+  countryLabel,
 } from '../../services/sales/salesTypes'
 import GradeBadge from '../../components/wms/GradeBadge'
 import { useOpenTab } from '../../hooks/useOpenTab'
 
 const { Title, Text } = Typography
 
-// ============================================
-// COUNTRY FLAG HELPER
-// ============================================
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  JP: '\u{1F1EF}\u{1F1F5}',
-  CN: '\u{1F1E8}\u{1F1F3}',
-  IN: '\u{1F1EE}\u{1F1F3}',
-  DE: '\u{1F1E9}\u{1F1EA}',
-  US: '\u{1F1FA}\u{1F1F8}',
-  MY: '\u{1F1F2}\u{1F1FE}',
-  KR: '\u{1F1F0}\u{1F1F7}',
-  TW: '\u{1F1F9}\u{1F1FC}',
-  TR: '\u{1F1F9}\u{1F1F7}',
-  BR: '\u{1F1E7}\u{1F1F7}',
-  IT: '\u{1F1EE}\u{1F1F9}',
-  FR: '\u{1F1EB}\u{1F1F7}',
-  ES: '\u{1F1EA}\u{1F1F8}',
-  TH: '\u{1F1F9}\u{1F1ED}',
-  ID: '\u{1F1EE}\u{1F1E9}',
-  RU: '\u{1F1F7}\u{1F1FA}',
-  PK: '\u{1F1F5}\u{1F1F0}',
-  BD: '\u{1F1E7}\u{1F1E9}',
-  EG: '\u{1F1EA}\u{1F1EC}',
-}
-
-const getCountryFlag = (code?: string): string => {
-  if (!code) return ''
-  return COUNTRY_FLAGS[code] || '\u{1F3F3}\u{FE0F}'
-}
-
-const getCountryLabel = (code?: string): string => {
-  if (!code) return ''
-  const opt = COUNTRY_OPTIONS.find((c) => c.value === code)
-  return opt ? opt.label : code
-}
+// Cờ + tên nước: countryFlag / countryLabel (salesTypes) — bỏ bảng 19 nước chép tay.
+const flagLabel = (code: string, label: string) => [countryFlag(code), label].filter(Boolean).join(' ')
 
 // ============================================
 // MAIN COMPONENT
@@ -121,6 +94,7 @@ const CustomerListPage = () => {
   // State
   const [customers, setCustomers] = useState<SalesCustomer[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [total, setTotal] = useState(0)
   const [stats, setStats] = useState<CustomerStats>({
     total: 0,
@@ -149,6 +123,7 @@ const CustomerListPage = () => {
   const fetchCustomers = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const response = await salesCustomerService.getList({
         page: pagination.current,
         pageSize: pagination.pageSize,
@@ -160,8 +135,9 @@ const CustomerListPage = () => {
       setCustomers(response.data)
       setTotal(response.total)
     } catch (error) {
+      // Lỗi tải ≠ "không có khách": khối lỗi + Thử lại thay cho bảng trống giả
       console.error('Error fetching customers:', error)
-      message.error('Không thể tải danh sách khách hàng')
+      setLoadError(error || new Error('Không thể tải danh sách khách hàng'))
     } finally {
       setLoading(false)
     }
@@ -221,6 +197,8 @@ const CustomerListPage = () => {
     form.setFieldsValue({
       ...customer,
       preferred_grades: customer.preferred_grades || [],
+      // jsonb → dòng "Thông số / Giá trị" (trước đây đổ object vào TextArea → "[object Object]")
+      custom_specs: customSpecsToRows(customer.custom_specs),
     })
     setModalOpen(true)
   }
@@ -250,7 +228,8 @@ const CustomerListPage = () => {
         quality_standard: values.quality_standard || undefined,
         preferred_grades: values.preferred_grades || [],
         requires_pre_shipment_sample: values.requires_pre_shipment_sample || false,
-        custom_specs: values.custom_specs || undefined,
+        // Danh sách dòng → object jsonb (không còn đẩy CHUỖI JSON gõ tay vào cột jsonb)
+        custom_specs: rowsToCustomSpecs(values.custom_specs),
       }
 
       if (editingCustomer) {
@@ -268,21 +247,24 @@ const CustomerListPage = () => {
     } catch (error: any) {
       if (error?.errorFields) return // validation error
       console.error('Save error:', error)
-      message.error('Không thể lưu khách hàng')
+      message.error(dichLoiHeThong(error, 'Không thể lưu khách hàng'))
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async (customer: SalesCustomer) => {
+  // salesCustomerService.delete() KHÔNG xoá — nó chuyển khách sang "Ngừng HĐ" (giữ lịch sử đơn) và
+  // từ chối khi khách còn đơn đang xử lý. Nhãn cũ "Xóa"/"Đã xóa" nói sai việc hệ thống làm.
+  const handleDeactivate = async (customer: SalesCustomer) => {
     try {
       await salesCustomerService.delete(customer.id)
-      message.success(`Đã xóa khách hàng "${customer.name}"`)
+      message.success(`Đã chuyển "${customer.name}" sang ${CUSTOMER_STATUS_LABELS.inactive}`)
       fetchCustomers()
       fetchStats()
     } catch (error) {
-      console.error('Delete error:', error)
-      message.error('Không thể xóa khách hàng')
+      console.error('Deactivate error:', error)
+      // Service đã nói rõ lý do (vd "còn 3 đơn hàng đang xử lý") — hiện nguyên văn, không thay bằng câu chung
+      message.error(dichLoiHeThong(error, 'Không chuyển được sang Ngừng hoạt động'), 6)
     }
   }
 
@@ -328,8 +310,8 @@ const CustomerListPage = () => {
       render: (country?: string) =>
         country ? (
           <Space size={4}>
-            <span>{getCountryFlag(country)}</span>
-            <Text>{getCountryLabel(country)}</Text>
+            <span>{countryFlag(country)}</span>
+            <Text>{countryLabel(country)}</Text>
           </Space>
         ) : (
           <Text type="secondary">-</Text>
@@ -414,24 +396,28 @@ const CustomerListPage = () => {
               }}
             />
           </Tooltip>
-          <Popconfirm
-            title="Xác nhận xóa"
-            description={`Xóa khách hàng "${record.name}"?`}
-            onConfirm={() => handleDelete(record)}
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true }}
-          >
-            <Tooltip title="Xóa">
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </Tooltip>
-          </Popconfirm>
+          {/* Chỉ khách đang hoạt động — khách "Cấm GD" mà bấm thì bị hạ xuống "Ngừng HĐ" (mất cờ cấm) */}
+          {record.status === 'active' && (
+            <Popconfirm
+              title={`Chuyển "${record.name}" sang Ngừng hoạt động?`}
+              description="Khách không bị xoá: toàn bộ đơn và lịch sử giữ nguyên, chỉ không hiện trong danh sách chọn khi tạo đơn. Bật lại bằng Sửa → Trạng thái. Khách còn đơn đang xử lý thì hệ thống sẽ từ chối."
+              onConfirm={(e) => { e?.stopPropagation(); handleDeactivate(record) }}
+              onCancel={(e) => e?.stopPropagation()}
+              okText="Ngừng hoạt động"
+              cancelText="Không"
+              okButtonProps={{ danger: true }}
+            >
+              <Tooltip title="Ngừng hoạt động">
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<StopOutlined />}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -487,7 +473,7 @@ const CustomerListPage = () => {
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
-              title="Premium"
+              title={CUSTOMER_TIER_LABELS.premium}
               value={stats.premium}
               prefix={<StarOutlined style={{ color: '#faad14' }} />}
               valueStyle={{ color: '#faad14' }}
@@ -497,7 +483,7 @@ const CustomerListPage = () => {
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
-              title="Strategic"
+              title={CUSTOMER_TIER_LABELS.strategic}
               value={stats.strategic}
               prefix={<CrownOutlined style={{ color: '#722ed1' }} />}
               valueStyle={{ color: '#722ed1' }}
@@ -530,9 +516,7 @@ const CustomerListPage = () => {
               style={{ width: '100%' }}
               options={[
                 { label: 'Trạng thái: Tất cả', value: 'all' },
-                { label: 'Hoạt động', value: 'active' },
-                { label: 'Ngưng', value: 'inactive' },
-                { label: 'Cấm GĐ', value: 'blacklisted' },
+                ...Object.entries(CUSTOMER_STATUS_LABELS).map(([value, label]) => ({ value, label })),
               ]}
             />
           </Col>
@@ -546,9 +530,7 @@ const CustomerListPage = () => {
               style={{ width: '100%' }}
               options={[
                 { label: 'Hạng: Tất cả', value: 'all' },
-                { label: 'Standard', value: 'standard' },
-                { label: 'Premium', value: 'premium' },
-                { label: 'Strategic', value: 'strategic' },
+                ...Object.entries(CUSTOMER_TIER_LABELS).map(([value, label]) => ({ value, label })),
               ]}
             />
           </Col>
@@ -565,7 +547,7 @@ const CustomerListPage = () => {
               options={[
                 { label: 'Tất cả quốc gia', value: undefined },
                 ...COUNTRY_OPTIONS.map((c) => ({
-                  label: `${getCountryFlag(c.value)} ${c.label}`,
+                  label: flagLabel(c.value, c.label),
                   value: c.value,
                 })),
               ]}
@@ -576,6 +558,9 @@ const CustomerListPage = () => {
 
       {/* Table */}
       <Card style={{ borderRadius: 8 }}>
+        {loadError && !loading ? (
+          <PageState error={loadError} onRetry={fetchCustomers} />
+        ) : (
         <Table<SalesCustomer>
           rowKey="id"
           columns={columns}
@@ -597,6 +582,7 @@ const CustomerListPage = () => {
           })}
           size="middle"
         />
+        )}
       </Card>
 
       {/* Create / Edit Modal */}
@@ -661,7 +647,7 @@ const CustomerListPage = () => {
                             showSearch
                             optionFilterProp="label"
                             options={COUNTRY_OPTIONS.map((c) => ({
-                              label: `${getCountryFlag(c.value)} ${c.label}`,
+                              label: flagLabel(c.value, c.label),
                               value: c.value,
                             }))}
                           />
@@ -736,7 +722,7 @@ const CustomerListPage = () => {
                     <Row gutter={16}>
                       <Col span={8}>
                         <Form.Item name="credit_limit" label="Hạn mức tín dụng (USD)">
-                          <Input type="number" placeholder="0" />
+                          <InputNumber {...usdInputProps} min={0} style={{ width: '100%' }} placeholder="0" />
                         </Form.Item>
                       </Col>
                       <Col span={8}>
@@ -746,11 +732,9 @@ const CustomerListPage = () => {
                           rules={[{ required: true }]}
                         >
                           <Select
-                            options={[
-                              { value: 'standard', label: 'Standard - Tiêu chuẩn' },
-                              { value: 'premium', label: 'Premium - Cao cấp' },
-                              { value: 'strategic', label: 'Strategic - Chiến lược' },
-                            ]}
+                            options={Object.entries(CUSTOMER_TIER_LABELS).map(
+                              ([value, label]) => ({ value, label })
+                            )}
                           />
                         </Form.Item>
                       </Col>
@@ -777,6 +761,10 @@ const CustomerListPage = () => {
               {
                 key: 'quality',
                 label: 'Chất lượng',
+                // Luôn render: tab chưa mở thì các ô của nó không đăng ký với Form → validateFields()
+                // thiếu preferred_grades/requires_pre_shipment_sample/custom_specs → sửa khách mà không
+                // mở tab này là GHI ĐÈ các trường đó thành rỗng/false.
+                forceRender: true,
                 children: (
                   <>
                     <Row gutter={16}>
@@ -820,16 +808,10 @@ const CustomerListPage = () => {
                         }))}
                       />
                     </Form.Item>
-                    <Form.Item
-                      name="custom_specs"
-                      label="Yêu cầu kỹ thuật riêng (JSON)"
-                      help='VD: {"PRI_min": 60, "dirt_max": 0.03}'
-                    >
-                      <Input.TextArea
-                        rows={4}
-                        placeholder='{"key": "value"}'
-                      />
-                    </Form.Item>
+                    {/* Yêu cầu kỹ thuật riêng — từng dòng "Thông số / Giá trị" (khớp bảng ở trang chi tiết),
+                        service đổi sang object jsonb. Không còn bắt sale gõ JSON tay. Dùng CHUNG với modal ở
+                        trang chi tiết khách. */}
+                    <CustomSpecsFormList />
                   </>
                 ),
               },

@@ -27,6 +27,13 @@ export const FLEET_PR_STATUS_COLORS: Record<FleetPrStatus, string> = {
 export const FLEET_PR_METHOD_LABELS: Record<FleetPrPaymentMethod, string> = {
   cash: 'Tiền mặt', transfer_company: 'Chuyển khoản Cty', transfer_fund: 'Chuyển khoản quỹ',
 }
+/** Loại dòng của phiếu — nhãn + màu một nguồn (trước nằm chép trong trang chi tiết). */
+export const FLEET_PR_LINE_TYPE_LABELS: Record<FleetPrLineType, string> = {
+  trip: 'Chuyến', advance: 'Trừ tạm ứng', manual: 'Khoản tay',
+}
+export const FLEET_PR_LINE_TYPE_COLORS: Record<FleetPrLineType, string> = {
+  trip: 'blue', advance: 'orange', manual: 'default',
+}
 
 export interface FleetPaymentRequest {
   id: string

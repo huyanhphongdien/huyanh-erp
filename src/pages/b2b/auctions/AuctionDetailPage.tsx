@@ -18,25 +18,16 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
+import { AUCTION_STATUS_MAP, BID_STATUS_LABELS, BID_STATUS_COLORS } from './auctionStatus'
 
 const { Title, Text } = Typography
 
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  draft: { label: 'Nháp', color: 'default' },
-  upcoming: { label: 'Sắp diễn ra', color: 'blue' },
-  active: { label: 'Đang đấu giá', color: 'green' },
-  extended: { label: 'Gia hạn', color: 'orange' },
-  ended: { label: 'Đã kết thúc', color: 'default' },
-  awarded: { label: 'Đã chọn winner', color: 'purple' },
-  cancelled: { label: 'Đã hủy', color: 'error' },
-}
+// Nhãn + màu trạng thái: một map chung với AuctionListPage (auctionStatus.ts) — không chép riêng
+const STATUS_MAP = AUCTION_STATUS_MAP
 
-const BID_STATUS: Record<string, { label: string; color: string }> = {
-  active: { label: 'Hợp lệ', color: 'green' },
-  outbid: { label: 'Bị vượt', color: 'default' },
-  winning: { label: 'Thắng', color: 'gold' },
-  withdrawn: { label: 'Rút', color: 'error' },
-}
+const BID_STATUS: Record<string, { label: string; color: string }> = Object.fromEntries(
+  Object.keys(BID_STATUS_LABELS).map((k) => [k, { label: BID_STATUS_LABELS[k], color: BID_STATUS_COLORS[k] }]),
+)
 
 export default function AuctionDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -105,7 +96,7 @@ export default function AuctionDetailPage() {
       ),
     },
     {
-      title: 'Giá bid',
+      title: 'Giá trả',
       dataIndex: 'bid_price',
       key: 'bid_price',
       render: (v: number) => (
@@ -130,12 +121,12 @@ export default function AuctionDetailPage() {
       render: (v: string) => v || '—',
     },
     {
-      title: 'Thời gian bid',
+      title: 'Thời điểm trả giá',
       dataIndex: 'bid_at',
       render: (v: string) => v ? new Date(v).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—',
     },
     {
-      title: 'Status',
+      title: 'Trạng thái',
       dataIndex: 'status',
       render: (v: string) => {
         const s = BID_STATUS[v] || BID_STATUS.active
@@ -167,7 +158,7 @@ export default function AuctionDetailPage() {
         </Col>
         <Col xs={6}>
           <Card size="small" style={{ borderRadius: 12 }}>
-            <Statistic title="Số lượt bid" value={auction.bid_count || bids.length} prefix={<DollarOutlined />} valueStyle={{ fontSize: 18 }} />
+            <Statistic title="Số lượt trả giá" value={auction.bid_count || bids.length} prefix={<DollarOutlined />} valueStyle={{ fontSize: 18 }} />
           </Card>
         </Col>
         <Col xs={6}>
@@ -201,7 +192,7 @@ export default function AuctionDetailPage() {
           <Descriptions.Item label="Giao hàng">{auction.delivery_date || '—'}</Descriptions.Item>
           <Descriptions.Item label="Nơi giao">{auction.delivery_location || '—'}</Descriptions.Item>
           {auction.winner && (
-            <Descriptions.Item label="Winner">
+            <Descriptions.Item label="Người thắng">
               <Tag color="purple" icon={<TrophyOutlined />}>
                 {auction.winner.name} — {Number(auction.winning_price || 0).toLocaleString('vi-VN')} {auction.currency || 'VND'}/kg
               </Tag>
@@ -216,7 +207,7 @@ export default function AuctionDetailPage() {
       </Card>
 
       {/* Bids table */}
-      <Card size="small" style={{ borderRadius: 12 }} title={`Danh sách bids (${bids.length})`}>
+      <Card size="small" style={{ borderRadius: 12 }} title={`Danh sách lượt trả giá (${bids.length})`}>
         <Table
           dataSource={bids}
           columns={bidColumns}

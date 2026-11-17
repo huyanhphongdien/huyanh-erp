@@ -2,6 +2,7 @@
 // Service tạo notification on-the-fly từ dữ liệu task (không cần bảng riêng)
 
 import { supabase } from '../lib/supabase'
+import { toDateStrVN, todayVN } from '../utils/dateVN'
 
 export interface TaskNotification {
   id: string
@@ -69,7 +70,8 @@ export const taskNotificationService = {
       .select('id, code, name, due_date')
       .eq('assignee_id', userId)
       .in('status', ['in_progress', 'draft'])
-      .lt('due_date', now.toISOString().split('T')[0])
+      // Hôm nay theo giờ VN — toISOString() trước 7h sáng còn là ngày hôm qua (UTC) → báo quá hạn trễ 1 ngày
+      .lt('due_date', todayVN())
 
     overdueTasks?.forEach((t) => {
       const nid = `overdue-${t.id}`
@@ -91,7 +93,7 @@ export const taskNotificationService = {
       .select('id, code, name, completed_date')
       .eq('assignee_id', userId)
       .eq('status', 'finished')
-      .gte('completed_date', new Date(now.getTime() - 48 * 3600000).toISOString().split('T')[0])
+      .gte('completed_date', toDateStrVN(new Date(now.getTime() - 48 * 3600000)))
 
     completedTasks?.forEach((t) => {
       const nid = `completed-${t.id}`

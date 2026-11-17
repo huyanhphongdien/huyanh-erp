@@ -9,9 +9,12 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { App } from 'antd';
 import { supabase } from '../../lib/supabase';
 import { shiftAssignmentService, shiftService } from '../../services';
 import { Modal, Button } from '../../components/ui';
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong';
+import { fmtDate } from '../../utils/format';
 import {
   ArrowRightLeft,
   Plus,
@@ -98,6 +101,7 @@ export function ShiftOverrideModal({
   maxShiftsPerDay = 2,
 }: ShiftOverrideModalProps) {
   const queryClient = useQueryClient();
+  const { modal, message } = App.useApp();
   const [actionMode, setActionMode] = useState<ActionMode>('assign');
   const [selectedShiftId, setSelectedShiftId] = useState('');
   const [notes, setNotes] = useState('');
@@ -277,17 +281,78 @@ export function ShiftOverrideModal({
     }
   };
 
-  const handleDelete = () => {
-    if (!currentShift?.id) return;
-    if (window.confirm('Xóa ca đã phân cho nhân viên này?')) {
-      deleteMutation.mutate();
-    }
-  };
-
   // Format date display
   const dateObj = new Date(date + 'T00:00:00');
   const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-  const dateDisplay = `${dayNames[dateObj.getDay()]}, ${dateObj.toLocaleDateString('vi-VN')}`;
+  const dateDisplay = `${dayNames[dateObj.getDay()]}, ${fmtDate(date)}`;
+
+  // Xác nhận bằng antd (bản cũ: window.confirm/alert của trình duyệt)
+  const handleDelete = () => {
+    if (!currentShift?.id) return;
+    modal.confirm({
+      title: 'Xoá ca đã phân?',
+      content: `Bỏ ca "${currentShift.shift_name}" của ${employeeName} — ${dateDisplay}.`,
+      okText: 'Xoá ca',
+      cancelText: 'Không xoá',
+      okButtonProps: { danger: true },
+      onOk: () => deleteMutation.mutateAsync().catch(() => undefined),
+    });
+  };
+
+  // Đánh dấu Công tác / Nghỉ phép thủ công: xoá ca đã phân + ghi/ghi đè chấm công ngày đó.
+  // Bản cũ không kiểm `error` của từng lệnh supabase → ghi lỗi là IM LẶNG.
+  const confirmMarkDay = (kind: 'business_trip' | 'leave') => {
+    const isTrip = kind === 'business_trip';
+    modal.confirm({
+      title: isTrip ? 'Đánh dấu Công tác cho ngày này?' : 'Đánh dấu Nghỉ phép cho ngày này?',
+      content: `${employeeName} — ${dateDisplay}: ${currentShift ? 'ca đã phân trong ngày sẽ bị xoá; ' : ''}chấm công ghi "${isTrip ? 'Công tác' : 'Nghỉ phép'}" (${isTrip ? '1,0' : '0'} công).`,
+      okText: isTrip ? 'Đánh dấu Công tác' : 'Đánh dấu Nghỉ phép',
+      cancelText: 'Không',
+      onOk: async () => {
+        try {
+          // Xóa shift_assignment
+          if (currentShift?.id) {
+            const { error: delErr } = await supabase.from('shift_assignments').delete().eq('employee_id', employeeId).eq('date', date);
+            if (delErr) throw delErr;
+          }
+          const { data: existing, error: exErr } = await supabase.from('attendance').select('id').eq('employee_id', employeeId).eq('date', date).maybeSingle();
+          if (exErr) throw exErr;
+          if (isTrip) {
+            // Tạo attendance business_trip
+            if (!existing) {
+              const { error: insErr } = await supabase.from('attendance').insert({
+                employee_id: employeeId, date, status: 'business_trip',
+                work_units: 1.0, working_minutes: 480,
+                check_in_time: date + 'T08:00:00+07:00', check_out_time: date + 'T17:00:00+07:00',
+                notes: 'Công tác (gán thủ công)',
+              });
+              if (insErr) throw insErr;
+            } else {
+              const { error: updErr } = await supabase.from('attendance').update({ status: 'business_trip', work_units: 1.0, working_minutes: 480, notes: 'Công tác (gán thủ công)' }).eq('id', existing.id);
+              if (updErr) throw updErr;
+            }
+          } else {
+            // Tạo attendance leave
+            if (!existing) {
+              const { error: insErr } = await supabase.from('attendance').insert({
+                employee_id: employeeId, date, status: 'leave', work_units: 0, working_minutes: 0,
+                notes: 'Nghỉ phép (gán thủ công)',
+              });
+              if (insErr) throw insErr;
+            } else {
+              const { error: updErr } = await supabase.from('attendance').update({ status: 'leave', work_units: 0, working_minutes: 0, notes: 'Nghỉ phép (gán thủ công)' }).eq('id', existing.id);
+              if (updErr) throw updErr;
+            }
+          }
+          queryClient.invalidateQueries({ queryKey: ['shift-calendar'] });
+          queryClient.invalidateQueries({ queryKey: ['shift-calendar-special'] });
+          handleClose();
+        } catch (e) {
+          message.error(dichLoiHeThong(e, isTrip ? 'Không đánh dấu được Công tác' : 'Không đánh dấu được Nghỉ phép'));
+        }
+      },
+    });
+  };
 
   const isLoading =
     overrideMutation.isPending ||
@@ -427,58 +492,14 @@ export function ShiftOverrideModal({
         <div className="flex gap-2 mb-3">
           <button
             type="button"
-            onClick={async () => {
-              if (!window.confirm('Đánh dấu Công tác cho ngày này?')) return;
-              try {
-                // Xóa shift_assignment
-                if (currentShift?.id) {
-                  await supabase.from('shift_assignments').delete().eq('employee_id', employeeId).eq('date', date);
-                }
-                // Tạo attendance business_trip
-                const { data: existing } = await supabase.from('attendance').select('id').eq('employee_id', employeeId).eq('date', date).maybeSingle();
-                if (!existing) {
-                  await supabase.from('attendance').insert({
-                    employee_id: employeeId, date, status: 'business_trip',
-                    work_units: 1.0, working_minutes: 480,
-                    check_in_time: date + 'T08:00:00+07:00', check_out_time: date + 'T17:00:00+07:00',
-                    notes: 'Công tác (gán thủ công)',
-                  });
-                } else {
-                  await supabase.from('attendance').update({ status: 'business_trip', work_units: 1.0, working_minutes: 480, notes: 'Công tác (gán thủ công)' }).eq('id', existing.id);
-                }
-                queryClient.invalidateQueries({ queryKey: ['shift-calendar'] });
-                queryClient.invalidateQueries({ queryKey: ['shift-calendar-special'] });
-                handleClose();
-              } catch (e: any) { alert(e.message); }
-            }}
+            onClick={() => confirmMarkDay('business_trip')}
             className="flex-1 py-2.5 border-2 border-sky-300 bg-sky-50 rounded-xl text-sm font-bold text-sky-700 active:bg-sky-100"
           >
             CT — Công tác
           </button>
           <button
             type="button"
-            onClick={async () => {
-              if (!window.confirm('Đánh dấu Nghỉ phép cho ngày này?')) return;
-              try {
-                // Xóa shift_assignment
-                if (currentShift?.id) {
-                  await supabase.from('shift_assignments').delete().eq('employee_id', employeeId).eq('date', date);
-                }
-                // Tạo attendance leave
-                const { data: existing } = await supabase.from('attendance').select('id').eq('employee_id', employeeId).eq('date', date).maybeSingle();
-                if (!existing) {
-                  await supabase.from('attendance').insert({
-                    employee_id: employeeId, date, status: 'leave', work_units: 0, working_minutes: 0,
-                    notes: 'Nghỉ phép (gán thủ công)',
-                  });
-                } else {
-                  await supabase.from('attendance').update({ status: 'leave', work_units: 0, working_minutes: 0, notes: 'Nghỉ phép (gán thủ công)' }).eq('id', existing.id);
-                }
-                queryClient.invalidateQueries({ queryKey: ['shift-calendar'] });
-                queryClient.invalidateQueries({ queryKey: ['shift-calendar-special'] });
-                handleClose();
-              } catch (e: any) { alert(e.message); }
-            }}
+            onClick={() => confirmMarkDay('leave')}
             className="flex-1 py-2.5 border-2 border-orange-300 bg-orange-50 rounded-xl text-sm font-bold text-orange-600 active:bg-orange-100"
           >
             P — Nghỉ phép
@@ -557,7 +578,7 @@ export function ShiftOverrideModal({
         {mutationError && (
           <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-xl text-sm">
             <AlertCircle size={16} className="shrink-0" />
-            <span>Lỗi: {(mutationError as Error).message}</span>
+            <span>{dichLoiHeThong(mutationError, 'Thao tác phân ca thất bại')}</span>
           </div>
         )}
 

@@ -295,6 +295,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
     set({ isLoading: true, error: null })
 
     try {
+      // Link trong email về route /reset-password (features/auth/ResetPasswordPage — form đặt mật khẩu mới).
+      // ⚠ URL này phải nằm trong Supabase Auth → URL Configuration → Redirect URLs, thiếu thì Supabase đổ về Site URL.
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       })

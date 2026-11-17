@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
+import { addDaysStr, todayVN } from '../utils/dateVN'
 
 export interface TaskTemplate {
   id: string
@@ -93,9 +94,10 @@ export const taskTemplateService = {
     name_suffix?: string
   }): Promise<string> {
     const template = await this.getById(templateId)
-    if (!template) throw new Error('Template không tồn tại')
+    if (!template) throw new Error('Mẫu công việc không tồn tại')
 
-    const dueDate = overrides?.due_date || new Date(Date.now() + template.default_duration_days * 86400000).toISOString().split('T')[0]
+    // Hạn = hôm nay (giờ VN) + N ngày — toISOString() cũ ra ngày UTC, lệch −1 ngày trước 7h sáng
+    const dueDate = overrides?.due_date || addDaysStr(todayVN(), template.default_duration_days)
     const taskName = overrides?.name_suffix ? `${template.name} — ${overrides.name_suffix}` : template.name
 
     // Create task

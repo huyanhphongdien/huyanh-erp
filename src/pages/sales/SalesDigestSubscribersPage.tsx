@@ -11,6 +11,8 @@ import {
 } from 'antd'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
 
 interface Subscriber {
   id: string
@@ -43,6 +45,7 @@ export default function SalesDigestSubscribersPage() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([])
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [selectedEmpId, setSelectedEmpId] = useState<string | undefined>()
   const [submitting, setSubmitting] = useState(false)
@@ -69,8 +72,9 @@ export default function SalesDigestSubscribersPage() {
         .eq('status', 'active')
         .order('full_name'),
     ])
+    setLoadError(subRes.error || null)
     if (subRes.error) {
-      message.error('Lỗi load subscribers: ' + subRes.error.message)
+      // Lỗi tải ≠ "chưa ai đăng ký" — bảng nhường chỗ cho khối lỗi + Thử lại
     } else {
       const rows = (subRes.data || []).map((r: any) => ({
         ...r,
@@ -113,11 +117,11 @@ export default function SalesDigestSubscribersPage() {
       if (error.code === '23505') {
         message.warning('NV này đã đăng ký rồi')
       } else {
-        message.error('Lỗi: ' + error.message)
+        message.error(dichLoiHeThong(error, 'Không thêm được người nhận'))
       }
       return
     }
-    message.success('Đã thêm subscriber')
+    message.success('Đã thêm người nhận bản tin')
     setAddModalOpen(false)
     setSelectedEmpId(undefined)
     fetch()
@@ -129,7 +133,7 @@ export default function SalesDigestSubscribersPage() {
       .delete()
       .eq('id', id)
     if (error) {
-      message.error('Lỗi xóa: ' + error.message)
+      message.error(dichLoiHeThong(error, 'Không xóa được'))
       return
     }
     message.success('Đã xóa')
@@ -142,7 +146,7 @@ export default function SalesDigestSubscribersPage() {
       .update({ [field]: value })
       .eq('id', sub.id)
     if (error) {
-      message.error('Lỗi: ' + error.message)
+      message.error(dichLoiHeThong(error, 'Không lưu được'))
       return
     }
     fetch()
@@ -190,7 +194,7 @@ export default function SalesDigestSubscribersPage() {
       ),
     },
     {
-      title: 'Capacity',
+      title: 'Công suất',
       key: 'capacity',
       align: 'center' as const,
       render: (_: any, r: Subscriber) => (
@@ -208,7 +212,7 @@ export default function SalesDigestSubscribersPage() {
       ),
     },
     {
-      title: 'Active',
+      title: 'Đang nhận',
       key: 'is_active',
       align: 'center' as const,
       render: (_: any, r: Subscriber) => (
@@ -221,7 +225,7 @@ export default function SalesDigestSubscribersPage() {
       width: 50,
       render: (_: any, r: Subscriber) => (
         <Popconfirm
-          title="Xóa subscriber này?"
+          title="Xóa người nhận bản tin này?"
           onConfirm={() => handleDelete(r.id)}
           okText="Xóa" cancelText="Hủy"
           okButtonProps={{ danger: true }}
@@ -237,7 +241,7 @@ export default function SalesDigestSubscribersPage() {
       <Card
         title={
           <span style={{ color: '#1B4D3E', fontSize: 16 }}>
-            👥 Sales Digest Subscribers
+            👥 Người nhận bản tin bán hàng
           </span>
         }
         extra={
@@ -249,7 +253,7 @@ export default function SalesDigestSubscribersPage() {
               onClick={() => setAddModalOpen(true)}
               style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
             >
-              Thêm subscriber
+              Thêm người nhận
             </Button>
           </div>
         }
@@ -261,6 +265,9 @@ export default function SalesDigestSubscribersPage() {
           Subscribers dùng để chuẩn bị danh sách nhận khi email infra sẵn sàng.
         </div>
 
+        {loadError && !loading ? (
+          <PageState error={loadError} onRetry={fetch} />
+        ) : (
         <Table
           columns={columns}
           dataSource={subscribers}
@@ -269,11 +276,12 @@ export default function SalesDigestSubscribersPage() {
           pagination={false}
           size="small"
         />
+        )}
       </Card>
 
       {/* Add modal */}
       <Modal
-        title="Thêm subscriber mới"
+        title="Thêm người nhận bản tin"
         open={addModalOpen}
         onOk={handleAdd}
         onCancel={() => { setAddModalOpen(false); setSelectedEmpId(undefined) }}

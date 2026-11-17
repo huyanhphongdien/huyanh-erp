@@ -49,6 +49,17 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { projectHealthService, type HealthResult } from '../../services/project/projectHealthService'
 import { exportStatusReportPDF, exportPortfolioCSV, type PDFReportData } from '../../utils/exportProjectPDF'
+import { App } from 'antd'
+import { fmtDate, fmtDateShort, fmtVndCompact } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import {
+  PROJECT_STATUS_LABELS,
+  PHASE_STATUS_LABELS,
+  MILESTONE_STATUS_LABELS,
+} from '../../services/project/project.types'
+import { RISK_STATUS_LABELS } from '../../services/project/riskService'
+import { ISSUE_STATUS_LABELS } from '../../services/project/issueService'
+import { MEMBER_ROLE_LABELS } from '../../services/project/resourceService'
 
 // ============================================================================
 // TYPES
@@ -123,13 +134,15 @@ interface MemberRow {
 // CONSTANTS
 // ============================================================================
 
+// Nhãn trạng thái gộp từ các map MỘT nguồn (project.types / riskService / issueService — Đợt 3 audit UI
+// 17/11/2026). Bản chép cũ ghi "Lên KH", "Hủy", "Sắp tới", "Đã xác định", "Đã xử lý", "Đóng" — lệch màn khác.
+// Thứ tự spread: mã trùng (in_progress, completed…) lấy nhãn của DỰ ÁN/GIAI ĐOẠN (đi sau cùng).
 const STATUS_VI: Record<string, string> = {
-  draft: 'Nháp', planning: 'Lên KH', approved: 'Đã duyệt',
-  in_progress: 'Đang thực hiện', on_hold: 'Tạm dừng', completed: 'Hoàn thành', cancelled: 'Hủy',
-  pending: 'Chờ', approaching: 'Sắp tới', overdue: 'Quá hạn',
-  identified: 'Đã xác định', analyzing: 'Đang phân tích', mitigating: 'Đang xử lý',
-  accepted: 'Chấp nhận', resolved: 'Đã xử lý', closed: 'Đóng',
-  open: 'Mở', 'in-progress': 'Đang xử lý',
+  ...ISSUE_STATUS_LABELS,
+  ...RISK_STATUS_LABELS,
+  ...MILESTONE_STATUS_LABELS,
+  ...PHASE_STATUS_LABELS,
+  ...PROJECT_STATUS_LABELS,
 }
 
 const PHASE_STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string }> = {
@@ -139,27 +152,11 @@ const PHASE_STATUS_CONFIG: Record<string, { bg: string; text: string; dot: strin
   skipped:     { bg: 'bg-gray-50',    text: 'text-gray-400',    dot: 'bg-gray-300' },
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  pm: 'PM', lead: 'Lead', member: 'Thành viên',
-  reviewer: 'Reviewer', observer: 'Quan sát',
-}
+// Vai trò đọc từ MEMBER_ROLE_LABELS (resourceService). Bản chép cũ dùng khoá 'pm' trong khi mã thật là
+// 'owner'/'co_owner' → chủ dự án hiện thẳng mã tiếng Anh "owner" ở bảng Nhân sự + bản in.
+const ROLE_LABELS: Record<string, string> = MEMBER_ROLE_LABELS
 
-function fmtDate(d?: string | null): string {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-function fmtDateShort(d?: string | null): string {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-}
-
-function fmtCurrency(n: number): string {
-  if (!n) return '0 đ'
-  if (n >= 1e9) return `${(n / 1e9).toFixed(1)} tỷ`
-  if (n >= 1e6) return `${(n / 1e6).toFixed(0)} tr`
-  return n.toLocaleString('vi-VN') + ' đ'
-}
+// fmtDate / fmtDateShort / fmtCurrency cục bộ đã bỏ → src/utils/format.ts (VND ' ₫' thay 'đ', "1,5 tỷ" dấu phẩy)
 
 function daysUntil(d?: string | null): number | null {
   if (!d) return null
@@ -176,6 +173,7 @@ const ProjectReportsTab: React.FC<{
   phases: Phase[]
 }> = ({ projectId, project, phases }) => {
   const { user } = useAuthStore()
+  const { message } = App.useApp()
 
   // State
   const [loading, setLoading] = useState(true)
@@ -416,12 +414,12 @@ const ProjectReportsTab: React.FC<{
         })),
         issues_by_severity: issuesBySeverity,
         task_stats: taskStats,
-        exported_by: user?.full_name || 'System',
+        exported_by: user?.full_name || 'Hệ thống',
       }
       exportStatusReportPDF(data)
     } catch (err) {
       console.error('Export PDF error:', err)
-      alert('Export thất bại')
+      message.error(dichLoiHeThong(err, 'Xuất báo cáo PDF thất bại'))
     } finally {
       setExporting(false)
     }
@@ -434,22 +432,13 @@ const ProjectReportsTab: React.FC<{
       const now = new Date()
       const periodLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`
       const hc = healthResult
-      const hConfig = hc ? projectHealthService.getConfig(hc.status) : null
+      // Nhãn + màu RAG đọc từ projectHealthService (HEALTH_CONFIG — một nguồn với thẻ "Sức khỏe dự án" trên màn và
+      // bản PDF tóm tắt). Bản chép tay cũ in "ĐÚNG HẠN"/"TRỄ" trong khi màn ghi "Đúng tiến độ"/"Trễ tiến độ".
+      const hConfig = projectHealthService.getConfig(hc?.status || 'green')
+      const ragC = { bg: hConfig.color, label: hConfig.label }
 
-      const HEALTH_COLORS: Record<string, { bg: string; label: string }> = {
-        green: { bg: '#16A34A', label: 'ON TRACK' },
-        amber: { bg: '#EA580C', label: 'AT RISK' },
-        red:   { bg: '#DC2626', label: 'BEHIND' },
-      }
-      const ragC = HEALTH_COLORS[hc?.status || 'green']
-
-      const STATUS_VI_MAP: Record<string, string> = {
-        draft: 'Nháp', planning: 'Lên KH', approved: 'Đã duyệt',
-        in_progress: 'Đang chạy', on_hold: 'Tạm dừng', completed: 'Xong', cancelled: 'Hủy',
-        pending: 'Chờ', approaching: 'Sắp tới', overdue: 'Trễ',
-        identified: 'Đã xác định', analyzing: 'Phân tích', mitigating: 'Xử lý',
-        accepted: 'Chấp nhận', resolved: 'Đã xử lý', closed: 'Đóng',
-      }
+      // Nhãn đọc từ map dùng chung (bản chép cũ: "Lên KH"/"Đang chạy"/"Xong"/"Trễ"/"Đã xác định" — lệch màn khác)
+      const STATUS_VI_MAP: Record<string, string> = STATUS_VI
 
       const fDate = (d?: string | null) => {
         if (!d) return '—'
@@ -479,7 +468,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;font-size:10px;color:#1a1a1a;li
 .header-left .period{font-size:9px;color:#9CA3AF;margin-top:3px}
 .rag{width:70px;height:70px;border-radius:50%;background:${ragC.bg};display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff}
 .rag-pct{font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace}
-.rag-label{font-size:7px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:1px}
+.rag-label{font-size:7px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:1px;text-align:center;line-height:1.2}
 .section{margin-bottom:12px}
 .section-title{font-size:11px;font-weight:700;color:#1B4D3E;border-bottom:1.5px solid #1B4D3E;padding-bottom:2px;margin-bottom:6px}
 .info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
@@ -521,9 +510,9 @@ td{padding:4px 5px;border:1px solid #E5E7EB}
     <div class="info-item"><div class="info-label">Thời gian KH</div><div class="info-value">${fDate(project.planned_start)} → ${fDate(project.planned_end)}</div></div>
     <div class="info-item"><div class="info-label">Bắt đầu thực tế</div><div class="info-value">${fDate(project.actual_start)}</div></div>
     <div class="info-item"><div class="info-label">Trạng thái</div><div class="info-value">${STATUS_VI_MAP[project.status] || project.status}</div></div>
-    <div class="info-item"><div class="info-label">Tiến độ TT / KH</div><div class="info-value" style="color:${ragC.bg}">${hc?.actual_progress || 0}% / ${hc?.planned_progress || 0}% (Gap: ${hc?.gap || 0}%)</div></div>
+    <div class="info-item"><div class="info-label">Tiến độ TT / KH</div><div class="info-value" style="color:${ragC.bg}">${hc?.actual_progress || 0}% / ${hc?.planned_progress || 0}% (Chênh: ${hc?.gap || 0}%)</div></div>
     <div class="info-item"><div class="info-label">Ngân sách</div><div class="info-value" ${budgetPctVal > 100 ? 'style="color:#DC2626"' : ''}>${fCurr(project.budget_actual)} / ${fCurr(project.budget_planned)} (${budgetPctVal}%)</div></div>
-    <div class="info-item"><div class="info-label">Tasks</div><div class="info-value">${taskStats.completed}/${taskStats.total} xong · ${taskStats.in_progress} đang làm · <span ${taskStats.overdue > 0 ? 'style="color:#DC2626"' : ''}>${taskStats.overdue} quá hạn</span></div></div>
+    <div class="info-item"><div class="info-label">Công việc</div><div class="info-value">${taskStats.completed}/${taskStats.total} xong · ${taskStats.in_progress} đang làm · <span ${taskStats.overdue > 0 ? 'style="color:#DC2626"' : ''}>${taskStats.overdue} quá hạn</span></div></div>
   </div>
 </div>
 
@@ -537,7 +526,7 @@ ${hc && hc.adjustments.length > 0 ? `
 
 <!-- 2. TIẾN ĐỘ PHASES -->
 <div class="section">
-  <div class="section-title">2. Tiến độ theo Phase (${phases.length})</div>
+  <div class="section-title">2. Tiến độ theo giai đoạn (${phases.length})</div>
   ${phases.sort((a,b) => a.order_index - b.order_index).map(ph => `
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
       <div style="width:130px;font-size:10px;font-weight:500;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ph.name}</div>
@@ -609,15 +598,15 @@ ${hc && hc.adjustments.length > 0 ? `
 
 <!-- 3. MILESTONES (FULL) -->
 <div class="section">
-  <div class="section-title">3. Milestones (${milestones.length}) — ${milestoneStats.completed} hoàn thành, ${milestoneStats.overdue} quá hạn</div>
+  <div class="section-title">3. Mốc (${milestones.length}) — ${milestoneStats.completed} hoàn thành, ${milestoneStats.overdue} quá hạn</div>
   ${milestones.length > 0 ? `
-  <table><thead><tr><th>Milestone</th><th>Phase</th><th>Phụ trách</th><th>Hạn</th><th>Hoàn thành</th><th>Trạng thái</th></tr></thead><tbody>
+  <table><thead><tr><th>Mốc</th><th>Giai đoạn</th><th>Phụ trách</th><th>Hạn</th><th>Hoàn thành</th><th>Trạng thái</th></tr></thead><tbody>
   ${milestones.map(ms => {
     const isOD = ms.status !== 'completed' && ms.status !== 'cancelled' && ms.due_date && new Date(ms.due_date) < new Date()
     const cls = ms.status === 'completed' ? 'completed' : isOD ? 'overdue' : ''
     return `<tr class="${cls}"><td>${ms.name}</td><td>${ms.phase_name || '—'}</td><td>${ms.assignee_name || '—'}</td><td>${fDate(ms.due_date)}</td><td>${ms.completed_date ? fDate(ms.completed_date) : '—'}</td><td>${ms.status === 'completed' ? '✓ Xong' : isOD ? '⚠ Quá hạn' : (STATUS_VI_MAP[ms.status] || ms.status)}</td></tr>`
   }).join('')}
-  </tbody></table>` : '<div style="color:#9CA3AF;font-size:9px">Chưa có milestone</div>'}
+  </tbody></table>` : '<div style="color:#9CA3AF;font-size:9px">Chưa có mốc</div>'}
 </div>
 
 <!-- PAGE BREAK -->
@@ -650,7 +639,7 @@ ${hc && hc.adjustments.length > 0 ? `
 <div class="section">
   <div class="section-title">6. Đội dự án (${members.length} thành viên)</div>
   ${members.length > 0 ? `
-  <table><thead><tr><th>Tên</th><th>Vai trò</th><th>Phòng ban</th><th style="text-align:center">Tasks</th></tr></thead><tbody>
+  <table><thead><tr><th>Tên</th><th>Vai trò</th><th>Phòng ban</th><th style="text-align:center">Công việc</th></tr></thead><tbody>
   ${members.map(m => `<tr><td style="font-weight:500">${m.full_name}</td><td>${ROLE_LABELS[m.role] || m.role}</td><td>${m.department_name || '—'}</td><td style="text-align:center;font-family:'JetBrains Mono',monospace">${m.task_count}</td></tr>`).join('')}
   </tbody></table>` : '<div style="color:#9CA3AF;font-size:9px">Chưa có thành viên</div>'}
 </div>
@@ -658,19 +647,19 @@ ${hc && hc.adjustments.length > 0 ? `
 <!-- FOOTER -->
 <div class="footer">
   <span>Công ty TNHH Cao su Huy Anh — Huy Anh Rubber ERP</span>
-  <span>Báo cáo chi tiết · Người lập: ${user?.full_name || 'System'} · ${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
+  <span>Báo cáo chi tiết · Người lập: ${user?.full_name || 'Hệ thống'} · ${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
 </div>
 
 </body></html>`
 
       const win = window.open('', '_blank')
-      if (!win) { alert('Không thể mở cửa sổ in. Vui lòng cho phép popup.'); return }
+      if (!win) { message.warning('Trình duyệt chặn cửa sổ in — cho phép popup cho trang này rồi bấm lại.'); return }
       win.document.write(html)
       win.document.close()
       setTimeout(() => win.print(), 400)
     } catch (err) {
       console.error('Export Detail PDF error:', err)
-      alert('Export thất bại')
+      message.error(dichLoiHeThong(err, 'Xuất báo cáo chi tiết thất bại'))
     } finally {
       setExportingDetail(false)
     }
@@ -683,19 +672,25 @@ ${hc && hc.adjustments.length > 0 ? `
       const now = new Date()
       const periodLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`
 
-      // Fetch all active projects
-      const { data: projects } = await supabase
+      // Fetch all active projects — lỗi tải PHẢI ném ra (catch dưới báo qua dichLoiHeThong); trước đây bỏ qua error
+      // nên mất mạng/hết phiên cũng báo "Không có dự án đang hoạt động" (giả)
+      const { data: projects, error: projectsError } = await supabase
         .from('projects')
+        // planned_start/planned_end PHẢI có: calculateHealthSimple thiếu ngày thì trả 'green' →
+        // trước đây cột "Sức khỏe" của file tổng hợp luôn "Đúng tiến độ" cho MỌI dự án (sai số liệu)
         .select(`
           id, code, name, status, progress_pct, budget_planned, budget_actual,
+          planned_start, planned_end,
           owner:employees!projects_owner_id_fkey(full_name),
           department:departments(name)
         `)
         .in('status', ['in_progress', 'planning', 'approved', 'on_hold'])
         .order('code')
 
+      if (projectsError) throw projectsError
+
       if (!projects?.length) {
-        alert('Không có dự án đang hoạt động để xuất báo cáo.')
+        message.warning('Không có dự án đang hoạt động để xuất báo cáo.')
         return
       }
 
@@ -707,28 +702,31 @@ ${hc && hc.adjustments.length > 0 ? `
           p.planned_end
         )
 
-        // Risk count
-        const { count: riskCount } = await supabase
+        // Risk count — lỗi thì ném (không ghi "0 rủi ro" giả vào file)
+        const { count: riskCount, error: riskError } = await supabase
           .from('project_risks')
           .select('id', { count: 'exact', head: true })
           .eq('project_id', p.id)
           .in('status', ['identified', 'analyzing', 'mitigating'])
+        if (riskError) throw riskError
 
         // Open issues count
-        const { count: issueCount } = await supabase
+        const { count: issueCount, error: issueError } = await supabase
           .from('project_issues')
           .select('id', { count: 'exact', head: true })
           .eq('project_id', p.id)
           .in('status', ['open', 'in_progress'])
+        if (issueError) throw issueError
 
         // Next milestone
-        const { data: nextMs } = await supabase
+        const { data: nextMs, error: msError } = await supabase
           .from('project_milestones')
           .select('name, due_date')
           .eq('project_id', p.id)
           .in('status', ['pending', 'approaching'])
           .order('due_date')
           .limit(1)
+        if (msError) throw msError
 
         const ownerName = Array.isArray(p.owner) ? p.owner[0]?.full_name : p.owner?.full_name
         const deptName = Array.isArray(p.department) ? p.department[0]?.name : p.department?.name
@@ -753,7 +751,7 @@ ${hc && hc.adjustments.length > 0 ? `
       exportPortfolioCSV(items, periodLabel)
     } catch (err) {
       console.error('Export Portfolio error:', err)
-      alert('Export thất bại')
+      message.error(dichLoiHeThong(err, 'Xuất báo cáo tổng hợp thất bại'))
     } finally {
       setExportingPortfolio(false)
     }
@@ -859,7 +857,7 @@ ${hc && hc.adjustments.length > 0 ? `
           <div className="text-[18px] font-bold font-mono text-emerald-600">
             {taskStats.completed}/{taskStats.total}
           </div>
-          <div className="text-[10px] text-gray-500 mt-0.5">Tasks xong</div>
+          <div className="text-[10px] text-gray-500 mt-0.5">Công việc xong</div>
           <div className="h-1 bg-gray-100 rounded-full mt-2 overflow-hidden">
             <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${completionPct}%` }} />
           </div>
@@ -884,7 +882,7 @@ ${hc && hc.adjustments.length > 0 ? `
           <div className="text-[18px] font-bold font-mono text-violet-600">
             {milestoneStats.completed}/{milestoneStats.total}
           </div>
-          <div className="text-[10px] text-gray-500 mt-0.5">Milestones</div>
+          <div className="text-[10px] text-gray-500 mt-0.5">Mốc</div>
         </div>
 
         {/* Risks */}
@@ -928,7 +926,7 @@ ${hc && hc.adjustments.length > 0 ? `
             {/* Label inside bar */}
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="text-[11px] font-bold text-white drop-shadow-sm">
-                {fmtCurrency(project.budget_actual)}
+                {fmtVndCompact(project.budget_actual)}
               </span>
             </div>
           </div>
@@ -937,18 +935,18 @@ ${hc && hc.adjustments.length > 0 ? `
           <div className="grid grid-cols-3 gap-3">
             <div>
               <div className="text-[10px] text-gray-400 uppercase">Dự toán</div>
-              <div className="text-[13px] font-bold font-mono text-gray-700">{fmtCurrency(project.budget_planned)}</div>
+              <div className="text-[13px] font-bold font-mono text-gray-700">{fmtVndCompact(project.budget_planned)}</div>
             </div>
             <div>
               <div className="text-[10px] text-gray-400 uppercase">Thực tế</div>
               <div className={`text-[13px] font-bold font-mono ${budgetPct > 100 ? 'text-red-600' : 'text-gray-700'}`}>
-                {fmtCurrency(project.budget_actual)}
+                {fmtVndCompact(project.budget_actual)}
               </div>
             </div>
             <div>
               <div className="text-[10px] text-gray-400 uppercase">Còn lại</div>
               <div className={`text-[13px] font-bold font-mono ${budgetRemaining < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                {budgetRemaining < 0 ? '-' : ''}{fmtCurrency(Math.abs(budgetRemaining))}
+                {budgetRemaining < 0 ? '-' : ''}{fmtVndCompact(Math.abs(budgetRemaining))}
               </div>
             </div>
           </div>
@@ -1000,8 +998,8 @@ ${hc && hc.adjustments.length > 0 ? `
       <div className="bg-white rounded-xl border border-gray-100 p-4">
         <div className="flex items-center gap-2 mb-3">
           <BarChart3 className="w-4 h-4 text-gray-400" />
-          <h3 className="text-[13px] font-semibold text-gray-700">Tiến độ theo Phase</h3>
-          <span className="text-[11px] text-gray-400 ml-auto">{phases.length} phases</span>
+          <h3 className="text-[13px] font-semibold text-gray-700">Tiến độ theo giai đoạn</h3>
+          <span className="text-[11px] text-gray-400 ml-auto">{phases.length} giai đoạn</span>
         </div>
 
         <div className="space-y-3">
@@ -1046,7 +1044,7 @@ ${hc && hc.adjustments.length > 0 ? `
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Flag className="w-4 h-4 text-gray-400" />
-              <h3 className="text-[13px] font-semibold text-gray-700">Milestones</h3>
+              <h3 className="text-[13px] font-semibold text-gray-700">Mốc</h3>
               <span className="text-[11px] text-gray-400">
                 {milestoneStats.completed}/{milestoneStats.total} hoàn thành
                 {milestoneStats.overdue > 0 && (
@@ -1060,8 +1058,8 @@ ${hc && hc.adjustments.length > 0 ? `
             <table className="w-full text-[12px]">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left py-2 pr-3 text-[10px] font-semibold text-gray-400 uppercase">Milestone</th>
-                  <th className="text-left py-2 pr-3 text-[10px] font-semibold text-gray-400 uppercase">Phase</th>
+                  <th className="text-left py-2 pr-3 text-[10px] font-semibold text-gray-400 uppercase">Mốc</th>
+                  <th className="text-left py-2 pr-3 text-[10px] font-semibold text-gray-400 uppercase">Giai đoạn</th>
                   <th className="text-left py-2 pr-3 text-[10px] font-semibold text-gray-400 uppercase">Hạn</th>
                   <th className="text-left py-2 pr-3 text-[10px] font-semibold text-gray-400 uppercase">Trạng thái</th>
                   <th className="text-left py-2 text-[10px] font-semibold text-gray-400 uppercase">Phụ trách</th>
@@ -1286,7 +1284,7 @@ ${hc && hc.adjustments.length > 0 ? `
             className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#1B4D3E] text-white text-[13px] font-semibold active:scale-[0.98] disabled:opacity-50 transition-transform"
           >
             {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-            Status Report (PDF)
+            Báo cáo trạng thái (PDF)
           </button>
 
           {/* Detailed Report */}
@@ -1306,7 +1304,7 @@ ${hc && hc.adjustments.length > 0 ? `
             className="flex items-center justify-center gap-2 py-3 rounded-xl border border-gray-200 text-gray-700 text-[13px] font-medium active:scale-[0.98] disabled:opacity-50 transition-transform"
           >
             {exportingPortfolio ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderKanban className="w-4 h-4" />}
-            Portfolio Report
+            Tổng hợp mọi dự án (Excel/CSV)
           </button>
         </div>
       </div>

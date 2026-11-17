@@ -1,6 +1,8 @@
 /**
  * TierBadge Component
  * Badge hiển thị tier đại lý với gradient màu
+ * Nhãn hạng đọc từ MỘT nguồn TIER_LABELS (src/services/b2b/partnerService.ts) — 'Kim cương', 'Vàng'…
+ * (trước 17/11/2026 badge này in tiếng Anh 'Diamond'/'Gold'… lệch với mọi màn B2B khác).
  */
 
 import React from 'react';
@@ -12,6 +14,8 @@ import {
   FireOutlined,
   UserOutlined,
 } from '@ant-design/icons';
+import { TIER_LABELS } from '../../services/b2b/partnerService';
+import { fmtNum } from '../../utils/format';
 
 // ==========================================
 // TYPES
@@ -45,7 +49,7 @@ export const tierConfig: Record<PartnerTier, {
   minTonnage: number;
 }> = {
   diamond: {
-    label: 'Diamond',
+    label: TIER_LABELS.diamond,
     icon: <CrownOutlined />,
     emoji: '💎',
     gradient: 'linear-gradient(135deg, #E8D5B7 0%, #B8860B 50%, #DAA520 100%)',
@@ -55,7 +59,7 @@ export const tierConfig: Record<PartnerTier, {
     minTonnage: 500,
   },
   gold: {
-    label: 'Gold',
+    label: TIER_LABELS.gold,
     icon: <TrophyOutlined />,
     emoji: '🥇',
     gradient: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
@@ -65,7 +69,7 @@ export const tierConfig: Record<PartnerTier, {
     minTonnage: 200,
   },
   silver: {
-    label: 'Silver',
+    label: TIER_LABELS.silver,
     icon: <StarOutlined />,
     emoji: '🥈',
     gradient: 'linear-gradient(135deg, #E0E0E0 0%, #808080 100%)',
@@ -75,7 +79,7 @@ export const tierConfig: Record<PartnerTier, {
     minTonnage: 50,
   },
   bronze: {
-    label: 'Bronze',
+    label: TIER_LABELS.bronze,
     icon: <FireOutlined />,
     emoji: '🥉',
     gradient: 'linear-gradient(135deg, #CD7F32 0%, #8B4513 100%)',
@@ -85,7 +89,7 @@ export const tierConfig: Record<PartnerTier, {
     minTonnage: 10,
   },
   new: {
-    label: 'New',
+    label: TIER_LABELS.new,
     icon: <UserOutlined />,
     emoji: '🆕',
     gradient: 'linear-gradient(135deg, #87CEEB 0%, #4682B4 100%)',
@@ -250,7 +254,7 @@ export const TierProgress: React.FC<{
         />
       </div>
       <div style={{ marginTop: 4, fontSize: 11, color: '#999' }}>
-        {currentTonnage.toFixed(1)} / {nextConfig.minTonnage} tấn ({progress.toFixed(0)}%)
+        {fmtNum(currentTonnage, 1)} / {fmtNum(nextConfig.minTonnage)} tấn ({fmtNum(progress)}%)
       </div>
     </div>
   );

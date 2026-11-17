@@ -7,18 +7,21 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Alert, Button, Card, Col, Descriptions, Empty, Input, InputNumber, Modal, Row, Space, Spin, Steps, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { ArrowLeftOutlined, ReloadOutlined, SaveOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ReloadOutlined, SaveOutlined, MobileOutlined } from '@ant-design/icons'
 import { rawIssueService, RAW_ISSUE_PURPOSE_LABELS, RAW_ISSUE_STATUS_COLORS, RAW_ISSUE_STATUS_LABELS, type RawIssueLine, type RawIssueOrder } from '../../../services/wms/rawIssueService'
 import { useRawRole } from '../../../hooks/useRawRole'
+import { useIsPhone } from '../../../hooks/useIsPhone'
+import { fmtKg, fmtPct, fmtDateTime } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
-const fmtKg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
-const fmtPct = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' %')
-const fmtTime = (iso: string | null) => (iso ? new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '')
+// Ngày-giờ chuẩn 'DD/MM HH:mm'; trống thì để trống (đứng sau tên người ký trong mô tả bước)
+const fmtTime = (iso: string | null) => (iso ? fmtDateTime(iso) : '')
 
 export default function RawIssueDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const isPhone = useIsPhone()
   const [order, setOrder] = useState<RawIssueOrder | null>(null)
   const [lines, setLines] = useState<RawIssueLine[]>([])
   const rawRole = useRawRole(order?.facility_id ?? null)
@@ -36,7 +39,7 @@ export default function RawIssueDetailPage() {
       if (!r) { setOrder(null); setLines([]); return }
       setOrder(r.order); setLines(r.lines)
       setDraft(Object.fromEntries(r.lines.map((l) => [l.id, l.actual_wet_kg])))
-    } catch (e: any) { setError(e?.message || 'Không tải được lệnh') }
+    } catch (e: any) { setError(dichLoiHeThong(e, 'Không tải được lệnh')) }
     finally { setLoading(false) }
   }, [id])
 
@@ -47,13 +50,14 @@ export default function RawIssueDetailPage() {
     if (v === null || v === undefined) return
     setSavingLine(l.id)
     try { await rawIssueService.ghiCan(l.id, v); message.success(`Đã ghi ${fmtKg(v)} kg cho lô ${l.batch_no}`); await load() }
-    catch (e: any) { message.error(e?.message || 'Không ghi được') }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Không ghi được')) }
     finally { setSavingLine(null) }
   }
 
   const sign = (buoc: 'submit' | 'qc_confirm' | 'receive' | 'cancel') => {
     if (!order) return
-    const titles = { submit: 'Bên giao ký: đã cân xong, gửi QS?', qc_confirm: 'Giám sát chất lượng xác nhận số cân?', receive: 'Thủ kho nhận: TRỪ SỔ KHO KHÔ ngay?', cancel: 'Hủy lệnh xuất này?' }
+    // Bước 2 do phòng QC (HAP-QC) ký — quyền qc_confirm / la_qc — nên gọi "QC" như màn nhập kho, cân lại
+    const titles = { submit: 'Bên giao ký: đã cân xong, gửi QC?', qc_confirm: 'QC xác nhận số cân?', receive: 'Thủ kho nhận: TRỪ SỔ KHO KHÔ ngay?', cancel: 'Hủy lệnh xuất này?' }
     let reason = ''
     Modal.confirm({
       title: titles[buoc],
@@ -67,14 +71,14 @@ export default function RawIssueDetailPage() {
           const r = await rawIssueService.ky(order.id, buoc, buoc === 'cancel' ? reason : null)
           message.success(buoc === 'receive' ? `Đã trừ sổ ${r.so_dong} lô · ${fmtKg(r.kho_kg)} kg khô` : 'Đã ký')
           await load()
-        } catch (e: any) { message.error(e?.message || 'Không ký được') }
+        } catch (e: any) { message.error(dichLoiHeThong(e, 'Không ký được')) }
         finally { setSigning(false) }
       },
     })
   }
 
   if (loading && !order) return <div style={{ padding: 48, textAlign: 'center' }}><Spin /></div>
-  if (error) return <div style={{ padding: 16 }}><Alert type="error" showIcon message={error} /></div>
+  if (error) return <div style={{ padding: 16 }}><Alert type="error" showIcon message={error} action={<Button size="small" onClick={load}>Thử lại</Button>} /></div>
   if (!order) return <div style={{ padding: 16 }}><Empty description="Không tìm thấy lệnh xuất" /></div>
 
   const isDraft = order.status === 'draft'
@@ -128,10 +132,14 @@ export default function RawIssueDetailPage() {
             <Steps size="small" current={stepIdx} items={[
               { title: 'Cân từng lô', description: isDraft ? `${chuaCan} dòng chưa cân` : 'xong' },
               { title: 'Bên giao ký', description: order.submitted_name ? `${order.submitted_name} · ${fmtTime(order.submitted_at)}` : undefined },
-              { title: 'QS xác nhận', description: order.qc_confirmed_name ? `${order.qc_confirmed_name} · ${fmtTime(order.qc_confirmed_at)}` : undefined },
+              { title: 'QC xác nhận', description: order.qc_confirmed_name ? `${order.qc_confirmed_name} · ${fmtTime(order.qc_confirmed_at)}` : undefined },
               { title: 'Thủ kho nhận · trừ sổ', description: order.received_name ? `${order.received_name} · ${fmtTime(order.received_at)}` : undefined },
             ]} />
           </Card>
+        )}
+        {isPhone && (
+          <Alert type="info" showIcon message="Đang mở trên điện thoại — bản điện thoại cân và ký lệnh xuất dễ hơn"
+            action={<Button size="small" type="primary" icon={<MobileOutlined />} onClick={() => navigate('/m/kho/xuat')}>Mở bản điện thoại</Button>} />
         )}
         {order.status === 'cancelled' && <Alert type="error" showIcon message={`Lệnh đã hủy ${fmtTime(order.cancelled_at)}`} description={order.cancel_reason || undefined} />}
         {!rawRole.perms.co_thu_kho && <Alert type="info" showIcon message="Chưa chỉ định thủ kho — bước 'nhận' đang mở cho mọi người." />}
@@ -154,7 +162,7 @@ export default function RawIssueDetailPage() {
             <Card size="small" title="Ký">
               <Space wrap>
                 {isDraft && <Button type="primary" disabled={chuaCan > 0 || !rawRole.perms.submit} loading={signing} onClick={() => sign('submit')}>1 · Bên giao ký ({chuaCan > 0 ? `còn ${chuaCan} dòng chưa cân` : 'đã cân đủ'})</Button>}
-                {order.status === 'submitted' && <Button type="primary" disabled={!rawRole.perms.qc_confirm} loading={signing} onClick={() => sign('qc_confirm')}>2 · QS xác nhận</Button>}
+                {order.status === 'submitted' && <Button type="primary" disabled={!rawRole.perms.qc_confirm} loading={signing} onClick={() => sign('qc_confirm')}>2 · QC xác nhận</Button>}
                 {order.status === 'qc_confirmed' && <Button type="primary" danger disabled={!rawRole.perms.receive} loading={signing} onClick={() => sign('receive')}>3 · Thủ kho nhận · trừ sổ</Button>}
                 {['draft', 'submitted', 'qc_confirmed'].includes(order.status) && <Button disabled={!rawRole.perms.cancel} loading={signing} onClick={() => sign('cancel')}>Hủy lệnh</Button>}
                 {order.status === 'received' && <Text type="success">Đã trừ sổ {fmtKg(order.actual_dry_kg)} kg khô lúc {fmtTime(order.received_at)}</Text>}

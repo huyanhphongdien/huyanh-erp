@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { vnDayStartTs, vnDayEndTs } from '../../utils/dateVN'
 
 export interface Downtime {
   id: string
@@ -97,8 +98,8 @@ export const downtimeService = {
     const { data, error } = await supabase
       .from('production_downtimes')
       .select('*')
-      .gte('started_at', from)
-      .lte('started_at', to + 'T23:59:59')
+      .gte('started_at', vnDayStartTs(from))
+      .lte('started_at', vnDayEndTs(to))
       .order('started_at', { ascending: false })
     if (error) throw error
     return data || []
@@ -109,8 +110,8 @@ export const downtimeService = {
     const { data, error } = await supabase
       .from('production_downtimes')
       .select('reason_category, duration_minutes')
-      .gte('started_at', from)
-      .lte('started_at', to + 'T23:59:59')
+      .gte('started_at', vnDayStartTs(from))
+      .lte('started_at', vnDayEndTs(to))
       .not('duration_minutes', 'is', null)
     if (error) throw error
 

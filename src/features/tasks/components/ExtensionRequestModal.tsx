@@ -14,6 +14,9 @@ import {
   useCreateAndAutoApproveExtension,
   useUploadExtensionAttachment,
 } from '../hooks/useExtensionRequests';
+import { fmtDate } from '../../../utils/format';
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong';
+import { dayOf } from '../../../services/taskScoring';
 
 // ============================================================================
 // TYPES
@@ -35,9 +38,7 @@ interface ExtensionRequestModalProps {
 // HELPERS
 // ============================================================================
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('vi-VN');
-}
+const formatDate = fmtDate;
 
 function calculateDays(fromDate: string, toDate: string): number {
   const from = new Date(fromDate);
@@ -87,9 +88,13 @@ export function ExtensionRequestModal({
     }
   }, [isOpen]);
 
-  // Calculate extension days
+  // Ngày lịch VN của hạn hiện tại. due_date là timestamptz: cắt 10 ký tự (`slice(0, 10)`) ra ngày UTC — hạn lưu giờ thật
+  // từ 17h UTC (= từ 0h hôm sau giờ VN) bị lùi 1 ngày, ô chọn cho phép chọn ngày TRƯỚC hạn thật.
+  const dueDay = dayOf(task.due_date);
+
+  // Calculate extension days (so ngày lịch với ngày lịch — cùng mốc với `min` của ô chọn)
   const extensionDays = requestedDate
-    ? calculateDays(task.due_date, requestedDate)
+    ? calculateDays(dueDay || task.due_date, requestedDate)
     : 0;
 
   // Check if self-approve (Executive)
@@ -179,7 +184,7 @@ export function ExtensionRequestModal({
       onSuccess?.();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Có lỗi xảy ra');
+      setError(dichLoiHeThong(err, 'Gửi yêu cầu gia hạn thất bại'));
     }
   };
 
@@ -267,7 +272,7 @@ export function ExtensionRequestModal({
                     type="date"
                     value={requestedDate}
                     onChange={(e) => setRequestedDate(e.target.value)}
-                    min={task.due_date}
+                    min={dueDay ?? undefined /* ô date chỉ nhận 'YYYY-MM-DD' — ngày lịch VN qua dayOf (taskScoring) */}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />

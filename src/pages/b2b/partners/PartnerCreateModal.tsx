@@ -7,6 +7,7 @@
 // ============================================================================
 import { useState } from 'react'
 import { Modal, Form, Input, Select, Segmented, Alert, Row, Col, message } from 'antd'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { IdcardOutlined, BankOutlined, UserAddOutlined } from '@ant-design/icons'
 import { b2bPartnerCreateService, type B2BPartnerKind } from '../../../services/b2b/b2bPartnerCreateService'
 
@@ -85,7 +86,7 @@ export default function PartnerCreateModal({ open, onClose, onCreated }: Props) 
       onCreated()
     } catch (e: any) {
       if (e?.errorFields) return // form validation
-      message.error(e?.message || 'Không tạo được đại lý')
+      message.error(dichLoiHeThong(e, 'Không tạo được đại lý'))
     } finally {
       setSubmitting(false)
     }

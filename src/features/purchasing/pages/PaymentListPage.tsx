@@ -35,45 +35,22 @@ import {
   User,
   Hash,
 } from 'lucide-react';
-import { invoicePaymentService } from '../../../services/invoicePaymentService';
+import { invoicePaymentService, PAYMENT_METHOD_LABELS } from '../../../services/invoicePaymentService';
 import type {
   PaymentWithDetails,
   PaymentStats,
   PaginatedResponse,
+  PaymentSortField,
 } from '../../../services/invoicePaymentService';
 import { useDebounce } from '../../../hooks/useDebounce';
+// Định dạng: utils/format (bản formatCurrency/formatDate/formatDateTime tự viết đã xoá)
+import { fmtVnd as formatCurrency, fmtDate as formatDate } from '../../../utils/format';
+import { todayVN, toDateStrVN } from '../../../utils/dateVN';
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
-
-const formatDate = (dateStr: string): string => {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-};
-
-const formatDateTime = (dateStr: string): string => {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
 
 // Lấy ngày đầu tháng hiện tại
 const getFirstDayOfMonth = (): string => {
@@ -82,15 +59,13 @@ const getFirstDayOfMonth = (): string => {
 };
 
 // Lấy ngày hôm nay
-const getToday = (): string => {
-  return new Date().toLocaleDateString('sv-SE');
-};
+const getToday = (): string => todayVN();
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type SortField = 'payment_date' | 'amount' | 'created_at';
+type SortField = PaymentSortField;
 type SortOrder = 'asc' | 'desc';
 
 interface Filters {
@@ -142,8 +117,8 @@ const PaymentListPage: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [searchInput, setSearchInput] = useState('');
-  // Gõ-là-tìm có debounce 400ms — đồng bộ hành vi tìm với các trang khác trong module
-  // (nút "Tìm" / Enter vẫn áp ngay như cũ)
+  // Gõ-là-tìm có debounce 400ms — CÙNG một kiểu tìm với các sổ khác trong module
+  // (đã bỏ nút "Tìm"; Enter vẫn áp ngay không chờ 400ms)
   const debouncedSearchInput = useDebounce(searchInput, 400);
   useEffect(() => {
     setFilters(prev => (prev.search === debouncedSearchInput ? prev : { ...prev, search: debouncedSearchInput }));
@@ -175,6 +150,8 @@ const PaymentListPage: React.FC = () => {
         payment_method: filters.paymentMethod !== 'all' ? filters.paymentMethod : undefined,
         from_date: filters.fromDate || undefined,
         to_date: filters.toDate || undefined,
+        // Sắp xếp phía SERVER trên cả kỳ đang lọc (trước đây chỉ xếp 20 dòng của trang đang xem)
+        orderBy: { field: sortField, ascending: sortOrder === 'asc' },
       });
 
       setPayments(result.data);
@@ -182,11 +159,11 @@ const PaymentListPage: React.FC = () => {
       setTotalPages(result.totalPages);
     } catch (err: any) {
       console.error('❌ Error loading payments:', err);
-      setError(err.message || 'Không thể tải danh sách thanh toán');
+      setError(dichLoiHeThong(err, 'Không thể tải danh sách thanh toán'));
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, filters]);
+  }, [page, pageSize, filters, sortField, sortOrder]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -244,6 +221,7 @@ const PaymentListPage: React.FC = () => {
   };
 
   const handleSort = (field: SortField) => {
+    setPage(1); // đổi cách xếp → về trang đầu (xếp trên cả kỳ, không phải trong trang)
     if (sortField === field) {
       setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -263,22 +241,8 @@ const PaymentListPage: React.FC = () => {
     fetchStats();
   };
 
-  // Sort payments locally (since API doesn't support sort param directly)
-  const sortedPayments = [...payments].sort((a, b) => {
-    let comparison = 0;
-    switch (sortField) {
-      case 'payment_date':
-        comparison = new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime();
-        break;
-      case 'amount':
-        comparison = (a.amount || 0) - (b.amount || 0);
-        break;
-      case 'created_at':
-        comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        break;
-    }
-    return sortOrder === 'asc' ? comparison : -comparison;
-  });
+  // Đã xếp sẵn ở server (orderBy trong getAll) — KHÔNG sort lại trong trang
+  const sortedPayments = payments;
 
   // ========================================================================
   // CHECK ACTIVE FILTERS
@@ -365,7 +329,7 @@ const PaymentListPage: React.FC = () => {
               <p className="text-xs text-gray-400 mt-0.5">
                 {stats?.total_amount
                   ? `${Math.round(((stats?.bank_transfer_amount || 0) / stats.total_amount) * 100)}%`
-                  : '0%'} tổng TT
+                  : '0%'} tổng đã chi
               </p>
             </>
           )}
@@ -389,7 +353,7 @@ const PaymentListPage: React.FC = () => {
               <p className="text-xs text-gray-400 mt-0.5">
                 {stats?.total_amount
                   ? `${Math.round(((stats?.cash_amount || 0) / stats.total_amount) * 100)}%`
-                  : '0%'} tổng TT
+                  : '0%'} tổng đã chi
               </p>
             </>
           )}
@@ -420,7 +384,7 @@ const PaymentListPage: React.FC = () => {
               </p>
               {(stats?.overdue_count || 0) > 0 && (
                 <p className="text-xs text-red-500 mt-0.5">
-                  {stats?.overdue_count} HĐ quá hạn · {formatCurrency(stats?.total_overdue || 0)}
+                  {stats?.overdue_count} hóa đơn quá hạn · {formatCurrency(stats?.total_overdue || 0)}
                 </p>
               )}
               {(stats?.overdue_count || 0) === 0 && (
@@ -479,14 +443,7 @@ const PaymentListPage: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-blue-500" />
               )}
             </button>
-
-            <button
-              onClick={handleSearch}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Search className="w-4 h-4" />
-              Tìm
-            </button>
+            {/* Bỏ nút "Tìm": ô tìm tự chạy sau khi ngừng gõ 400ms như mọi sổ khác của module Mua hàng */}
           </div>
         </div>
 
@@ -551,11 +508,12 @@ const PaymentListPage: React.FC = () => {
               </button>
               <button
                 onClick={() => {
+                  // Date dựng theo giờ máy → toDateStrVN (toISOString ra ngày cuối tháng TRƯỚC NỮA + mất ngày cuối tháng)
                   const now = new Date();
                   const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                   const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-                  handleFilterChange('fromDate', prevMonth.toISOString().split('T')[0]);
-                  handleFilterChange('toDate', lastDay.toISOString().split('T')[0]);
+                  handleFilterChange('fromDate', toDateStrVN(prevMonth));
+                  handleFilterChange('toDate', toDateStrVN(lastDay));
                 }}
                 className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
               >
@@ -566,7 +524,7 @@ const PaymentListPage: React.FC = () => {
                   const now = new Date();
                   const q = Math.floor(now.getMonth() / 3);
                   const startQ = new Date(now.getFullYear(), q * 3, 1);
-                  handleFilterChange('fromDate', startQ.toISOString().split('T')[0]);
+                  handleFilterChange('fromDate', toDateStrVN(startQ));
                   handleFilterChange('toDate', getToday());
                 }}
                 className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
@@ -603,7 +561,8 @@ const PaymentListPage: React.FC = () => {
       {/* PAYMENT TABLE                                                    */}
       {/* ================================================================ */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        {loading ? (
+        {/* Spinner thay bảng chỉ ở lần tải đầu; các lần sau giữ bảng cũ phủ mờ (không nháy trắng theo từng lần lọc) */}
+        {loading && sortedPayments.length === 0 ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-3" />
             <span className="text-gray-500">Đang tải dữ liệu thanh toán...</span>
@@ -640,7 +599,7 @@ const PaymentListPage: React.FC = () => {
             )}
           </div>
         ) : (
-          <>
+          <div className={`transition-opacity ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
             {/* Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -651,8 +610,9 @@ const PaymentListPage: React.FC = () => {
                       <button
                         onClick={() => handleSort('payment_date')}
                         className="flex items-center gap-1 hover:text-gray-700 transition-colors"
+                        title="Sắp xếp theo ngày thanh toán (trên toàn bộ kết quả lọc)"
                       >
-                        Ngày TT
+                        Ngày thanh toán
                         {sortField === 'payment_date' ? (
                           sortOrder === 'desc' ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />
                         ) : (
@@ -667,6 +627,7 @@ const PaymentListPage: React.FC = () => {
                       <button
                         onClick={() => handleSort('amount')}
                         className="flex items-center gap-1 hover:text-gray-700 transition-colors ml-auto"
+                        title="Sắp xếp theo số tiền (trên toàn bộ kết quả lọc)"
                       >
                         Số tiền
                         {sortField === 'amount' ? (
@@ -693,7 +654,7 @@ const PaymentListPage: React.FC = () => {
                         {/* # */}
                         <td className="px-4 py-3.5 text-gray-400 text-xs">{rowNum}</td>
 
-                        {/* Ngày TT */}
+                        {/* Ngày thanh toán */}
                         <td className="px-4 py-3.5">
                           <span className="font-medium text-gray-900">
                             {formatDate(payment.payment_date)}
@@ -715,7 +676,7 @@ const PaymentListPage: React.FC = () => {
                           )}
                           {payment.order_code && (
                             <p className="text-xs text-gray-400 mt-0.5">
-                              ĐH: {payment.order_code}
+                              Đơn hàng: {payment.order_code}
                             </p>
                           )}
                         </td>
@@ -744,7 +705,7 @@ const PaymentListPage: React.FC = () => {
                             ) : (
                               <Banknote className="w-3 h-3" />
                             )}
-                            {payment.payment_method === 'bank_transfer' ? 'CK' : 'TM'}
+                            {PAYMENT_METHOD_LABELS[payment.payment_method] || payment.payment_method}
                           </span>
                           {payment.bank_name && (
                             <p className="text-xs text-gray-400 mt-0.5">{payment.bank_name}</p>
@@ -889,7 +850,7 @@ const PaymentListPage: React.FC = () => {
                 </button>
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

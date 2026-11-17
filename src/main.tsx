@@ -7,6 +7,7 @@ import { antdTheme } from './config/antdTheme'
 import './index.css'
 import './styles/airtable-theme.css'
 import App from './App.tsx'
+import { ErrorBoundary } from './components/common/ErrorBoundary'
 
 // Sau khi deploy mới, các chunk import động (hash cũ) hết hạn → "Failed to fetch
 // dynamically imported module" / MIME text/html. Tự reload để nạp bản mới.
@@ -24,7 +25,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ConfigProvider theme={antdTheme} locale={viVN}>
       <AntdApp>
-        <App />
+        {/* Lưới đỡ CUỐI cho mọi màn (đăng nhập, vỏ app Ops/Kho NVL, sidebar…): lỗi render → màn lỗi tiếng Việt
+            thay vì trang trắng. Trong MainLayout còn một boundary riêng quanh Outlet để menu vẫn dùng được. */}
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
       </AntdApp>
     </ConfigProvider>
   </StrictMode>,

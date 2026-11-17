@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
 import type {
   ProjectMilestone,
   MilestoneFormData,
@@ -180,7 +181,8 @@ export const milestoneService = {
     const today = new Date().toLocaleDateString('sv-SE')
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + days)
-    const futureDateStr = futureDate.toISOString().split('T')[0]
+    // Ngày theo giờ VN — toISOString() trước 7h sáng ra ngày hôm trước (UTC)
+    const futureDateStr = toDateStrVN(futureDate)
 
     let query = supabase
       .from('project_milestones')
@@ -500,7 +502,8 @@ export const milestoneService = {
     const today = new Date().toLocaleDateString('sv-SE')
     const sevenDaysLater = new Date()
     sevenDaysLater.setDate(sevenDaysLater.getDate() + 7)
-    const sevenDaysStr = sevenDaysLater.toISOString().split('T')[0]
+    // Ngày theo giờ VN — toISOString() trước 7h sáng ra ngày hôm trước (UTC)
+    const sevenDaysStr = toDateStrVN(sevenDaysLater)
 
     let updated = 0
 

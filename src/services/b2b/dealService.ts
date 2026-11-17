@@ -153,6 +153,14 @@ export const DEAL_STATUS_COLORS = _DEAL_STATUS_COLORS
 export const DEAL_TYPE_LABELS = _DEAL_TYPE_LABELS
 export const DEAL_TYPE_COLORS = _DEAL_TYPE_COLORS
 
+/** Luồng thu mua (b2b_deals.purchase_type) — nhãn tiếng Việt, đừng in mã thô 'drc_after_production'. */
+export const PURCHASE_TYPE_LABELS: Record<NonNullable<Deal['purchase_type']>, string> = {
+  standard: 'Tiêu chuẩn',
+  outright: 'Mua đứt',
+  drc_after_production: 'Chạy đầu ra',
+  farmer_walkin: 'Hộ nông dân (vãng lai)',
+}
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
@@ -518,8 +526,8 @@ export const dealService = {
         && updateData.final_price !== current.final_price
       if (wantsFinalPrice) {
         throw new Error(
-          `Deal ${current.deal_number} đã ở trạng thái "${current.status}" — không thể sửa ` +
-          `đơn giá cuối (final_price). Nếu cần điều chỉnh, hãy hủy deal hoặc ghi bút toán điều chỉnh.`,
+          `Deal ${current.deal_number} đã ở trạng thái "${DEAL_STATUS_LABELS[current.status] || current.status}" — không thể sửa ` +
+          `đơn giá cuối. Nếu cần điều chỉnh, hãy hủy deal hoặc ghi bút toán điều chỉnh.`,
         )
       }
       if (updateData.status) {
@@ -531,7 +539,7 @@ export const dealService = {
         const next = allowedNext[current.status] || []
         if (!next.includes(updateData.status)) {
           throw new Error(
-            `Không thể chuyển deal từ "${current.status}" sang "${updateData.status}".`,
+            `Không thể chuyển deal từ "${DEAL_STATUS_LABELS[current.status] || current.status}" sang "${DEAL_STATUS_LABELS[updateData.status] || updateData.status}".`,
           )
         }
       }
@@ -589,7 +597,7 @@ export const dealService = {
     const deal = await this.getDealById(id)
     if (!deal) throw new Error('Không tìm thấy deal')
     if (deal.status !== 'pending') {
-      throw new Error(`Không thể bắt đầu xử lý deal đang ở trạng thái "${deal.status}". Chỉ deal ở "pending" mới bắt đầu được.`)
+      throw new Error(`Không thể bắt đầu xử lý deal đang ở trạng thái "${DEAL_STATUS_LABELS[deal.status] || deal.status}". Chỉ deal "${DEAL_STATUS_LABELS.pending}" mới bắt đầu được.`)
     }
     return this.updateStatus(id, 'processing')
   },
@@ -615,7 +623,7 @@ export const dealService = {
     const missing: string[] = []
 
     if (deal.status !== 'processing') {
-      missing.push(`Deal phải ở trạng thái "Đang xử lý" (hiện: ${deal.status})`)
+      missing.push(`Deal phải ở trạng thái "Đang xử lý" (hiện: ${DEAL_STATUS_LABELS[deal.status] || deal.status})`)
     }
     // Mua đứt/Bán: DRC chốt từ trước, tính tiền theo khối lượng cân thực tế →
     // duyệt không cần đo DRC lại. Chỉ "Chạy đầu ra"/"Ký gửi" (giá theo DRC sản
@@ -658,7 +666,7 @@ export const dealService = {
     const deal = await this.getDealById(id)
     if (!deal) throw new Error('Không tìm thấy deal')
     if (deal.status !== 'accepted') {
-      throw new Error(`Chỉ deal đã được DUYỆT mới quyết toán được (hiện: ${deal.status}).`)
+      throw new Error(`Chỉ deal đã được DUYỆT mới quyết toán được (hiện: ${DEAL_STATUS_LABELS[deal.status] || deal.status}).`)
     }
     return this.updateStatus(id, 'settled')
   },

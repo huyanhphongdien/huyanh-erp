@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Card, Table, Button, Space, Typography, Tag, Row, Col, Empty, Spin, Tooltip, Switch, Alert, message,
+  Card, Table, Button, Space, Typography, Tag, Row, Col, Empty, Spin, Tooltip, Switch, Alert,
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, InboxOutlined, PrinterOutlined, TeamOutlined } from '@ant-design/icons'
 
@@ -27,11 +27,15 @@ import {
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import ChiDinhThuKhoModal from '../../../components/wms/ChiDinhThuKhoModal'
+import PageState from '../../../components/common/PageState'
+import { stdPagination, LimitNotice } from '../../../components/common/tableDefaults'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtNum, fmtKg } from '../../../utils/format'
 
 const { Title, Text } = Typography
 
-const fmt = (n: number, d = 0) =>
-  n.toLocaleString('vi-VN', { minimumFractionDigits: d, maximumFractionDigits: d })
+/** Sổ nạp một cục N phiếu gần nhất — chạm trần thì báo (LimitNotice), đừng im lặng mất phiếu cũ. */
+const GIOI_HAN_PHIEU = 60
 
 /** Ai đang giữ phiếu — dịch trạng thái thành việc phải làm, không phải thành thuật ngữ. */
 const DANG_CHO: Record<ShiftBookStatus, string> = {
@@ -53,13 +57,16 @@ export default function ShiftBookListPage() {
   const [quyen, setQuyen] = useState<QuyenKy>(QUYEN_DONG)
   const [choToi, setChoToi] = useState(false)
   const [moChiDinh, setMoChiDinh] = useState(false)
+  // Lỗi đọc sổ → khối lỗi + Thử lại; "Chưa có phiếu" chỉ khi đọc được mà rỗng
+  const [loiNap, setLoiNap] = useState<unknown>(null)
 
   const nap = async () => {
     if (!facilityId) return
     setLoading(true)
+    setLoiNap(null)
     try {
       const [rs, b, q] = await Promise.all([
-        shiftBookService.listReports({ facilityId, limit: 60 }),
+        shiftBookService.listReports({ facilityId, limit: GIOI_HAN_PHIEU }),
         shiftBookService.getBalance(facilityId),
         shiftBookService.getQuyen(facilityId).catch(() => QUYEN_DONG),
       ])
@@ -67,7 +74,7 @@ export default function ShiftBookListPage() {
       setTon(b)
       setQuyen(q)
     } catch (e) {
-      message.error('Không đọc được sổ ca: ' + (e as Error).message)
+      setLoiNap(e)
     } finally {
       setLoading(false)
     }
@@ -154,13 +161,13 @@ export default function ShiftBookListPage() {
     { title: 'Tên hàng', dataIndex: 'name' },
     {
       title: 'Tồn (bành)', dataIndex: 'tonBanh', width: 110, align: 'right' as const,
-      render: (v: number) => <Text strong>{fmt(v)}</Text>,
+      render: (v: number) => <Text strong>{fmtNum(v)}</Text>,
     },
     {
       title: 'Tồn (kg)', dataIndex: 'tonKg', width: 170, align: 'right' as const,
       render: (v: number, r: { thieuKg: boolean }) => (
         <Space size={4}>
-          <Text style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(v, 2)}</Text>
+          <Text style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtKg(v, 2)}</Text>
           {r.thieuKg && (
             <Tooltip title="Có dòng chưa quy ra kg được — số này mới là phần tính được, chưa đủ">
               <Text type="warning">chưa đủ</Text>
@@ -238,13 +245,15 @@ export default function ShiftBookListPage() {
         />
       )}
 
+      {/* Đọc sổ lỗi thì ẩn dãy thẻ — "Tồn 0 bành" lúc lỗi là con số giả */}
+      {!loiNap && (
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         <Col xs={12} md={8}>
           <Card size="small">
             <Text type="secondary" style={{ fontSize: 12 }}>TỒN THÀNH PHẨM</Text>
-            <div><Text strong style={{ fontSize: 24 }}>{fmt(tonTong.banh)}</Text> <Text type="secondary">bành</Text></div>
+            <div><Text strong style={{ fontSize: 24 }}>{fmtNum(tonTong.banh)}</Text> <Text type="secondary">bành</Text></div>
             <Text type="secondary">
-              {fmt(tonTong.kg, 2)} kg · chỉ tính phiếu thủ kho đã nhận
+              {fmtKg(tonTong.kg, 2)} kg · chỉ tính phiếu thủ kho đã nhận
               {tonTong.thieu > 0 && ` · ${tonTong.thieu} dòng chưa quy ra kg được`}
             </Text>
           </Card>
@@ -278,20 +287,26 @@ export default function ShiftBookListPage() {
           </Card>
         </Col>
       </Row>
+      )}
 
       <Card size="small" style={{ marginBottom: 12 }}>
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center' }}><Spin /></div>
+        ) : loiNap ? (
+          <PageState error={dichLoiHeThong(loiNap, 'Không đọc được sổ ca')} onRetry={() => void nap()} />
         ) : hienThi.length === 0 ? (
           <Empty description={choToi
             ? 'Không có phiếu nào đang chờ bạn'
             : 'Chưa có phiếu ca nào — bấm “Ghi sổ ca” để bắt đầu'} />
         ) : (
-          <Table<ShiftBook>
-            rowKey="id" dataSource={hienThi} columns={cols}
-            size="small" pagination={{ pageSize: 20, showSizeChanger: false }}
-            scroll={{ x: 840 }}
-          />
+          <>
+            <LimitNotice shown={reports.length} limit={GIOI_HAN_PHIEU} what="phiếu" />
+            <Table<ShiftBook>
+              rowKey="id" dataSource={hienThi} columns={cols}
+              size="small" pagination={stdPagination(20)}
+              scroll={{ x: 840 }}
+            />
+          </>
         )}
       </Card>
 
@@ -307,7 +322,9 @@ export default function ShiftBookListPage() {
         size="small"
         title={<Space><InboxOutlined /><span>Tồn theo mã hàng</span></Space>}
       >
-        {tonRows.length === 0 ? (
+        {loiNap ? (
+          <Text type="secondary">Chưa đọc được tồn — bấm “Thử lại” ở khung trên.</Text>
+        ) : tonRows.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description="Chưa có tồn — tồn chỉ hiện sau khi thủ kho nhận phiếu đầu tiên"

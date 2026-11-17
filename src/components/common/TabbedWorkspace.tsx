@@ -21,6 +21,9 @@ import { CloseOutlined, CloseCircleOutlined, ExclamationCircleOutlined } from '@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTabStore, type OpenTab } from '../../stores/tabStore'
 import { TabContent } from './TabContent'
+import { menuLabelForPath } from './Sidebar'
+
+const APP_TITLE = 'Huy Anh ERP'
 
 interface TabbedWorkspaceProps {
   /** Fallback content khi không có tab nào mở (list pages, dashboard...) */
@@ -93,6 +96,15 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
     return () => window.removeEventListener('keydown', onKeydown)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveActiveKey, tabs, closeTab, setActive, navigate])
+
+  // Tiêu đề tab TRÌNH DUYỆT: '<Tên màn> · Huy Anh ERP' — nhãn tab nội bộ đang mở, không thì nhãn menu của URL.
+  // (Trước đây mọi tab trình duyệt đều 'Huy Anh ERP' — mở 2 đơn song song không phân biệt được.)
+  const matchingTitle = matchingTab?.title
+  useEffect(() => {
+    const name = matchingTitle || menuLabelForPath(location.pathname)
+    document.title = name ? `${name} · ${APP_TITLE}` : APP_TITLE
+    return () => { document.title = APP_TITLE }
+  }, [matchingTitle, location.pathname])
 
   // Split tabs: top-level (no parentKey) vs child tabs (has parentKey)
   const topTabs = tabs.filter((t) => !t.parentKey)

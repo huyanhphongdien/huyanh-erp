@@ -7,6 +7,7 @@
 
 import { useRef, useState } from 'react'
 import { rawPhotoService, RAW_PHOTO_KIND_LABELS, type RawPhoto, type RawPhotoKind, type RawPhotoRefType } from '../../services/wms/rawPhotoService'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const KINDS: RawPhotoKind[] = ['toan_canh', 'man_hinh_can', 'bo_sung']
 
@@ -31,7 +32,7 @@ export default function RawPhotoTiles({ refType, refId, photos, required = ['toa
     if (!f) return
     setBusy(kind); setErr(null)
     try { await rawPhotoService.upload(f, { refType, refId, kind, facilityCode }); onChange() }
-    catch (e: any) { setErr(e?.message || 'Tải ảnh thất bại') }
+    catch (e: any) { setErr(dichLoiHeThong(e, 'Tải ảnh thất bại')) }
     finally { setBusy(null); const el = inputs.current[kind]; if (el) el.value = '' }
   }
 

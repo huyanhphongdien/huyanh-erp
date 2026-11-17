@@ -43,21 +43,15 @@ import { usePurchaseAccess } from '../../../hooks/usePurchaseAccess';
 import { useAuthStore } from '../../../stores/authStore';
 import GrantAccessModal from './components/access/GrantAccessModal';
 import { useDebounce } from '../../../hooks/useDebounce';
+import { App as AntdApp } from 'antd';
+import { fmtDateTime as formatDateTime } from '../../../utils/format';
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-const formatDateTime = (dateStr: string): string => {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+// formatDateTime = fmtDateTime (utils/format: 'DD/MM HH:mm') — bản tự viết cũ đã xoá
 
 const ACCESS_LEVEL_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   full: { label: 'Toàn quyền', color: 'text-green-700', bg: 'bg-green-100', icon: Edit3 },
@@ -72,6 +66,7 @@ const AccessManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { canManageAccess } = usePurchaseAccess();
+  const { message, modal } = AntdApp.useApp();
 
   // State
   const [accessList, setAccessList] = useState<PurchaseAccess[]>([]);
@@ -100,7 +95,7 @@ const AccessManagementPage: React.FC = () => {
       setAccessList(data);
     } catch (err: any) {
       console.error('❌ Error loading access list:', err);
-      setError(err.message || 'Không thể tải danh sách phân quyền');
+      setError(dichLoiHeThong(err, 'Không thể tải danh sách phân quyền'));
     } finally {
       setLoading(false);
     }
@@ -130,35 +125,50 @@ const AccessManagementPage: React.FC = () => {
   // HANDLERS
   // ========================================================================
 
-  const handleRevoke = async (access: PurchaseAccess) => {
+  const handleRevoke = (access: PurchaseAccess) => {
     const name = access.employee?.full_name || 'nhân viên';
-    if (!confirm(`Thu hồi quyền truy cập của ${name}? Nhân viên sẽ không thể truy cập module Mua hàng nữa.`)) {
-      return;
-    }
-
-    try {
-      await purchaseAccessService.revokeAccess(access.id, user?.employee_id ?? undefined);
-      fetchData();
-      fetchStats();
-    } catch (err: any) {
-      alert('Lỗi thu hồi quyền: ' + err.message);
-    }
+    modal.confirm({
+      title: `Thu hồi quyền truy cập của ${name}?`,
+      content: 'Nhân viên sẽ không thể truy cập module Mua hàng nữa.',
+      okText: 'Thu hồi quyền',
+      okButtonProps: { danger: true },
+      cancelText: 'Không',
+      onOk: async () => {
+        try {
+          await purchaseAccessService.revokeAccess(access.id, user?.employee_id ?? undefined);
+          message.success(`Đã thu hồi quyền của ${name}`);
+          fetchData();
+          fetchStats();
+        } catch (err: any) {
+          message.error(dichLoiHeThong(err, 'Lỗi thu hồi quyền'));
+        }
+      },
+    });
   };
 
-  const handleToggleLevel = async (access: PurchaseAccess) => {
+  const handleToggleLevel = (access: PurchaseAccess) => {
     const newLevel: AccessLevel = access.access_level === 'full' ? 'view_only' : 'full';
     const name = access.employee?.full_name || 'nhân viên';
-    const levelLabel = newLevel === 'full' ? 'Toàn quyền' : 'Chỉ xem';
+    const levelLabel = ACCESS_LEVEL_CONFIG[newLevel]?.label || newLevel;
 
-    if (!confirm(`Đổi quyền của ${name} thành "${levelLabel}"?`)) return;
-
-    try {
-      await purchaseAccessService.updateAccessLevel(access.id, newLevel);
-      fetchData();
-      fetchStats();
-    } catch (err: any) {
-      alert('Lỗi cập nhật quyền: ' + err.message);
-    }
+    modal.confirm({
+      title: `Đổi quyền của ${name} thành "${levelLabel}"?`,
+      content: newLevel === 'full'
+        ? 'Nhân viên sẽ được Xem + Tạo + Sửa + Xóa trong module Mua hàng.'
+        : 'Nhân viên chỉ còn xem danh sách, không tạo/sửa/xóa được.',
+      okText: 'Đổi quyền',
+      cancelText: 'Không',
+      onOk: async () => {
+        try {
+          await purchaseAccessService.updateAccessLevel(access.id, newLevel);
+          message.success(`Đã đổi quyền của ${name} thành "${levelLabel}"`);
+          fetchData();
+          fetchStats();
+        } catch (err: any) {
+          message.error(dichLoiHeThong(err, 'Lỗi cập nhật quyền'));
+        }
+      },
+    });
   };
 
   const handleGrantSuccess = () => {
@@ -255,7 +265,7 @@ const AccessManagementPage: React.FC = () => {
           iconColor="text-green-600"
           label="Toàn quyền"
           value={stats?.active_full}
-          sub="full access"
+          sub="xem + tạo + sửa + xóa"
           loading={statsLoading}
         />
         <StatCard
@@ -264,7 +274,7 @@ const AccessManagementPage: React.FC = () => {
           iconColor="text-cyan-600"
           label="Chỉ xem"
           value={stats?.active_view_only}
-          sub="view only"
+          sub="chỉ xem danh sách"
           loading={statsLoading}
         />
         <StatCard
@@ -273,7 +283,7 @@ const AccessManagementPage: React.FC = () => {
           iconColor="text-gray-500"
           label="Đã thu hồi"
           value={stats?.revoked_count}
-          sub="revoked"
+          sub="không còn quyền"
           loading={statsLoading}
         />
       </div>
@@ -331,7 +341,8 @@ const AccessManagementPage: React.FC = () => {
       {/* ACCESS TABLE                                                     */}
       {/* ================================================================ */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        {loading ? (
+        {/* Spinner thay bảng chỉ ở lần tải đầu; lần sau (gõ tìm, bật "đã thu hồi") giữ bảng cũ phủ mờ */}
+        {loading && accessList.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-3" />
             <span className="text-gray-500">Đang tải danh sách...</span>
@@ -340,6 +351,12 @@ const AccessManagementPage: React.FC = () => {
           <div className="text-center py-16">
             <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-3" />
             <p className="text-red-600 font-medium">{error}</p>
+            <button
+              onClick={() => { fetchData(); fetchStats(); }}
+              className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 hover:text-blue-700"
+            >
+              <RefreshCw className="w-4 h-4" /> Thử lại
+            </button>
           </div>
         ) : accessList.length === 0 ? (
           <div className="text-center py-16">
@@ -359,7 +376,7 @@ const AccessManagementPage: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className={`overflow-x-auto transition-opacity ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-gray-500 uppercase tracking-wider border-b border-gray-100 bg-gray-50/50">

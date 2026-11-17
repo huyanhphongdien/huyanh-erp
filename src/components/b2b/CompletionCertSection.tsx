@@ -12,7 +12,16 @@ import { UploadOutlined, EditOutlined, FileTextOutlined } from '@ant-design/icon
 import type { UploadProps } from 'antd'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
-import { completionCertService, type CompletionCert } from '../../services/b2b/completionCertService'
+import {
+  completionCertService,
+  COMPLETION_CERT_STATUS_LABELS,
+  COMPLETION_CERT_STATUS_COLORS,
+  type CompletionCert,
+} from '../../services/b2b/completionCertService'
+import { EnumTag } from '../common/EnumTag'
+import PageState from '../common/PageState'
+import { fmtDateTime, fmtKg, fmtPct, fmtVnd, fmtVndNum } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text } = Typography
 
@@ -24,36 +33,38 @@ interface Supervisor {
   checked_in_at: string | null
 }
 
-const STATUS_META: Record<string, { color: string; label: string }> = {
-  draft: { color: 'default', label: 'Nháp' },
-  pending_partner: { color: 'processing', label: 'Chờ đại lý ký' },
-  fully_signed: { color: 'success', label: 'Đã ký đủ 2 bên' },
-}
-
-const fmt = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('vi-VN'))
-
 export default function CompletionCertSection({ dealId }: { dealId: string }) {
   const employeeName = useAuthStore((s) => s.user?.full_name || 'Nhà máy')
   const [cert, setCert] = useState<CompletionCert | null>(null)
   const [supervisors, setSupervisors] = useState<Supervisor[]>([])
   const [finishedKg, setFinishedKg] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [busy, setBusy] = useState(false)
   const [signOpen, setSignOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [c, sup, deal] = await Promise.all([
-      completionCertService.getByDeal(dealId),
-      supabase.schema('b2b').from('deal_supervisors')
-        .select('id, supervisor_name, supervisor_phone, status, checked_in_at')
-        .eq('deal_id', dealId).order('assigned_at', { ascending: false }),
-      supabase.from('b2b_deals').select('finished_product_kg').eq('id', dealId).maybeSingle(),
-    ])
-    setCert(c)
-    setSupervisors((sup.data as Supervisor[]) || [])
-    setFinishedKg((deal.data as { finished_product_kg: number | null } | null)?.finished_product_kg ?? null)
-    setLoading(false)
+    setLoadError(null)
+    try {
+      const [c, sup, deal] = await Promise.all([
+        completionCertService.getByDeal(dealId),
+        supabase.schema('b2b').from('deal_supervisors')
+          .select('id, supervisor_name, supervisor_phone, status, checked_in_at')
+          .eq('deal_id', dealId).order('assigned_at', { ascending: false }),
+        supabase.from('b2b_deals').select('finished_product_kg').eq('id', dealId).maybeSingle(),
+      ])
+      if (sup.error) throw sup.error
+      if (deal.error) throw deal.error
+      setCert(c)
+      setSupervisors((sup.data as Supervisor[]) || [])
+      setFinishedKg((deal.data as { finished_product_kg: number | null } | null)?.finished_product_kg ?? null)
+    } catch (e) {
+      // Trước đây lỗi tải bị nuốt → hiện "Chưa lập phiếu" / spinner mãi
+      setLoadError(e)
+    } finally {
+      setLoading(false)
+    }
   }, [dealId])
 
   useEffect(() => { load() }, [load])
@@ -65,7 +76,7 @@ export default function CompletionCertSection({ dealId }: { dealId: string }) {
       message.success('Đã lập phiếu chốt thành phẩm (nháp)')
       load()
     } catch (e: any) {
-      message.error(e.message || 'Lỗi lập phiếu')
+      message.error(dichLoiHeThong(e, 'Lỗi lập phiếu'))
     } finally { setBusy(false) }
   }
 
@@ -79,11 +90,11 @@ export default function CompletionCertSection({ dealId }: { dealId: string }) {
         const file = opt.file as File
         const { url, name } = await completionCertService.uploadFactoryFile(dealId, file)
         await completionCertService.attachFactoryFile(cert.id, url, name)
-        message.success('Đã upload file phiếu')
+        message.success('Đã tải file phiếu lên')
         opt.onSuccess?.({} as any)
         load()
       } catch (e: any) {
-        message.error(e.message || 'Lỗi upload')
+        message.error(dichLoiHeThong(e, 'Lỗi tải file lên'))
         opt.onError?.(e)
       } finally { setBusy(false) }
     },
@@ -101,11 +112,19 @@ export default function CompletionCertSection({ dealId }: { dealId: string }) {
       setSignOpen(false)
       load()
     } catch (e: any) {
-      message.error(e.message || 'Lỗi ký')
+      message.error(dichLoiHeThong(e, 'Lỗi ký'))
     } finally { setBusy(false) }
   }
 
   if (loading) return <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
+
+  if (loadError) {
+    return (
+      <Card size="small" title={<><FileTextOutlined /> Phiếu chốt thành phẩm</>}>
+        <PageState error={loadError} onRetry={load} minHeight={120} />
+      </Card>
+    )
+  }
 
   // Chưa có phiếu
   if (!cert) {
@@ -124,21 +143,19 @@ export default function CompletionCertSection({ dealId }: { dealId: string }) {
     )
   }
 
-  const meta = STATUS_META[cert.status] || STATUS_META.draft
-
   return (
     <Card
       size="small"
       title={<><FileTextOutlined /> Phiếu chốt thành phẩm · {cert.cert_number}</>}
-      extra={<Tag color={meta.color}>{meta.label}</Tag>}
+      extra={<EnumTag value={cert.status} labels={COMPLETION_CERT_STATUS_LABELS} colors={COMPLETION_CERT_STATUS_COLORS} />}
     >
       <Descriptions bordered column={2} size="small" style={{ marginBottom: 12 }}>
-        <Descriptions.Item label="KL nguyên liệu">{fmt(cert.quantity_kg)} kg</Descriptions.Item>
-        <Descriptions.Item label="KL thành phẩm">{fmt(cert.finished_product_kg)} kg</Descriptions.Item>
-        <Descriptions.Item label="Sample DRC">{cert.sample_drc ?? '—'}%</Descriptions.Item>
-        <Descriptions.Item label="Actual DRC">{cert.actual_drc ?? '—'}%</Descriptions.Item>
-        <Descriptions.Item label="Đơn giá">{fmt(cert.unit_price)} đ/kg</Descriptions.Item>
-        <Descriptions.Item label="Giá trị cuối"><Text strong>{fmt(cert.final_value)} đ</Text></Descriptions.Item>
+        <Descriptions.Item label="KL nguyên liệu">{fmtKg(cert.quantity_kg, 3)} kg</Descriptions.Item>
+        <Descriptions.Item label="KL thành phẩm">{fmtKg(cert.finished_product_kg, 3)} kg</Descriptions.Item>
+        <Descriptions.Item label="DRC mẫu">{fmtPct(cert.sample_drc, 2)}</Descriptions.Item>
+        <Descriptions.Item label="DRC thực tế">{fmtPct(cert.actual_drc, 2)}</Descriptions.Item>
+        <Descriptions.Item label="Đơn giá">{fmtVndNum(cert.unit_price)} ₫/kg</Descriptions.Item>
+        <Descriptions.Item label="Giá trị cuối"><Text strong>{fmtVnd(cert.final_value)}</Text></Descriptions.Item>
       </Descriptions>
 
       {/* Người giám sát đại lý */}
@@ -167,7 +184,7 @@ export default function CompletionCertSection({ dealId }: { dealId: string }) {
           </Space>
         ) : (
           <Upload {...uploadProps}>
-            <Button icon={<UploadOutlined />} loading={busy}>Upload file phiếu (PDF/ảnh)</Button>
+            <Button icon={<UploadOutlined />} loading={busy}>Tải file phiếu lên (PDF/ảnh)</Button>
           </Upload>
         )}
       </div>
@@ -186,7 +203,7 @@ export default function CompletionCertSection({ dealId }: { dealId: string }) {
         </Button>
       )}
       {!cert.factory_file_url && cert.status === 'draft' && (
-        <div style={{ marginTop: 8 }}><Text type="warning">Cần upload file phiếu trước khi ký.</Text></div>
+        <div style={{ marginTop: 8 }}><Text type="warning">Cần tải file phiếu lên trước khi ký.</Text></div>
       )}
 
       <SignatureModal
@@ -213,7 +230,7 @@ function SignatureRow({ cert }: { cert: CompletionCert }) {
           <>
             <div><img src={cert.factory_signature_url} alt="ký nhà máy" style={{ maxHeight: 50 }} /></div>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {cert.factory_signer_name} · {cert.factory_signed_at ? new Date(cert.factory_signed_at).toLocaleString('vi-VN') : ''}
+              {cert.factory_signer_name} · {cert.factory_signed_at ? fmtDateTime(cert.factory_signed_at) : ''}
             </Text>
           </>
         ) : <div><Text type="secondary">Chưa ký</Text></div>}
@@ -224,7 +241,7 @@ function SignatureRow({ cert }: { cert: CompletionCert }) {
           <>
             <div><img src={cert.partner_signature_url} alt="ký đại lý" style={{ maxHeight: 50 }} /></div>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {cert.partner_signer_name} · {cert.partner_signed_at ? new Date(cert.partner_signed_at).toLocaleString('vi-VN') : ''}
+              {cert.partner_signer_name} · {cert.partner_signed_at ? fmtDateTime(cert.partner_signed_at) : ''}
             </Text>
           </>
         ) : <div><Text type="secondary">Chưa ký</Text></div>}

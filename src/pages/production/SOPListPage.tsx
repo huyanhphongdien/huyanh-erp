@@ -10,6 +10,7 @@ import { ArrowLeftOutlined, PlusOutlined, FileTextOutlined } from '@ant-design/i
 import { sopService, SOP_CATEGORIES, SOP_STATUS, type SOPDocument } from '../../services/production/sopService'
 import { useAuthStore } from '../../stores/authStore'
 import AdvancedDataTable, { type ColumnDef } from '../../components/common/AdvancedDataTable'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text } = Typography
 
@@ -18,7 +19,7 @@ export default function SOPListPage() {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
 
-  const { data: sops = [], isLoading, refetch } = useQuery({
+  const { data: sops = [], isLoading, error, refetch } = useQuery({
     queryKey: ['sop-documents'],
     queryFn: () => sopService.getAll(),
   })
@@ -28,7 +29,7 @@ export default function SOPListPage() {
       await sopService.updateStatus(id, status, user?.employee_id ?? undefined)
     },
     onSuccess: () => { message.success('Đã cập nhật'); queryClient.invalidateQueries({ queryKey: ['sop-documents'] }) },
-    onError: (e: Error) => message.error(e.message),
+    onError: (e: Error) => message.error(dichLoiHeThong(e, 'Không cập nhật được trạng thái SOP')),
   })
 
   const columns: ColumnDef<SOPDocument>[] = [
@@ -98,6 +99,7 @@ export default function SOPListPage() {
         dataSource={sops}
         rowKey="id"
         loading={isLoading}
+        error={error}
         title="Quy trình SOP"
         onRefresh={() => refetch()}
         expandedRowRender={renderInlineDetail}

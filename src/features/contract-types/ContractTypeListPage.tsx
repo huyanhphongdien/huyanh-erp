@@ -3,8 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contractTypeService } from '../../services'
 import { Card, Button, Input, DataTable, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { ContractTypeForm } from './ContractTypeForm'
+import PageState from '../../components/common/PageState'
 import type { ContractType } from '../../types'
- 
+
 export function ContractTypeListPage() {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
@@ -12,8 +13,8 @@ export function ContractTypeListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<ContractType | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
- 
-  const { data, isLoading } = useQuery({
+
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['contract-types', page, search],
     queryFn: () => contractTypeService.getAll({ page, pageSize: 10, search })
   })
@@ -26,9 +27,11 @@ export function ContractTypeListPage() {
     }
   })
  
+  // Cột chữ trần PHẢI có dataIndex (thiếu → antd vẽ ô trống). Cột có render(item) cố ý
+  // KHÔNG khai dataIndex để render nhận cả bản ghi.
   const columns = [
-    { key: 'code', title: 'Mã' },
-    { key: 'name', title: 'Tên loại hợp đồng' },
+    { key: 'code', dataIndex: 'code', title: 'Mã' },
+    { key: 'name', dataIndex: 'name', title: 'Tên loại hợp đồng' },
     {
       key: 'duration_months',
       title: 'Thời hạn',
@@ -86,14 +89,21 @@ export function ContractTypeListPage() {
           />
         </div>
  
-        <DataTable
-          columns={columns}
-          data={data?.data || []}
-          isLoading={isLoading}
-          emptyMessage="Chưa có loại hợp đồng nào"
-        />
- 
-        {data && data.totalPages > 1 && (
+        {error ? (
+          <PageState error={error} onRetry={() => refetch()} />
+        ) : (
+          // Phân trang ở server → tắt thanh phân trang của bảng, chỉ giữ <Pagination> bên dưới
+          <DataTable
+            columns={columns}
+            data={data?.data || []}
+            isLoading={isLoading}
+            emptyMessage="Chưa có loại hợp đồng nào"
+            pagination={false}
+            showSearch={false}
+          />
+        )}
+
+        {!error && data && data.totalPages > 1 && (
           <div className="p-4 border-t">
             <Pagination
               currentPage={page}

@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { salaryGradeService } from '../../services'
 import { Button, Input, Select, Card, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { SalaryGradeForm } from './SalaryGradeForm'
+import PageState from '../../components/common/PageState'
+import { fmtVnd } from '../../utils/format'
 import type { SalaryGrade } from '../../types'
 
 export function SalaryGradeListPage() {
@@ -14,7 +16,7 @@ export function SalaryGradeListPage() {
   const [selectedItem, setSelectedItem] = useState<SalaryGrade | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['salary-grades', page, search, statusFilter],
     queryFn: () => salaryGradeService.getAll({ 
       page, 
@@ -32,9 +34,7 @@ export function SalaryGradeListPage() {
     }
   })
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value)
-  }
+  const formatCurrency = fmtVnd
 
   return (
     <div className="p-6">
@@ -87,6 +87,12 @@ export function SalaryGradeListPage() {
                     Đang tải...
                   </td>
                 </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={8} className="p-0">
+                    <PageState error={error} onRetry={() => refetch()} />
+                  </td>
+                </tr>
               ) : !data?.data?.length ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
@@ -99,10 +105,10 @@ export function SalaryGradeListPage() {
                     <td className="px-4 py-3 text-sm">{item.code}</td>
                     <td className="px-4 py-3 text-sm font-medium">{item.name}</td>
                     <td className="px-4 py-3 text-sm">{item.level}</td>
-                    <td className="px-4 py-3 text-sm">{formatCurrency(item.min_salary ?? 0)}</td>
-                    <td className="px-4 py-3 text-sm">{formatCurrency(item.max_salary ?? 0)}</td>
+                    <td className="px-4 py-3 text-sm">{formatCurrency(item.min_salary)}</td>
+                    <td className="px-4 py-3 text-sm">{formatCurrency(item.max_salary)}</td>
                     <td className="px-4 py-3 text-sm">
-                      {item.base_salary ? formatCurrency(item.base_salary) : '-'}
+                      {formatCurrency(item.base_salary)}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span className={`px-2 py-1 rounded text-xs ${

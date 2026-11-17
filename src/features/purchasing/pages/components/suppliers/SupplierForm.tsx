@@ -24,7 +24,16 @@ import {
 // File: src/features/purchasing/pages/components/suppliers/SupplierForm.tsx
 // Service: src/services/supplierService.ts
 // Path: 5 cấp lên (../../../../../)
-import { supplierService, type Supplier, type SupplierFormData } from '../../../../../services/supplierService';
+import {
+  supplierService,
+  type Supplier,
+  type SupplierFormData,
+  SUPPLIER_TYPE_LABELS,
+  SUPPLIER_GROUP_LABELS,
+  SUPPLIER_STATUS_LABELS,
+} from '../../../../../services/supplierService';
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong';
+import { vndToInputText, vndInputToNumber } from '../../../moneyInput';
 
 // ============================================================================
 // TYPES
@@ -49,15 +58,16 @@ interface FormErrors {
 // CONSTANTS
 // ============================================================================
 
+// Nhãn lấy từ supplierService (MỘT nguồn với sổ NCC / chi tiết NCC); ở đây chỉ thêm icon + mô tả
 const SUPPLIER_TYPES = [
-  { value: 'company', label: 'Công ty', icon: Building2 },
-  { value: 'individual', label: 'Cá nhân', icon: User }
+  { value: 'company', label: SUPPLIER_TYPE_LABELS.company, icon: Building2 },
+  { value: 'individual', label: SUPPLIER_TYPE_LABELS.individual, icon: User }
 ];
 
 const SUPPLIER_GROUPS = [
-  { value: 'primary', label: 'NCC Chính', description: 'Nhà cung cấp chính, ưu tiên đặt hàng' },
-  { value: 'secondary', label: 'NCC Phụ', description: 'Nhà cung cấp dự phòng' },
-  { value: 'service', label: 'Dịch vụ', description: 'Cung cấp dịch vụ (vận chuyển, bảo trì...)' }
+  { value: 'primary', label: SUPPLIER_GROUP_LABELS.primary, description: 'Nhà cung cấp chính, ưu tiên đặt hàng' },
+  { value: 'secondary', label: SUPPLIER_GROUP_LABELS.secondary, description: 'Nhà cung cấp dự phòng' },
+  { value: 'service', label: SUPPLIER_GROUP_LABELS.service, description: 'Cung cấp dịch vụ (vận chuyển, bảo trì...)' }
 ];
 
 const PAYMENT_TERMS_OPTIONS = [
@@ -305,7 +315,7 @@ export const SupplierForm: React.FC<SupplierFormProps> = ({
     } catch (err: any) {
       console.error('Save supplier error:', err);
       setErrors({
-        general: err.message || 'Không thể lưu nhà cung cấp. Vui lòng thử lại.'
+        general: dichLoiHeThong(err, 'Không thể lưu nhà cung cấp. Vui lòng thử lại.')
       });
     } finally {
       setLoading(false);
@@ -655,18 +665,18 @@ export const SupplierForm: React.FC<SupplierFormProps> = ({
 
           <FormField label="Hạn mức công nợ">
             <div className="relative">
+              {/* Ô tiền: chấm ngăn nghìn khi gõ (trước đây type=number, hạn mức hàng trăm triệu không phân cách) */}
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 name="credit_limit"
-                value={formData.credit_limit || ''}
-                onChange={handleChange}
-                min={0}
-                step={1000000}
+                value={vndToInputText(formData.credit_limit || undefined)}
+                onChange={(e) => setFormData((prev) => ({ ...prev, credit_limit: vndInputToNumber(e.target.value) ?? 0 }))}
                 placeholder="0 = Không giới hạn"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                VNĐ
+                ₫
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-1">
@@ -695,9 +705,9 @@ export const SupplierForm: React.FC<SupplierFormProps> = ({
         <FormSection title="Trạng thái" icon={<CheckCircle size={20} />}>
           <div className="flex items-center gap-6">
             {[
-              { value: 'active', label: 'Hoạt động', color: 'green' },
-              { value: 'inactive', label: 'Tạm ngừng', color: 'yellow' },
-              { value: 'blocked', label: 'Đã khóa', color: 'red' }
+              { value: 'active', label: SUPPLIER_STATUS_LABELS.active, color: 'green' },
+              { value: 'inactive', label: SUPPLIER_STATUS_LABELS.inactive, color: 'yellow' },
+              { value: 'blocked', label: SUPPLIER_STATUS_LABELS.blocked, color: 'red' }
             ].map((status) => (
               <label key={status.value} className="flex items-center gap-2 cursor-pointer">
                 <input

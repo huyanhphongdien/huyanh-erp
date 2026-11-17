@@ -67,9 +67,10 @@ export async function exportLedgerReport(data: LedgerReportExportData): Promise<
   subCell.alignment = { horizontal: 'center' }
 
   const summaryRows = [
-    ['Tổng nợ phải thu', data.summary?.total_debit ?? 0],
-    ['Tổng nợ phải trả', data.summary?.total_credit ?? 0],
-    ['Số dư ròng', data.summary?.net_balance ?? 0],
+    // Cùng chiều sổ với LedgerReportPage: Nợ = phát sinh nhà máy phải trả đại lý, Có = đã chi + tạm ứng
+    ['Tổng Nợ (phát sinh phải trả đại lý)', data.summary?.total_debit ?? 0],
+    ['Tổng Có (đã chi + tạm ứng)', data.summary?.total_credit ?? 0],
+    ['Số dư ròng (Nợ − Có)', data.summary?.net_balance ?? 0],
     ['Số đối tác', data.summary?.partner_count ?? 0],
   ]
 

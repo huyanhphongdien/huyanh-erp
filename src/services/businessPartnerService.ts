@@ -23,6 +23,48 @@ export type BpRoleType =
   | 'PARTNER_B2B'
   | 'RUBBER_SUPPLIER'
 
+// ─── Nhãn + màu — MỘT nguồn (Đợt 3 audit UI 17/11/2026) ─────────────────────
+// Trước đó trang chi tiết in thẳng mã 'active'/'suspended' ra màn, nhãn vai trò sống trong file trang.
+
+export const BP_ROLE_LABELS: Record<BpRoleType, string> = {
+  CUSTOMER_INTL: 'KH quốc tế',
+  CUSTOMER_DOM: 'KH nội địa',
+  SUPPLIER_GENERAL: 'NCC',
+  PARTNER_B2B: 'Đại lý B2B',
+  RUBBER_SUPPLIER: 'NCC mủ',
+}
+
+/** Lớp Tailwind cho chip vai trò (màn kit tay) */
+export const BP_ROLE_COLORS: Record<BpRoleType, string> = {
+  CUSTOMER_INTL: 'bg-indigo-100 text-indigo-700',
+  CUSTOMER_DOM: 'bg-sky-100 text-sky-700',
+  SUPPLIER_GENERAL: 'bg-amber-100 text-amber-700',
+  PARTNER_B2B: 'bg-pink-100 text-pink-700',
+  RUBBER_SUPPLIER: 'bg-lime-100 text-lime-700',
+}
+
+export const BP_STATUS_LABELS: Record<BpStatus, string> = {
+  active: 'Hoạt động',
+  inactive: 'Tạm dừng',
+  blocked: 'Khóa',
+  pending: 'Chờ duyệt',
+}
+
+/** Màu antd cho trạng thái đối tác */
+export const BP_STATUS_COLORS: Record<BpStatus, string> = {
+  active: 'green',
+  inactive: 'default',
+  blocked: 'red',
+  pending: 'gold',
+}
+
+/** Trạng thái của MỘT vai trò (bp_roles.status) */
+export const BP_ROLE_STATUS_LABELS: Record<string, string> = {
+  active: 'Đang hoạt động',
+  inactive: 'Ngừng',
+  suspended: 'Tạm đình chỉ',
+}
+
 export interface BusinessPartner {
   id: string
   hac13_code: string

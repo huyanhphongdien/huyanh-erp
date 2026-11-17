@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
+import { vnDayStartTs, vnDayEndTs } from '../utils/dateVN'
 
 export interface AuditLogEntry {
   id: string
@@ -61,8 +62,9 @@ export const auditLogService = {
     if (recordId) query = query.eq('record_id', recordId)
     if (changedByEmail) query = query.ilike('changed_by_email', `%${changedByEmail}%`)
     if (action && action !== 'all') query = query.eq('action', action)
-    if (dateFrom) query = query.gte('changed_at', dateFrom + 'T00:00:00Z')
-    if (dateTo) query = query.lte('changed_at', dateTo + 'T23:59:59Z')
+    // Mốc NGÀY VN (+07:00): 'T00:00:00Z' cũ là 7h sáng VN → sự kiện 0h–7h lọt sang ngày hôm trước
+    if (dateFrom) query = query.gte('changed_at', vnDayStartTs(dateFrom))
+    if (dateTo) query = query.lte('changed_at', vnDayEndTs(dateTo))
 
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
@@ -71,9 +73,8 @@ export const auditLogService = {
       .order('changed_at', { ascending: false })
       .range(from, to)
 
-    if (error) {
-      throw new Error('Không thể tải audit log: ' + error.message)
-    }
+    // Ném nguyên lỗi Supabase (giữ `code`) — trang dịch qua dichLoiHeThong/PageState
+    if (error) throw error
 
     return {
       data: (data || []) as AuditLogEntry[],
@@ -113,17 +114,18 @@ export const auditLogService = {
     const day7Ago = new Date(now.getTime() - 7 * 86400000).toISOString()
     const day30Ago = new Date(now.getTime() - 30 * 86400000).toISOString()
 
-    const [{ count: today }, { count: last7 }, { count: last30 }] = await Promise.all([
+    const counts = await Promise.all([
       supabase.from('audit_log').select('id', { count: 'exact', head: true }).gte('changed_at', todayStart),
       supabase.from('audit_log').select('id', { count: 'exact', head: true }).gte('changed_at', day7Ago),
       supabase.from('audit_log').select('id', { count: 'exact', head: true }).gte('changed_at', day30Ago),
-    ])
-
-    const [{ count: ins }, { count: upd }, { count: del }] = await Promise.all([
       supabase.from('audit_log').select('id', { count: 'exact', head: true }).eq('action', 'INSERT').gte('changed_at', day30Ago),
       supabase.from('audit_log').select('id', { count: 'exact', head: true }).eq('action', 'UPDATE').gte('changed_at', day30Ago),
       supabase.from('audit_log').select('id', { count: 'exact', head: true }).eq('action', 'DELETE').gte('changed_at', day30Ago),
     ])
+    // supabase-js không throw: lỗi mà không đọc là thẻ thống kê hiện 0 giả
+    const loi = counts.find(r => r.error)?.error
+    if (loi) throw loi
+    const [{ count: today }, { count: last7 }, { count: last30 }, { count: ins }, { count: upd }, { count: del }] = counts
 
     return {
       today: today || 0,
@@ -149,7 +151,7 @@ export function formatChangedFields(
     return `${FIELD_LABELS[field] || field}: ${oStr} → ${nStr}`
   })
   const more = Object.keys(changedFields).length - maxFields
-  if (more > 0) parts.push(`(+${more} field nữa)`)
+  if (more > 0) parts.push(`(+${more} trường nữa)`)
   return parts.join('; ')
 }
 
@@ -160,7 +162,7 @@ function formatValue(v: any): string {
     return `"${v}"`
   }
   if (typeof v === 'number') return v.toLocaleString('vi-VN')
-  if (typeof v === 'boolean') return v ? 'true' : 'false'
+  if (typeof v === 'boolean') return v ? 'có' : 'không'
   if (typeof v === 'object') return JSON.stringify(v).substring(0, 30)
   return String(v)
 }
@@ -169,7 +171,7 @@ function formatValue(v: any): string {
 const FIELD_LABELS: Record<string, string> = {
   status: 'Trạng thái',
   current_stage: 'Bộ phận',
-  current_owner_id: 'Owner',
+  current_owner_id: 'Người phụ trách',
   contract_no: 'Số HĐ',
   customer_id: 'Khách hàng',
   grade: 'Grade',
@@ -194,6 +196,6 @@ const FIELD_LABELS: Record<string, string> = {
   confirmed_by: 'Người xác nhận',
   locked_at: 'Khóa lúc',
   locked_by: 'Khóa bởi',
-  stage_started_at: 'Bắt đầu stage',
-  stage_sla_hours: 'SLA stage',
+  stage_started_at: 'Bắt đầu ở bộ phận',
+  stage_sla_hours: 'SLA bộ phận (giờ)',
 }

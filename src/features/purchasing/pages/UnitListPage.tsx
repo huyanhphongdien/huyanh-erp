@@ -24,6 +24,9 @@ import {
   getUnitTypeColor 
 } from '../../../services/unitService'
 import UnitForm from './components/materials/UnitForm'
+import { App as AntdApp } from 'antd'
+import { useDebounce } from '../../../hooks/useDebounce'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // Icon mapping for unit types
 const UNIT_TYPE_ICONS: Record<string, React.ElementType> = {
@@ -35,10 +38,14 @@ const UNIT_TYPE_ICONS: Record<string, React.ElementType> = {
 }
 
 const UnitListPage: React.FC = () => {
+  const { message } = AntdApp.useApp()
   // State
   const [units, setUnits] = useState<Unit[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải — trước đây nuốt im, bảng trống y như "chưa có đơn vị"
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 400) // gõ xong 400ms mới bắn query (trước đây mỗi phím 1 query)
   const [filterType, setFilterType] = useState<string>('')
   const [filterActive, setFilterActive] = useState<string>('all')
   const [page, setPage] = useState(1)
@@ -55,10 +62,11 @@ const UnitListPage: React.FC = () => {
   const fetchUnits = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const result = await unitService.getAll({
         page,
         pageSize,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         unitType: filterType || undefined,
         isActive: filterActive === 'all' ? undefined : filterActive === 'active'
       })
@@ -67,6 +75,7 @@ const UnitListPage: React.FC = () => {
       setTotal(result.total)
     } catch (error) {
       console.error('Error fetching units:', error)
+      setLoadError(dichLoiHeThong(error, 'Không tải được danh sách đơn vị tính'))
     } finally {
       setLoading(false)
     }
@@ -74,7 +83,7 @@ const UnitListPage: React.FC = () => {
 
   useEffect(() => {
     fetchUnits()
-  }, [page, search, filterType, filterActive])
+  }, [page, debouncedSearch, filterType, filterActive])
 
   // Handlers
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,7 +126,7 @@ const UnitListPage: React.FC = () => {
       }
       fetchUnits()
     } catch (error: any) {
-      alert(error.message || 'Có lỗi xảy ra')
+      message.error(dichLoiHeThong(error, 'Có lỗi xảy ra khi đổi trạng thái đơn vị'))
     }
   }
 
@@ -125,9 +134,10 @@ const UnitListPage: React.FC = () => {
     try {
       await unitService.delete(unit.id)
       setShowDeleteConfirm(null)
+      message.success(`Đã xóa đơn vị "${unit.name}"`)
       fetchUnits()
     } catch (error: any) {
-      alert(error.message || 'Có lỗi xảy ra khi xóa')
+      message.error(dichLoiHeThong(error, 'Có lỗi xảy ra khi xóa'))
     }
   }
 
@@ -258,11 +268,25 @@ const UnitListPage: React.FC = () => {
                     <p className="mt-2 text-gray-500">Đang tải...</p>
                   </td>
                 </tr>
+              ) : loadError ? (
+                // Lỗi xét TRƯỚC trống
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center bg-red-50">
+                    <p className="font-semibold text-red-700">Không tải được dữ liệu</p>
+                    <p className="text-sm text-red-600">{loadError}</p>
+                    <button
+                      onClick={() => fetchUnits()}
+                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-100"
+                    >
+                      <RefreshCw className="w-4 h-4" /> Thử lại
+                    </button>
+                  </td>
+                </tr>
               ) : units.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center">
                     <Package className="w-12 h-12 text-gray-300 mx-auto" />
-                    <p className="mt-2 text-gray-500">Không có đơn vị nào</p>
+                    <p className="mt-2 text-gray-500">{search || filterType || filterActive !== 'all' ? 'Không tìm thấy đơn vị phù hợp' : 'Không có đơn vị nào'}</p>
                     <button
                       onClick={handleCreate}
                       className="mt-3 text-blue-600 hover:underline"
@@ -307,7 +331,7 @@ const UnitListPage: React.FC = () => {
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
                             <PowerOff className="w-3 h-3" />
-                            Ngưng
+                            Ngưng hoạt động
                           </span>
                         )}
                       </td>

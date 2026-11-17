@@ -4,9 +4,9 @@
 // (UI gate + DB RLS đồng bộ, tránh "thấy menu nhưng 403" hoặc ngược lại).
 // ============================================================================
 import type { User } from '../types'
+import { isAdminUser } from './adminAccess'   // danh sách email admin: MỘT nguồn ở adminAccess.ts
 
 const FINANCE_EMAILS = ['minhld@huyanhrubber.com', 'yendt@huyanhrubber.com', 'phulv@huyanhrubber.com']
-const ADMIN_EMAILS = ['minhld@huyanhrubber.com']
 
 // ⚠ TẠM THỜI (đang test): CHỈ Admin (minhld) thấy Tài chính.
 // Khi test xong → đổi FINANCE_OPEN = true để mở cho Ban giám đốc + Phòng kế toán.
@@ -15,7 +15,7 @@ const FINANCE_OPEN = false
 export function isFinanceUser(user?: User | null): boolean {
   if (!user) return false
   const email = (user.email || '').toLowerCase()
-  const isAdmin = user.role === 'admin' || ADMIN_EMAILS.includes(email)
+  const isAdmin = isAdminUser(user)
   if (!FINANCE_OPEN) return isAdmin          // tạm thời: chỉ Admin
 
   const level = user.position_level ?? 99    // BGĐ: Giám đốc/Trợ lý/Phó GĐ = level <= 3
@@ -31,7 +31,5 @@ export function isFinanceUser(user?: User | null): boolean {
 // CHỈ Admin — dùng cho Nhật ký kiểm toán tài chính (dữ liệu cực nhạy cảm).
 // Phải KHỚP fn_is_finance_admin() trong finance_audit_log_v1.sql (UI gate + DB RLS).
 export function isFinanceAdmin(user?: User | null): boolean {
-  if (!user) return false
-  const email = (user.email || '').toLowerCase()
-  return user.role === 'admin' || ADMIN_EMAILS.includes(email)
+  return isAdminUser(user)
 }

@@ -1,17 +1,14 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { employeeService, departmentService } from '../../services'
+import { employeeService, departmentService, positionService, EMPLOYEE_STATUS_LABELS, EMPLOYEE_STATUS_COLORS } from '../../services'
 import { Card, Button, Input, Select, DataTable, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { EmployeeForm } from './EmployeeForm'
 import { Lock } from 'lucide-react'
 import { formatHac13Display } from '../../lib/hac13'
+import PageState from '../../components/common/PageState'
+import { EnumTag } from '../../components/common/EnumTag'
+import { HR_MASTER_DATA_READONLY, HR_MASTER_DATA_READONLY_NOTE } from './hrMasterData'
 import type { Employee } from '../../types'
-
-// ============================================================================
-// TẠM THỜI KHÓA CHỨC NĂNG SỬA/XÓA
-// Set = false để mở lại
-// ============================================================================
-const DISABLE_EDIT_DELETE = true
 
 export function EmployeeListPage() {
   const queryClient = useQueryClient()
@@ -23,11 +20,11 @@ export function EmployeeListPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   // Query danh sách nhân viên
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['employees', page, search, departmentFilter],
-    queryFn: () => employeeService.getAll({ 
-      page, 
-      pageSize: 10, 
+    queryFn: () => employeeService.getAll({
+      page,
+      pageSize: 10,
       search,
       department_id: departmentFilter || undefined
     })
@@ -39,6 +36,15 @@ export function EmployeeListPage() {
     queryFn: departmentService.getAllActive
   })
 
+  // Chức vụ — để hiện tên (employeeService.getAll chỉ select '*', không join)
+  const { data: positions } = useQuery({
+    queryKey: ['positions-active'],
+    queryFn: positionService.getAllActive
+  })
+
+  const deptName = useMemo(() => new Map((departments || []).map(d => [d.id, d.name] as [string, string])), [departments])
+  const posName = useMemo(() => new Map((positions || []).map(p => [p.id, p.name] as [string, string])), [positions])
+
   const deleteMutation = useMutation({
     mutationFn: employeeService.delete,
     onSuccess: () => {
@@ -47,6 +53,8 @@ export function EmployeeListPage() {
     }
   })
 
+  // Cột chữ trần PHẢI có dataIndex (thiếu → antd vẽ ô trống). Cột có render(item) cố ý
+  // KHÔNG khai dataIndex để render nhận cả bản ghi.
   const columns = [
     {
       key: 'hac13_code',
@@ -57,76 +65,44 @@ export function EmployeeListPage() {
         </span>
       ),
     },
-    { key: 'full_name', title: 'Họ và tên' },
+    { key: 'full_name', dataIndex: 'full_name', title: 'Họ và tên' },
     {
       key: 'department',
       title: 'Phòng ban',
-      render: (item: Employee) => item.department?.name || '-'
+      render: (item: Employee) => item.department?.name || deptName.get(item.department_id || '') || '—'
     },
     {
       key: 'position',
       title: 'Chức vụ',
-      render: (item: Employee) => item.position?.name || '-'
+      render: (item: Employee) => item.position?.name || posName.get(item.position_id || '') || '—'
     },
-    { key: 'phone', title: 'Điện thoại' },
+    { key: 'phone', dataIndex: 'phone', title: 'Điện thoại' },
     {
       key: 'status',
       title: 'Trạng thái',
       render: (item: Employee) => (
-        <span className={`px-2 py-1 rounded-full text-xs ${
-          item.status === 'active' 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {item.status === 'active' ? 'Đang làm' : 'Nghỉ việc'}
-        </span>
+        <EnumTag value={item.status} labels={EMPLOYEE_STATUS_LABELS} colors={EMPLOYEE_STATUS_COLORS} />
       )
     },
-    {
+    // Khoá Sửa/Xoá → ẩn hẳn cột Thao tác (không vẽ 2 nút chết mỗi dòng)
+    ...(HR_MASTER_DATA_READONLY ? [] : [{
       key: 'actions',
       title: 'Thao tác',
       render: (item: Employee) => (
         <div className="flex gap-2">
-          {DISABLE_EDIT_DELETE ? (
-            <>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                disabled
-                className="opacity-50 cursor-not-allowed"
-                title="Chức năng tạm khóa"
-              >
-                <Lock className="w-3 h-3 mr-1" />
-                Sửa
-              </Button>
-              <Button 
-                size="sm" 
-                variant="danger" 
-                disabled
-                className="opacity-50 cursor-not-allowed"
-                title="Chức năng tạm khóa"
-              >
-                <Lock className="w-3 h-3 mr-1" />
-                Xóa
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
-                Sửa
-              </Button>
-              <Button size="sm" variant="danger" onClick={() => setDeleteId(item.id)}>
-                Xóa
-              </Button>
-            </>
-          )}
+          <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
+            Sửa
+          </Button>
+          <Button size="sm" variant="danger" onClick={() => setDeleteId(item.id)}>
+            Xóa
+          </Button>
         </div>
       )
-    }
+    }])
   ]
 
   const handleEdit = (employee: Employee) => {
-    if (DISABLE_EDIT_DELETE) return
+    if (HR_MASTER_DATA_READONLY) return
     setSelectedEmployee(employee)
     setIsModalOpen(true)
   }
@@ -154,10 +130,10 @@ export function EmployeeListPage() {
       </div>
 
       {/* Thông báo tạm khóa */}
-      {DISABLE_EDIT_DELETE && (
+      {HR_MASTER_DATA_READONLY && (
         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-amber-700">
           <Lock className="w-4 h-4" />
-          <span className="text-sm">Chức năng Sửa/Xóa đang tạm thời bị khóa để đảm bảo tính toàn vẹn dữ liệu.</span>
+          <span className="text-sm">{HR_MASTER_DATA_READONLY_NOTE}</span>
         </div>
       )}
 
@@ -167,12 +143,12 @@ export function EmployeeListPage() {
           <Input
             placeholder="Tìm theo mã HAC-13, tên, email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="max-w-md"
           />
           <Select
             value={departmentFilter}
-            onChange={(e) => setDepartmentFilter(e.target.value)}
+            onChange={(e) => { setDepartmentFilter(e.target.value); setPage(1) }}
             options={[
               { value: '', label: 'Tất cả phòng ban' },
               ...(departments?.map(d => ({ value: d.id, label: d.name })) || [])
@@ -181,19 +157,28 @@ export function EmployeeListPage() {
           />
         </div>
 
-        <DataTable
-          columns={columns}
-          data={data?.data || []}
-          isLoading={isLoading}
-          emptyMessage="Chưa có nhân viên nào"
-        />
+        {error ? (
+          <PageState error={error} onRetry={() => refetch()} />
+        ) : (
+          <>
+            {/* Phân trang ở server → tắt thanh phân trang của bảng, chỉ giữ <Pagination> bên dưới */}
+            <DataTable
+              columns={columns}
+              data={data?.data || []}
+              isLoading={isLoading}
+              emptyMessage="Chưa có nhân viên nào"
+              pagination={false}
+              showSearch={false}
+            />
 
-        {data && (
-          <Pagination
-            currentPage={data.page}
-            totalPages={data.totalPages}
-            onPageChange={setPage}
-          />
+            {data && (
+              <Pagination
+                currentPage={data.page}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+              />
+            )}
+          </>
         )}
       </Card>
 

@@ -29,6 +29,7 @@ import {
   ALLOWED_MIME_TYPES,
 } from '../../services/b2b/chatAttachmentService'
 import { ChatAttachment } from '../../services/b2b/chatMessageService'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Dragger } = Upload
 const { Text } = Typography
@@ -144,7 +145,7 @@ const ChatAttachmentUpload = ({
       setFileList((prev) =>
         prev.map((f) =>
           f.uid === uid
-            ? { ...f, status: 'error', error: 'Upload thất bại' }
+            ? { ...f, status: 'error', error: dichLoiHeThong(error, 'Tải lên thất bại') }
             : f
         )
       )
@@ -172,7 +173,7 @@ const ChatAttachmentUpload = ({
     const successFiles = fileList.filter((f) => f.status === 'done' && f.attachment)
     
     if (successFiles.length === 0) {
-      message.warning('Chưa có file nào được upload')
+      message.warning('Chưa có tệp nào tải lên xong')
       return
     }
 

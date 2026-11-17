@@ -54,6 +54,29 @@ export interface Supplier {
   deleted_at?: string;
 }
 
+// ===== NHÃN + MÀU NCC — MỘT nguồn (Đợt 3 audit UI 17/11/2026) =====
+// Sổ NCC, chi tiết NCC, form NCC đọc chung; trước đó mỗi màn chép một bản ('Chính' vs 'NCC Chính'…).
+export const SUPPLIER_STATUS_LABELS: Record<string, string> = {
+  active: 'Hoạt động',
+  inactive: 'Tạm ngừng',
+  blocked: 'Đã khóa',
+};
+/** Màu antd cho trạng thái NCC */
+export const SUPPLIER_STATUS_COLORS: Record<string, string> = {
+  active: 'green',
+  inactive: 'gold',
+  blocked: 'red',
+};
+export const SUPPLIER_TYPE_LABELS: Record<string, string> = {
+  company: 'Công ty',
+  individual: 'Cá nhân',
+};
+export const SUPPLIER_GROUP_LABELS: Record<string, string> = {
+  primary: 'NCC Chính',
+  secondary: 'NCC Phụ',
+  service: 'Dịch vụ',
+};
+
 export interface SupplierContact {
   id: string;
   supplier_id: string;

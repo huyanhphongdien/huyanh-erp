@@ -7,45 +7,57 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
-  Card, Table, Button, Space, Typography, Tag, Input, Select, Segmented, message, Breadcrumb,
+  Card, Table, Button, Space, Typography, Tag, Input, Select, Segmented, Breadcrumb, DatePicker,
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, SendOutlined, TruckOutlined, CarOutlined, IdcardOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
+import type { Dayjs } from 'dayjs'
 import {
-  dispatchService, DISPATCH_STATUS_LABELS, isContainerTrip,
+  dispatchService, DISPATCH_STATUS_LABELS, DISPATCH_STATUS_COLORS, isContainerTrip,
   FETCH_RUBBER_LABELS, palletOutKg,
   dispatchCategoryLabel, tripCardFor, TRIP_GROUP_META,
   type DispatchOrder, type DispatchStatus, type TripVehicleGroup,
 } from '../../../services/logistics/dispatchService'
+import { DASH, fmtDate } from '../../../utils/format'
+import PageState from '../../../components/common/PageState'
+import { LimitNotice, stdPagination } from '../../../components/common/tableDefaults'
 
 const { Title } = Typography
 
-const STATUS_COLOR: Record<DispatchStatus, string> = {
-  draft: 'default', dispatched: 'blue', in_transit: 'gold', completed: 'green', cancelled: 'red',
-}
+/** Trần tải một lần (mới tạo trước). Chạm trần → hiện LimitNotice, lọc theo ngày để xem lệnh cũ. */
+const LOAD_LIMIT = 200
 
 export default function DispatchListPage() {
   const navigate = useNavigate()
   const openTab = useOpenTab()
   const [rows, setRows] = useState<DispatchOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState<unknown>(null)
   const [filter, setFilter] = useState<DispatchStatus | 'all'>('all')
   const [groupFilter, setGroupFilter] = useState<'all' | TripVehicleGroup>('all')
   const [search, setSearch] = useState('')
+  // Lọc theo NGÀY ĐIỀU ĐỘNG (service đã nhận date_from/date_to). Mặc định để trống = như cũ (200 lệnh mới
+  // nhất): đặt sẵn "30 ngày gần nhất" sẽ giấu lệnh lên lịch cho ngày tới và lệnh nháp cũ chưa chạy.
+  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null)
+  const dateFrom = range?.[0]?.format('YYYY-MM-DD')
+  const dateTo = range?.[1]?.format('YYYY-MM-DD')
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadErr(null)
     try {
       setRows(await dispatchService.list({
         status: filter === 'all' ? undefined : filter,
         search: search || undefined,
-        limit: 200,
+        date_from: dateFrom,
+        date_to: dateTo,
+        limit: LOAD_LIMIT,
       }))
     } catch (e: any) {
-      message.error('Lỗi tải lệnh điều động: ' + (e?.message || e))
+      // Không để bảng hiện "trống" khi tải hỏng — PageState báo lỗi + nút Thử lại.
+      setLoadErr(e)
     }
     setLoading(false)
-  }, [filter, search])
+  }, [filter, search, dateFrom, dateTo])
 
   useEffect(() => { load() }, [load])
 
@@ -56,7 +68,7 @@ export default function DispatchListPage() {
 
   const columns = [
     { title: 'Mã lệnh', dataIndex: 'code', key: 'code', width: 140, render: (v: string) => <b>{v}</b> },
-    { title: 'Ngày', dataIndex: 'dispatch_date', key: 'date', width: 110, render: (v: string) => dayjs(v).format('DD/MM/YYYY') },
+    { title: 'Ngày', dataIndex: 'dispatch_date', key: 'date', width: 110, render: (v: string) => fmtDate(v) },
     { title: 'Loại chuyến', key: 'trip', width: 180, render: (_: any, r: DispatchOrder) => <span>{dispatchCategoryLabel(r.trip_type, r.cargo_kind)}</span> },
     {
       title: 'Xe / Tài xế', key: 'veh', render: (_: any, r: DispatchOrder) => (
@@ -77,7 +89,7 @@ export default function DispatchListPage() {
         ].filter(Boolean)
         return <span style={{ color: '#0369A1' }}>🌳 Lấy mủ{parts.length ? ': ' + parts.join(' · ') : ''}</span>
       }
-      return <span>{[r.customer_name, r.destination].filter(Boolean).join(' → ') || '–'}</span>
+      return <span>{[r.customer_name, r.destination].filter(Boolean).join(' → ') || DASH}</span>
     } },
     {
       // Đi cảng: số container. Đi lấy mủ: số pallet mang đi. Chuyến khác: số dòng hành trình.
@@ -87,14 +99,14 @@ export default function DispatchListPage() {
           const p = r.pallet_plastic_out || 0, s = r.pallet_steel_out || 0
           return (p || s)
             ? <span title={`${p} nhựa + ${s} sắt = ${palletOutKg(p, s).toLocaleString('vi-VN')} kg`}>📦 {p + s}</span>
-            : '–'
+            : DASH
         }
-        return isContainerTrip(r.trip_type) ? (v || 0) : (v ? v : '–')
+        return isContainerTrip(r.trip_type) ? (v || 0) : (v ? v : DASH)
       },
     },
     { title: 'KL (kg)', dataIndex: 'total_weight', key: 'w', width: 110, align: 'right' as const,
-      render: (v: number, r: DispatchOrder) => (r.trip_type === 'fetch_mu' ? <span style={{ color: '#94a3b8' }}>cân sau</span> : (v ? v.toLocaleString('vi-VN') : '–')) },
-    { title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 130, render: (s: DispatchStatus) => <Tag color={STATUS_COLOR[s]}>{DISPATCH_STATUS_LABELS[s]}</Tag> },
+      render: (v: number, r: DispatchOrder) => (r.trip_type === 'fetch_mu' ? <span style={{ color: '#94a3b8' }}>cân sau</span> : (v ? v.toLocaleString('vi-VN') : DASH)) },
+    { title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 130, render: (s: DispatchStatus) => <Tag color={DISPATCH_STATUS_COLORS[s]}>{DISPATCH_STATUS_LABELS[s]}</Tag> },
   ]
 
   return (
@@ -138,8 +150,14 @@ export default function DispatchListPage() {
               })),
             ]}
           />
+          <DatePicker.RangePicker
+            value={range} format="DD/MM/YYYY" allowClear placeholder={['Từ ngày điều động', 'Đến ngày']}
+            onChange={v => setRange(v && v[0] && v[1] ? [v[0], v[1]] as [Dayjs, Dayjs] : null)}
+          />
         </div>
 
+        <PageState error={loadErr} onRetry={load}>
+        <LimitNotice shown={rows.length} limit={LOAD_LIMIT} what="lệnh" />
         <Table rowKey="id" size="middle" loading={loading} columns={columns as any} dataSource={shown}
           onRow={(r) => ({
             // Mở TAB chi tiết thay vì điều hướng — trang này giờ là 1 tab, navigate
@@ -153,7 +171,8 @@ export default function DispatchListPage() {
             }),
             style: { cursor: 'pointer' },
           })}
-          pagination={{ pageSize: 20, showSizeChanger: false }} />
+          pagination={stdPagination(20)} />
+        </PageState>
       </Card>
     </div>
   )

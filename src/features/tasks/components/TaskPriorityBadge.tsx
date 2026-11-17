@@ -5,6 +5,7 @@
 // ============================================================================
 
 import React from 'react';
+import { TASK_PRIORITY_LABELS } from '../../../types';
 
 // ============================================================================
 // TYPES
@@ -24,6 +25,7 @@ export interface TaskPriorityBadgeProps {
 // CONSTANTS
 // ============================================================================
 
+// Nhãn đọc từ TASK_PRIORITY_LABELS (types/index.ts) — chỉ icon + lớp màu là của riêng badge
 const PRIORITY_CONFIG: Record<string, {
   label: string;
   icon: string;
@@ -32,28 +34,28 @@ const PRIORITY_CONFIG: Record<string, {
   borderColor: string;
 }> = {
   low: {
-    label: 'Thấp',
+    label: TASK_PRIORITY_LABELS.low,
     icon: '↓',
     bgColor: 'bg-gray-100',
     textColor: 'text-gray-700',
     borderColor: 'border-gray-300',
   },
   medium: {
-    label: 'Trung bình',
+    label: TASK_PRIORITY_LABELS.medium,
     icon: '→',
     bgColor: 'bg-blue-100',
     textColor: 'text-blue-700',
     borderColor: 'border-blue-300',
   },
   high: {
-    label: 'Cao',
+    label: TASK_PRIORITY_LABELS.high,
     icon: '↑',
     bgColor: 'bg-orange-100',
     textColor: 'text-orange-700',
     borderColor: 'border-orange-300',
   },
   urgent: {
-    label: 'Khẩn cấp',
+    label: TASK_PRIORITY_LABELS.urgent,
     icon: '⚡',
     bgColor: 'bg-red-100',
     textColor: 'text-red-700',

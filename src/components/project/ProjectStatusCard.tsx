@@ -10,6 +10,8 @@
 
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
+import { fmtDate } from '../../utils/format'
+import { PROJECT_STATUS_LABELS, PROJECT_PRIORITY_LABELS } from '../../services/project/project.types'
 import {
   Calendar,
   Users,
@@ -59,27 +61,26 @@ const HEALTH_CONFIG: Record<HealthStatus, { label: string; color: string; bg: st
   behind_schedule: { label: 'Chậm tiến độ', color: 'text-red-700', bg: 'bg-red-50 border-red-200', icon: Clock },
 }
 
+// Lớp màu là của thẻ này; CHỮ đọc từ project.types (một nguồn — Đợt 3 audit UI 17/11/2026).
+// Bản chép cũ rút ưu tiên medium thành "TB" trong khi mọi màn khác ghi "Trung bình".
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  draft: { label: 'Nháp', color: 'text-gray-600', bg: 'bg-gray-100' },
-  planning: { label: 'Lập kế hoạch', color: 'text-blue-600', bg: 'bg-blue-50' },
-  approved: { label: 'Đã duyệt', color: 'text-teal-600', bg: 'bg-teal-50' },
-  in_progress: { label: 'Đang thực hiện', color: 'text-[#1B4D3E]', bg: 'bg-emerald-50' },
-  on_hold: { label: 'Tạm dừng', color: 'text-amber-600', bg: 'bg-amber-50' },
-  completed: { label: 'Hoàn thành', color: 'text-green-600', bg: 'bg-green-50' },
-  cancelled: { label: 'Đã hủy', color: 'text-red-600', bg: 'bg-red-50' },
+  draft: { label: PROJECT_STATUS_LABELS.draft, color: 'text-gray-600', bg: 'bg-gray-100' },
+  planning: { label: PROJECT_STATUS_LABELS.planning, color: 'text-blue-600', bg: 'bg-blue-50' },
+  approved: { label: PROJECT_STATUS_LABELS.approved, color: 'text-teal-600', bg: 'bg-teal-50' },
+  in_progress: { label: PROJECT_STATUS_LABELS.in_progress, color: 'text-[#1B4D3E]', bg: 'bg-emerald-50' },
+  on_hold: { label: PROJECT_STATUS_LABELS.on_hold, color: 'text-amber-600', bg: 'bg-amber-50' },
+  completed: { label: PROJECT_STATUS_LABELS.completed, color: 'text-green-600', bg: 'bg-green-50' },
+  cancelled: { label: PROJECT_STATUS_LABELS.cancelled, color: 'text-red-600', bg: 'bg-red-50' },
 }
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
-  critical: { label: 'Khẩn cấp', color: 'text-red-600' },
-  high: { label: 'Cao', color: 'text-orange-600' },
-  medium: { label: 'TB', color: 'text-amber-600' },
-  low: { label: 'Thấp', color: 'text-blue-600' },
+  critical: { label: PROJECT_PRIORITY_LABELS.critical, color: 'text-red-600' },
+  high: { label: PROJECT_PRIORITY_LABELS.high, color: 'text-orange-600' },
+  medium: { label: PROJECT_PRIORITY_LABELS.medium, color: 'text-amber-600' },
+  low: { label: PROJECT_PRIORITY_LABELS.low, color: 'text-blue-600' },
 }
 
-function formatDate(d: string | null | undefined): string {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
+// formatDate cục bộ đã bỏ → fmtDate (src/utils/format.ts)
 
 // ============================================
 // COMPONENT
@@ -153,9 +154,9 @@ const ProjectStatusCard: React.FC<ProjectStatusCardProps> = ({
         {(planned_start || planned_end) && (
           <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-500">
             <Calendar className="w-3.5 h-3.5" />
-            <span>{formatDate(planned_start)}</span>
+            <span>{fmtDate(planned_start)}</span>
             <span>→</span>
-            <span>{formatDate(planned_end)}</span>
+            <span>{fmtDate(planned_end)}</span>
           </div>
         )}
       </div>
@@ -172,7 +173,7 @@ const ProjectStatusCard: React.FC<ProjectStatusCardProps> = ({
       <div className="px-4 pb-3 grid grid-cols-4 gap-1 text-center">
         <div className="bg-gray-50 rounded px-1 py-1.5">
           <div className="text-xs font-mono font-semibold text-gray-700">{task_count}</div>
-          <div className="text-[10px] text-gray-400">Tasks</div>
+          <div className="text-[10px] text-gray-400">Công việc</div>
         </div>
         <div className="bg-gray-50 rounded px-1 py-1.5">
           <div className="text-xs font-mono font-semibold text-gray-700">{milestone_count}</div>
@@ -196,7 +197,7 @@ const ProjectStatusCard: React.FC<ProjectStatusCardProps> = ({
             <span className="truncate">{next_milestone}</span>
             {next_milestone_due && (
               <span className="ml-auto text-blue-500 flex-shrink-0 font-mono">
-                {formatDate(next_milestone_due)}
+                {fmtDate(next_milestone_due)}
               </span>
             )}
           </div>

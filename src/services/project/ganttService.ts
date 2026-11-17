@@ -5,6 +5,8 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { TASK_STATUS_LABELS } from '../../types'
+import { PROJECT_STATUS_LABELS, PHASE_STATUS_LABELS, MILESTONE_STATUS_LABELS } from './project.types'
 
 // ============================================================================
 // TYPES
@@ -12,6 +14,25 @@ import { supabase } from '../../lib/supabase'
 
 export type GanttItemType = 'project' | 'phase' | 'milestone' | 'task'
 export type DependencyType = 'FS' | 'FF' | 'SS' | 'SF'
+
+/** Nhãn loại mục Gantt — mọi màn Gantt đọc từ đây (Đợt 3 audit UI: trước đó in 'Phase'/'Task'/mã thô 'milestone') */
+export const GANTT_ITEM_TYPE_LABELS: Record<string, string> = {
+  project: 'Dự án',
+  phase: 'Giai đoạn',
+  milestone: 'Mốc',
+  task: 'Công việc',
+}
+
+/** Nhãn trạng thái của một mục Gantt — mỗi loại mục có bộ trạng thái riêng; mã lạ trả nguyên mã */
+export function ganttStatusLabel(type: GanttItemType | string, status?: string | null): string {
+  if (!status) return '—'
+  const map: Record<string, string> =
+    type === 'phase' ? PHASE_STATUS_LABELS
+      : type === 'milestone' ? MILESTONE_STATUS_LABELS
+      : type === 'project' ? PROJECT_STATUS_LABELS
+      : TASK_STATUS_LABELS
+  return map[status] ?? status
+}
 
 export interface GanttItem {
   id: string
@@ -737,7 +758,7 @@ export const ganttService = {
 
     const { data: baselineRows, error: blError } = await baselineQuery
     if (blError) throw blError
-    if (!baselineRows || baselineRows.length === 0) throw new Error('Không tìm thấy baseline')
+    if (!baselineRows || baselineRows.length === 0) throw new Error('Dự án chưa có đường cơ sở nào — bấm "Lưu đường cơ sở" trước rồi mới so được')
 
     const row = baselineRows[0]
     const baselineItems = (Array.isArray(row.data) ? row.data : []) as unknown as BaselineItem[]

@@ -9,6 +9,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
 import type {
   Material,
   Warehouse,
@@ -437,13 +438,13 @@ export const inventoryService = {
     for (let i = 0; i <= days; i++) {
       const d = new Date()
       d.setDate(d.getDate() - (days - i))
-      const key = d.toISOString().split('T')[0]
+      const key = toDateStrVN(d)   // ngày VN — toISOString() lệch −1 ngày trước 7h sáng
       dayMap.set(key, { in_qty: 0, out_qty: 0, adj_qty: 0 })
     }
 
-    // Aggregate transactions
+    // Aggregate transactions — created_at là timestamp UTC, quy về NGÀY VN cho khớp khoá ở trên
     for (const tx of (transactions || [])) {
-      const dateKey = tx.created_at.split('T')[0]
+      const dateKey = toDateStrVN(new Date(tx.created_at))
       const entry = dayMap.get(dateKey)
       if (!entry) continue
 

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { performanceService } from '../../services'
 import { Button, Input, Card, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { PerformanceCriteriaForm } from './PerformanceCriteriaForm'
+import PageState from '../../components/common/PageState'
 
 // Define type inline
 interface PerformanceCriteria {
@@ -34,7 +35,7 @@ export function PerformanceCriteriaListPage() {
   const [selectedItem, setSelectedItem] = useState<PerformanceCriteria | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['performance-criteria', page, search],
     queryFn: () => performanceService.getCriteria({ 
       page, 
@@ -89,6 +90,12 @@ export function PerformanceCriteriaListPage() {
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                     Đang tải...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={7} className="p-0">
+                    <PageState error={error} onRetry={() => refetch()} />
                   </td>
                 </tr>
               ) : !data?.data?.length ? (

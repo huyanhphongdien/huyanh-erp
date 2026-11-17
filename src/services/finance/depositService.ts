@@ -4,6 +4,7 @@
 // Bảng: fin_deposits (finance_deposits_v1.sql). Đèn = nhắc TÁI TỤC trước đáo hạn.
 // ============================================================================
 import { supabase } from '../../lib/supabase'
+import { FIN_LIGHT } from './finLight'
 
 export type DepositStatus = 'active' | 'closed'
 export type DepositAlert = 'ok' | 'soon' | 'due' | 'overdue' | 'closed'
@@ -45,8 +46,12 @@ export const ALERT_LABEL: Record<DepositAlert, string> = {
   ok: 'Còn hạn', soon: 'Sắp đáo hạn', due: 'Đáo hạn tuần này', overdue: 'QUÁ HẠN — tái tục gấp', closed: 'Đã tất toán',
 }
 export const ALERT_COLOR: Record<DepositAlert, string> = {
-  ok: '#16a34a', soon: '#ca8a04', due: '#ea580c', overdue: '#dc2626', closed: '#9ca3af',
+  ok: FIN_LIGHT.ok, soon: FIN_LIGHT.soon, due: FIN_LIGHT.due, overdue: FIN_LIGHT.overdue, closed: FIN_LIGHT.closed,
 }
+// Một nguồn nhãn cho form + bảng (trước đây bảng ghi "Đảm bảo vay"/"Thường", form ghi "Đảm bảo khoản vay"/"Tiền gửi thường")
+export const DEPOSIT_STATUS_LABELS: Record<DepositStatus, string> = { active: 'Đang gửi', closed: 'Đã tất toán' }
+export const DEPOSIT_PURPOSE_LABELS: Record<string, string> = { dam_bao_vay: 'Đảm bảo vay', thuong: 'Tiền gửi thường' }
+export const DEPOSIT_PURPOSE_COLORS: Record<string, string> = { dam_bao_vay: 'blue', thuong: 'default' }
 export const ALERT_BG: Record<DepositAlert, string> = {
   ok: '#f0fdf4', soon: '#fefce8', due: '#fff7ed', overdue: '#fef2f2', closed: '#f9fafb',
 }

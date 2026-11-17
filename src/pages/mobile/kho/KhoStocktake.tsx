@@ -5,11 +5,13 @@
 // ============================================================================
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import OpsQrScanner from '../OpsQrScanner'
-import { rawStocktakeService, RAW_STOCKTAKE_STATUS_LABELS, type RawStocktake, type RawStocktakeLine } from '../../../services/wms/rawStocktakeService'
+import { rawStocktakeService, RAW_STOCKTAKE_STATUS_COLORS, RAW_STOCKTAKE_STATUS_LABELS, type RawStocktake, type RawStocktakeLine } from '../../../services/wms/rawStocktakeService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
-import { FacilitySelect, fmtKg, fmtSigned, parseKhoScan, todayLocal, useKhoFacility } from './khoCommon'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtDate, fmtNum } from '../../../utils/format'
+import { FacilitySelect, KhoToast, Msg, XacNhanTaiCho, fmtKg, fmtSigned, kmxChip, parseKhoScan, todayLocal, useKhoFacility } from './khoCommon'
 import { I } from './khoMixUtil'
 import './khoMix.css'
 
@@ -23,7 +25,9 @@ export default function KhoStocktake() {
   const [lines, setLines] = useState<RawStocktakeLine[]>([])
   const [settings, setSettings] = useState<RawSettings>(RAW_SETTINGS_DEFAULT)
   const [loading, setLoading] = useState(true)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [loadErr, setLoadErr] = useState<string | null>(null)   // lỗi TẢI phiếu — đầu trang, kèm Thử lại
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)   // kết quả thao tác — ghim đáy màn (KhoToast)
+  const [rowErr, setRowErr] = useState<{ id: string; text: string } | null>(null)   // lỗi nhập của ĐÚNG lô đang đếm — hiện trong thẻ lô
   const [busy, setBusy] = useState<string | null>(null)
   const [edit, setEdit] = useState<Record<string, { wet: string; drc: string; lyDo: string }>>({})
   const [filter, setFilter] = useState<'chua' | 'tat_ca'>('chua')
@@ -35,13 +39,13 @@ export default function KhoStocktake() {
 
   const load = useCallback(async (keepId?: string | null) => {
     if (!facilityId) return
-    setLoading(true)
+    setLoading(true); setLoadErr(null)
     try {
       const [l, s] = await Promise.all([rawStocktakeService.list(facilityId, 20), rawSettingsService.getForFacility(facilityId)])
       setList(l); setSettings(s)
       const open = l.find((x) => x.status === 'draft') || l.find((x) => x.status === 'counted') || (keepId ? l.find((x) => x.id === keepId) : null) || l[0] || null
       if (open) { const d = await rawStocktakeService.get(open.id); setSt(d?.stocktake ?? open); setLines(d?.lines ?? []) } else { setSt(null); setLines([]) }
-    } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không tải được kiểm kê' }) }
+    } catch (e: any) { setLoadErr(dichLoiHeThong(e, 'Không tải được kiểm kê')) }
     finally { setLoading(false) }
   }, [facilityId])
   useEffect(() => { load() }, [load])
@@ -68,15 +72,15 @@ export default function KhoStocktake() {
 
   async function ghi(l: RawStocktakeLine) {
     const e = edit[l.id]; const p = preview(l)
-    if (!e || !p) { setMsg({ ok: false, text: 'Nhập kg ướt đếm được' }); return }
-    if (p.vuot && !e.lyDo) { setMsg({ ok: false, text: `${l.batch_no}: lệch khô quá ${nguong} %, chọn lý do` }); return }
-    setBusy(l.id); setMsg(null)
+    if (!e || !p) { setRowErr({ id: l.id, text: 'Nhập kg ướt đếm được' }); return }
+    if (p.vuot && !e.lyDo) { setRowErr({ id: l.id, text: `Lệch khô quá ${nguong} %, chọn lý do` }); return }
+    setBusy(l.id); setMsg(null); setRowErr(null)
     try {
       const r = await rawStocktakeService.ghiDem(l.id, Number(e.wet), e.drc !== '' ? Number(e.drc) : null, e.lyDo || null, null)
       setMsg({ ok: true, text: `${l.batch_no}: đếm ${fmtKg(Number(e.wet))} kg ướt → ${fmtKg(r.counted_dry_kg)} kg khô (${fmtSigned(r.chenh_kho_kg)} kg)` })
       setEdit((x) => { const y = { ...x }; delete y[l.id]; return y })
       await load(st?.id)
-    } catch (e2: any) { setMsg({ ok: false, text: e2?.message || 'Không ghi được' }) }
+    } catch (e2: any) { setMsg({ ok: false, text: `${l.batch_no}: ${dichLoiHeThong(e2, 'Không ghi được')}` }) }
     finally { setBusy(null) }
   }
 
@@ -87,10 +91,10 @@ export default function KhoStocktake() {
       if (buoc === 'create') { const id = await rawStocktakeService.create(facilityId, todayLocal(), 'Tạo từ điện thoại', force); setForceAsk(null); setMsg({ ok: true, text: 'Đã tạo phiếu kiểm kê hôm nay' }); await load(id); return }
       if (!st) return
       const r = await rawStocktakeService.ky(st.id, buoc)
-      setMsg({ ok: true, text: buoc === 'count_done' ? 'Đã hoàn tất đếm, chờ BGĐ duyệt' : buoc === 'approve' ? `Đã duyệt: điều chỉnh ${r.so_lo_dieu_chinh} lô, ${fmtSigned(r.chenh_kho_kg)} kg khô, khóa sổ đến ${new Date(st.ngay_kiem_ke).toLocaleDateString('vi-VN')}` : 'Đã hủy phiếu kiểm kê' })
+      setMsg({ ok: true, text: buoc === 'count_done' ? 'Đã hoàn tất đếm, chờ BGĐ duyệt' : buoc === 'approve' ? `Đã duyệt: điều chỉnh ${r.so_lo_dieu_chinh} lô, ${fmtSigned(r.chenh_kho_kg)} kg khô, khóa sổ đến ${fmtDate(st.ngay_kiem_ke)}` : 'Đã hủy phiếu kiểm kê' })
       await load(st.id)
     } catch (e: any) {
-      const t = e?.message || 'Thao tác thất bại'
+      const t = dichLoiHeThong(e, 'Thao tác thất bại')
       if (buoc === 'create' && /phiếu cân sẵn sàng chưa nhập/.test(t)) setForceAsk(t)
       setMsg({ ok: false, text: t })
     }
@@ -113,18 +117,13 @@ export default function KhoStocktake() {
           <span className="kmx-eyebrow">Kiểm kê NVL · {facility?.code || ''}</span>
           <span className="kmx-title">{st ? `${st.code}` : 'Chưa có phiếu kiểm kê'}</span>
         </div>
-        {st && <span className={`kmx-chip ${st.status === 'draft' ? 'amb' : st.status === 'counted' ? 'blue' : st.status === 'approved' ? 'ok' : 'red'}`} style={{ flex: '0 0 auto' }}>{RAW_STOCKTAKE_STATUS_LABELS[st.status]}</span>}
+        {st && <span className={`kmx-chip ${kmxChip(RAW_STOCKTAKE_STATUS_COLORS[st.status])}`} style={{ flex: '0 0 auto' }}>{RAW_STOCKTAKE_STATUS_LABELS[st.status]}</span>}
         <FacilitySelect value={facilityId} onChange={setFacilityId} facilities={facilities} />
       </header>
       <div className="kmx-body"><div className="kmx-inner">
-        {msg && (
-          <div className={`kmx-msg ${msg.ok ? 'ok' : 'err'}`} style={msg.ok ? undefined : { display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ flex: 1, minWidth: 0 }}>{msg.text}</span>
-            {!msg.ok && <button type="button" className="kmx-pill sm" onClick={() => { setMsg(null); load(st?.id) }}>Thử lại</button>}
-          </div>
-        )}
+        <Msg m={loadErr ? { ok: false, text: loadErr } : null} onRetry={() => load(st?.id)} />
         {loading && !st && <div className="kmx-skel" />}
-        {!loading && !st && (
+        {!loading && !st && !loadErr && (
           <section className="kmx-card hero" style={{ gap: 10 }}>
             <span className="kmx-strong" style={{ fontSize: 17 }}>Chưa có phiếu kiểm kê nào</span>
             <span className="kmx-md">Tạo phiếu cho hôm nay: máy chụp số sổ của từng lô còn hàng, bạn đi đếm và cân lại từng lô. Duyệt xong là khóa sổ đến hết ngày kiểm kê, nên làm kiểm kê vào cuối ngày.</span>
@@ -137,7 +136,7 @@ export default function KhoStocktake() {
             <section className="kmx-card" style={{ gap: 8 }}>
               <div className="kmx-row">
                 <span className="kmx-col"><span className="kmx-lbl">Tiến độ đếm</span><span className="kmx-num lg">{daDem}<span className="kmx-unit"> / {lines.length} lô</span></span></span>
-                <span className="kmx-col" style={{ alignItems: 'flex-end' }}><span className="kmx-sm">ngày {new Date(st.ngay_kiem_ke).toLocaleDateString('vi-VN')}</span>{st.counted_name && <span className="kmx-sm">đếm xong: {st.counted_name}</span>}{st.approved_name && <span className="kmx-sm">duyệt: {st.approved_name}</span>}</span>
+                <span className="kmx-col" style={{ alignItems: 'flex-end' }}><span className="kmx-sm">ngày {fmtDate(st.ngay_kiem_ke)}</span>{st.counted_name && <span className="kmx-sm">đếm xong: {st.counted_name}</span>}{st.approved_name && <span className="kmx-sm">duyệt: {st.approved_name}</span>}</span>
               </div>
               <div className="kmx-bar"><span style={{ width: `${lines.length ? Math.round((100 * daDem) / lines.length) : 0}%` }} /></div>
               {editing && daDem === lines.length && lines.length > 0 && <button type="button" className="kmx-btn md" disabled={busy === 'count_done'} onClick={() => act('count_done')}>{I.check}Hoàn tất đếm · gửi duyệt</button>}
@@ -148,27 +147,27 @@ export default function KhoStocktake() {
               <>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button type="button" className="kmx-pill" onClick={() => setScan(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{I.qr}Quét tem lô</button>
-                  <button type="button" className={`kmx-pill${filter === 'chua' ? '' : ''}`} style={filter === 'chua' ? { background: '#1B4D3E', color: '#fff', borderColor: '#1B4D3E' } : undefined} onClick={() => setFilter((f) => (f === 'chua' ? 'tat_ca' : 'chua'))}>{filter === 'chua' ? `Chưa đếm · ${lines.length - daDem}` : 'Tất cả lô'}</button>
+                  <button type="button" className={`kmx-pill${filter === 'chua' ? ' on' : ''}`} aria-pressed={filter === 'chua'} onClick={() => setFilter((f) => (f === 'chua' ? 'tat_ca' : 'chua'))}>{filter === 'chua' ? `Chưa đếm · ${lines.length - daDem}` : 'Tất cả lô'}</button>
                 </div>
                 <input className="kmx-text" placeholder="Tìm mã lô, loại mủ…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm lô" />
               </>
             )}
-            {!rows.length && !loading && <div className="kmx-card muted kmx-center" style={{ fontSize: 13 }}>{filter === 'chua' && lines.length ? 'Đã đếm hết. Bấm "Hoàn tất đếm" ở trên.' : 'Không có lô'}</div>}
+            {!rows.length && !loading && <div className="kmx-card muted kmx-center" style={{ fontSize: 13 }}>{q.trim() ? 'Không có lô khớp từ khóa' : filter === 'chua' && lines.length ? 'Đã đếm hết. Bấm "Hoàn tất đếm" ở trên.' : 'Không có lô'}</div>}
             {rows.map((l) => {
               const e = edit[l.id] ?? { wet: '', drc: '', lyDo: '' }
               const p = preview(l)
               const done = l.counted_wet_kg !== null
               return (
-                <section key={l.id} ref={(el) => { refs.current[l.id] = el }} className="kmx-card" aria-label={`Lô ${l.batch_no}`} style={{ gap: 8, boxShadow: hi === l.id ? '0 0 0 2px #E8A838' : undefined }}>
+                <section key={l.id} ref={(el) => { refs.current[l.id] = el }} className={`kmx-card${hi === l.id ? ' hi' : ''}`} aria-label={`Lô ${l.batch_no}`} style={{ gap: 8 }}>
                   <div className="kmx-row">
-                    <span className="kmx-mono" style={{ fontSize: 15, fontWeight: 700, color: '#0D2E25' }}>{l.batch_no}</span>
+                    <span className="kmx-mono kmx-strong" style={{ fontSize: 15 }}>{l.batch_no}</span>
                     {done ? <span className={`kmx-chip ${Math.abs(l.lech_kho_pct ?? 0) > nguong ? 'red' : 'ok'}`}>{I.checkSm}đếm {fmtKg(l.counted_wet_kg)} · {fmtSigned(l.lech_kho_pct, 2)} %</span> : <span className="kmx-chip amb">chưa đếm</span>}
                   </div>
                   <span className="kmx-md">{l.rubber_type_name}{l.supplier_name ? ` · ${l.supplier_name}` : ''}{l.tuoi_ngay !== null ? ` · ${l.tuoi_ngay} ng` : ''}</span>
                   <div className="kmx-grid3" style={{ gap: 6 }}>
-                    <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Sổ · ướt</span><span className="kmx-num sm">{fmtKg(l.book_wet_kg)}</span></div>
-                    <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>DRC</span><span className="kmx-num sm">{l.book_drc_pct ?? '—'} %</span></div>
-                    <div className="kmx-stat"><span className="kmx-lbl" style={{ fontSize: 10 }}>Sổ · khô</span><span className="kmx-num sm">{fmtKg(l.book_dry_kg)}</span></div>
+                    <div className="kmx-stat"><span className="kmx-lbl">Sổ · ướt</span><span className="kmx-num sm">{fmtKg(l.book_wet_kg)}</span></div>
+                    <div className="kmx-stat"><span className="kmx-lbl">DRC</span><span className="kmx-num sm">{fmtNum(l.book_drc_pct, 2)} %</span></div>
+                    <div className="kmx-stat"><span className="kmx-lbl">Sổ · khô</span><span className="kmx-num sm">{fmtKg(l.book_dry_kg)}</span></div>
                   </div>
                   {editing && (
                     <>
@@ -176,8 +175,9 @@ export default function KhoStocktake() {
                         <input className="kmx-input" style={{ height: 56, fontSize: 28 }} type="number" inputMode="decimal" placeholder={done ? String(l.counted_wet_kg) : 'kg ướt đếm'} value={e.wet} onChange={(ev) => setEdit((x) => ({ ...x, [l.id]: { ...e, wet: ev.target.value } }))} aria-label={`Kg ướt đếm lô ${l.batch_no}`} />
                         <input className="kmx-text" style={{ width: 96, flex: '0 0 96px', textAlign: 'right' }} type="number" inputMode="decimal" step="0.1" placeholder={`DRC ${l.book_drc_pct ?? ''}`} value={e.drc} onChange={(ev) => setEdit((x) => ({ ...x, [l.id]: { ...e, drc: ev.target.value } }))} aria-label="DRC mới" />
                       </div>
-                      {p && <div className="kmx-tint" style={p.vuot ? { background: '#FEE2E2', color: '#B91C1C' } : undefined}><span>Khô {fmtKg(l.book_dry_kg)} → {fmtKg(p.dry)} kg</span><span className="kmx-num sm" style={p.vuot ? { color: '#B91C1C' } : undefined}>{fmtSigned(p.chenh)} kg ({fmtSigned(p.lech, 2)} %)</span></div>}
+                      {p && <div className={`kmx-tint${p.vuot ? ' red' : ''}`}><span>Khô {fmtKg(l.book_dry_kg)} → {fmtKg(p.dry)} kg</span><span className="kmx-num sm">{fmtSigned(p.chenh)} kg ({fmtSigned(p.lech, 2)} %)</span></div>}
                       {p?.vuot && <select className="kmx-text" value={e.lyDo} onChange={(ev) => setEdit((x) => ({ ...x, [l.id]: { ...e, lyDo: ev.target.value } }))} aria-label="Lý do lệch"><option value="">— lý do lệch quá {nguong} % —</option>{LY_DO.map((v) => <option key={v} value={v}>{v}</option>)}</select>}
+                      {rowErr?.id === l.id && <div className="kmx-note red" role="alert" style={{ padding: '8px 12px' }}>{I.info}<span>{rowErr.text}</span></div>}
                       <button type="button" className={`kmx-btn ${done ? 'sec' : 'md'}`} disabled={!canCount || !p || busy === l.id || (p.vuot && !e.lyDo)} onClick={() => ghi(l)}>{busy === l.id ? 'Đang ghi…' : done ? 'Ghi lại số đếm' : 'Ghi số đếm'}</button>
                     </>
                   )}
@@ -185,12 +185,13 @@ export default function KhoStocktake() {
                 </section>
               )
             })}
-            {editing && canCount && <button type="button" className="kmx-btn ghost" style={{ color: '#B91C1C' }} disabled={busy === 'cancel'} onClick={() => { if (window.confirm('Hủy phiếu kiểm kê này?')) act('cancel') }}>Hủy phiếu kiểm kê</button>}
+            {editing && canCount && <XacNhanTaiCho nut="Hủy phiếu kiểm kê" hoi={<>Hủy phiếu {st.code}? Số đếm đã ghi ({daDem}/{lines.length} lô) sẽ không được dùng, sổ kho giữ nguyên — muốn kiểm kê lại phải tạo phiếu mới.</>} xacNhan="Xác nhận hủy phiếu" busy={busy === 'cancel'} onOk={() => act('cancel')} />}
             {list.length > 1 && <span className="kmx-sm kmx-center">Phiếu cũ: {list.filter((x) => x.id !== st.id).slice(0, 3).map((x) => `${x.code} (${RAW_STOCKTAKE_STATUS_LABELS[x.status]})`).join(' · ')}</span>}
           </>
         )}
       </div></div>
-      {scan && <OpsQrScanner onClose={() => setScan(false)} onDetect={onScan} />}
+      <KhoToast m={msg} onClose={() => setMsg(null)} />
+      {scan && <OpsQrScanner onClose={() => setScan(false)} onDetect={onScan} title="Quẹt tem lô đang kiểm kê" hint="Hoặc gõ mã lô trên tem (vd NVL-PD-…)" placeholder="NVL-…" />}
     </div>
   )
 }

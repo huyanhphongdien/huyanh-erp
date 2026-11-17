@@ -1,5 +1,5 @@
 // ============================================================================
-// BATCH MERGE MODAL — Gop nhieu lo thanh 1 lo
+// BATCH MERGE MODAL — Gộp nhiều lô thành 1 lô
 // File: src/components/wms/BatchMergeModal.tsx
 // Phase 6: Batch Split/Merge
 // ============================================================================
@@ -18,6 +18,8 @@ import type { StockBatch } from '../../services/wms/wms.types'
 import GradeBadge from './GradeBadge'
 import { QCBadge } from './QCInputForm'
 import { rubberGradeService } from '../../services/wms/rubberGradeService'
+import { fmtKg, fmtPct } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text } = Typography
 
@@ -49,25 +51,25 @@ const BatchMergeModal: React.FC<BatchMergeModalProps> = ({ open, batches, onClos
     const errors: string[] = []
 
     if (batches.length < 2) {
-      errors.push('Can it nhat 2 lo de gop')
+      errors.push('Cần ít nhất 2 lô để gộp')
     }
 
     // Check same material
     const materialIds = new Set(batches.map(b => b.material_id))
     if (materialIds.size > 1) {
-      errors.push('Tat ca lo phai cung loai nguyen lieu')
+      errors.push('Tất cả lô phải cùng loại nguyên liệu')
     }
 
     // Check all active
     const nonActive = batches.filter(b => b.status !== 'active')
     if (nonActive.length > 0) {
-      errors.push(`Lo ${nonActive.map(b => b.batch_no).join(', ')} khong hoat dong`)
+      errors.push(`Lô ${nonActive.map(b => b.batch_no).join(', ')} không còn hoạt động`)
     }
 
     // Check QC status
     const nonPassed = batches.filter(b => b.qc_status !== 'passed' && b.qc_status !== 'warning')
     if (nonPassed.length > 0) {
-      errors.push(`Lo ${nonPassed.map(b => b.batch_no).join(', ')} chua qua QC`)
+      errors.push(`Lô ${nonPassed.map(b => b.batch_no).join(', ')} chưa qua QC`)
     }
 
     return errors
@@ -106,12 +108,12 @@ const BatchMergeModal: React.FC<BatchMergeModalProps> = ({ open, batches, onClos
     setSaving(true)
     try {
       const result = await batchService.mergeBatches(batches.map(b => b.id))
-      message.success(`Da gop ${batches.length} lo thanh lo ${result.batch_no}`)
+      message.success(`Đã gộp ${batches.length} lô thành lô ${result.batch_no}`)
       onSuccess(result)
       onClose()
     } catch (err: any) {
       console.error('Merge batches error:', err)
-      message.error(err?.message || 'Loi khi gop lo')
+      message.error(dichLoiHeThong(err, 'Lỗi khi gộp lô'))
     } finally {
       setSaving(false)
     }
@@ -123,7 +125,7 @@ const BatchMergeModal: React.FC<BatchMergeModalProps> = ({ open, batches, onClos
 
   const columns = [
     {
-      title: 'Ma lo',
+      title: 'Mã lô',
       dataIndex: 'batch_no',
       key: 'batch_no',
       render: (v: string) => (
@@ -131,12 +133,12 @@ const BatchMergeModal: React.FC<BatchMergeModalProps> = ({ open, batches, onClos
       ),
     },
     {
-      title: 'Khoi luong (kg)',
+      title: 'Khối lượng (kg)',
       key: 'weight',
       align: 'right' as const,
       render: (_: any, r: StockBatch) => (
         <Text style={{ fontFamily: "'JetBrains Mono'" }}>
-          {(r.current_weight || r.initial_weight || 0).toLocaleString('vi-VN')}
+          {fmtKg(r.current_weight || r.initial_weight || 0)}
         </Text>
       ),
     },
@@ -146,7 +148,7 @@ const BatchMergeModal: React.FC<BatchMergeModalProps> = ({ open, batches, onClos
       align: 'right' as const,
       render: (_: any, r: StockBatch) => (
         <Text style={{ fontFamily: "'JetBrains Mono'", color: BRAND_COLOR }}>
-          {r.latest_drc ? `${r.latest_drc}%` : '---'}
+          {r.latest_drc ? fmtPct(r.latest_drc, 2) : '—'}
         </Text>
       ),
     },
@@ -173,14 +175,14 @@ const BatchMergeModal: React.FC<BatchMergeModalProps> = ({ open, batches, onClos
       title={
         <Space>
           <MergeCellsOutlined />
-          <span>Gop lo ({batches.length} lo)</span>
+          <span>Gộp lô ({batches.length} lô)</span>
         </Space>
       }
       open={open}
       onCancel={onClose}
       width={650}
       footer={[
-        <Button key="cancel" onClick={onClose}>Huy</Button>,
+        <Button key="cancel" onClick={onClose}>Hủy</Button>,
         <Button
           key="submit"
           type="primary"
@@ -189,7 +191,7 @@ const BatchMergeModal: React.FC<BatchMergeModalProps> = ({ open, batches, onClos
           disabled={!isValid}
           style={{ background: BRAND_COLOR, borderColor: BRAND_COLOR }}
         >
-          <MergeCellsOutlined /> Xac nhan gop lo
+          <MergeCellsOutlined /> Xác nhận gộp lô
         </Button>,
       ]}
       styles={{ body: { maxHeight: '70vh', overflow: 'auto' } }}
@@ -198,7 +200,7 @@ const BatchMergeModal: React.FC<BatchMergeModalProps> = ({ open, batches, onClos
       {validation.length > 0 && (
         <Alert
           type="error"
-          message="Khong the gop lo"
+          message="Không thể gộp lô"
           description={
             <ul style={{ margin: 0, paddingLeft: 16 }}>
               {validation.map((err, i) => <li key={i}>{err}</li>)}
@@ -226,31 +228,31 @@ const BatchMergeModal: React.FC<BatchMergeModalProps> = ({ open, batches, onClos
           title={
             <Space>
               <CheckCircleOutlined style={{ color: BRAND_COLOR }} />
-              <Text strong>Ket qua gop</Text>
+              <Text strong>Kết quả gộp</Text>
             </Space>
           }
           style={{ background: '#f0fdf4', borderColor: '#86efac' }}
         >
           <Descriptions size="small" column={3}>
-            <Descriptions.Item label="Tong khoi luong">
+            <Descriptions.Item label="Tổng khối lượng">
               <Text strong style={{ fontFamily: "'JetBrains Mono'", fontSize: 16, color: BRAND_COLOR }}>
-                {totalWeight.toLocaleString('vi-VN')} kg
+                {fmtKg(totalWeight)} kg
               </Text>
             </Descriptions.Item>
-            <Descriptions.Item label="DRC trung binh">
+            <Descriptions.Item label="DRC trung bình">
               <Text strong style={{ fontFamily: "'JetBrains Mono'", fontSize: 16, color: BRAND_COLOR }}>
-                {weightedAvgDRC != null ? `${weightedAvgDRC}%` : '---'}
+                {weightedAvgDRC != null ? fmtPct(weightedAvgDRC, 2) : '—'}
               </Text>
             </Descriptions.Item>
             <Descriptions.Item label="Grade">
-              {resultGrade ? <GradeBadge grade={resultGrade} /> : '---'}
+              {resultGrade ? <GradeBadge grade={resultGrade} /> : '—'}
             </Descriptions.Item>
           </Descriptions>
 
           {batches.some(b => b.qc_status === 'warning') && (
             <Alert
               type="warning"
-              message="Co lo o trang thai canh bao — lo gop se can tai kiem"
+              message="Có lô ở trạng thái cảnh báo — lô gộp sẽ cần tái kiểm"
               showIcon
               icon={<WarningOutlined />}
               style={{ marginTop: 8 }}

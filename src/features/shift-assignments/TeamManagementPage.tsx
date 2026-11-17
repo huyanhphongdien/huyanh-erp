@@ -8,6 +8,7 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { shiftTeamService } from '../../services/shiftTeamService'
 import { supabase } from '../../lib/supabase'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import {
   Users, UserPlus, UserMinus, RefreshCw, ChevronDown, ChevronUp,
   AlertCircle, CheckCircle2, Info, Search, X, ArrowRightLeft
@@ -159,7 +160,7 @@ export default function TeamManagementPage() {
       setShowAddModal(null)
     },
     onError: (err: any) => {
-      showToast('error', err.message || 'Lỗi khi thêm nhân viên')
+      showToast('error', dichLoiHeThong(err, 'Lỗi khi thêm nhân viên'))
     }
   })
 
@@ -172,7 +173,7 @@ export default function TeamManagementPage() {
       setConfirmRemove(null)
     },
     onError: (err: any) => {
-      showToast('error', err.message || 'Lỗi khi xóa')
+      showToast('error', dichLoiHeThong(err, 'Lỗi khi xoá nhân viên khỏi đội'))
     }
   })
 

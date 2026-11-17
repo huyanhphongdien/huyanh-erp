@@ -35,6 +35,9 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { App } from 'antd'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate, fmtVnd, fmtVndCompact } from '../../utils/format'
 
 // ============================================================================
 // TYPES
@@ -497,6 +500,7 @@ export const ProjectCreatePage: React.FC = () => {
   const { user } = useAuthStore()
   const [currentStep, setCurrentStep] = useState(1)
   const [form, setForm] = useState<FormData>({ ...INITIAL_FORM })
+  const { message } = App.useApp()
   const [errors, setErrors] = useState<FormErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const [previewCode, setPreviewCode] = useState('DA-2026-???')
@@ -561,6 +565,8 @@ export const ProjectCreatePage: React.FC = () => {
         }
       } catch (err) {
         console.error('[ProjectCreate] Failed to load options:', err)
+        // Trước đây im lặng → các ô chọn loại DA / phụ trách / phòng ban rỗng mà không biết vì sao
+        message.error(dichLoiHeThong(err, 'Không tải được danh sách loại dự án / nhân viên / phòng ban'))
       } finally {
         setLoadingData(false)
       }
@@ -723,7 +729,7 @@ export const ProjectCreatePage: React.FC = () => {
 
     } catch (err: any) {
       console.error('Create project failed:', err)
-      setErrors({ submit: err.message || 'Có lỗi xảy ra khi tạo dự án' })
+      setErrors({ submit: dichLoiHeThong(err, 'Có lỗi xảy ra khi tạo dự án') })
     } finally {
       setSubmitting(false)
     }
@@ -904,7 +910,7 @@ export const ProjectCreatePage: React.FC = () => {
               </FormField>
 
               {/* Tags */}
-              <FormField label="Tags">
+              <FormField label="Nhãn (tag)">
                 <TagInput
                   tags={form.tags}
                   onChange={(tags) => updateForm('tags', tags)}
@@ -990,10 +996,8 @@ export const ProjectCreatePage: React.FC = () => {
                 </div>
                 {parseBudget(form.budget_planned) > 0 && (
                   <p className="text-[12px] text-gray-500 mt-1">
-                    ≈ {parseBudget(form.budget_planned) >= 1e9
-                      ? `${(parseBudget(form.budget_planned) / 1e9).toFixed(1)} tỷ đồng`
-                      : `${(parseBudget(form.budget_planned) / 1e6).toFixed(0)} triệu đồng`
-                    }
+                    {/* fmtVndCompact: "1,5 tỷ" / "350,5 tr" / "500.000 ₫" — bản cũ in "1.5 tỷ" và số < 1 triệu thành "0 triệu" */}
+                    ≈ {fmtVndCompact(parseBudget(form.budget_planned))}
                   </p>
                 )}
               </FormField>
@@ -1148,19 +1152,19 @@ export const ProjectCreatePage: React.FC = () => {
                     <div>
                       <p className="text-[11px] text-gray-400">Bắt đầu</p>
                       <p className="text-[14px] font-medium text-gray-800">
-                        {form.planned_start ? new Date(form.planned_start).toLocaleDateString('vi-VN') : '—'}
+                        {fmtDate(form.planned_start)}
                       </p>
                     </div>
                     <div>
                       <p className="text-[11px] text-gray-400">Kết thúc</p>
                       <p className="text-[14px] font-medium text-gray-800">
-                        {form.planned_end ? new Date(form.planned_end).toLocaleDateString('vi-VN') : '—'}
+                        {fmtDate(form.planned_end)}
                       </p>
                     </div>
                     <div>
                       <p className="text-[11px] text-gray-400">Ngân sách</p>
                       <p className="text-[14px] font-semibold text-gray-800" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                        {parseBudget(form.budget_planned) > 0 ? formatBudget(form.budget_planned) + ' VND' : '—'}
+                        {parseBudget(form.budget_planned) > 0 ? fmtVnd(parseBudget(form.budget_planned)) : '—'}
                       </p>
                     </div>
                     {form.budget_source && (
@@ -1186,7 +1190,7 @@ export const ProjectCreatePage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Briefcase className="w-4 h-4 text-amber-600" />
-                      <span className="text-[12px] text-gray-500 w-16">Sponsor:</span>
+                      <span className="text-[12px] text-gray-500 w-16">Bảo trợ:</span>
                       <span className="text-[14px] font-medium text-gray-800">{selectedSponsor?.full_name || '(chưa chọn)'}</span>
                     </div>
                     {selectedMembers.length > 0 && (

@@ -13,6 +13,8 @@ import {
   CheckCircle2, Clock, TrendingDown, Filter,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { fmtVndCompact, fmtDate as fmtDateStd } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -39,18 +41,10 @@ type FilterMode = 'all' | 'has_debt' | 'no_debt'
 // HELPERS
 // ============================================================================
 
-function fmtMoney(a?: number | null): string {
-  if (!a || a === 0) return '0đ'
-  if (Math.abs(a) >= 1_000_000_000) return `${(a / 1_000_000_000).toFixed(2)} tỷ`
-  if (Math.abs(a) >= 1_000_000) return `${(a / 1_000_000).toFixed(1)} tr`
-  if (Math.abs(a) >= 1_000) return `${(a / 1_000).toFixed(0)}k`
-  return a.toLocaleString('vi-VN') + 'đ'
-}
-
-function fmtDate(s?: string | null): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
+// Tiền VND rút gọn chung (format.ts): "9,33 tỷ" / "350,5 tr" / "12.000 ₫" — trước đây "1.23 tỷ" dấu chấm,
+// "12k", hậu tố 'đ'. Số 0 in "0 ₫".
+const fmtMoney = (a?: number | null): string => fmtVndCompact(a ?? 0)
+const fmtDate = (s?: string | null): string => fmtDateStd(s)
 
 const TYPE_CFG: Record<string, { label: string; icon: string }> = {
   tieu_dien: { label: 'Tiểu điền', icon: '🌿' },
@@ -164,7 +158,7 @@ const SupplierDebtCard: React.FC<{
               )}
             </div>
             <span className={`text-[16px] font-bold font-mono ${hasDebt ? 'text-red-600' : 'text-emerald-600'}`}>
-              {hasDebt ? fmtMoney(data.total_debt) : '0đ'}
+              {hasDebt ? fmtMoney(data.total_debt) : fmtMoney(0)}
             </span>
           </div>
 
@@ -225,22 +219,30 @@ const RubberDebtPage: React.FC = () => {
       setLoading(true)
       setError(null)
 
-      // Query all non-cancelled intakes grouped by supplier
-      const { data: intakes, error: intakeErr } = await supabase
-        .from('rubber_intake_batches')
-        .select(`
-          supplier_id,
-          total_amount,
-          paid_amount,
-          payment_status,
-          status,
-          intake_date,
-          supplier:rubber_suppliers(id, code, name, supplier_type, country)
-        `)
-        .neq('status', 'cancelled')
-        .not('supplier_id', 'is', null)
-
-      if (intakeErr) throw intakeErr
+      // Đọc theo trang: PostgREST trả tối đa 1000 dòng/lần — bảng này tăng mỗi ngày (842 dòng 11/2026),
+      // đọc một phát thì quá 1000 là tổng công nợ NCC thiếu mà không báo.
+      const PAGE = 1000
+      const intakes: any[] = []
+      for (let from = 0; ; from += PAGE) {
+        const { data, error: intakeErr } = await supabase
+          .from('rubber_intake_batches')
+          .select(`
+            supplier_id,
+            total_amount,
+            paid_amount,
+            payment_status,
+            status,
+            intake_date,
+            supplier:rubber_suppliers(id, code, name, supplier_type, country)
+          `)
+          .neq('status', 'cancelled')
+          .not('supplier_id', 'is', null)
+          .order('id')
+          .range(from, from + PAGE - 1)
+        if (intakeErr) throw intakeErr
+        intakes.push(...(data || []))
+        if (!data || data.length < PAGE) break
+      }
 
       // Group by supplier
       const map = new Map<string, SupplierDebt>()
@@ -291,7 +293,7 @@ const RubberDebtPage: React.FC = () => {
       setSuppliers(result)
     } catch (err: unknown) {
       console.error('Lỗi tải công nợ:', err)
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu'))
     } finally {
       setLoading(false)
     }

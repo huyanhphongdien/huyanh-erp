@@ -1,3 +1,6 @@
+// Kit Tailwind tay CŨ — chỉ còn cho các màn HR legacy trong features/* (audit UI 17/11/2026: 32/34 nơi import ở đó).
+// ĐÓNG BĂNG: không thêm component mới vào đây. Màn MỚI dùng antd + src/components/common
+// (PageState, EnumTag, AdvancedDataTable, tableDefaults…) và màu từ src/theme/palette.js.
 export { Button } from './Button'
 export { Input } from './Input'
 export { Select } from './Select'

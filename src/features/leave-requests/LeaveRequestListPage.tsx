@@ -11,18 +11,26 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { App } from 'antd'
 import {
   Plus, RefreshCw, Calendar, FileText,
-  CheckCircle, XCircle, Clock, AlertTriangle, ChevronDown,
+  CheckCircle, XCircle, ChevronDown,
   ChevronUp, Loader2, X, SlidersHorizontal, Building2
 } from 'lucide-react'
 import { leaveRequestService, type LeaveRequest } from '../../services'
 import { useAuthStore } from '../../stores/authStore'
 import { LeaveRequestForm } from './LeaveRequestForm'
+import { approvalStatus, APPROVAL_STATUS_LABELS } from '../attendance/labels'
+import PageState from '../../components/common/PageState'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate, fmtDateTime } from '../../utils/format'
+
+const LEAVE_FILTER_STATUSES = ['pending', 'approved', 'rejected', 'cancelled']
 
 export function LeaveRequestListPage() {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
+  const { modal, message } = App.useApp()
 
   // Phân quyền
   const employeeId = user?.employee_id || ''
@@ -55,7 +63,7 @@ export function LeaveRequestListPage() {
   // Nhân viên: chỉ xem đơn của chính mình
   // Manager: chỉ xem đơn trong phòng ban mình
   // Executive: xem tất cả
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['leave-requests', page, statusFilter, employeeId, userLevel],
     queryFn: () => leaveRequestService.getAll({
       page,
@@ -133,19 +141,26 @@ export function LeaveRequestListPage() {
     })
   }
 
-  const formatDateTime = (dateStr: string | undefined) => {
-    if (!dateStr) return '—'
-    return new Date(dateStr).toLocaleString('vi-VN', {
-      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-    })
-  }
+  const formatDateTime = fmtDateTime
 
-  // Status config
-  const STATUS_CONFIG: Record<string, { label: string; cls: string; icon: any }> = {
-    pending: { label: 'Chờ duyệt', cls: 'bg-amber-100 text-amber-800 border-amber-200', icon: Clock },
-    approved: { label: 'Đã duyệt', cls: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle },
-    rejected: { label: 'Từ chối', cls: 'bg-red-100 text-red-800 border-red-200', icon: XCircle },
-    cancelled: { label: 'Đã hủy', cls: 'bg-gray-100 text-gray-800 border-gray-200', icon: AlertTriangle },
+  // Hủy đơn — xác nhận antd, nêu rõ hệ quả (bản cũ: confirm()/alert() của trình duyệt)
+  const confirmCancel = (req: LeaveRequest) => {
+    modal.confirm({
+      title: 'Hủy đơn nghỉ phép này?',
+      content: `Đơn ${req.request_number} (${fmtDate(req.start_date)} → ${fmtDate(req.end_date)}, ${req.total_days} ngày) sẽ chuyển sang "Đã hủy" và không còn chờ duyệt.`,
+      okText: 'Hủy đơn',
+      cancelText: 'Giữ đơn',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await leaveRequestService.cancel(req.id)
+          queryClient.invalidateQueries({ queryKey: ['leave-requests'] })
+          message.success('Đã hủy đơn')
+        } catch (err) {
+          message.error(dichLoiHeThong(err, 'Không thể hủy đơn'))
+        }
+      },
+    })
   }
 
   const requests = data?.data || []
@@ -228,10 +243,9 @@ export function LeaveRequestListPage() {
                     bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Tất cả trạng thái</option>
-                  <option value="pending">Chờ duyệt</option>
-                  <option value="approved">Đã duyệt</option>
-                  <option value="rejected">Từ chối</option>
-                  <option value="cancelled">Đã hủy</option>
+                  {LEAVE_FILTER_STATUSES.map(s => (
+                    <option key={s} value={s}>{APPROVAL_STATUS_LABELS[s]}</option>
+                  ))}
                 </select>
               </div>
               {hasFilters && (
@@ -254,6 +268,8 @@ export function LeaveRequestListPage() {
             <Loader2 className="w-7 h-7 animate-spin text-blue-500" />
             <span className="mt-2 text-sm text-gray-500">Đang tải...</span>
           </div>
+        ) : error ? (
+          <PageState error={error} onRetry={() => refetch()} />
         ) : requests.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-2xl border">
             <FileText className="w-14 h-14 text-gray-200 mx-auto mb-4" />
@@ -268,7 +284,7 @@ export function LeaveRequestListPage() {
               const emp = req.employee
               const dept = (emp as any)?.department
               const leaveType = req.leave_type
-              const status = STATUS_CONFIG[req.status] || STATUS_CONFIG.pending
+              const status = approvalStatus(req.status)
               const isExpanded = expandedId === req.id
               const showApprovalActions = req.status === 'pending' && canApproveRequest(req)
               const isOwnRequest = req.employee_id === employeeId
@@ -289,7 +305,7 @@ export function LeaveRequestListPage() {
                               <span className="ml-1.5 text-xs text-blue-600 font-normal">(Bạn)</span>
                             )}
                           </h3>
-                          <span className={`px-2 py-0.5 text-[11px] font-bold rounded-full border ${status.cls}`}>
+                          <span className={`px-2 py-0.5 text-[11px] font-bold rounded-full border ${status.badge}`}>
                             {status.label}
                           </span>
                         </div>
@@ -415,16 +431,7 @@ export function LeaveRequestListPage() {
                         {/* Nhân viên có thể hủy đơn pending của mình */}
                         {isOwnRequest && (
                           <button
-                            onClick={async () => {
-                              if (confirm('Bạn có chắc muốn hủy đơn này?')) {
-                                try {
-                                  await leaveRequestService.cancel(req.id)
-                                  queryClient.invalidateQueries({ queryKey: ['leave-requests'] })
-                                } catch (err: any) {
-                                  alert(err.message || 'Không thể hủy đơn. Vui lòng thử lại.')
-                                }
-                              }
-                            }}
+                            onClick={() => confirmCancel(req)}
                             className="flex items-center justify-center gap-1.5 px-4 py-2.5
                               text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl
                               active:bg-amber-100 transition-colors"
@@ -550,7 +557,7 @@ export function LeaveRequestListPage() {
 
               {approveMutation.isError && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-                  {(approveMutation.error as Error)?.message || 'Lỗi khi duyệt đơn'}
+                  {dichLoiHeThong(approveMutation.error, 'Lỗi khi duyệt đơn')}
                 </div>
               )}
 
@@ -620,7 +627,7 @@ export function LeaveRequestListPage() {
 
               {rejectMutation.isError && (
                 <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-                  {(rejectMutation.error as Error)?.message || 'Lỗi khi từ chối đơn'}
+                  {dichLoiHeThong(rejectMutation.error, 'Lỗi khi từ chối đơn')}
                 </div>
               )}
 

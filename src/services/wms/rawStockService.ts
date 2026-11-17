@@ -11,6 +11,8 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { addDaysStr, eachDayStr, vnDayStartTs, vnDayEndTs } from '../../utils/dateVN'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import type { RawRubberType, RawRubberGroup, RawLotSource } from './raw.types'
 
 const num = (v: unknown): number => {
@@ -22,6 +24,16 @@ const numOrNull = (v: unknown): number | null => {
   const n = Number(v)
   return Number.isFinite(n) ? n : null
 }
+
+/**
+ * NGÀY CỦA DB ('YYYY-MM-DD' theo UTC) — CHỈ dùng để so/gom với raw_stock_ledger.txn_date.
+ * DB chạy giờ UTC và tự ghi txn_date = completed_at::date (nhập từ phiếu cân) / current_date (xuất, cân lại,
+ * kiểm kê, mở sổ) → txn_date là ngày UTC, giao dịch 0h–7h sáng VN mang ngày hôm trước. Client so bằng lịch VN
+ * là lệch 1 ngày với chính dòng sổ đó. Lọc cột timestamptz (completed_at…) vẫn theo ngày VN qua vnDayStartTs.
+ * ⚠ Khi có migration đổi txn_date sang ngày VN thì thay hàm này bằng todayVN() (dateVN).
+ */
+const ngayCuaDB = (d: Date = new Date()): string =>
+  `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 
 // ----------------------------------------------------------------------------
 // TYPES (khớp view)
@@ -198,11 +210,13 @@ export interface NhapKhoResult {
   dry_kg: number
 }
 
-/** Mã lỗi hàm DB → câu tiếng Việt cho người dùng */
+/** Mã lỗi hàm DB → câu tiếng Việt cho người dùng.
+ *  Lỗi KHÔNG có mã nghiệp vụ (mất mạng, hết phiên, RLS, trùng khoá…) → dichLoiHeThong
+ *  (trước 17/11/2026 trả nguyên văn tiếng Anh 'Failed to fetch', 'duplicate key…'). */
 export function dichLoiNhapKho(err: unknown): string {
   const msg = String((err as any)?.message ?? err ?? '')
   const m = msg.match(/(THIEU_NGUON|MA_DANG_CHAY_LENH_KHAC|THIEU_MA_LENH|KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|KHONG_CO_QUYEN|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO|LENH_TRONG|KHONG_TIM_THAY_LO|LO_KHAC_NHA_MAY|LO_DA_HET|VUOT_TON|KHONG_TIM_THAY_DONG|LENH_DA_GUI_KY|KHONG_TIM_THAY_LENH|SAI_TRANG_THAI|THIEU_KG_CAN|DA_TRU_SO|BUOC_KHONG_HOP_LE|CAN_LY_DO|DANG_CO_KIEM_KE_MO|KHO_TRONG|KHONG_TIM_THAY_KIEM_KE|CON_LO_CHUA_DEM|DA_DUYET|KY_DA_KHOA|DKL_CHUA_XU_LY|TRA_QUA_LAY|THIEU_ANH|THIEU_CA|CON_PHIEU_CAN_CHO_NHAP|PHIEU_CA_CHUA_MO|PHIEU_CA_DA_KY|THIEU_CO_BANH|DA_CHUYEN_HET|LO_NVL_CHI_SUA_QUA_SO_KHO|THIEU_MA_NVL|MA_KHONG_HOP_LE|THIEU_SO_LO|TRUNG_SO_LO|LO_TP_CHUA_QC|LO_TP_KHONG_DU|KHONG_TIM_THAY_PALLET|PALLET_DANG_O_DAY_CHUYEN|PALLET_TAT|PALLET_CHUA_BI|TRUNG_MA|BI_KHONG_HOP_LE|SO_KHONG_HOP_LE|THIEU_MA)(?::([^\n"]*))?/)
-  if (!m) return msg || 'Lỗi không xác định'
+  if (!m) return dichLoiHeThong(err, 'Thao tác thất bại')
   const chi_tiet = m[2] ? ` (${m[2]})` : ''
   switch (m[1]) {
     case 'KHONG_TIM_THAY_PHIEU': return 'Không tìm thấy phiếu'
@@ -211,7 +225,7 @@ export function dichLoiNhapKho(err: unknown): string {
     case 'THIEU_NHA_MAY': return `Phiếu chưa gắn nhà máy${chi_tiet}`
     case 'DA_NHAP': return `Phiếu đã nhập kho rồi${chi_tiet}`
     case 'KHONG_CO_QUYEN_NHAN': return 'Bạn không có quyền "thủ kho nhận" ở nhà máy này'
-    case 'THIEU_KHO_NVL': return 'Nhà máy chưa có kho nguyên liệu (warehouse type raw)'
+    case 'THIEU_KHO_NVL': return 'Nhà máy chưa có kho loại "Nguyên vật liệu" — nhờ quản trị tạo kho trước'
     case 'LOAI_MU_LA': return `Loại mủ lạ, không nhập được${chi_tiet}`
     case 'THIEU_KHOI_LUONG': return `Thiếu khối lượng${chi_tiet}`
     case 'THIEU_DRC': return `Thiếu DRC, chưa nhập kho được${chi_tiet}`
@@ -267,7 +281,7 @@ export function dichLoiNhapKho(err: unknown): string {
     case 'THIEU_NGUON': return `Chưa chọn nguồn hàng chèn${chi_tiet}`
     case 'MA_DANG_CHAY_LENH_KHAC': return `Mã đang nằm trong lệnh khác${chi_tiet}`
     case 'THIEU_MA_LENH': return `Chưa chọn mã cho lệnh${chi_tiet}`
-    default: return msg
+    default: return dichLoiHeThong(err, 'Thao tác thất bại')
   }
 }
 
@@ -357,8 +371,8 @@ export const rawStockService = {
     let q = supabase.from('v_raw_intake_queue').select('*').order('completed_at', { ascending: false })
     if (opts.facilityId) q = q.eq('facility_id', opts.facilityId)
     if (!opts.includeDone) q = q.eq('da_nhap', false)
-    if (opts.fromDate) q = q.gte('completed_at', opts.fromDate)
-    if (opts.toDate) q = q.lte('completed_at', opts.toDate)
+    if (opts.fromDate) q = q.gte('completed_at', vnDayStartTs(opts.fromDate))   // 'YYYY-MM-DD' = ngày VN
+    if (opts.toDate) q = q.lte('completed_at', vnDayEndTs(opts.toDate))
     q = q.limit(opts.limit ?? 200)
     const { data, error } = await q
     if (error) throw error
@@ -463,8 +477,11 @@ export const rawStockService = {
   },
 
   async getDailyFlow(facilityId: string | null | undefined, days = 14): Promise<RawDailyFlow[]> {
-    const from = new Date(); from.setDate(from.getDate() - (days - 1))
-    const fromStr = from.toISOString().slice(0, 10)
+    // Cột = txn_date ĐÚNG như DB ghi (cùng ngày Sổ kho/báo cáo cân đối hiện), cửa sổ tính theo NGÀY CỦA DB.
+    // Không suy lại theo lịch VN: trước 7h sáng VN, DB chưa thể có dòng mang ngày VN hôm nay → cột "hôm nay"
+    // trống giả, còn giao dịch 0h–7h nằm ở cột hôm trước (xem ngayCuaDB).
+    const denNgay = ngayCuaDB()
+    const fromStr = addDaysStr(denNgay, -(days - 1))
     let q = supabase.from('v_raw_daily_flow').select('*').gte('txn_date', fromStr).order('txn_date')
     if (facilityId) q = q.eq('facility_id', facilityId)
     const { data, error } = await q
@@ -478,9 +495,7 @@ export const rawStockService = {
       byDay.set(r.txn_date, cur)
     }
     const out: RawDailyFlow[] = []
-    for (let i = 0; i < days; i++) {
-      const d = new Date(from); d.setDate(from.getDate() + i)
-      const key = d.toISOString().slice(0, 10)
+    for (const key of eachDayStr(fromStr, denNgay)) {
       out.push(byDay.get(key) ?? { facility_id: facilityId ?? '', txn_date: key, nhap_kho_kg: 0, mo_so_kho_kg: 0, xuat_kho_kg: 0, dieu_chinh_kho_kg: 0, so_dong: 0 })
     }
     return out
@@ -491,11 +506,24 @@ export const rawStockService = {
     dry_kg: number; wet_kg: number; so_lo: number; drc_pct: number | null; tuoi_bq: number | null;
     so_lo_qua_tuoi: number; nhap_hom_nay_kho_kg: number; nhap_hom_nay_so_phieu: number; cho_nhap_so_phieu: number; cho_drc_so_phieu: number
   }> {
-    const [byType, queue, flow] = await Promise.all([
+    const [byType, queue] = await Promise.all([
       this.getBalanceByType(facilityId),
+      // "Hôm nay" = phiếu cân xong từ 0h giờ VN (lọc completed_at qua vnDayStartTs)
       this.getIntakeQueue({ facilityId, includeDone: true, fromDate: new Date().toLocaleDateString('sv-SE') }),
-      this.getDailyFlow(facilityId, 1),
     ])
+    // "Nhập hôm nay": kg khô cộng từ dòng sổ của ĐÚNG các phiếu đếm ở "N phiếu đã nhập". Trước đây kg lấy theo
+    // txn_date = "ngày VN" gõ ở client, mà txn_date do DB ghi theo ngày UTC → phiếu 0h–7h VN được đếm số phiếu
+    // nhưng kg rơi sang ngày hôm trước (trước 7h sáng thẻ ghi 0 t dù đã nhập). Dòng 'in' của phiếu cân = ref_type
+    // 'weighbridge_ticket', ref_id = phiếu (cùng định nghĩa da_nhap của v_raw_intake_queue).
+    const daNhapIds = queue.filter((q) => q.da_nhap).map((q) => q.ticket_id)
+    let nhapHomNayKho = 0
+    if (daNhapIds.length > 0) {
+      const { data: ledger, error: ledgerErr } = await supabase
+        .from('raw_stock_ledger').select('dry_kg')
+        .eq('ref_type', 'weighbridge_ticket').eq('txn_type', 'in').in('ref_id', daNhapIds)
+      if (ledgerErr) throw ledgerErr
+      nhapHomNayKho = Math.round(((ledger ?? []) as any[]).reduce((s, r) => s + num(r.dry_kg), 0) * 100) / 100
+    }
     const wet = byType.reduce((s, r) => s + r.wet_kg, 0)
     const dry = byType.reduce((s, r) => s + r.dry_kg, 0)
     const soLo = byType.reduce((s, r) => s + r.so_lo, 0)
@@ -505,7 +533,7 @@ export const rawStockService = {
       drc_pct: wet > 0 ? Math.round((100 * dry / wet) * 10) / 10 : null,
       tuoi_bq: soLo > 0 ? Math.round(tuoiW / soLo) : null,
       so_lo_qua_tuoi: byType.reduce((s, r) => s + r.so_lo_qua_tuoi, 0),
-      nhap_hom_nay_kho_kg: flow[0]?.nhap_kho_kg ?? 0,
+      nhap_hom_nay_kho_kg: nhapHomNayKho,
       nhap_hom_nay_so_phieu: queue.filter((q) => q.da_nhap).length,
       cho_nhap_so_phieu: queue.filter((q) => !q.da_nhap && q.san_sang).length,
       cho_drc_so_phieu: queue.filter((q) => !q.da_nhap && !q.san_sang).length,

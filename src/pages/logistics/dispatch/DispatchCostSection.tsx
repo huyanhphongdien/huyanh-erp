@@ -11,17 +11,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  AutoComplete, Button, Card, DatePicker, Descriptions, Form, Image, Input, InputNumber, Modal, Popconfirm,
+  Alert, AutoComplete, Button, Card, DatePicker, Descriptions, Form, Image, Input, InputNumber, Modal, Popconfirm,
   Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, Upload, message,
 } from 'antd'
 import type { UploadFile } from 'antd'
 import {
-  CheckCircleOutlined, DeleteOutlined, EditOutlined, FilePdfOutlined, LockOutlined, PaperClipOutlined, PlusOutlined,
+  CheckCircleOutlined, DeleteOutlined, EditOutlined, FilePdfOutlined, PaperClipOutlined, PlusOutlined,
   TableOutlined, UnlockOutlined, UploadOutlined, WalletOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useAuthStore } from '../../../stores/authStore'
+import { isFinanceUser } from '../../../lib/financeAccess'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { DASH, fmtDate as fmtD, fmtDateTime } from '../../../utils/format'
+import PageState from '../../../components/common/PageState'
 import type { DispatchOrder } from '../../../services/logistics/dispatchService'
 import {
   fleetCostService, EXPENSE_KINDS, EXPENSE_KIND_LABELS, HIRE_KIND_LABEL, RECEIPT_ACCEPT, RECEIPT_MAX_BYTES, fmtAmt, fmtMoney,
@@ -31,11 +35,10 @@ import {
 } from '../../../services/logistics/fleetCostService'
 import { FLEET_PR_STATUS_LABELS, type FleetPrStatus } from '../../../services/logistics/fleetPaymentRequestService'
 import { useNavigate } from 'react-router-dom'
-import { AMBER, BRAND_DARK, GOLD, INK_2, Kpi, MONO, OK, thousands } from '../costs/fleetCostUi'
+import { AMBER, BRAND_DARK, GOLD, INK_2, Kpi, MONO, OK, thousands, TripCostTag } from '../costs/fleetCostUi'
 
 const { Text } = Typography
 const toIso = (d?: Dayjs | null) => (d ? d.format('YYYY-MM-DD') : null)
-const fmtD = (iso?: string | null) => (iso ? dayjs(iso).format('DD/MM/YYYY') : '–')
 
 interface Props {
   order: DispatchOrder
@@ -85,6 +88,9 @@ export default function DispatchCostSection({ order }: Props) {
   const [advances, setAdvances] = useState<DriverAdvance[]>([])
   const [routes, setRoutes] = useState<FleetRoute[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState<unknown>(null)
+  // Đã tải thành công ít nhất một lần (trip có thể null hợp lệ — lệnh chưa vào view — nên không dùng `trip` làm cờ)
+  const [loaded, setLoaded] = useState(false)
   const [lastLak, setLastLak] = useState<number | null>(null)
 
   const [tripOpen, setTripOpen] = useState(false)
@@ -107,15 +113,20 @@ export default function DispatchCostSection({ order }: Props) {
   // Khoá sửa khi kế toán đã duyệt HOẶC chuyến đã gom vào đề nghị thanh toán (số tiền đã chép sang phiếu;
   // muốn sửa thì bỏ chuyến khỏi phiếu nháp trước). DB cũng chặn ở trigger.
   const reviewed = trip?.cost_status === 'reviewed' || inPr
-  const canReview = true   // menu VẬN TẢI đã gate theo phòng; duyệt dành cho kế toán/BGĐ (chưa siết thêm ở Đợt 1)
+  // "Kế toán duyệt & khoá" / "Mở lại": CÙNG cửa quyền với nút Duyệt của đề nghị thanh toán
+  // (FleetPaymentRequestDetailPage) — trước 17/11/2026 là `true`, HC-TH nhập liệu bấm nhầm là khoá cả chuyến.
+  const canReview = isFinanceUser(user)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadErr(null)
     try {
       const [res, rs, rate] = await Promise.all([fleetCostService.getTripCost(order.id), fleetCostService.listRoutes(), fleetCostService.lastLakRate()])
       setTrip(res.trip); setExpenses(res.expenses); setAdvances(res.advances); setRoutes(rs); setLastLak(rate)
+      setLoaded(true)
     } catch (e: any) {
-      message.error('Lỗi tải chi phí chuyến: ' + (e?.message || e))
+      // Không để khối hiện "Chưa có khoản chi" giả khi tải hỏng — HC-TH sẽ nhập lại thành trùng.
+      setLoadErr(e)
     } finally {
       setLoading(false)
     }
@@ -150,7 +161,7 @@ export default function DispatchCostSection({ order }: Props) {
       message.success('Đã lưu hành trình')
       setTripOpen(false); load()
     } catch (e: any) {
-      message.error('Lỗi lưu: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi lưu hành trình'))
     } finally { setSaving(false) }
   }
 
@@ -182,32 +193,35 @@ export default function DispatchCostSection({ order }: Props) {
         if (!raw) continue
         try { await fleetCostService.uploadReceipt(saved, raw, order.code) } catch { failed++ }
       }
-      message.success(editing ? 'Đã sửa khoản chi' : 'Đã thêm khoản chi' + (failed ? ` (${failed} chứng từ tải lỗi)` : ''))
+      // Ngoặc đúng chỗ: trước đây khi SỬA khoản chi, số chứng từ tải lỗi bị nuốt mất (chỉ hiện "Đã sửa khoản chi").
+      const okText = editing ? 'Đã sửa khoản chi' : 'Đã thêm khoản chi'
+      if (failed) message.warning(`${okText} — ${failed} chứng từ tải lỗi, tải lại ở cột Chứng từ`)
+      else message.success(okText)
       if (addMore) { setEditing(null); setPendingFiles([]); expForm.setFieldsValue({ description: '', amount: undefined as unknown as number, note: '' }) }
       else setExpOpen(false)
       load()
     } catch (e: any) {
-      message.error('Lỗi lưu khoản chi: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi lưu khoản chi'))
     } finally { setSaving(false) }
   }
   const toggleCounted = async (x: DispatchExpense, counted: boolean) => {
     if (!counted) { openExpense({ ...x, counted: false }); return }   // tắt "được tính" → mở hộp để ghi lý do
     try { await fleetCostService.updateExpense(x.id, { counted: true }); load() }
-    catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi đổi cờ được tính')) }
   }
   const deleteExpense = async (x: DispatchExpense) => {
     try { await fleetCostService.removeExpense(x); message.success('Đã xoá khoản chi'); load() }
-    catch (e: any) { message.error('Lỗi xoá: ' + (e?.message || e)) }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi xoá khoản chi')) }
   }
   const uploadTo = async (x: DispatchExpense, file: File) => {
     setUploadingId(x.id)
     try { await fleetCostService.uploadReceipt(x, file, order.code); load() }
-    catch (e: any) { message.error('Lỗi tải chứng từ: ' + (e?.message || e)) }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi tải chứng từ')) }
     finally { setUploadingId(null) }
   }
   const deleteFile = async (f: DispatchExpenseFile) => {
     try { await fleetCostService.removeReceipt(f); load() }
-    catch (e: any) { message.error('Lỗi xoá chứng từ: ' + (e?.message || e)) }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi xoá chứng từ')) }
   }
 
   // ── Nhập nhanh ────────────────────────────────────────────────────────────
@@ -233,7 +247,7 @@ export default function DispatchCostSection({ order }: Props) {
       message.success(`Đã lưu ${rows.length} khoản chi`)
       setQuickOpen(false); load()
     } catch (e: any) {
-      message.error('Lỗi lưu: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi lưu các khoản chi'))
     } finally { setSaving(false) }
   }
 
@@ -251,13 +265,20 @@ export default function DispatchCostSection({ order }: Props) {
       message.success('Đã ghi tạm ứng')
       setAdvOpen(false); load()
     } catch (e: any) {
-      message.error('Lỗi ghi tạm ứng: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi ghi tạm ứng'))
     } finally { setSaving(false) }
   }
   const deleteAdvance = async (a: DriverAdvance) => {
-    try { await fleetCostService.removeAdvance(a.id); load() }
-    catch (e: any) { message.error('Lỗi xoá: ' + (e?.message || e)) }
+    try { await fleetCostService.removeAdvance(a.id); message.success(`Đã xoá tạm ứng ${a.code}`); load() }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi xoá tạm ứng')) }
   }
+  // Dấu × trên thẻ tạm ứng là xoá hẳn một khoản TIỀN đã chi → hỏi lại, nêu rõ số tiền (trước đây bấm là mất).
+  const confirmDeleteAdvance = (a: DriverAdvance) => Modal.confirm({
+    title: `Xoá tạm ứng ${a.code}?`,
+    content: `${fmtMoney(a.amount, a.currency)} ngày ${fmtD(a.advance_date)}${a.paid_by_name ? ` · ${a.paid_by_name} chi` : ''} — xoá hẳn khỏi sổ tạm ứng, không khôi phục được.`,
+    okText: 'Xoá tạm ứng', okButtonProps: { danger: true }, cancelText: 'Không xoá',
+    onOk: () => deleteAdvance(a),
+  })
 
   // ── Duyệt / khoá ──────────────────────────────────────────────────────────
   const setReviewed = async (next: boolean) => {
@@ -265,7 +286,7 @@ export default function DispatchCostSection({ order }: Props) {
       await fleetCostService.setCostStatus(order.id, next ? 'reviewed' : 'open')
       message.success(next ? 'Đã duyệt và khoá chi phí chuyến' : 'Đã mở lại để sửa')
       load()
-    } catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) }
+    } catch (e: any) { message.error(dichLoiHeThong(e, next ? 'Lỗi duyệt chi phí chuyến' : 'Lỗi mở lại chi phí chuyến')) }
   }
 
   // ── Bảng khoản chi ────────────────────────────────────────────────────────
@@ -284,7 +305,7 @@ export default function DispatchCostSection({ order }: Props) {
     { title: 'Nội dung', key: 'desc', render: (_: unknown, r: Row) => 'hire' in r
       ? <span>{order.hire_company || 'Xe thuê ngoài'} <Text type="secondary" style={{ fontSize: 12 }}>· lấy từ lệnh (sửa ở Sửa lệnh)</Text></span>
       : <div>
-          <div>{r.description || <Text type="secondary">–</Text>}</div>
+          <div>{r.description || <Text type="secondary">{DASH}</Text>}</div>
           {(r.note || (!r.counted && r.uncounted_reason)) && <div style={{ fontSize: 12, color: '#6b7280' }}>{!r.counted && r.uncounted_reason ? `Chưa thông qua: ${r.uncounted_reason}` : r.note}</div>}
         </div> },
     { title: 'Ngày', key: 'date', width: 96, render: (_: unknown, r: Row) => 'hire' in r ? fmtD(order.dispatch_date) : fmtD(r.expense_date) },
@@ -299,7 +320,7 @@ export default function DispatchCostSection({ order }: Props) {
       ? <Tag color="green">có</Tag>
       : <Switch size="small" checked={r.counted} disabled={reviewed} checkedChildren="có" unCheckedChildren="chờ" onChange={(v) => toggleCounted(r, v)} /> },
     { title: 'Chứng từ', key: 'files', width: 210, render: (_: unknown, r: Row) => {
-      if ('hire' in r) return <Text type="secondary">–</Text>
+      if ('hire' in r) return <Text type="secondary">{DASH}</Text>
       const imgs = r.files.filter((f) => (f.mime || '').startsWith('image/'))
       const pdfs = r.files.filter((f) => !(f.mime || '').startsWith('image/'))
       return (
@@ -324,7 +345,7 @@ export default function DispatchCostSection({ order }: Props) {
         </Space>
       )
     } },
-    { title: 'Người nhập', key: 'by', width: 130, render: (_: unknown, r: Row) => 'hire' in r ? '' : <span style={{ fontSize: 12, color: '#6b7280' }}>{r.created_by_name || '–'}<br />{dayjs(r.created_at).format('DD/MM HH:mm')}</span> },
+    { title: 'Người nhập', key: 'by', width: 130, render: (_: unknown, r: Row) => 'hire' in r ? '' : <span style={{ fontSize: 12, color: '#6b7280' }}>{r.created_by_name || DASH}<br />{fmtDateTime(r.created_at)}</span> },
     { title: '', key: 'act', width: 80, render: (_: unknown, r: Row) => 'hire' in r || reviewed ? null : (
       <Space size={0}>
         <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openExpense(r)} />
@@ -347,6 +368,17 @@ export default function DispatchCostSection({ order }: Props) {
   const quickCount = quickRows.filter((r) => r.amount && r.amount > 0).length
   const quickEquiv = quickVnd + (quickRate && quickRate > 0 ? quickLak * quickRate : 0)
   const quickDiff = quickFormTotal != null ? Math.round(quickEquiv - quickFormTotal) : null
+  const hasCost = !!expenses.length || !!(order.is_hired && order.hire_cost)
+
+  // Tải hỏng LẦN ĐẦU (chưa có số nào) → báo lỗi + Thử lại, KHÔNG vẽ khối trống "Chưa có khoản chi" (dễ bị nhập trùng).
+  // Đã có số mà lượt tải lại hỏng (vd sau khi lưu) → giữ nội dung + Modal đang mở, chỉ hiện băng lỗi phía trên.
+  if (loadErr && !loaded) {
+    return (
+      <Card style={{ marginTop: 16 }} title={<span style={{ fontWeight: 700 }}>🧾 Hành trình &amp; chi phí chuyến</span>}>
+        <PageState error={loadErr} onRetry={load} />
+      </Card>
+    )
+  }
 
   return (
     <Card
@@ -354,9 +386,8 @@ export default function DispatchCostSection({ order }: Props) {
       style={{ marginTop: 16 }}
       title={<Space wrap size={8}>
         <span style={{ fontWeight: 700 }}>🧾 Hành trình &amp; chi phí chuyến</span>
-        {trip?.cost_status === 'reviewed'
-          ? <Tag icon={<LockOutlined />} color="green" style={{ margin: 0 }}>Đã duyệt{trip?.cost_reviewed_at ? ` · ${dayjs(trip.cost_reviewed_at).format('DD/MM HH:mm')}` : ''}</Tag>
-          : <Tag color={expenses.length ? 'gold' : 'default'} style={{ margin: 0 }}>{expenses.length ? 'Chờ kế toán duyệt' : 'Chưa nhập chi phí'}</Tag>}
+        <TripCostTag costStatus={trip?.cost_status} nExpenses={expenses.length}
+          suffix={trip?.cost_status === 'reviewed' && trip.cost_reviewed_at ? ` · ${fmtDateTime(trip.cost_reviewed_at)}` : null} />
         {trip?.payment_request_code && (
           <Tag color="geekblue" style={{ margin: 0, cursor: 'pointer', ...MONO }} onClick={() => navigate(`/logistics/costs/payment-requests/${trip.fleet_payment_request_id}`)}>
             ĐNTT {trip.payment_request_code} · {FLEET_PR_STATUS_LABELS[trip.payment_request_status as FleetPrStatus] || trip.payment_request_status}
@@ -372,16 +403,22 @@ export default function DispatchCostSection({ order }: Props) {
         <Button type="primary" icon={<TableOutlined />} onClick={openQuick} disabled={reviewed}>Nhập nhanh cả phiếu</Button>
       </Space>}
     >
+      {!!loadErr && (
+        <Alert type="error" showIcon style={{ marginBottom: 12 }}
+          message="Không tải lại được chi phí chuyến — số dưới đây là của lần tải trước, có thể chưa gồm thay đổi vừa lưu"
+          description={<>{dichLoiHeThong(loadErr, 'Có lỗi khi tải')} · Bấm Thử lại trước khi nhập thêm, kẻo nhập trùng.</>}
+          action={<Button size="small" onClick={load} loading={loading}>Thử lại</Button>} />
+      )}
       <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 5 }} style={{ marginBottom: 14 }} labelStyle={{ fontWeight: 600, fontSize: 12 }}>
         <Descriptions.Item label="Ngày đi">{fmtD(order.dispatch_date)}</Descriptions.Item>
         <Descriptions.Item label="Ngày về">{fmtD(trip?.return_date)}</Descriptions.Item>
-        <Descriptions.Item label="Tổng ngày đi và về"><b>{tripDays ?? '–'}</b></Descriptions.Item>
+        <Descriptions.Item label="Tổng ngày đi và về"><b>{tripDays ?? DASH}</b></Descriptions.Item>
         <Descriptions.Item label="Hành trình" span={2}>{trip?.route_name || <Text type="secondary">chưa ghi</Text>}</Descriptions.Item>
-        <Descriptions.Item label="Km đồng hồ lúc đi"><span style={MONO}>{trip?.odometer_start_km != null ? fmtAmt(trip.odometer_start_km) : '–'}</span></Descriptions.Item>
-        <Descriptions.Item label="Km đồng hồ lúc về"><span style={MONO}>{trip?.odometer_end_km != null ? fmtAmt(trip.odometer_end_km) : '–'}</span></Descriptions.Item>
-        <Descriptions.Item label="Km chuyến"><b style={MONO}>{trip?.trip_km != null ? fmtAmt(trip.trip_km) : '–'}</b></Descriptions.Item>
-        <Descriptions.Item label="Số ngày chuẩn">{trip?.standard_days ?? '–'}</Descriptions.Item>
-        <Descriptions.Item label="Vượt thời gian">{overDays != null ? <b style={{ color: overDays > 0 ? AMBER : OK }}>{overDays > 0 ? `+${overDays} ngày` : 'không'}</b> : '–'}</Descriptions.Item>
+        <Descriptions.Item label="Km đồng hồ lúc đi"><span style={MONO}>{fmtAmt(trip?.odometer_start_km)}</span></Descriptions.Item>
+        <Descriptions.Item label="Km đồng hồ lúc về"><span style={MONO}>{fmtAmt(trip?.odometer_end_km)}</span></Descriptions.Item>
+        <Descriptions.Item label="Km chuyến"><b style={MONO}>{fmtAmt(trip?.trip_km)}</b></Descriptions.Item>
+        <Descriptions.Item label="Số ngày chuẩn">{trip?.standard_days ?? DASH}</Descriptions.Item>
+        <Descriptions.Item label="Vượt thời gian">{overDays != null ? <b style={{ color: overDays > 0 ? AMBER : OK }}>{overDays > 0 ? `+${overDays} ngày` : 'không'}</b> : DASH}</Descriptions.Item>
       </Descriptions>
 
       <Table className="fleet-table" rowKey="id" size="small" pagination={false} columns={columns as any} dataSource={rows} scroll={{ x: 960 }}
@@ -402,7 +439,8 @@ export default function DispatchCostSection({ order }: Props) {
           <Text strong>Tạm ứng gắn chuyến:</Text>
           {advances.length === 0 && <Text type="secondary">chưa có</Text>}
           {advances.map((a) => (
-            <Tag key={a.id} closable={!reviewed} onClose={(e) => { e.preventDefault(); deleteAdvance(a) }} style={{ margin: 0 }}>
+            // Tạm ứng đã vào đề nghị thanh toán thì không xoá ở đây (cùng luật nút xoá ở Sổ chi phí).
+            <Tag key={a.id} closable={!reviewed && !a.fleet_payment_request_id} onClose={(e) => { e.preventDefault(); confirmDeleteAdvance(a) }} style={{ margin: 0 }}>
               <span style={MONO}>{a.code}</span> · {fmtD(a.advance_date)} · <b style={MONO}>{fmtMoney(a.amount, a.currency)}</b>{a.paid_by_name ? ` · ${a.paid_by_name}` : ''}
             </Tag>
           ))}
@@ -412,15 +450,21 @@ export default function DispatchCostSection({ order }: Props) {
           )}
           {!reviewed && <Button size="small" icon={<PlusOutlined />} onClick={openAdvance} disabled={!order.driver_id}>Gắn tạm ứng</Button>}
         </Space>
-        {canReview && (trip?.cost_status === 'reviewed'
-          ? (inPr ? <Text type="secondary" style={{ fontSize: 12 }}>Đã duyệt qua đề nghị thanh toán.</Text> : <Popconfirm title="Mở lại để sửa chi phí chuyến này?" onConfirm={() => setReviewed(false)} okText="Mở lại" cancelText="Huỷ">
-              <Button icon={<UnlockOutlined />}>Mở lại</Button>
-            </Popconfirm>)
+        {trip?.cost_status === 'reviewed'
+          ? (inPr
+            ? <Text type="secondary" style={{ fontSize: 12 }}>Đã duyệt qua đề nghị thanh toán.</Text>
+            : <Tooltip title={canReview ? '' : 'Chỉ kế toán / BGĐ mở lại được'}>
+                <Popconfirm title="Mở lại để sửa chi phí chuyến này?" onConfirm={() => setReviewed(false)} okText="Mở lại" cancelText="Huỷ" disabled={!canReview}>
+                  <Button icon={<UnlockOutlined />} disabled={!canReview}>Mở lại</Button>
+                </Popconfirm>
+              </Tooltip>)
           : inPr
             ? <Text type="secondary" style={{ fontSize: 12 }}>Chuyến đang nằm trong đề nghị thanh toán — duyệt ở phiếu đó.</Text>
-            : <Popconfirm title={`Duyệt ${expenses.length} khoản chi và khoá chuyến này?`} description="Sau khi khoá không sửa/xoá khoản chi và chứng từ được nữa." onConfirm={() => setReviewed(true)} okText="Duyệt & khoá" cancelText="Huỷ" disabled={!expenses.length && !(order.is_hired && order.hire_cost)}>
-              <Button type="primary" icon={<CheckCircleOutlined />} style={expenses.length || (order.is_hired && order.hire_cost) ? { background: GOLD, borderColor: GOLD, color: '#0D2E25', fontWeight: 600 } : undefined} disabled={!expenses.length && !(order.is_hired && order.hire_cost)}>Kế toán duyệt &amp; khoá</Button>
-            </Popconfirm>)}
+            : <Tooltip title={canReview ? '' : 'Chỉ kế toán / BGĐ duyệt & khoá'}>
+                <Popconfirm title={`Duyệt ${expenses.length} khoản chi và khoá chuyến này?`} description="Sau khi khoá không sửa/xoá khoản chi và chứng từ được nữa." onConfirm={() => setReviewed(true)} okText="Duyệt & khoá" cancelText="Huỷ" disabled={!canReview || !hasCost}>
+                  <Button type="primary" icon={<CheckCircleOutlined />} style={canReview && hasCost ? { background: GOLD, borderColor: GOLD, color: '#0D2E25', fontWeight: 600 } : undefined} disabled={!canReview || !hasCost}>Kế toán duyệt &amp; khoá</Button>
+                </Popconfirm>
+              </Tooltip>}
       </div>
 
       {/* ── Modal: hành trình ── */}

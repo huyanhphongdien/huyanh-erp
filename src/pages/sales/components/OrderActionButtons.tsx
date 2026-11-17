@@ -18,6 +18,7 @@ import {
   DollarOutlined,
 } from '@ant-design/icons'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import type { SalesOrder, SalesOrderStatus } from '../../../services/sales/salesTypes'
 import {
   salesPermissions,
@@ -44,7 +45,20 @@ interface ActionDef {
   confirm?: {
     title: string
     description?: string
+    /** Nút đồng ý — ghi rõ hành động (tránh "Hủy đơn hàng?" [Hủy] [Đồng ý] gây nhầm). */
+    okText?: string
+    cancelText?: string
+    danger?: boolean
   }
+}
+
+// Xác nhận huỷ đơn: nêu hệ quả + nút đỏ ghi rõ hành động
+const CANCEL_CONFIRM: ActionDef['confirm'] = {
+  title: 'Hủy đơn hàng?',
+  description: 'Đơn chuyển sang "Đã hủy" và không xử lý tiếp được nữa.',
+  okText: 'Hủy đơn',
+  cancelText: 'Không',
+  danger: true,
 }
 
 // Single source of truth cho tất cả chuyển đổi trạng thái
@@ -60,13 +74,13 @@ const ACTIONS: ActionDef[] = [
     from: 'draft', to: 'cancelled', tab: 'contract', permission: 'canCancelOrder',
     label: 'Hủy', icon: <CloseCircleOutlined />,
     variant: { danger: true },
-    confirm: { title: 'Hủy đơn hàng?' },
+    confirm: CANCEL_CONFIRM,
   },
   {
     from: 'confirmed', to: 'cancelled', tab: 'contract', permission: 'canCancelOrder',
     label: 'Hủy', icon: <CloseCircleOutlined />,
     variant: { danger: true },
-    confirm: { title: 'Hủy đơn hàng?' },
+    confirm: CANCEL_CONFIRM,
   },
   // ── Tab Sản xuất ──
   // NOTE: `confirmed → producing` KHÔNG được flip qua button này.
@@ -90,7 +104,7 @@ const ACTIONS: ActionDef[] = [
     from: 'packing', to: 'shipped', tab: 'shipping', permission: 'canEditBooking',
     label: 'Xuất hàng', icon: <TruckOutlined />,
     variant: { bgColor: '#52c41a' },
-    confirm: { title: 'Xác nhận xuất hàng?', description: 'Hàng đã lên tàu — trạng thái chuyển sang Shipped' },
+    confirm: { title: 'Xác nhận xuất hàng?', description: 'Hàng đã lên tàu — trạng thái chuyển sang "Đã xuất"' },
   },
   {
     from: 'shipped', to: 'delivered', tab: 'shipping', permission: 'canEditBooking',
@@ -133,8 +147,8 @@ export default function OrderActionButtons({ order, salesRole, onSaved, size = '
       }
       message.success('Đã cập nhật trạng thái')
       onSaved()
-    } catch (err: any) {
-      message.error(err?.message || 'Không thể cập nhật trạng thái')
+    } catch (err: unknown) {
+      message.error(dichLoiHeThong(err, 'Không thể cập nhật trạng thái'))
     } finally {
       setLoading(false)
     }
@@ -175,6 +189,9 @@ export default function OrderActionButtons({ order, salesRole, onSaved, size = '
         key={`${a.from}->${a.to}-${idx}`}
         title={a.confirm.title}
         description={a.confirm.description}
+        okText={a.confirm.okText}
+        cancelText={a.confirm.cancelText}
+        okButtonProps={a.confirm.danger ? { danger: true } : undefined}
         onConfirm={() => handleStatus(a.to)}
       >
         {btn}

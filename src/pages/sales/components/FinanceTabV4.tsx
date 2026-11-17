@@ -2,6 +2,9 @@
 // FINANCE TAB v4 — Tab Tài chính trong Detail Panel v4
 // File: src/pages/sales/components/FinanceTabV4.tsx
 // BP Kế toán nhập: tỷ giá, payment, net revenue
+// + ĐẶT CỌC · CHIẾT KHẤU NH · PHÍ NH: MỘT cửa nhập duy nhất là tab này (audit 17/11/2026 — trước
+//   đây tab Vận chuyển cũng sửa được cùng các cột đó, hai bộ phận ghi đè nhau). Tab Vận chuyển
+//   giờ chỉ hiện chỉ-đọc.
 // ============================================================================
 
 import { useState } from 'react'
@@ -27,9 +30,15 @@ import {
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
-import { PAYMENT_TERMS_LABELS, type PaymentTerms } from '../../../services/sales/salesTypes'
-import { fmtMoney, toUsdEquivalent } from '../../../services/sales/salesMoney'
+import {
+  PAYMENT_TERMS_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS,
+  type PaymentTerms, type PaymentStatus,
+} from '../../../services/sales/salesTypes'
+import { fmtMoney, toUsdEquivalent, isVnd, vndInputProps, vndRateError, orderTotalInCurrency } from '../../../services/sales/salesMoney'
+import { salesOrderPaymentService } from '../../../services/sales/salesOrderPaymentService'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
+import { fmtDate, fmtUsd, fmtVndCompact, usdInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import OrderActionButtons from './OrderActionButtons'
 import PaymentHistorySection from './PaymentHistorySection'
 
@@ -37,31 +46,12 @@ import PaymentHistorySection from './PaymentHistorySection'
 // HELPERS
 // ============================================================================
 
-const fmtDate = (d: string | undefined | null) => d ? dayjs(d).format('DD/MM/YYYY') : '—'
+/** USD của tab Tài chính — giữ cent (số dư, phí NH đối chiếu sao kê ngân hàng). */
+const fmtUSD = (v: number | undefined | null) => fmtUsd(v, 2)
 
-const fmtUSD = (v: number | undefined | null) => {
-  if (v == null) return '—'
-  return `$${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
-}
-
-const fmtVND = (v: number | undefined | null) => {
-  if (v == null || v === 0) return '—'
-  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)} tỷ`
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)} tr`
-  return v.toLocaleString('vi-VN') + ' đ'
-}
-
-const PAYMENT_STATUS_OPTIONS = [
-  { value: 'unpaid', label: 'Chưa TT' },
-  { value: 'partial', label: 'TT một phần' },
-  { value: 'paid', label: 'Đã TT đủ' },
-]
-
-const PAYMENT_STATUS_COLORS: Record<string, string> = {
-  unpaid: 'orange',
-  partial: 'blue',
-  paid: 'green',
-}
+// Trạng thái thanh toán: nhãn + màu dùng chung PAYMENT_STATUS_LABELS/COLORS (salesTypes)
+const PAYMENT_STATUS_OPTIONS = (Object.keys(PAYMENT_STATUS_LABELS) as PaymentStatus[])
+  .map((value) => ({ value, label: PAYMENT_STATUS_LABELS[value] }))
 
 // ============================================================================
 // TYPES
@@ -89,7 +79,9 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
   // Tab tài chính tính bằng USD; đơn VNĐ dùng số quy đổi (total_value_usd = vnd ÷ tỷ giá)
   const totalUSD = order.total_value_usd || toUsdEquivalent(order.quantity_tons * order.unit_price, order.currency, order.exchange_rate)
   const exchangeRate = order.exchange_rate || 0
-  const totalVND = exchangeRate > 0 ? totalUSD * exchangeRate : (order.total_value_vnd || 0)
+  const orderIsVnd = isVnd(order.currency)
+  // Đơn VNĐ: số VNĐ trên HĐ là gốc (total_value_vnd), không suy ngược từ USD quy đổi
+  const totalVND = orderIsVnd ? (order.total_value_vnd || 0) : exchangeRate > 0 ? totalUSD * exchangeRate : (order.total_value_vnd || 0)
   const deposit = order.deposit_amount || 0
   const discount = order.discount_amount || 0
   const bankCharges = order.bank_charges || 0
@@ -115,7 +107,12 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
       actual_payment_amount: order.actual_payment_amount,
       bank_charges: order.bank_charges,
       bank_name: order.bank_name,
+      // Đặt cọc (chuyển từ tab Vận chuyển về đây — một cửa nhập)
+      deposit_amount: order.deposit_amount,
+      deposit_date: order.deposit_date ? dayjs(order.deposit_date) : null,
+      deposit_note: order.deposit_note,
       // Chiết khấu · Hoa hồng · Giá (gộp từ bản full-page cũ)
+      discount_bank: order.discount_bank,
       discount_amount: order.discount_amount,
       discount_date: order.discount_date ? dayjs(order.discount_date) : null,
       commission_usd_per_mt: order.commission_usd_per_mt,
@@ -136,29 +133,41 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
       setSaving(true)
 
       const exRate = vals.exchange_rate || 0
+      const rateErr = orderIsVnd ? vndRateError(exRate) : null
+      if (rateErr) { message.error(rateErr); return }
       const discExRate = vals.discount_exchange_rate || 0
       const charges = vals.bank_charges || 0
       const disc = vals.discount_amount || 0
       const commUsdPerMt = vals.commission_usd_per_mt || 0
       const commPct = vals.commission_pct || 0
-      const commTotal = commUsdPerMt > 0 ? (order.quantity_tons || 0) * commUsdPerMt : totalUSD * commPct / 100
 
-      // Recalc
-      const totalVndCalc = exRate > 0 ? totalUSD * exRate : null
-      const dep = order.deposit_amount || 0
-      const netRev = totalUSD - dep - disc - charges - commTotal
+      // Đơn USD: VNĐ = USD × tỷ giá. Đơn VNĐ: GIỮ số VNĐ trên HĐ (lùi về tấn × giá nếu cột trống), USD quy đổi
+      // tính lại theo tỷ giá vừa nhập — nhân ngược USD × tỷ giá mới là đổi trị giá hợp đồng; xoá tỷ giá là mất số VNĐ.
+      const vndBase = orderIsVnd ? orderTotalInCurrency(order) : 0
+      const usdBase = orderIsVnd && vndBase > 0 ? toUsdEquivalent(vndBase, order.currency, exRate) : totalUSD
+      const totalVndCalc = orderIsVnd ? (vndBase > 0 ? vndBase : (order.total_value_vnd ?? null)) : (exRate > 0 ? totalUSD * exRate : null)
+      const usdChanged = orderIsVnd && vndBase > 0 && Math.abs(usdBase - (order.total_value_usd || 0)) > 0.005
+      const commTotal = commUsdPerMt > 0 ? (order.quantity_tons || 0) * commUsdPerMt : usdBase * commPct / 100
+      const dep = vals.deposit_amount || 0
+      const netRev = usdBase - dep - disc - charges - commTotal
 
       const updateData: Record<string, any> = {
         exchange_rate: exRate || null,
         discount_exchange_rate: discExRate || null,
         total_value_vnd: totalVndCalc,
+        ...(usdChanged ? { total_value_usd: usdBase } : {}),
         // ⚠ KHÔNG gửi payment_status / payment_received_date / actual_payment_amount.
         // Ô đã disabled nhưng antd Form vẫn giữ giá trị và vẫn gửi kèm — bỏ khỏi payload
         // mới thật sự đóng đường ghi. Ba cột này do trigger trg_sop_sync_order tính lại
         // từ bảng sales_order_payments; ghi thẳng vào chúng là tạo nguồn sự thật thứ hai.
         bank_charges: charges || null,
         bank_name: vals.bank_name || null,
+        // Đặt cọc
+        deposit_amount: dep || null,
+        deposit_date: vals.deposit_date?.format('YYYY-MM-DD') || null,
+        deposit_note: vals.deposit_note || null,
         // Chiết khấu · Hoa hồng · Giá HĐ (gộp từ bản full-page cũ — dùng cột THẬT)
+        discount_bank: vals.discount_bank || null,
         discount_amount: disc || null,
         discount_date: vals.discount_date?.format('YYYY-MM-DD') || null,
         commission_usd_per_mt: commUsdPerMt || null,
@@ -166,16 +175,18 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
         commission_amount: commTotal || null,
         contract_price: vals.contract_price || null,
         net_revenue: netRev,
-        remaining_amount: totalUSD - dep - disc - charges,
+        remaining_amount: usdBase - dep - disc - charges,
       }
 
       await salesOrderService.updateFields(order.id, updateData)
+      // Mẫu số công nợ (total_value_usd) vừa đổi → tính lại "đã thu đủ" (trigger chỉ chạy khi bảng thu tiền đổi)
+      if (usdChanged) await salesOrderPaymentService.recompute(order.id)
       message.success('Đã cập nhật tài chính')
       setEditing(false)
       onSaved()
     } catch (e: any) {
-      if (e.errorFields) return
-      message.error(e.message || 'Lỗi cập nhật')
+      if (e?.errorFields) return
+      message.error(dichLoiHeThong(e, 'Lỗi cập nhật'))
     } finally {
       setSaving(false)
     }
@@ -204,11 +215,12 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
         {/* Tỷ giá */}
         <SectionHeader title="Tỷ giá" color="#cf1322" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+          {/* Chấm ngăn nghìn như ô tỷ giá ở form tạo đơn (vndInputProps) — trước đây placeholder "25,400" */}
           <Form.Item label="Tỷ giá USD/VND" name="exchange_rate">
-            <InputNumber min={0} step={100} style={{ width: '100%' }} placeholder="VD: 25,400" />
+            <InputNumber min={0} step={100} style={{ width: '100%' }} placeholder="VD: 25.400" {...vndInputProps} />
           </Form.Item>
           <Form.Item label="Tỷ giá CK (chiết khấu)" name="discount_exchange_rate">
-            <InputNumber min={0} step={100} style={{ width: '100%' }} placeholder="VD: 25,350" />
+            <InputNumber min={0} step={100} style={{ width: '100%' }} placeholder="VD: 25.350" {...vndInputProps} />
           </Form.Item>
         </div>
 
@@ -250,7 +262,7 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
             <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" disabled />
           </Form.Item>
           <Form.Item label="Phí NH (USD)" name="bank_charges">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" {...usdInputProps} />
           </Form.Item>
         </div>
 
@@ -258,23 +270,41 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
           <Input placeholder="Tên ngân hàng" />
         </Form.Item>
 
+        {/* Đặt cọc — chuyển từ tab Vận chuyển về đây (một cửa nhập, kế toán giữ số) */}
+        <SectionHeader title="Đặt cọc" color="#722ed1" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+          <Form.Item label="Số tiền đặt cọc (USD)" name="deposit_amount">
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" {...usdInputProps} />
+          </Form.Item>
+          <Form.Item label="Ngày đặt cọc" name="deposit_date">
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+          </Form.Item>
+          <Form.Item label="Ghi chú cọc" name="deposit_note">
+            <Input placeholder="VD: T/T 30% trước giao hàng" />
+          </Form.Item>
+        </div>
+
         {/* Chiết khấu · Hoa hồng · Giá HĐ */}
         <SectionHeader title="Chiết khấu · Hoa hồng · Giá" color="#cf1322" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-          <Form.Item label="Chiết khấu NH (USD)" name="discount_amount">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+          <Form.Item label="NH chiết khấu" name="discount_bank">
+            <Input placeholder="Ngân hàng chiết khấu" />
           </Form.Item>
           <Form.Item label="Ngày chiết khấu" name="discount_date">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
+          <Form.Item label="Chiết khấu NH (USD)" name="discount_amount">
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" {...usdInputProps} />
+          </Form.Item>
           <Form.Item label="Hoa hồng (USD/MT)" name="commission_usd_per_mt" tooltip="Dùng USD/MT HOẶC %, không dùng cả hai.">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD/tấn" />
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD/tấn" {...usdInputProps} />
           </Form.Item>
           <Form.Item label="Hoa hồng (%)" name="commission_pct">
             <InputNumber min={0} max={100} style={{ width: '100%' }} placeholder="%" />
           </Form.Item>
           <Form.Item label="Giá HĐ (contract price)" name="contract_price" tooltip="Giá ký hợp đồng — để so với giá chốt thực tế.">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD/tấn" />
+            <InputNumber min={0} style={{ width: '100%' }} placeholder={isVnd(order.currency) ? '₫/tấn' : 'USD/tấn'}
+              {...(isVnd(order.currency) ? vndInputProps : usdInputProps)} />
           </Form.Item>
         </div>
       </Form>
@@ -349,9 +379,10 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
           {PAYMENT_TERMS_LABELS[order.payment_terms as PaymentTerms] || order.payment_terms || '—'}
         </Descriptions.Item>
         <Descriptions.Item label="Trạng thái">
-          <Tag color={PAYMENT_STATUS_COLORS[order.payment_status || 'unpaid'] || 'default'}>
-            {PAYMENT_STATUS_OPTIONS.find(o => o.value === (order.payment_status || 'unpaid'))?.label || 'Chưa TT'}
-          </Tag>
+          {(() => {
+            const ps = (order.payment_status || 'unpaid') as PaymentStatus
+            return <Tag color={PAYMENT_STATUS_COLORS[ps] || 'default'}>{PAYMENT_STATUS_LABELS[ps] || ps}</Tag>
+          })()}
         </Descriptions.Item>
         <Descriptions.Item label="Ngày tiền về">{fmtDate(order.payment_received_date)}</Descriptions.Item>
         <Descriptions.Item label="Thực nhận">{fmtUSD(order.actual_payment_amount)}</Descriptions.Item>
@@ -361,10 +392,21 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
         </Descriptions.Item>
       </Descriptions>
 
+      {/* Đặt cọc · Chiết khấu NH — nhập ở tab này (bấm Chỉnh sửa); tab Vận chuyển chỉ đọc lại */}
+      <SectionHeader title="Đặt cọc · Chiết khấu NH" color="#722ed1" />
+      <Descriptions column={2} size="small" bordered>
+        <Descriptions.Item label="Đặt cọc">{fmtUSD(order.deposit_amount)}</Descriptions.Item>
+        <Descriptions.Item label="Ngày cọc">{fmtDate(order.deposit_date)}</Descriptions.Item>
+        <Descriptions.Item label="Ghi chú cọc" span={2}>{order.deposit_note || '—'}</Descriptions.Item>
+        <Descriptions.Item label="NH chiết khấu">{order.discount_bank || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Ngày CK">{fmtDate(order.discount_date)}</Descriptions.Item>
+        <Descriptions.Item label="Số tiền CK">{fmtUSD(order.discount_amount)}</Descriptions.Item>
+      </Descriptions>
+
       {/* Bank info đầy đủ (5 fields) — tự sync từ HĐ workflow v10 */}
       {(order.bank_name || order.bank_account || order.bank_swift) && (
         <>
-          <SectionHeader title="🏦 Bank info (auto-sync từ HĐ)" color="#1B4D3E" />
+          <SectionHeader title="🏦 Thông tin ngân hàng (tự đồng bộ từ HĐ)" color="#1B4D3E" />
           <Descriptions column={1} size="small" bordered style={{ fontSize: 11 }}>
             <Descriptions.Item label="Account Name">{order.bank_name || '—'}</Descriptions.Item>
             <Descriptions.Item label="Account No.">{order.bank_account || '—'}</Descriptions.Item>
@@ -412,7 +454,7 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
             <SummaryRow label="Còn lại (sau CK + phí)" value={fmtUSD(remainingAmount)} bold />
             <SummaryRow label="Doanh thu ròng (sau hoa hồng)" value={fmtUSD(netRevenue)} bold color="#1B4D3E" />
             {totalVND > 0 && (
-              <SummaryRow label="Quy đổi VND" value={fmtVND(totalVND)} color="#666" />
+              <SummaryRow label="Quy đổi VND" value={fmtVndCompact(totalVND)} color="#666" />
             )}
           </tbody>
         </table>
@@ -450,9 +492,9 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
                 lcDaysLeft <= 0
                   ? <Tag color="red">Hết hạn</Tag>
                   : lcDaysLeft <= 7
-                  ? <Tag color="red">{fmtDate(order.lc_expiry_date)} ({lcDaysLeft}d)</Tag>
+                  ? <Tag color="red">{fmtDate(order.lc_expiry_date)} (còn {lcDaysLeft} ngày)</Tag>
                   : lcDaysLeft <= 20
-                  ? <Tag color="orange">{fmtDate(order.lc_expiry_date)} ({lcDaysLeft}d)</Tag>
+                  ? <Tag color="orange">{fmtDate(order.lc_expiry_date)} (còn {lcDaysLeft} ngày)</Tag>
                   : <span>{fmtDate(order.lc_expiry_date)}</span>
               ) : '—'}
             </Descriptions.Item>

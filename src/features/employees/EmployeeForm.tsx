@@ -1,8 +1,9 @@
 import { useForm } from 'react-hook-form'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { employeeService, departmentService, positionService } from '../../services'
+import { employeeService, departmentService, positionService, EMPLOYEE_STATUS_LABELS } from '../../services'
 import { Button, Input, Select } from '../../components/ui'
 import { formatHac13Display } from '../../lib/hac13'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import type { Employee } from '../../types'
 
 // Define EmployeeFormData inline - match với employeeService
@@ -167,17 +168,13 @@ export function EmployeeForm({ employee, onSuccess, onCancel }: EmployeeFormProp
         <Select
           label="Trạng thái"
           {...register('status')}
-          options={[
-            { value: 'active', label: 'Đang làm việc' },
-            { value: 'inactive', label: 'Tạm nghỉ' },
-            { value: 'terminated', label: 'Đã nghỉ việc' }
-          ]}
+          options={['active', 'inactive', 'terminated'].map(v => ({ value: v, label: EMPLOYEE_STATUS_LABELS[v] }))}
         />
       </div>
 
       {mutation.error && (
         <p className="text-danger text-sm">
-          {(mutation.error as Error).message}
+          {dichLoiHeThong(mutation.error, 'Lưu nhân viên thất bại')}
         </p>
       )}
 

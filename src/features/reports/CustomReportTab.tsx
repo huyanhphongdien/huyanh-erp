@@ -3,6 +3,7 @@
 // ============================================================
 
 import { useState, useEffect } from 'react'
+import { App } from 'antd'
 import {
   Settings,
   Filter,
@@ -28,6 +29,9 @@ import {
   exportEmployeeReportToExcel,
   exportDepartmentReportToPDF
 } from '../../utils/reportExportUtils'
+import { toDateStrVN } from '../../utils/dateVN'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { DASH, fmtNum, fmtPct } from '../../utils/format'
 
 // ============================================================================
 // TYPES
@@ -86,10 +90,11 @@ const getDefaultDateRange = () => {
   const now = new Date()
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  
+
+  // toDateStrVN: toISOString() của nửa đêm giờ VN là hôm TRƯỚC (UTC) → mặc định cũ ra 31/10 → 29/11
   return {
-    start_date: firstDay.toISOString().split('T')[0],
-    end_date: lastDay.toISOString().split('T')[0]
+    start_date: toDateStrVN(firstDay),
+    end_date: toDateStrVN(lastDay)
   }
 }
 
@@ -98,6 +103,7 @@ const getDefaultDateRange = () => {
 // ============================================================================
 
 export default function CustomReportTab() {
+  const { message } = App.useApp()
   // State
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -225,7 +231,7 @@ export default function CustomReportTab() {
       
     } catch (error) {
       console.error('Error generating report:', error)
-      alert('Có lỗi khi tạo báo cáo. Vui lòng thử lại.')
+      message.error(dichLoiHeThong(error, 'Có lỗi khi tạo báo cáo. Vui lòng thử lại.'))
     } finally {
       setLoading(false)
     }
@@ -237,7 +243,7 @@ export default function CustomReportTab() {
 
   const handleExportExcel = async () => {
     if (!reportData || reportData.rows.length === 0) {
-      alert('Chưa có dữ liệu để xuất')
+      message.warning('Chưa có dữ liệu để xuất')
       return
     }
     
@@ -291,7 +297,7 @@ export default function CustomReportTab() {
       }
     } catch (error) {
       console.error('Export Excel error:', error)
-      alert('Có lỗi khi xuất Excel. Vui lòng thử lại.')
+      message.error(dichLoiHeThong(error, 'Có lỗi khi xuất Excel. Vui lòng thử lại.'))
     } finally {
       setExporting(false)
     }
@@ -299,7 +305,7 @@ export default function CustomReportTab() {
 
   const handleExportPDF = () => {
     if (!reportData || reportData.rows.length === 0) {
-      alert('Chưa có dữ liệu để xuất')
+      message.warning('Chưa có dữ liệu để xuất')
       return
     }
     
@@ -326,7 +332,7 @@ export default function CustomReportTab() {
       })
     } catch (error) {
       console.error('Export PDF error:', error)
-      alert('Có lỗi khi xuất PDF. Vui lòng thử lại.')
+      message.error(dichLoiHeThong(error, 'Có lỗi khi xuất PDF. Vui lòng thử lại.'))
     } finally {
       setExporting(false)
     }
@@ -503,7 +509,7 @@ export default function CustomReportTab() {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-sm text-gray-600">Tỷ lệ HT</p>
-          <p className="text-2xl font-bold text-purple-600">{summary.completion_rate}%</p>
+          <p className="text-2xl font-bold text-purple-600">{fmtPct(summary.completion_rate)}</p>
         </div>
       </div>
     )
@@ -596,14 +602,16 @@ export default function CustomReportTab() {
                               style={{ width: `${Math.min(row[col.key] || 0, 100)}%` }}
                             />
                           </div>
-                          <span className="text-gray-900">{row[col.key]}%</span>
+                          <span className="text-gray-900">{fmtPct(row[col.key])}</span>
                         </div>
                       ) : col.key === 'overdue_count' && row[col.key] > 0 ? (
                         <span className="text-red-600 font-medium">{row[col.key]}</span>
                       ) : col.key === 'finished_tasks' ? (
                         <span className="text-green-600 font-medium">{row[col.key]}</span>
                       ) : (
-                        <span className="text-gray-900">{row[col.key] ?? 'N/A'}</span>
+                        <span className="text-gray-900">
+                          {typeof row[col.key] === 'number' ? fmtNum(row[col.key], 1) : (row[col.key] ?? DASH)}
+                        </span>
                       )}
                     </td>
                   ))}

@@ -4,14 +4,15 @@
 // Features: column filters, date range, sort, export, row expand, status badges
 // ============================================================================
 
-import { useState, useMemo, useCallback } from 'react'
-import { Input, Select, DatePicker, Button, Tag, Tooltip, Space, Typography, Dropdown } from 'antd'
+import { useState, useMemo, useCallback, useRef, useLayoutEffect, Fragment } from 'react'
+import { Input, Select, DatePicker, Button, Tag, Tooltip, Space, Typography, Dropdown, Checkbox } from 'antd'
 import {
   SearchOutlined, DownloadOutlined, FilterOutlined, ClearOutlined,
   SortAscendingOutlined, SortDescendingOutlined, ReloadOutlined,
-  ExpandOutlined, EyeOutlined,
+  ExpandOutlined, EyeOutlined, ColumnHeightOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text } = Typography
 const { RangePicker } = DatePicker
@@ -56,6 +57,14 @@ export interface AdvancedDataTableProps<T = any> {
   emptyText?: string
   statusField?: string
   statusColorMap?: Record<string, { label: string; color: string }>
+  /** Lỗi tải (Error/string/object Supabase) → hiện khối lỗi + nút Thử lại (onRefresh) thay vì "không có dữ liệu" */
+  error?: unknown
+  /** Trang tải tối đa N dòng (vd .limit(500)) → khi chạm trần, chân bảng báo đang hiện N dòng gần nhất */
+  loadLimit?: number
+  /** Header + hàng lọc dính khi cuộn (mặc định bật) */
+  stickyHeader?: boolean
+  /** Khoá lưu cột đang ẩn (localStorage) — mặc định dùng exportFileName */
+  storageKey?: string
 }
 
 // ============================================================================
@@ -88,6 +97,10 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
   emptyText = 'Không có dữ liệu',
   statusField,
   statusColorMap,
+  error,
+  loadLimit,
+  stickyHeader = true,
+  storageKey,
 }: AdvancedDataTableProps<T>) {
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [sortKey, setSortKey] = useState<string | null>(null)
@@ -96,6 +109,22 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [hoveredRow, setHoveredRow] = useState<string | null>(null)
   const [page, setPage] = useState(0)
+  // Ẩn/hiện cột — nhớ theo máy (localStorage), không ảnh hưởng file Excel (xuất đủ cột)
+  const colKey = `adt_cols_${storageKey || exportFileName}`
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(colKey) || '[]')) } catch { return new Set() }
+  })
+  const toggleCol = (k: string) => setHiddenCols(prev => {
+    const n = new Set(prev)
+    if (n.has(k)) n.delete(k); else n.add(k)
+    try { localStorage.setItem(colKey, JSON.stringify([...n])) } catch { /* bỏ qua */ }
+    return n
+  })
+  const shownColumns = useMemo(() => columns.filter(c => !hiddenCols.has(c.key)), [columns, hiddenCols])
+  // Chiều cao hàng tiêu đề → hàng lọc dính ngay dưới nó
+  const headRowRef = useRef<HTMLTableRowElement | null>(null)
+  const [headH, setHeadH] = useState(37)
+  useLayoutEffect(() => { if (headRowRef.current) setHeadH(headRowRef.current.offsetHeight) }, [shownColumns])
 
   const getRowKey = useCallback((record: T) => {
     return typeof rowKey === 'function' ? rowKey(record) : String(record[rowKey])
@@ -159,7 +188,9 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
     const wb = new ExcelJS.Workbook()
     wb.creator = 'Huy Anh ERP'
     // Freeze title (row 1) + header (row 2)
-    const ws = wb.addWorksheet(title || 'Data', { views: [{ state: 'frozen', ySplit: 2 }] })
+    // Tên sheet Excel: tối đa 31 ký tự, cấm [ ] : * ? / \ — tiêu đề dài bị ExcelJS cắt cụt (hở ngoặc) kèm cảnh báo
+    const sheetName = (title || 'Data').replace(/[[\]:*?/\\]/g, ' ').replace(/\s*\(.*$/, '').trim().slice(0, 31) || 'Data'
+    const ws = wb.addWorksheet(sheetName, { views: [{ state: 'frozen', ySplit: 2 }] })
 
     const colCount = columns.length
     const DARK = 'FF1B4D3E'
@@ -311,6 +342,22 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
               <Button size="small" icon={<ClearOutlined />} onClick={clearFilters} danger>Xóa lọc</Button>
             </Tooltip>
           )}
+          {columns.length > 4 && (
+            <Dropdown
+              trigger={['click']}
+              dropdownRender={() => (
+                <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 6px 16px rgba(0,0,0,.12)', padding: 8, maxHeight: 360, overflowY: 'auto' }}>
+                  {columns.map(c => (
+                    <div key={c.key} style={{ padding: '3px 6px' }}>
+                      <Checkbox checked={!hiddenCols.has(c.key)} onChange={() => toggleCol(c.key)}>{c.title || c.key}</Checkbox>
+                    </div>
+                  ))}
+                </div>
+              )}
+            >
+              <Button size="small" icon={<ColumnHeightOutlined />}>Cột{hiddenCols.size ? ` (ẩn ${hiddenCols.size})` : ''}</Button>
+            </Dropdown>
+          )}
           {onRefresh && (
             <Tooltip title="Tải lại">
               <Button size="small" icon={<ReloadOutlined />} onClick={onRefresh} loading={loading} />
@@ -323,15 +370,17 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
       </div>
 
       {/* ═══ TABLE ═══ */}
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+      <div style={{ overflow: 'auto', maxHeight: stickyHeader ? 'max(360px, calc(100vh - 240px))' : undefined }}>
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 800 }}>
           {/* Header */}
           <thead>
-            <tr style={{ background: '#1B4D3E' }}>
-              {expandedRowRender && <th style={{ width: 36, padding: '8px 4px', borderRight: '1px solid rgba(255,255,255,0.15)' }} />}
-              {columns.map(col => (
+            <tr ref={headRowRef} style={{ background: '#1B4D3E' }}>
+              {expandedRowRender && <th style={{ width: 36, padding: '8px 4px', borderRight: '1px solid rgba(255,255,255,0.15)', background: '#1B4D3E', ...(stickyHeader ? { position: 'sticky', top: 0, zIndex: 3 } : {}) }} />}
+              {shownColumns.map(col => (
                 <th key={col.key}
                   style={{
+                    ...(stickyHeader ? { position: 'sticky', top: 0, zIndex: 3 } : {}),
+                    background: '#1B4D3E',
                     padding: '10px 8px', color: '#fff', fontSize: 12, fontWeight: 600,
                     textAlign: (col.align || 'left') as any, whiteSpace: 'nowrap',
                     width: col.width, minWidth: col.minWidth || 60,
@@ -355,9 +404,9 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
 
             {/* Filter row */}
             <tr style={{ background: '#f9fafb', borderBottom: '2px solid #1B4D3E' }}>
-              {expandedRowRender && <td style={{ padding: 4, borderRight: '1px solid #e5e7eb' }} />}
-              {columns.map(col => (
-                <td key={col.key} style={{ padding: '4px 4px', borderRight: '1px solid #e5e7eb' }}>
+              {expandedRowRender && <td style={{ padding: 4, borderRight: '1px solid #e5e7eb', background: '#f9fafb', ...(stickyHeader ? { position: 'sticky', top: headH, zIndex: 2 } : {}) }} />}
+              {shownColumns.map(col => (
+                <td key={col.key} style={{ padding: '4px 4px', borderRight: '1px solid #e5e7eb', background: '#f9fafb', borderBottom: '2px solid #1B4D3E', ...(stickyHeader ? { position: 'sticky', top: headH, zIndex: 2 } : {}) }}>
                   {col.filterable !== false && (
                     col.filterType === 'select' && col.filterOptions ? (
                       <Select
@@ -389,16 +438,22 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
           {/* Body */}
           <tbody>
             {loading ? (
-              <tr><td colSpan={columns.length + (expandedRowRender ? 1 : 0)} style={{ textAlign: 'center', padding: 40, color: '#999' }}>Đang tải...</td></tr>
+              <tr><td colSpan={shownColumns.length + (expandedRowRender ? 1 : 0)} style={{ textAlign: 'center', padding: 40, color: '#999' }}>Đang tải...</td></tr>
+            ) : error ? (
+              <tr><td colSpan={shownColumns.length + (expandedRowRender ? 1 : 0)} style={{ textAlign: 'center', padding: 32, background: '#FEF2F2' }}>
+                <div style={{ fontWeight: 700, color: '#B91C1C' }}>Không tải được dữ liệu</div>
+                <div style={{ fontSize: 12, color: '#7F1D1D', margin: '4px 0 10px' }}>{dichLoiHeThong(error, 'Có lỗi khi tải')}</div>
+                {onRefresh && <Button size="small" icon={<ReloadOutlined />} onClick={onRefresh}>Thử lại</Button>}
+              </td></tr>
             ) : pagedData.length === 0 ? (
-              <tr><td colSpan={columns.length + (expandedRowRender ? 1 : 0)} style={{ textAlign: 'center', padding: 40, color: '#999' }}>{emptyText}</td></tr>
+              <tr><td colSpan={shownColumns.length + (expandedRowRender ? 1 : 0)} style={{ textAlign: 'center', padding: 40, color: '#999' }}>{emptyText}</td></tr>
             ) : (
               pagedData.map((row, idx) => {
                 const key = getRowKey(row)
                 const isExpanded = expandedRows.has(key)
                 return (
-                  <>
-                    <tr key={key}
+                  <Fragment key={key}>
+                    <tr
                       style={{
                         background: hoveredRow === key ? '#f0fdf4' : idx % 2 === 0 ? '#fff' : '#fafafa',
                         cursor: onRowClick || onViewDetail ? 'pointer' : 'default',
@@ -415,13 +470,14 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
                           <span style={{ fontSize: 10, color: '#999', transition: 'transform 0.2s', display: 'inline-block', transform: isExpanded ? 'rotate(90deg)' : 'none' }}>▶</span>
                         </td>
                       )}
-                      {columns.map(col => {
+                      {shownColumns.map(col => {
                         const val = getNestedValue(row, col.dataIndex || col.key)
                         return (
                           <td key={col.key} style={{
                             padding: '8px 8px', fontSize: 12,
                             textAlign: (col.align || 'left') as any,
                             borderRight: '1px solid #f5f5f5',
+                            borderBottom: '1px solid #f0f0f0',   // border-collapse: separate (cho header dính) → viền dòng nằm ở ô
                             maxWidth: col.width || 'auto',
                             overflow: col.ellipsis ? 'hidden' : 'visible',
                             textOverflow: col.ellipsis ? 'ellipsis' : 'clip',
@@ -469,13 +525,13 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
                       )}
                     </tr>
                     {expandedRowRender && isExpanded && (
-                      <tr key={`${key}-expand`}>
-                        <td colSpan={columns.length + 1} style={{ padding: '12px 16px', background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                      <tr>
+                        <td colSpan={shownColumns.length + 1} style={{ padding: '12px 16px', background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
                           {expandedRowRender(row)}
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 )
               })
             )}
@@ -485,7 +541,14 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
 
       {/* ═══ FOOTER ═══ */}
       <div style={{ padding: '8px 16px', borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafafa', fontSize: 12, color: '#888' }}>
-        <span>Hiện {pagedData.length} / {filteredData.length} dòng</span>
+        <span>
+          Hiện {pagedData.length} / {filteredData.length} dòng
+          {loadLimit && dataSource.length >= loadLimit && (
+            <span style={{ color: '#B45309', fontWeight: 600, marginLeft: 8 }}>
+              · Đang hiện {loadLimit.toLocaleString('vi-VN')} dòng gần nhất — lọc theo ngày/điều kiện để xem dòng cũ hơn
+            </span>
+          )}
+        </span>
         {hasMore && (
           <Button size="small" type="link" onClick={() => setPage(p => p + 1)}>
             Xem thêm {Math.min(pageSize, filteredData.length - pagedData.length)} dòng

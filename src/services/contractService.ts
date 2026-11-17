@@ -1,4 +1,20 @@
 import { supabase } from '../lib/supabase'
+import { toDateStrVN } from '../utils/dateVN'
+
+/** Trạng thái hợp đồng LAO ĐỘNG (bảng contracts) — MỘT nguồn cho Sổ HĐLĐ, bộ lọc và form.
+ *  (Khác CONTRACT_STATUS_LABELS của hợp đồng BÁN ở pages/sales.) */
+export const LABOR_CONTRACT_STATUS_LABELS: Record<string, string> = {
+  active: 'Đang hiệu lực',
+  expired: 'Hết hạn',
+  terminated: 'Đã chấm dứt',
+  renewed: 'Đã gia hạn',
+}
+export const LABOR_CONTRACT_STATUS_COLORS: Record<string, string> = {
+  active: 'green',
+  expired: 'orange',
+  terminated: 'red',
+  renewed: 'blue',
+}
 
 // Define types inline
 interface Contract {
@@ -23,7 +39,7 @@ interface ContractFormData {
   contract_type_id: string
   contract_number: string
   start_date: string
-  end_date?: string
+  end_date?: string | null   // null = HĐ không thời hạn ('' vào cột date là Postgres từ chối)
   salary?: number
   allowances?: number
   benefits?: string
@@ -201,8 +217,9 @@ export const contractService = {
       `)
       .eq('status', 'active')
       .not('end_date', 'is', null)
-      .gte('end_date', today.toISOString().split('T')[0])
-      .lte('end_date', futureDate.toISOString().split('T')[0])
+      // toDateStrVN: ngày theo giờ VN — toISOString (UTC) lùi 1 ngày trước 7h sáng
+      .gte('end_date', toDateStrVN(today))
+      .lte('end_date', toDateStrVN(futureDate))
       .order('end_date', { ascending: true })
 
     if (error) throw error

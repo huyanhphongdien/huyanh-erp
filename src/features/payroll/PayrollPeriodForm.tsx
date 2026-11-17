@@ -1,8 +1,10 @@
 import { useForm } from 'react-hook-form'
 import { useMutation } from '@tanstack/react-query'
-import { payrollService } from '../../services'
+import { payrollService, PAYROLL_PERIOD_STATUS_LABELS, PAYROLL_PERIOD_STATUS_COLORS } from '../../services'
 import { useAuthStore } from '../../stores/authStore'
 import { Button, Input } from '../../components/ui'
+import { EnumTag } from '../../components/common/EnumTag'
+import { fmtVnd, fmtDate } from '../../utils/format'
 import type { PayrollPeriod, PayrollPeriodFormData } from '../../types'
 
 interface Props {
@@ -52,9 +54,7 @@ export function PayrollPeriodForm({ initialData, onSuccess, onCancel }: Props) {
     onSuccess
   })
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value)
-  }
+  const formatCurrency = fmtVnd
 
   // View mode for existing period
   if (initialData) {
@@ -79,19 +79,22 @@ export function PayrollPeriodForm({ initialData, onSuccess, onCancel }: Props) {
           </div>
           <div>
             <label className="text-sm text-gray-500">Tổng lương</label>
-            <p className="font-medium text-green-600">{formatCurrency(initialData.total_amount ?? 0)}</p>
+            <p className="font-medium text-green-600">{formatCurrency(initialData.total_amount)}</p>
           </div>
           <div>
             <label className="text-sm text-gray-500">Trạng thái</label>
-            <p className="font-medium capitalize">{initialData.status}</p>
+            {/* Bản cũ in thẳng mã tiếng Anh ('processing') */}
+            <p className="font-medium">
+              <EnumTag value={initialData.status} labels={PAYROLL_PERIOD_STATUS_LABELS} colors={PAYROLL_PERIOD_STATUS_COLORS} />
+            </p>
           </div>
           <div>
             <label className="text-sm text-gray-500">Từ ngày</label>
-            <p className="font-medium">{new Date(initialData.start_date).toLocaleDateString('vi-VN')}</p>
+            <p className="font-medium">{fmtDate(initialData.start_date)}</p>
           </div>
           <div>
             <label className="text-sm text-gray-500">Đến ngày</label>
-            <p className="font-medium">{new Date(initialData.end_date).toLocaleDateString('vi-VN')}</p>
+            <p className="font-medium">{fmtDate(initialData.end_date)}</p>
           </div>
         </div>
         {initialData.notes && (

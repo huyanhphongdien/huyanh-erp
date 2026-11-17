@@ -23,6 +23,7 @@ import {
   Statistic,
   Row,
   Col,
+  Alert,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -120,7 +121,7 @@ const PickupLocationSettingsPage = () => {
         setLocations(prev =>
           prev.map(l => (l.value === editingLocation.value ? { ...l, ...values } : l))
         )
-        message.success('Đã cập nhật địa điểm')
+        message.success('Đã sửa địa điểm (chỉ trong phiên này — CHƯA lưu)')
       } else {
         // Check duplicate
         if (locations.some(l => l.value === values.value || l.code === values.code)) {
@@ -128,7 +129,7 @@ const PickupLocationSettingsPage = () => {
           return
         }
         setLocations(prev => [...prev, values])
-        message.success('Đã thêm địa điểm mới')
+        message.success('Đã thêm địa điểm (chỉ trong phiên này — CHƯA lưu)')
       }
       setModalOpen(false)
       form.resetFields()
@@ -140,7 +141,7 @@ const PickupLocationSettingsPage = () => {
   // Handle delete
   const handleDelete = (location: PickupLocation) => {
     setLocations(prev => prev.filter(l => l.value !== location.value))
-    message.success('Đã xóa địa điểm')
+    message.success('Đã ẩn địa điểm (chỉ trong phiên này — CHƯA lưu)')
   }
 
   // Country color mapping
@@ -154,7 +155,7 @@ const PickupLocationSettingsPage = () => {
   // Table columns
   const columns: ColumnsType<PickupLocation> = [
     {
-      title: 'Ma',
+      title: 'Mã',
       dataIndex: 'code',
       key: 'code',
       width: 120,
@@ -190,7 +191,7 @@ const PickupLocationSettingsPage = () => {
       onFilter: (value, record) => record.country === value,
     },
     {
-      title: 'DRC du kien (%)',
+      title: 'DRC dự kiến (%)',
       dataIndex: 'default_drc',
       key: 'default_drc',
       width: 140,
@@ -220,12 +221,13 @@ const PickupLocationSettingsPage = () => {
             size="small"
             onClick={() => openModal(record)}
           />
+          {/* Khớp toast "Đã ẩn…" + Alert đầu trang: chỉ ẩn trong phiên, chưa lưu — KHÔNG phải xoá vĩnh viễn */}
           <Popconfirm
-            title="Xoa dia diem nay?"
-            description="Hành động này không thể hoàn tác"
+            title="Ẩn địa điểm này khỏi danh sách?"
+            description="Chỉ ẩn trong phiên đang mở, chưa lưu vào hệ thống — tải lại trang thì địa điểm hiện lại."
             onConfirm={() => handleDelete(record)}
-            okText="Xoa"
-            cancelText="Huy"
+            okText="Ẩn"
+            cancelText="Huỷ"
             okButtonProps={{ danger: true }}
           >
             <Button type="text" danger icon={<DeleteOutlined />} size="small" />
@@ -238,9 +240,9 @@ const PickupLocationSettingsPage = () => {
   // Country tabs
   const countryTabs = [
     { key: 'all', label: 'Tất cả' },
-    { key: 'vietnam', label: `${COUNTRY_FLAGS.vietnam} Viet Nam` },
-    { key: 'laos', label: `${COUNTRY_FLAGS.laos} Lao` },
-    { key: 'thailand', label: `${COUNTRY_FLAGS.thailand} Thai Lan` },
+    { key: 'vietnam', label: `${COUNTRY_FLAGS.vietnam} Việt Nam` },
+    { key: 'laos', label: `${COUNTRY_FLAGS.laos} Lào` },
+    { key: 'thailand', label: `${COUNTRY_FLAGS.thailand} Thái Lan` },
     { key: 'cambodia', label: `${COUNTRY_FLAGS.cambodia} Campuchia` },
   ]
 
@@ -250,12 +252,23 @@ const PickupLocationSettingsPage = () => {
       <div style={{ marginBottom: 24 }}>
         <Title level={3} style={{ margin: 0 }}>
           <EnvironmentOutlined style={{ marginRight: 8 }} />
-          Dia diem chot hang
+          Địa điểm chốt hàng
         </Title>
         <Text type="secondary">
-          Quan ly danh sach dia diem chot hang va DRC du kien theo vung
+          Danh sách địa điểm chốt hàng và DRC dự kiến theo vùng
         </Text>
       </div>
+
+      {/* Trang này CHƯA nối CSDL: danh sách lấy từ cấu hình cố định (constants/pickupLocations.ts);
+          thêm/sửa/xoá chỉ đổi trong phiên đang mở, tải lại trang là mất. Trước đây toast báo "Đã cập nhật"
+          như thể đã lưu (audit 17/11/2026). */}
+      <Alert
+        type="warning"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message="Danh sách này chưa được lưu vào hệ thống"
+        description="Địa điểm lấy từ cấu hình cố định trong phần mềm. Thêm / sửa / xoá ở đây chỉ có tác dụng trong phiên đang mở — tải lại trang sẽ mất. Cần đổi danh sách thật thì báo bộ phận IT."
+      />
 
       {/* Stats */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
@@ -294,7 +307,7 @@ const PickupLocationSettingsPage = () => {
         {/* Toolbar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
           <Input
-            placeholder="Tìm kiếm dia diem..."
+            placeholder="Tìm kiếm địa điểm..."
             prefix={<SearchOutlined />}
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
@@ -322,7 +335,7 @@ const PickupLocationSettingsPage = () => {
           columns={columns}
           dataSource={filteredLocations}
           rowKey="value"
-          pagination={{ pageSize: 20, showTotal: (total) => `${total} dia diem` }}
+          pagination={{ pageSize: 20, showTotal: (total) => `${total} địa điểm` }}
           size="middle"
         />
       </Card>
@@ -336,8 +349,8 @@ const PickupLocationSettingsPage = () => {
           setModalOpen(false)
           form.resetFields()
         }}
-        okText={editingLocation ? 'Cập nhật' : 'Them'}
-        cancelText="Huy"
+        okText={editingLocation ? 'Cập nhật' : 'Thêm'}
+        cancelText="Huỷ"
         width={520}
         destroyOnHidden
       >
@@ -356,8 +369,8 @@ const PickupLocationSettingsPage = () => {
             <Col span={12}>
               <Form.Item
                 name="value"
-                label="Gia tri (value)"
-                rules={[{ required: true, message: 'Nhập value' }]}
+                label="Giá trị (mã value)"
+                rules={[{ required: true, message: 'Nhập giá trị' }]}
               >
                 <Input placeholder="VD: phong_dien" disabled={!!editingLocation} />
               </Form.Item>
@@ -369,7 +382,7 @@ const PickupLocationSettingsPage = () => {
             label="Tên hiển thị"
             rules={[{ required: true, message: 'Nhập tên' }]}
           >
-            <Input placeholder="VD: Phong Dien, Hue" />
+            <Input placeholder="VD: Phong Điền, Huế" />
           </Form.Item>
 
           <Row gutter={16}>
@@ -390,7 +403,7 @@ const PickupLocationSettingsPage = () => {
             <Col span={12}>
               <Form.Item
                 name="region"
-                label="Vung / Tinh"
+                label="Vùng / Tỉnh"
                 rules={[{ required: true, message: 'Nhập vùng' }]}
               >
                 <Input placeholder="VD: hue, quang_tri" />
@@ -400,19 +413,19 @@ const PickupLocationSettingsPage = () => {
 
           <Form.Item
             name="default_drc"
-            label="DRC du kien (%)"
+            label="DRC dự kiến (%)"
             rules={[
-              { required: true, message: 'Nhap DRC' },
-              { type: 'number', min: 1, max: 100, message: 'DRC tu 1-100%' },
+              { required: true, message: 'Nhập DRC' },
+              { type: 'number', min: 1, max: 100, message: 'DRC từ 1–100%' },
             ]}
-            tooltip="DRC trung binh cua vung — se tu dong dien khi dai ly chon dia diem"
+            tooltip="DRC trung bình của vùng — sẽ tự động điền khi đại lý chọn địa điểm"
           >
             <InputNumber<number>
               style={{ width: '100%' }}
               min={1}
               max={100}
               step={0.5}
-              placeholder="VD: 32.0"
+              placeholder="VD: 32"
               suffix="%"
             />
           </Form.Item>

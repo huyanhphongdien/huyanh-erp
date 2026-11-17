@@ -7,7 +7,8 @@
 // ============================================================================
 
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import {
   Calendar, User, FileText, Clock, Loader2,
@@ -15,6 +16,14 @@ import {
 } from 'lucide-react'
 import { leaveRequestService, leaveTypeService, employeeService } from '../../services'
 import { useAuthStore } from '../../stores/authStore'
+import { EmployeePicker } from '../employees/EmployeePicker'
+import { approvalStatus } from '../attendance/labels'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+
+// Icon theo trạng thái (nhãn + màu lấy từ attendance/labels — một nguồn)
+const READONLY_STATUS_ICON: Record<string, any> = {
+  pending: Clock, approved: CheckCircle, rejected: XCircle, cancelled: AlertTriangle,
+}
 
 interface LeaveRequestFormData {
   employee_id: string
@@ -77,7 +86,7 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
   const ownName = initialData?.employee?.full_name || user?.full_name || user?.email || ''
   const ownCode = initialData?.employee?.code || user?.employee_code || ''
 
-  const { register, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm<LeaveRequestFormData>({
+  const { register, control, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm<LeaveRequestFormData>({
     defaultValues: initialData ? {
       employee_id: initialData.employee_id || '',
       leave_type_id: initialData.leave_type_id || '',
@@ -127,6 +136,9 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
   const isBusinessTrip = !!(leaveTypes || []).find(
     (t: any) => t.id === selectedLeaveTypeId && t.code === 'BUSINESS_TRIP'
   )
+  // Công tác chỉ còn MỘT cửa nhập: màn Đơn công tác (/attendance/business-trips) — cùng
+  // leaveRequestService.createBusinessTrips. Không cho chọn ở form nghỉ phép nữa.
+  const leaveTypeOptions = (leaveTypes || []).filter((t: any) => t.code !== 'BUSINESS_TRIP')
 
   // Tính số ngày nghỉ tự động
   const startDate = watch('start_date')
@@ -168,19 +180,13 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
   const isReadOnly = viewOnly || (initialData && initialData.status !== 'pending')
 
   if (initialData && isReadOnly) {
-    const statusConfig: Record<string, { label: string; icon: any; cls: string }> = {
-      pending:   { label: 'Chờ duyệt', icon: Clock, cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-      approved:  { label: 'Đã duyệt', icon: CheckCircle, cls: 'bg-green-50 text-green-700 border-green-200' },
-      rejected:  { label: 'Từ chối', icon: XCircle, cls: 'bg-red-50 text-red-700 border-red-200' },
-      cancelled: { label: 'Đã hủy', icon: AlertTriangle, cls: 'bg-gray-50 text-gray-700 border-gray-200' },
-    }
-    const status = statusConfig[initialData.status] || statusConfig.pending
-    const StatusIcon = status.icon
+    const status = approvalStatus(initialData.status)
+    const StatusIcon = READONLY_STATUS_ICON[initialData.status] || Clock
 
     return (
       <div className="space-y-4 sm:space-y-5">
         {/* Status badge */}
-        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border ${status.cls}`}>
+        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border ${status.soft}`}>
           <StatusIcon className="w-5 h-5 flex-shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-semibold">{status.label}</p>
@@ -335,19 +341,22 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
           Nhân viên <span className="text-red-500">*</span>
         </label>
         {canPickEmployee ? (
-          <select
-            {...register('employee_id', { required: 'Vui lòng chọn nhân viên' })}
-            className={`w-full px-4 py-3.5 sm:py-3 border rounded-xl text-[15px] sm:text-sm
-              bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-              ${errors.employee_id ? 'border-red-300' : 'border-gray-300'}`}
-          >
-            <option value="">-- Chọn nhân viên --</option>
-            {(employees?.data || []).map(e => (
-              <option key={e.id} value={e.id}>
-                {e.code} - {e.full_name}
-              </option>
-            ))}
-          </select>
+          // Gõ tên/mã để tìm (không dấu cũng được) — thay <select> native 1000 dòng
+          <Controller
+            name="employee_id"
+            control={control}
+            rules={{ required: 'Vui lòng chọn nhân viên' }}
+            render={({ field }) => (
+              <EmployeePicker
+                employees={employees?.data || []}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                invalid={!!errors.employee_id}
+                size="large"
+              />
+            )}
+          />
         ) : (
           <>
             <input
@@ -380,7 +389,7 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
             ${errors.leave_type_id ? 'border-red-300' : 'border-gray-300'}`}
         >
           <option value="">-- Chọn loại nghỉ --</option>
-          {(leaveTypes || []).map(t => (
+          {leaveTypeOptions.map(t => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
@@ -390,6 +399,13 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
             {errors.leave_type_id.message}
           </p>
         )}
+        <p className="text-xs text-gray-500 flex items-center gap-1">
+          <Briefcase className="w-3 h-3 flex-shrink-0" />
+          <span>
+            Đi công tác không tạo ở đây — Trưởng/Phó phòng gán ở màn{' '}
+            <Link to="/attendance/business-trips" className="font-medium text-blue-600 underline">Đơn công tác</Link>.
+          </span>
+        </p>
       </div>
 
       {/* ★ Trường công tác — chỉ hiện khi loại = Công tác */}
@@ -547,7 +563,7 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
             <div className="text-sm text-red-700">
               <p className="font-semibold">Có lỗi xảy ra</p>
               <p className="text-xs mt-0.5">
-                {(mutation.error as Error)?.message || 'Không thể tạo đơn nghỉ phép'}
+                {dichLoiHeThong(mutation.error, 'Không thể tạo đơn nghỉ phép')}
               </p>
             </div>
           </div>

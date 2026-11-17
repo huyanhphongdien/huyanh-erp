@@ -12,6 +12,12 @@ import {
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS } from '../../types'
+import { TASK_PRIORITY_TAG_COLORS, taskPriorityLabel } from '../../features/tasks/taskUi'
+import PageState from '../../components/common/PageState'
+import { LimitNotice } from '../../components/common/tableDefaults'
+import { fmtDateShort } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text, Title } = Typography
 
@@ -49,19 +55,20 @@ interface Employee {
 // COLUMN CONFIG
 // ============================================================================
 
+// Nhãn cột đọc từ TASK_STATUS_LABELS (types/index.ts) — màu cột là của riêng bảng Kanban
 const COLUMNS = [
-  { key: 'draft', label: 'Nháp', color: '#8c8c8c', bgColor: '#f5f5f5', borderColor: '#d9d9d9' },
-  { key: 'in_progress', label: 'Đang làm', color: '#1890ff', bgColor: '#e6f7ff', borderColor: '#91d5ff' },
-  { key: 'paused', label: 'Tạm dừng', color: '#faad14', bgColor: '#fffbe6', borderColor: '#ffe58f' },
-  { key: 'finished', label: 'Hoàn thành', color: '#52c41a', bgColor: '#f6ffed', borderColor: '#b7eb8f' },
+  { key: 'draft', label: TASK_STATUS_LABELS.draft, color: '#8c8c8c', bgColor: '#f5f5f5', borderColor: '#d9d9d9' },
+  { key: 'in_progress', label: TASK_STATUS_LABELS.in_progress, color: '#1890ff', bgColor: '#e6f7ff', borderColor: '#91d5ff' },
+  { key: 'paused', label: TASK_STATUS_LABELS.paused, color: '#faad14', bgColor: '#fffbe6', borderColor: '#ffe58f' },
+  { key: 'finished', label: TASK_STATUS_LABELS.finished, color: '#52c41a', bgColor: '#f6ffed', borderColor: '#b7eb8f' },
 ]
 
-const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
-  low: { label: 'Thấp', color: 'default' },
-  medium: { label: 'TB', color: 'blue' },
-  high: { label: 'Cao', color: 'orange' },
-  urgent: { label: 'Gấp', color: 'red' },
-}
+// Ưu tiên: nhãn + màu từ MỘT nguồn (bản cũ rút "TB"/"Gấp" lệch với "Trung bình"/"Khẩn cấp" mọi nơi khác)
+const PRIORITY_OPTIONS = (Object.keys(TASK_PRIORITY_LABELS) as (keyof typeof TASK_PRIORITY_LABELS)[])
+  .map(value => ({ value, label: TASK_PRIORITY_LABELS[value] }))
+
+// Bảng tải một cục tối đa N việc gốc (cập nhật gần nhất trước)
+const KANBAN_LIMIT = 100
 
 // ============================================================================
 // HELPERS
@@ -76,15 +83,7 @@ function isOverdue(dueDate: string | null, status: string): boolean {
   return due < today
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return ''
-  try {
-    const d = new Date(dateStr)
-    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-  } catch {
-    return ''
-  }
-}
+const formatDate = fmtDateShort
 
 // ============================================================================
 // KANBAN CARD COMPONENT
@@ -100,7 +99,10 @@ function KanbanCard({
   onClick: (taskId: string) => void
 }) {
   const overdue = isOverdue(task.due_date, task.status)
-  const priorityCfg = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium
+  const priorityCfg = {
+    label: taskPriorityLabel(task.priority),
+    color: TASK_PRIORITY_TAG_COLORS[task.priority] || 'default',
+  }
   const assigneeName = task.assignee?.full_name || ''
 
   return (
@@ -287,6 +289,8 @@ export default function TaskKanbanPage() {
   const navigate = useNavigate()
   const [tasks, setTasks] = useState<KanbanTask[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải — trước đây chỉ toast rồi vẽ "Không có công việc nào" như thật
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [updating, setUpdating] = useState(false)
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
@@ -327,7 +331,7 @@ export default function TaskKanbanPage() {
         .in('status', ['draft', 'in_progress', 'paused', 'finished'])
         .is('parent_task_id', null)
         .order('updated_at', { ascending: false })
-        .limit(100)
+        .limit(KANBAN_LIMIT)
 
       if (filterDept) query = query.eq('department_id', filterDept)
       if (filterAssignee) query = query.eq('assignee_id', filterAssignee)
@@ -370,8 +374,9 @@ export default function TaskKanbanPage() {
       }
 
       setTasks(normalized)
+      setLoadError(null)
     } catch (err: any) {
-      message.error('Không thể tải danh sách công việc')
+      setLoadError(err)
       console.error('Kanban load error:', err)
     }
     setLoading(false)
@@ -438,7 +443,7 @@ export default function TaskKanbanPage() {
       setTasks(prev => prev.map(t =>
         t.id === taskId ? { ...t, status: task.status } : t
       ))
-      message.error('Không thể cập nhật trạng thái')
+      message.error(dichLoiHeThong(err, 'Không thể cập nhật trạng thái'))
       console.error('Kanban drop error:', err)
     }
 
@@ -496,15 +501,11 @@ export default function TaskKanbanPage() {
             style={{ minWidth: 110 }}
             value={filterPriority}
             onChange={setFilterPriority}
-            options={[
-              { value: 'low', label: 'Thấp' },
-              { value: 'medium', label: 'Trung bình' },
-              { value: 'high', label: 'Cao' },
-              { value: 'urgent', label: 'Gấp' },
-            ]}
+            options={PRIORITY_OPTIONS}
           />
           <button
             onClick={() => loadTasks()}
+            title="Tải lại"
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '5px 12px', borderRadius: 6,
@@ -530,10 +531,14 @@ export default function TaskKanbanPage() {
       )}
 
       {/* Kanban Board */}
+      <LimitNotice shown={tasks.length} limit={KANBAN_LIMIT} what="công việc" />
+
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
           <Spin size="large" />
         </div>
+      ) : loadError ? (
+        <PageState error={loadError} onRetry={() => loadTasks()} />
       ) : tasks.length === 0 ? (
         <Empty description="Không có công việc nào" style={{ padding: 80 }} />
       ) : (

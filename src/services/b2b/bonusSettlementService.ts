@@ -87,13 +87,13 @@ export const bonusSettlementService = {
     partnerCode: string,
   ): Promise<CreateQuarterlySettlementResult> {
     if (bundle.bonuses.length === 0) {
-      throw new Error('Không có bonus nào để tạo phiếu chi.')
+      throw new Error('Không có khoản thưởng nào để tạo phiếu chi.')
     }
 
     // Lấy employee_id của user hiện tại (b2b.settlements.created_by NOT NULL)
     const createdBy = await getCurrentEmployeeId()
     if (!createdBy) {
-      throw new Error('Không xác định được nhân viên hiện tại (employees.user_id không khớp auth.user). Vui lòng login lại hoặc kiểm tra account.')
+      throw new Error('Tài khoản đang đăng nhập chưa gắn với hồ sơ nhân viên — đăng nhập lại, hoặc nhờ HCNS liên kết tài khoản với nhân viên.')
     }
 
     const settlementCode = `BONUS-${partnerCode}-${bundle.year}Q${bundle.quarter}`

@@ -32,6 +32,8 @@ import type { SalesDocument } from '../../../services/sales/salesDocumentUploadS
 import { isBOD, type SalesRole } from '../../../services/sales/salesPermissionService'
 import { useAuthStore } from '../../../stores/authStore'
 import { SALES_CONFIG } from '../../../config/sales.config'
+import { fmtDateTime } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const MAX_FILES = SALES_CONFIG.MAX_CONTRACT_FILES
 const MAX_FILE_SIZE_MB = SALES_CONFIG.MAX_FILE_SIZE_MB
@@ -147,12 +149,14 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
     setUploading(true)
     let okCount = 0
     let failCount = 0
+    let firstError: unknown = null
     const subType = uploadSubTypeRef.current
     for (const f of arr) {
       const res = await salesContractService.uploadContract(orderId, f, user, salesRole, { subType })
       if (res.ok) okCount++
       else {
         failCount++
+        if (firstError == null) firstError = res.error
         console.error('Upload fail:', f.name, res.error)
       }
     }
@@ -165,7 +169,8 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
       )
       await load()
     } else {
-      message.error('Upload thất bại toàn bộ — xem console')
+      // Trước đây "xem console" — người dùng không mở console; nói lý do thật bằng tiếng Việt
+      message.error(dichLoiHeThong(firstError, 'Tải lên thất bại toàn bộ'))
     }
   }
 
@@ -188,7 +193,7 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
       message.success('Đã thay thế file (file cũ vẫn lưu trong storage)')
       await load()
     } else {
-      message.error('Lỗi thay thế: ' + (res.error || ''))
+      message.error(dichLoiHeThong(res.error, 'Lỗi thay thế file'))
     }
   }
 
@@ -201,7 +206,7 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
       message.success(`Đã xóa "${doc.file_name || 'file'}"`)
       await load()
     } else {
-      message.error('Lỗi xóa: ' + (res.error || ''))
+      message.error(dichLoiHeThong(res.error, 'Lỗi xóa file'))
     }
   }
 
@@ -394,7 +399,7 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                     <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
                       {formatSize(doc.file_size)}
                       {doc.received_at && (
-                        <> • Tải lên {dayjs(doc.received_at).format('DD/MM/YYYY HH:mm')}</>
+                        <> • Tải lên {fmtDateTime(doc.received_at)}</>
                       )}
                     </div>
                   </div>

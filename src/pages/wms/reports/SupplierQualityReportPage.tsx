@@ -5,13 +5,12 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Card, Table, Tag, Button, Space, Typography, Row, Col,
   DatePicker,
 } from 'antd'
 import {
-  ArrowLeftOutlined, ReloadOutlined, TeamOutlined, DownloadOutlined,
+  ReloadOutlined, TeamOutlined, DownloadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import wmsReportService from '../../../services/wms/wmsReportService'
@@ -23,7 +22,6 @@ const { Title, Text } = Typography
 const { RangePicker } = DatePicker
 
 const SupplierQualityReportPage = () => {
-  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<SupplierQualityReport[]>([])
@@ -96,7 +94,7 @@ const SupplierQualityReportPage = () => {
       render: (v: number) => <Text style={numStyle}>{v}</Text>,
     },
     {
-      title: 'Tong KL (kg)', dataIndex: 'total_weight_kg', key: 'weight', align: 'right' as const, width: 120,
+      title: 'Tổng KL (kg)', dataIndex: 'total_weight_kg', key: 'weight', align: 'right' as const, width: 120,
       render: (v: number) => <Text style={numStyle}>{v.toLocaleString('vi-VN')}</Text>,
     },
     {
@@ -104,7 +102,7 @@ const SupplierQualityReportPage = () => {
       render: (v: number) => <Text style={{ ...numStyle, color: '#1B4D3E' }}>{v}%</Text>,
     },
     {
-      title: 'DRC Range', key: 'drc_range', align: 'center' as const, width: 120,
+      title: 'Khoảng DRC', key: 'drc_range', align: 'center' as const, width: 120,
       render: (_: unknown, r: SupplierQualityReport) => (
         <Text type="secondary" style={numStyle}>{r.drc_min}% – {r.drc_max}%</Text>
       ),
@@ -114,7 +112,7 @@ const SupplierQualityReportPage = () => {
       render: (v: number) => <Tag color="green">{v}</Tag>,
     },
     {
-      title: 'C.bao', dataIndex: 'warning_count', key: 'warning', align: 'right' as const, width: 70,
+      title: 'Cảnh báo', dataIndex: 'warning_count', key: 'warning', align: 'right' as const, width: 80,
       render: (v: number) => v > 0 ? <Tag color="orange">{v}</Tag> : <Text type="secondary">0</Text>,
     },
     {
@@ -122,7 +120,7 @@ const SupplierQualityReportPage = () => {
       render: (v: number) => v > 0 ? <Tag color="red">{v}</Tag> : <Text type="secondary">0</Text>,
     },
     {
-      title: 'Ty le dat', dataIndex: 'pass_rate', key: 'pass_rate', align: 'right' as const, width: 100,
+      title: 'Tỷ lệ đạt', dataIndex: 'pass_rate', key: 'pass_rate', align: 'right' as const, width: 100,
       sorter: (a: SupplierQualityReport, b: SupplierQualityReport) => a.pass_rate - b.pass_rate,
       defaultSortOrder: 'descend' as const,
       render: (v: number) => (
@@ -133,15 +131,11 @@ const SupplierQualityReportPage = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      {/* Header */}
-      <Space style={{ marginBottom: 16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/reports')}>Quay lại</Button>
-      </Space>
-
+      {/* Header — trang sống trong tab của /wms/reports nên không có nút Quay lại */}
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
           <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
-            <TeamOutlined style={{ marginRight: 8 }} />Chất lượng đại lý cung cap
+            <TeamOutlined style={{ marginRight: 8 }} />Chất lượng đại lý cung cấp
           </Title>
         </Col>
         <Col>

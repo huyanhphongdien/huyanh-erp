@@ -6,6 +6,11 @@
 import { useState, useEffect } from 'react'
 import { Search } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { TIER_LABELS } from '../../services/b2b/partnerService'
+import { enumLabel } from '../common/EnumTag'
+
+// Hạng đại lý hiện bằng nhãn tiếng Việt (trước đây in thẳng mã 'diamond'/'gold')
+const tierText = (tier?: string) => enumLabel(TIER_LABELS, tier, '')
 
 interface PartnerOption {
   id: string
@@ -144,7 +149,7 @@ export function B2BPartnerSelector({
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-slate-900 truncate">{selected.name}</div>
             <div className="text-xs text-slate-600 font-mono">
-              {selected.code} {selected.tier && <span className="ml-1 text-emerald-700">· {selected.tier}</span>}
+              {selected.code} {selected.tier && <span className="ml-1 text-emerald-700">· {tierText(selected.tier)}</span>}
             </div>
           </div>
           {!disabled && (
@@ -188,7 +193,7 @@ export function B2BPartnerSelector({
                   <div className="text-sm font-medium text-slate-900">{opt.name}</div>
                   <div className="text-xs text-slate-500 font-mono">
                     {opt.code}
-                    {opt.tier && <span className="ml-2 text-emerald-700">· {opt.tier}</span>}
+                    {opt.tier && <span className="ml-2 text-emerald-700">· {tierText(opt.tier)}</span>}
                   </div>
                 </button>
               ))}

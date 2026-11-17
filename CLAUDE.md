@@ -7,7 +7,8 @@ Full-stack React + Supabase ERP covering: attendance, payroll, production, inven
 ## Tech Stack
 - **Frontend:** React 18 + TypeScript + Vite + Tailwind CSS + Ant Design (some pages)
 - **Backend:** Supabase (PostgreSQL + Auth + Storage + RLS)
-- **State:** Zustand (authStore, themeStore) + TanStack Query (server state)
+- **State:** Zustand (authStore, tabStore, facilityFilterStore…) + TanStack Query (server state). ⚠ KHÔNG có themeStore / dark mode
+  cho ERP desktop (chỉ màn thợ `/m/*` tự tối theo máy qua opsTheme.css) — đừng hứa dark mode.
 - **Routing:** React Router v6 (lazy-loaded pages)
 - **Deploy:** Vercel (auto-deploy from GitHub `main` branch)
 
@@ -49,8 +50,40 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
   `toISOString().slice(0,10)`/`split('T')[0]` cho NGÀY (bug UTC lùi 1 ngày trước 7h sáng — codemod 17/11 đã quét
   `new Date().toISOString()…` → `toLocaleDateString('sv-SE')`) và CẤM `toLocaleString()` trần (phải 'vi-VN' — đã
   codemod 151 chỗ; USD dùng 'en-US' qua salesMoney).
+  ⚠ **DB Supabase chạy giờ UTC** (`current_setting('TimeZone')` = UTC, kiểm 17/11/2026): lọc cột timestamptz theo NGÀY phải gửi
+  mốc có offset — `vnDayStartTs(d)` / `vnDayEndTs(d)` (dateVN.ts → `${d}T00:00:00+07:00` / `T23:59:59.999+07:00`). Chuỗi
+  `${d}T00:00:00` hay ngày trần bị hiểu là 0h UTC = 7h sáng VN (12% phiếu cân nhập cân trước 7h). Gom/so ngày của một timestamp
+  thì quy về lịch VN (`toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })`), đừng cắt 10 ký tự chuỗi UTC.
+  Cột kiểu DATE ghi `todayVN()`, đừng ghi ISO timestamp.
+- **Hội tụ giao diện (Đợt 3 audit 17/11/2026) — màn MỚI phải theo, màn cũ quy về khi chạm file:**
+  · Định dạng: `src/utils/format.ts` là nguồn DUY NHẤT (fmtNum/fmtKg/fmtVnd/fmtVndNum/fmtVndCompact/fmtTy/fmtUsd/fmtPct/fmtDate/
+    fmtDateTime…; re-export fmtMoney/vndInputProps). Luật: null→'—', 0 in "0"; VND ' ₫' (không 'đ'/'VNĐ'); ngày 'DD/MM/YYYY',
+    ngày-giờ 'DD/MM HH:mm'; USD bảng 0 số lẻ; kg không làm tròn. ⚠ 'đ' = ĐIỂM (chấm công việc) giữ nguyên. Trang in khớp mẫu giấy
+    thì giữ định dạng riêng. Ô nhập tiền VND = `vndInputProps` (chấm ngăn nghìn), USD = `usdInputProps`.
+  · Nhãn + màu trạng thái: MỘT map/thực thể ở service/types (`XXX_STATUS_LABELS/COLORS`), render qua
+    `src/components/common/EnumTag.tsx`; cấm in mã enum tiếng Anh ra màn. Màu: default nháp · gold chờ · blue đang làm/đã duyệt
+    chờ chi · green xong/đã chi · red huỷ/từ chối.
+  · Bảng: sổ mới dùng `AdvancedDataTable` (lọc cột, Excel, ẩn/hiện cột nhớ theo máy, header dính, prop `error` + `loadLimit`) hoặc
+    antd Table + `stdPagination(20|50)` + `<LimitNotice>` (src/components/common/tableDefaults.tsx) — cấm `.limit(N)` im lặng.
+  · Màu: `src/theme/palette.js` là nguồn chung cho antd (antdTheme.ts) VÀ Tailwind (tailwind.config.js) — Tailwind `primary` nay là
+    xanh thương hiệu #1B4D3E (trước là xanh dương #2E86AB lạc tông). Màu mới lấy từ palette, không gõ hex; KHÔNG codemod hex cũ.
+  · Màn điện thoại kho `/m/kho/*`: hệ **kmx-*** (khoMix.css) là chuẩn duy nhất; ops-* chỉ còn cho vỏ app Ops.
+  · Thuật ngữ đã thống nhất: 'Deal' giữ nguyên, số ít ('Số deal', không 'Deals'); 'Lô' thay Batch/Lot; bước xác nhận chất lượng ở
+    xuất NVL là **QC** (riêng hàng chèn: QS = khai báo, QC = duyệt — hai vai khác nhau). Sổ cái đại lý B2B: **Nợ** = phát sinh nhà máy
+    phải trả đại lý (quyết toán duyệt), **Có** = đã chi + tạm ứng, số dư > 0 = nhà máy còn nợ đại lý (nhãn cũ "phải thu" đọc ngược).
+  · In từ trang nằm trong khung tab: dùng `src/pages/wms/PhieuKhoPrintPortal.tsx` (portal ra body, chỉ in khi trang đang hiện).
+    CẤM `<style>` in toàn cục kiểu `body * {visibility:hidden}` / `@page` để sẵn trong trang — tab ẩn vẫn mounted, đè bản in tab khác.
+- **Điểm công việc — MỘT nguồn `src/services/taskScoring.ts`** (Đợt 3, 17/11/2026): 3 cửa duyệt ("Cần anh xem", Duyệt hàng loạt,
+  trang Phê duyệt) + mọi ô xem trước + câu hứa với NV đều đọc từ đây. Công thức đang chạy: Tự chấm × 40% + QL × 60% (chưa tự chấm →
+  trọn điểm QL), × hệ số khó (khó 1,2 · rất khó 1,5, trần 100), − 2đ/ngày trễ (miễn trễ thì không trừ). Tự duyệt theo nguồn =
+  tự chấm × AUTO_COEF (định kỳ 0,8 · tự giao 0,85 · dự án 0,9 · QL làm thay 1). ⚠ Owner CHƯA chốt công thức — đổi = sửa hằng ở
+  taskScoring (SELF_WEIGHT=0 là quay về kiểu "bỏ qua tự chấm"). Duyệt luôn qua `approveTasksScored` (chèn task_approvals MỘT lô → trigger
+  DB tự đổi trạng thái + lan điểm người cùng làm + báo NV — đừng notify thêm ở client kẻo đúp). `task_evaluations.rating` chỉ nhận
+  excellent/good/fair/average/poor → ghi qua `evalTableRating`. due_date/completed_date là timestamptz (đa số nửa đêm UTC, một số giờ
+  thật lúc bấm xong) → lấy ngày bằng `dayOf()` (quy về lịch VN). `subtaskService.recalculateParent` KHÔNG đụng việc cha đã
+  xong/huỷ và KHÔNG tự đóng cha khi con xong hết (owner chưa chốt tự đóng).
 - **Điện thoại (≤ 640px)**: hook `src/hooks/useIsPhone.ts`. Sổ đơn hàng bán (`SalesOrderListPage`) trên điện thoại vẽ THẺ
-  (`components/SalesOrderPhoneList.tsx`) thay cho bảng 20 cột và giấu Views/độ dày/Split/ẩn cột/Excel/chọn nhiều dòng
+  (`components/SalesOrderPhoneList.tsx`) thay cho bảng 20 cột và giấu Bộ lọc đã lưu/độ dày/Chia đôi/ẩn cột/Excel/chọn nhiều dòng
   (04/11/2026, đo bằng Chrome DevTools MCP). Thêm cột mới cho Sổ đơn → cân nhắc thêm vào thẻ; chi tiết đơn mở bằng
   `SalesOrderDetailPanel` (drawer 100% trên điện thoại). Kiểm tra UI điện thoại: MCP `chrome-devtools` đã cài (user scope),
   `emulate viewport 390x844x3,mobile,touch` rồi `evaluate_script` đo `scrollWidth` + phần tử rộng hơn `innerWidth`.
@@ -116,6 +149,10 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
 - **Đơn VND bắt buộc có `exchange_rate`** (service từ chối nếu thiếu): `total_value_vnd` = tấn × giá (số thật trên HĐ),
   `total_value_usd` = vnd ÷ tỷ giá = **số quy đổi** để công nợ (`v_ar_aging_rows`), sổ lô, dashboard, tab Tài chính cộng
   chung một đơn vị. Đơn USD giữ như cũ (`total_value_vnd` = usd × tỷ giá nếu có).
+- **Tỷ giá đơn VND phải là số đồng của 1 USD** (10.000–50.000, `vndRateError` trong salesMoney — tạo/sửa đơn và tab Tài chính đều
+  chặn). ⚠ 10/2026 hai đơn VND (SO-2026-0139 Sailun, SO-2026-0153 ASEAN Tire) được nhập tỷ giá **1** → USD quy đổi = nguyên số VNĐ,
+  Công nợ khách/dashboard phình ~$2,08 tỷ. Tab Tài chính đơn VND GIỮ `total_value_vnd` (số trên HĐ), chỉ tính lại `total_value_usd`
+  = vnd ÷ tỷ giá mới (bản cũ nhân ngược USD × tỷ giá → đổi tỷ giá là đổi trị giá HĐ, xoá tỷ giá là mất số VNĐ).
 - Mọi nhãn/định dạng lấy từ `src/services/sales/salesMoney.ts` (`isVnd`, `priceUnitLabel` "$/tấn"|"₫/tấn", `fmtMoney`,
   `orderTotalInCurrency`, `toUsdEquivalent`, `orderTotals`, `vndInputProps`) — đừng gõ cứng "$" ở màn mới.
 - Chưa phủ: sinh hợp đồng/Invoice .docx (mẫu xuất khẩu, chữ USD), hoa hồng & tab Tài chính vẫn tính bằng USD quy đổi,

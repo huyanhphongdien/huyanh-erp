@@ -14,8 +14,12 @@ import {
 } from '../../../services/b2b/settlementService'
 import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
 import { B2BSectionTabs, SETTLEMENT_TABS } from '../../../components/b2b/B2BSectionTabs'
+import { fmtDate, fmtVndCompact, fmtVndNum } from '../../../utils/format'
 
 const { Text } = Typography
+
+// Sổ quyết toán tải một cục tối đa N phiếu — chạm trần thì bảng báo (LimitNotice của AdvancedDataTable)
+const LOAD_LIMIT = 500
 
 // Đủ 7 trạng thái của SettlementStatus — lấy thẳng từ SETTLEMENT_STATUS_LABELS để không lệch service
 const STATUS_TABS = [
@@ -24,22 +28,17 @@ const STATUS_TABS = [
 ]
 const STATUS_OPTIONS = STATUS_TABS.filter(t => t.key !== 'all').map(t => ({ value: t.key, label: t.label }))
 
-const formatCurrency = (v: number | null) => {
-  if (!v) return '—'
-  if (v >= 1e9) return `${(v / 1e9).toFixed(2)} tỷ`
-  if (v >= 1e6) return `${(v / 1e6).toFixed(1)} tr`
-  return v.toLocaleString('vi-VN')
-}
-const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—'
+// Bảng kế toán in số ĐẦY ĐỦ (tiêu đề cột đã ghi ₫); chỉ thẻ KPI trong dòng mở rộng mới rút gọn tỷ/tr
+// — bản cũ viết tắt "1.23 tỷ" (chấm kiểu Mỹ) ngay trong cột tiền (audit 17/11/2026).
 
 export default function SettlementListPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('all')
 
-  const { data: allSettlements = [], isLoading, refetch } = useQuery({
+  const { data: allSettlements = [], isLoading, error, refetch } = useQuery({
     queryKey: ['b2b-settlements-all'],
     queryFn: async () => {
-      const res = await settlementService.getSettlements({ page: 1, pageSize: 500 })
+      const res = await settlementService.getSettlements({ page: 1, pageSize: LOAD_LIMIT })
       return res.data
     },
     staleTime: 60000,
@@ -64,18 +63,18 @@ export default function SettlementListPage() {
       exportRender: (_, r) => (r as any).partner?.name || '' },
     { key: 'settlement_type', title: 'Loại', dataIndex: 'settlement_type', width: 100,
       render: (v) => <Tag color={SETTLEMENT_TYPE_COLORS[v as keyof typeof SETTLEMENT_TYPE_COLORS]}>{SETTLEMENT_TYPE_LABELS[v as keyof typeof SETTLEMENT_TYPE_LABELS] || v}</Tag> },
-    { key: 'gross_amount', title: 'Tổng giá trị', dataIndex: 'gross_amount', width: 120, align: 'right', sortable: true,
-      render: (v) => <Text strong style={{ color: '#1B4D3E' }}>{formatCurrency(v)}</Text>, exportRender: (v) => v || 0 },
-    { key: 'total_advance', title: 'Đã ứng', dataIndex: 'total_advance', width: 110, align: 'right',
-      render: (v) => <Text style={{ color: '#722ed1' }}>{formatCurrency(v)}</Text>, exportRender: (v) => v || 0 },
-    { key: 'remaining_amount', title: 'Còn nợ', dataIndex: 'remaining_amount', width: 110, align: 'right', sortable: true,
-      render: (v) => <Text strong style={{ color: v > 0 ? '#cf1322' : '#52c41a' }}>{formatCurrency(v)}</Text>, exportRender: (v) => v || 0 },
+    { key: 'gross_amount', title: 'Tổng giá trị (₫)', dataIndex: 'gross_amount', width: 135, align: 'right', sortable: true,
+      render: (v) => <Text strong style={{ color: '#1B4D3E' }}>{fmtVndNum(v)}</Text>, exportRender: (v) => v || 0 },
+    { key: 'total_advance', title: 'Đã ứng (₫)', dataIndex: 'total_advance', width: 125, align: 'right',
+      render: (v) => <Text style={{ color: '#722ed1' }}>{fmtVndNum(v)}</Text>, exportRender: (v) => v || 0 },
+    { key: 'remaining_amount', title: 'Còn nợ (₫)', dataIndex: 'remaining_amount', width: 125, align: 'right', sortable: true,
+      render: (v) => <Text strong style={{ color: v > 0 ? '#cf1322' : '#52c41a' }}>{fmtVndNum(v)}</Text>, exportRender: (v) => v || 0 },
     { key: 'status', title: 'Trạng thái', dataIndex: 'status', width: 110,
       filterType: 'select', filterOptions: STATUS_OPTIONS,
       render: (v) => <Tag color={SETTLEMENT_STATUS_COLORS[v as keyof typeof SETTLEMENT_STATUS_COLORS]}>{SETTLEMENT_STATUS_LABELS[v as keyof typeof SETTLEMENT_STATUS_LABELS]}</Tag>,
       exportRender: (v) => SETTLEMENT_STATUS_LABELS[v as keyof typeof SETTLEMENT_STATUS_LABELS] || v },
     { key: 'created_at', title: 'Ngày tạo', dataIndex: 'created_at', width: 100, sortable: true,
-      render: (v) => formatDate(v) },
+      render: (v) => fmtDate(v) },
   ]
 
   const renderInlineDetail = (s: Settlement) => {
@@ -84,13 +83,13 @@ export default function SettlementListPage() {
       <div style={{ padding: '4px 0' }}>
         <Row gutter={[16, 12]} style={{ marginBottom: 12 }}>
           <Col xs={6}><Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-            <Statistic title="Tổng giá trị" value={s.gross_amount || 0} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: '#1B4D3E' }} />
+            <Statistic title="Tổng giá trị" value={s.gross_amount || 0} formatter={v => fmtVndCompact(Number(v))} valueStyle={{ fontSize: 18, color: '#1B4D3E' }} />
           </Card></Col>
           <Col xs={6}><Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-            <Statistic title="Đã ứng" value={s.total_advance || 0} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: '#722ed1' }} />
+            <Statistic title="Đã ứng" value={s.total_advance || 0} formatter={v => fmtVndCompact(Number(v))} valueStyle={{ fontSize: 18, color: '#722ed1' }} />
           </Card></Col>
           <Col xs={6}><Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-            <Statistic title="Còn nợ" value={s.remaining_amount || 0} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: (s.remaining_amount || 0) > 0 ? '#cf1322' : '#52c41a' }} />
+            <Statistic title="Còn nợ" value={s.remaining_amount || 0} formatter={v => fmtVndCompact(Number(v))} valueStyle={{ fontSize: 18, color: (s.remaining_amount || 0) > 0 ? '#cf1322' : '#52c41a' }} />
           </Card></Col>
           <Col xs={6}><Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
             <Statistic title="Tuổi nợ" value={aging} suffix="ngày" valueStyle={{ fontSize: 18, color: aging > 30 ? '#cf1322' : aging > 14 ? '#fa8c16' : '#52c41a' }} />
@@ -101,7 +100,7 @@ export default function SettlementListPage() {
           <Descriptions.Item label="Trạng thái"><Tag color={SETTLEMENT_STATUS_COLORS[s.status as keyof typeof SETTLEMENT_STATUS_COLORS]}>{SETTLEMENT_STATUS_LABELS[s.status as keyof typeof SETTLEMENT_STATUS_LABELS]}</Tag></Descriptions.Item>
           <Descriptions.Item label="Đại lý">{(s as any).partner?.name || '—'}</Descriptions.Item>
           <Descriptions.Item label="Loại">{SETTLEMENT_TYPE_LABELS[s.settlement_type as keyof typeof SETTLEMENT_TYPE_LABELS] || s.settlement_type}</Descriptions.Item>
-          <Descriptions.Item label="Ngày tạo">{formatDate(s.created_at)}</Descriptions.Item>
+          <Descriptions.Item label="Ngày tạo">{fmtDate(s.created_at)}</Descriptions.Item>
           <Descriptions.Item label="Ghi chú">{(s as any).notes || '—'}</Descriptions.Item>
         </Descriptions>
         <div style={{ marginTop: 8 }}>
@@ -135,6 +134,8 @@ export default function SettlementListPage() {
         dataSource={tabData}
         rowKey="id"
         loading={isLoading}
+        error={error}
+        loadLimit={LOAD_LIMIT}
         title="Quyết toán B2B"
         dateRangeField="created_at"
         onRefresh={() => refetch()}

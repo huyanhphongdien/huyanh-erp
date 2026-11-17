@@ -9,17 +9,21 @@
 // Xuất .xlsx đúng mẫu (fleetCostExcel.ts). Mọi số đọc từ v_fleet_cost_trips / v_fleet_cost_month.
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Popconfirm, Segmented, Select, Space, Table, Tabs, Tag, Tooltip, Typography, message,
 } from 'antd'
 import type { TableProps } from 'antd'
 import {
-  CarOutlined, DeleteOutlined, DollarOutlined, FileExcelOutlined, FileTextOutlined, LockOutlined, PlusOutlined, ReloadOutlined, WalletOutlined, WarningOutlined,
+  CarOutlined, DeleteOutlined, DollarOutlined, FileExcelOutlined, FileTextOutlined, PlusOutlined, ReloadOutlined, WalletOutlined, WarningOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useAuthStore } from '../../../stores/authStore'
+import { useOpenTab } from '../../../hooks/useOpenTab'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { DASH, fmtDate, fmtDateShort as fmtD, fmtPct } from '../../../utils/format'
+import PageState from '../../../components/common/PageState'
 import { fleetService, type FleetDriver, type FleetVehicle } from '../../../services/logistics/fleetService'
 import { TRIP_TYPE_LABELS, type TripType } from '../../../services/logistics/dispatchService'
 import {
@@ -32,14 +36,12 @@ import {
   type AvailableForRequest, type FleetPaymentRequest, type FleetPrPaymentMethod, type FleetPrStatus,
 } from '../../../services/logistics/fleetPaymentRequestService'
 import { exportFleetCostMonth, type DriverSheet } from '../../../services/logistics/fleetCostExcel'
-import { AMBER, BRAND, GOLD, INK_2, Kpi, MONO, OK, PageHeader, Pair, PrStatusTag, RED, Th, thousands } from './fleetCostUi'
+import { AMBER, BRAND, GOLD, INK_2, Kpi, MONO, OK, PageHeader, Pair, PrStatusTag, RED, Th, thousands, TripCostTag } from './fleetCostUi'
 
 const { Text } = Typography
 const HIRED_LABEL = 'Xe thuê ngoài / không gắn tài xế'
 /** Tên cột ngắn cho bảng theo xe (tên đầy đủ hiện ở tooltip) — tránh tiêu đề 2–3 dòng. */
 const KIND_SHORT: Record<string, string> = { fuel: 'Dầu', toll: 'BOT', port: 'Cầu cảng', loading: 'Bốc xếp', meals: 'Ăn ở', repair: 'Sửa chữa', border: 'Biên giới', parking: 'Gửi/rửa xe', other: 'Khác', hire: 'Thuê ngoài' }
-const fmtD = (iso?: string | null) => (iso ? dayjs(iso).format('DD/MM') : '–')
-const fmtDate = (iso?: string | null) => (iso ? dayjs(iso).format('DD/MM/YYYY') : '–')
 
 type VehicleRow = { key: string; plate: string; trips: number; km: number; kinds: Record<string, number>; total: number }
 type DriverRow = { key: string; driver_id: string | null; name: string; trips: number; advVnd: number; advLak: number; cVnd: number; cLak: number; uVnd: number; uLak: number; balVnd: number; balLak: number }
@@ -47,6 +49,11 @@ type AvailAdvance = AvailableForRequest['advances'][number]
 
 export default function FleetCostPage() {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
+  // Mở chi tiết lệnh thành TAB (khuôn của Sổ lệnh) — navigate() đè mất tab đang mở.
+  const openDispatch = (id: string, code: string) => openTab({
+    key: `dispatch-${id}`, title: `Lệnh ${code}`, componentId: 'dispatch-detail', props: { id }, path: `/logistics/dispatch/${id}`,
+  })
   const user = useAuthStore((s) => s.user)
   const [month, setMonth] = useState<Dayjs>(dayjs().startOf('month'))
   const ym = month.format('YYYY-MM')
@@ -62,6 +69,7 @@ export default function FleetCostPage() {
   const [advances, setAdvances] = useState<DriverAdvance[]>([])
   const [requests, setRequests] = useState<FleetPaymentRequest[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadErr, setLoadErr] = useState<unknown>(null)
   const [exporting, setExporting] = useState(false)
   const [lastLak, setLastLak] = useState<number | null>(null)
 
@@ -77,12 +85,17 @@ export default function FleetCostPage() {
   const [prForm] = Form.useForm()
 
   useEffect(() => {
-    fleetService.listDrivers({ active: true }).then(setDrivers).catch(() => setDrivers([]))
-    fleetService.listVehicles({ kind: 'tractor', active: true }).then(setVehicles).catch(() => setVehicles([]))
+    // Lỗi tải danh mục → báo, đừng để ô lọc Tài xế / Đầu kéo trống im lặng (không lập được đề nghị mà không biết vì sao).
+    fleetService.listDrivers({ active: true }).then(setDrivers).catch((e) => { setDrivers([]); message.error(dichLoiHeThong(e, 'Lỗi tải danh sách tài xế')) })
+    fleetService.listVehicles({ kind: 'tractor', active: true }).then(setVehicles).catch((e) => { setVehicles([]); message.error(dichLoiHeThong(e, 'Lỗi tải danh sách đầu kéo')) })
   }, [])
 
+  // Lượt tải mới nhất: đổi tháng / bộ lọc nhanh tay thì kết quả của lượt CŨ về sau không được đè lên tháng mới.
+  const loadSeq = useRef(0)
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setLoading(true)
+    setLoadErr(null)
     try {
       const [t, m, e, a, rate, prs] = await Promise.all([
         fleetCostService.listTrips({ ym, driverId, tractorVehicleId: vehicleId }),
@@ -92,10 +105,15 @@ export default function FleetCostPage() {
         fleetCostService.lastLakRate(),
         fleetPaymentRequestService.list({ ym, driverId }),
       ])
+      if (seq !== loadSeq.current) return
       setTrips(t); setMonthRows(m); setMonthExp(e); setAdvances(a); setLastLak(rate); setRequests(prs)
     } catch (err: any) {
-      message.error('Lỗi tải sổ chi phí: ' + (err?.message || err))
-    } finally { setLoading(false) }
+      if (seq !== loadSeq.current) return
+      // Sổ tiền: tải hỏng thì KHÔNG hiện KPI 0 ₫ / bảng trống giả — PageState báo lỗi + Thử lại.
+      // Xoá số của lượt tải trước: tháng / bộ lọc có thể đã đổi — nút Xuất Excel từng xuất chuyến tháng CŨ dưới tên tháng MỚI.
+      setTrips([]); setMonthRows([]); setMonthExp([]); setAdvances([]); setRequests([])
+      setLoadErr(err)
+    } finally { if (seq === loadSeq.current) setLoading(false) }
   }, [ym, driverId, vehicleId])
   useEffect(() => { load() }, [load])
 
@@ -163,7 +181,7 @@ export default function FleetCostPage() {
       render: (_: unknown, r: VehicleRow) => <span style={MONO}>{r.kinds[k] ? fmtAmt(r.kinds[k]) : ''}</span>,
     })),
     { title: <Th main="Tổng" sub="₫ quy đổi" />, dataIndex: 'total', width: 130, align: 'right', render: (v: number) => <b style={MONO}>{fmtAmt(v)}</b> },
-    { title: '₫ / km', width: 90, align: 'right', render: (_: unknown, r: VehicleRow) => <span style={MONO}>{r.km > 0 ? fmtAmt(r.total / r.km) : '–'}</span> },
+    { title: '₫ / km', width: 90, align: 'right', render: (_: unknown, r: VehicleRow) => <span style={MONO}>{r.km > 0 ? fmtAmt(r.total / r.km) : DASH}</span> },
   ]
 
   // ── Theo loại chi ─────────────────────────────────────────────────────────
@@ -189,12 +207,12 @@ export default function FleetCostPage() {
     try {
       const groups = new Map<string, TripCostRow[]>()
       for (const t of trips) {
-        const name = t.driver_name || (t.is_hired ? 'Xe thue ngoai' : 'Chua gan tai xe')
+        const name = t.driver_name || (t.is_hired ? 'Xe thuê ngoài' : 'Chưa gắn tài xế')
         groups.set(name, [...(groups.get(name) || []), t])
       }
       const sheets: DriverSheet[] = Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], 'vi')).map(([driverName, rows]) => ({ driverName, trips: rows }))
       await exportFleetCostMonth({ ym, sheets })
-    } catch (e: any) { message.error('Lỗi xuất Excel: ' + (e?.message || e)) }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi xuất Excel')) }
     finally { setExporting(false) }
   }
 
@@ -209,7 +227,7 @@ export default function FleetCostPage() {
     try {
       await fleetCostService.addAdvance({ driver_id: v.driver_id, advance_date: v.advance_date.format('YYYY-MM-DD'), amount: v.amount, currency: v.currency, fx_rate_vnd: v.currency === 'LAK' ? v.fx_rate_vnd : null, dispatch_order_id: v.dispatch_order_id || null, paid_by_name: v.paid_by_name, note: v.note })
       message.success('Đã ghi tạm ứng'); setAdvOpen(false); load()
-    } catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi ghi tạm ứng')) }
     finally { setSaving(false) }
   }
   const advDriverWatch = Form.useWatch('driver_id', advForm)
@@ -223,7 +241,7 @@ export default function FleetCostPage() {
       setPrAvail(a); setPrTrips(a.trips.map((t) => t.dispatch_order_id)); setPrAdvs(a.advances.map((x) => x.id))
       prForm.setFieldsValue({ request_date: dayjs(), payment_method: 'cash', payee_account: '' })
       setPrOpen(true)
-    } catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi tải chuyến / tạm ứng chưa gom')) }
   }
   const prTotals = useMemo(() => {
     if (!prAvail) return { exp: 0, adv: 0 }
@@ -243,36 +261,36 @@ export default function FleetCostPage() {
       message.success(`Đã lập phiếu nháp ${req.code}`)
       setPrOpen(false)
       navigate(`/logistics/costs/payment-requests/${req.id}`)
-    } catch (e: any) { message.error('Lỗi lập phiếu: ' + (e?.message || e)) }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi lập phiếu')) }
     finally { setSaving(false) }
   }
 
   // ── Cột bảng chuyến (bố cục form) ─────────────────────────────────────────
   const tripColumns = [
-    { title: 'Lệnh', dataIndex: 'code', width: 118, fixed: 'left' as const, render: (v: string, t: TripCostRow) => <a style={{ ...MONO, fontWeight: 600 }} onClick={() => navigate(`/logistics/dispatch/${t.dispatch_order_id}`)}>{v}</a> },
-    { title: 'Tài xế', dataIndex: 'driver_name', width: 140, render: (v: string | null, t: TripCostRow) => v || (t.is_hired ? <Tag color="purple" style={{ margin: 0 }}>thuê ngoài</Tag> : '–') },
+    { title: 'Lệnh', dataIndex: 'code', width: 118, fixed: 'left' as const, render: (v: string, t: TripCostRow) => <a style={{ ...MONO, fontWeight: 600 }} onClick={() => openDispatch(t.dispatch_order_id, t.code)}>{v}</a> },
+    { title: 'Tài xế', dataIndex: 'driver_name', width: 140, render: (v: string | null, t: TripCostRow) => v || (t.is_hired ? <Tag color="purple" style={{ margin: 0 }}>thuê ngoài</Tag> : DASH) },
     { title: 'Đi', dataIndex: 'dispatch_date', width: 66, render: fmtD },
     { title: 'Về', dataIndex: 'return_date', width: 66, render: fmtD },
-    { title: 'Ngày', dataIndex: 'trip_days', width: 66, align: 'right' as const, render: (v: number | null) => v ?? '–' },
-    { title: 'Xe / moóc', width: 150, render: (_: unknown, t: TripCostRow) => <span style={{ fontSize: 12, ...MONO }}>{t.tractor_plate || '–'}{t.trailer_plate ? ` / ${t.trailer_plate}` : ''}</span> },
-    { title: <Th main="Km đi" sub="đồng hồ" />, dataIndex: 'odometer_start_km', width: 96, align: 'right' as const, render: (v: number | null) => <span style={MONO}>{v != null ? fmtAmt(v) : '–'}</span> },
-    { title: <Th main="Km về" sub="đồng hồ" />, dataIndex: 'odometer_end_km', width: 96, align: 'right' as const, render: (v: number | null) => <span style={MONO}>{v != null ? fmtAmt(v) : '–'}</span> },
-    { title: 'Km', dataIndex: 'trip_km', width: 64, align: 'right' as const, render: (v: number | null) => <b style={MONO}>{v != null ? fmtAmt(v) : '–'}</b> },
-    { title: 'Hành trình', width: 190, render: (_: unknown, t: TripCostRow) => t.route_name || [t.pickup_location, t.destination].filter(Boolean).join(' → ') || <Text type="secondary">–</Text> },
-    { title: <Th main="Chuẩn" sub="ngày" />, dataIndex: 'standard_days', width: 78, align: 'right' as const, render: (v: number | null) => v ?? '–' },
-    { title: <Th main="Vượt" sub="ngày" />, dataIndex: 'over_days', width: 72, align: 'right' as const, render: (v: number | null) => v ? <b style={{ color: AMBER }}>+{v}</b> : (v === 0 ? <span style={{ color: OK }}>0</span> : '–') },
+    { title: 'Ngày', dataIndex: 'trip_days', width: 66, align: 'right' as const, render: (v: number | null) => v ?? DASH },
+    { title: 'Xe / moóc', width: 150, render: (_: unknown, t: TripCostRow) => <span style={{ fontSize: 12, ...MONO }}>{t.tractor_plate || DASH}{t.trailer_plate ? ` / ${t.trailer_plate}` : ''}</span> },
+    { title: <Th main="Km đi" sub="đồng hồ" />, dataIndex: 'odometer_start_km', width: 96, align: 'right' as const, render: (v: number | null) => <span style={MONO}>{v != null ? fmtAmt(v) : DASH}</span> },
+    { title: <Th main="Km về" sub="đồng hồ" />, dataIndex: 'odometer_end_km', width: 96, align: 'right' as const, render: (v: number | null) => <span style={MONO}>{v != null ? fmtAmt(v) : DASH}</span> },
+    { title: 'Km', dataIndex: 'trip_km', width: 64, align: 'right' as const, render: (v: number | null) => <b style={MONO}>{v != null ? fmtAmt(v) : DASH}</b> },
+    { title: 'Hành trình', width: 190, render: (_: unknown, t: TripCostRow) => t.route_name || [t.pickup_location, t.destination].filter(Boolean).join(' → ') || <Text type="secondary">{DASH}</Text> },
+    { title: <Th main="Chuẩn" sub="ngày" />, dataIndex: 'standard_days', width: 78, align: 'right' as const, render: (v: number | null) => v ?? DASH },
+    { title: <Th main="Vượt" sub="ngày" />, dataIndex: 'over_days', width: 72, align: 'right' as const, render: (v: number | null) => v ? <b style={{ color: AMBER }}>+{v}</b> : (v === 0 ? <span style={{ color: OK }}>0</span> : DASH) },
     { title: 'Nội dung công việc', width: 190, render: (_: unknown, t: TripCostRow) => {
       const typeLabel = TRIP_TYPE_LABELS[t.trip_type as TripType] || t.trip_type
       const reason = t.reason && t.reason.trim().toLowerCase() !== typeLabel.toLowerCase() ? t.reason.trim() : ''
       return <span style={{ fontSize: 12 }}>{[typeLabel, t.customer_name, reason].filter(Boolean).join(' · ')}</span>
     } },
-    { title: 'Nội dung chi', width: 180, render: (_: unknown, t: TripCostRow) => <span style={{ fontSize: 12 }}>{[(t.kinds || '').split(',').filter(Boolean).map((k) => EXPENSE_KIND_LABELS[k as ExpenseKind] || k).join(', '), t.is_hired && t.hire_cost ? HIRE_KIND_LABEL : ''].filter(Boolean).join(', ') || '–'}</span> },
+    { title: 'Nội dung chi', width: 180, render: (_: unknown, t: TripCostRow) => <span style={{ fontSize: 12 }}>{[(t.kinds || '').split(',').filter(Boolean).map((k) => EXPENSE_KIND_LABELS[k as ExpenseKind] || k).join(', '), t.is_hired && t.hire_cost ? HIRE_KIND_LABEL : ''].filter(Boolean).join(', ') || DASH}</span> },
     { title: <Th main="Tạm ứng" sub="gắn chuyến" />, width: 130, align: 'right' as const, render: (_: unknown, t: TripCostRow) => <Pair vnd={t.adv_vnd} lak={t.adv_lak} /> },
     { title: <Th main="Chi được tính" sub={COUNTED_SUB} />, width: 150, align: 'right' as const, onCell: () => ({ style: { background: '#F0F9F4' } }), render: (_: unknown, t: TripCostRow) => <Pair vnd={t.counted_vnd} lak={t.counted_lak} tone={BRAND} bold /> },
     { title: <Th main={UNCOUNTED_LABEL} sub={UNCOUNTED_SUB} />, width: 170, align: 'right' as const, onCell: () => ({ style: { background: '#FFFBEB' } }), render: (_: unknown, t: TripCostRow) => <Pair vnd={t.uncounted_vnd} lak={t.uncounted_lak} tone={AMBER} /> },
     { title: 'Trạng thái', width: 150, render: (_: unknown, t: TripCostRow) => (
       <Space size={4} wrap>
-        {t.cost_status === 'reviewed' ? <Tag icon={<LockOutlined />} color="green" style={{ margin: 0 }}>đã duyệt</Tag> : t.n_expenses > 0 ? <Tag color="gold" style={{ margin: 0 }}>chờ duyệt</Tag> : <Tag style={{ margin: 0 }}>chưa nhập</Tag>}
+        <TripCostTag costStatus={t.cost_status} nExpenses={t.n_expenses} />
         {t.payment_request_code && <Tooltip title={`Đề nghị thanh toán · ${FLEET_PR_STATUS_LABELS[t.payment_request_status as FleetPrStatus] || t.payment_request_status}`}><Tag color="geekblue" style={{ margin: 0, cursor: 'pointer', ...MONO }} onClick={() => navigate(`/logistics/costs/payment-requests/${t.fleet_payment_request_id}`)}>{t.payment_request_code}</Tag></Tooltip>}
       </Space>
     ) },
@@ -291,8 +309,8 @@ export default function FleetCostPage() {
   const prColumns = [
     { title: 'Số phiếu', dataIndex: 'code', width: 130, render: (v: string, r: FleetPaymentRequest) => <a style={{ ...MONO, fontWeight: 600 }} onClick={() => navigate(`/logistics/costs/payment-requests/${r.id}`)}>{v}</a> },
     { title: 'Ngày', dataIndex: 'request_date', width: 100, render: fmtDate },
-    { title: 'Kỳ', dataIndex: 'period_ym', width: 80, render: (v: string | null) => v ? `${v.slice(5, 7)}/${v.slice(0, 4)}` : '–' },
-    { title: 'Tài xế', width: 170, render: (_: unknown, r: FleetPaymentRequest) => r.payee_name || r.driver?.full_name || '–' },
+    { title: 'Kỳ', dataIndex: 'period_ym', width: 80, render: (v: string | null) => v ? `${v.slice(5, 7)}/${v.slice(0, 4)}` : DASH },
+    { title: 'Tài xế', width: 170, render: (_: unknown, r: FleetPaymentRequest) => r.payee_name || r.driver?.full_name || DASH },
     { title: 'Tiêu đề', dataIndex: 'title', render: (v: string | null) => <span style={{ fontSize: 12.5 }}>{v || ''}</span> },
     { title: 'Chi được tính', dataIndex: 'total_expense', width: 130, align: 'right' as const, render: (v: number) => <span style={MONO}>{fmtAmt(v)} ₫</span> },
     { title: 'Trừ tạm ứng', dataIndex: 'total_advance', width: 120, align: 'right' as const, render: (v: number) => <span style={{ ...MONO, color: AMBER }}>{v ? `−${fmtAmt(v)} ₫` : ''}</span> },
@@ -305,7 +323,7 @@ export default function FleetCostPage() {
     <div style={{ padding: 20, maxWidth: 1680, margin: '0 auto' }}>
       <PageHeader
         title="Sổ chi phí đội xe"
-        subtitle={<>Tháng <b>{month.format('MM/YYYY')}</b> · {trips.length} lệnh điều động{selectedDriver ? <> · tài xế <b>{selectedDriver.full_name}</b></> : ''} · một dòng = một chuyến, đúng bố cục form theo dõi chi phí tài xế</>}
+        subtitle={<>Tháng <b>{month.format('MM/YYYY')}</b> · {loadErr ? 'chưa tải được số liệu' : `${trips.length} lệnh điều động`}{selectedDriver ? <> · tài xế <b>{selectedDriver.full_name}</b></> : ''} · một dòng = một chuyến, đúng bố cục form theo dõi chi phí tài xế</>}
         extra={(
           <Space wrap>
             <DatePicker picker="month" value={month} onChange={(d) => d && setMonth(d.startOf('month'))} format="MM/YYYY" allowClear={false} />
@@ -314,7 +332,10 @@ export default function FleetCostPage() {
             <Select allowClear showSearch placeholder="Đầu kéo" style={{ width: 150 }} value={vehicleId || undefined} onChange={(v) => setVehicleId(v || null)}
               options={vehicles.map((v) => ({ value: v.id, label: v.plate }))} filterOption={(i, o) => String(o?.label || '').toLowerCase().includes(i.toLowerCase())} />
             <Tooltip title="Tải lại"><Button icon={<ReloadOutlined />} onClick={load} loading={loading} /></Tooltip>
-            <Button icon={<FileExcelOutlined />} onClick={doExport} loading={exporting} disabled={!trips.length}>Xuất Excel</Button>
+            {/* Khoá khi đang tải / tải hỏng: số trên màn chưa chắc thuộc tháng đang chọn → không xuất file mang tên tháng này */}
+            <Tooltip title={loadErr ? 'Chưa tải được số liệu tháng này — bấm Thử lại trước khi xuất' : ''}>
+              <Button icon={<FileExcelOutlined />} onClick={doExport} loading={exporting} disabled={loading || !!loadErr || !trips.length}>Xuất Excel</Button>
+            </Tooltip>
             <Tooltip title={driverId ? 'Gom chuyến có chi phí + tạm ứng của tài xế này thành phiếu đề nghị thanh toán' : 'Chọn một tài xế trước'}>
               <Button type="primary" icon={<FileTextOutlined />} onClick={openPr} disabled={!driverId} style={driverId ? { background: GOLD, borderColor: GOLD, color: '#0D2E25', fontWeight: 600 } : undefined}>Lập đề nghị thanh toán</Button>
             </Tooltip>
@@ -322,6 +343,7 @@ export default function FleetCostPage() {
         )}
       />
 
+      <PageState error={loadErr} onRetry={load}>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <Kpi label="Chuyến" value={kpi.n} sub={`${trips.filter((t) => t.is_hired).length} thuê ngoài · ${fmtAmt(kpi.km)} km`} icon={<CarOutlined />} />
         <Kpi label="Chi được tính" value={`${fmtAmt(kpi.counted)} ₫`} sub={kpi.countedLak ? `+ ${fmtAmt(kpi.countedLak)} LAK · quy đổi ${fmtAmt(kpi.countedEq)} ₫` : COUNTED_SUB} icon={<DollarOutlined />} />
@@ -383,7 +405,7 @@ export default function FleetCostPage() {
                   { title: <Th main="Được tính" sub="VNĐ" />, dataIndex: 'vnd', width: 140, align: 'right' as const, render: (v: number) => <span style={MONO}>{v ? fmtAmt(v) : ''}</span> },
                   { title: <Th main="Được tính" sub="LAK" />, dataIndex: 'lak', width: 140, align: 'right' as const, render: (v: number) => <span style={MONO}>{v ? fmtAmt(v) : ''}</span> },
                   { title: <Th main="Quy đổi" sub="₫" />, dataIndex: 'eq', width: 140, align: 'right' as const, render: (v: number) => <b style={MONO}>{fmtAmt(v)}</b> },
-                  { title: 'Tỷ trọng', width: 100, align: 'right' as const, render: (_: unknown, r: { eq: number }) => kpi.countedEq ? `${(r.eq / kpi.countedEq * 100).toFixed(1)} %` : '' },
+                  { title: 'Tỷ trọng', width: 100, align: 'right' as const, render: (_: unknown, r: { eq: number }) => kpi.countedEq ? fmtPct(r.eq / kpi.countedEq * 100, 1) : '' },
                   { title: <Th main={UNCOUNTED_LABEL} sub="₫ · chờ quyết định" />, dataIndex: 'uncounted', width: 160, align: 'right' as const, render: (v: number) => <span style={{ ...MONO, color: AMBER }}>{v ? fmtAmt(v) : ''}</span> },
                 ]}
                 locale={{ emptyText: 'Không có khoản chi' }} />
@@ -400,14 +422,14 @@ export default function FleetCostPage() {
                   columns={[
                     { title: 'Phiếu', dataIndex: 'code', width: 120, render: (v: string) => <span style={{ ...MONO, fontWeight: 600 }}>{v}</span> },
                     { title: 'Ngày', dataIndex: 'advance_date', width: 100, render: fmtDate },
-                    { title: 'Tài xế', width: 180, render: (_: unknown, a: DriverAdvance) => a.driver?.full_name || '–' },
+                    { title: 'Tài xế', width: 180, render: (_: unknown, a: DriverAdvance) => a.driver?.full_name || DASH },
                     { title: 'Số tiền', width: 150, align: 'right' as const, render: (_: unknown, a: DriverAdvance) => <b style={MONO}>{fmtMoney(a.amount, a.currency)}</b> },
-                    { title: 'Chuyến', width: 130, render: (_: unknown, a: DriverAdvance) => a.dispatch_order ? <a style={MONO} onClick={() => navigate(`/logistics/dispatch/${a.dispatch_order!.id}`)}>{a.dispatch_order.code}</a> : <Text type="secondary">chưa gắn</Text> },
+                    { title: 'Chuyến', width: 130, render: (_: unknown, a: DriverAdvance) => a.dispatch_order ? <a style={MONO} onClick={() => openDispatch(a.dispatch_order!.id, a.dispatch_order!.code)}>{a.dispatch_order.code}</a> : <Text type="secondary">chưa gắn</Text> },
                     { title: 'Đối soát', width: 130, render: (_: unknown, a: DriverAdvance) => a.fleet_payment_request_id ? <Tag color="geekblue" style={{ margin: 0 }}>đã vào ĐNTT</Tag> : <Tag style={{ margin: 0 }}>chưa</Tag> },
-                    { title: 'Người chi', dataIndex: 'paid_by_name', width: 150, render: (v: string | null) => v || '–' },
+                    { title: 'Người chi', dataIndex: 'paid_by_name', width: 150, render: (v: string | null) => v || DASH },
                     { title: 'Ghi chú', dataIndex: 'note', render: (v: string | null) => v || '' },
                     { title: '', width: 50, render: (_: unknown, a: DriverAdvance) => a.fleet_payment_request_id ? null : (
-                      <Popconfirm title={`Xoá tạm ứng ${a.code}?`} onConfirm={async () => { try { await fleetCostService.removeAdvance(a.id); load() } catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) } }} okText="Xoá" cancelText="Huỷ">
+                      <Popconfirm title={`Xoá tạm ứng ${a.code}?`} description={`${fmtMoney(a.amount, a.currency)} — xoá hẳn khỏi sổ tạm ứng, không khôi phục được.`} okButtonProps={{ danger: true }} onConfirm={async () => { try { await fleetCostService.removeAdvance(a.id); message.success(`Đã xoá tạm ứng ${a.code}`); load() } catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi xoá tạm ứng')) } }} okText="Xoá" cancelText="Huỷ">
                         <Button size="small" type="text" danger icon={<DeleteOutlined />} />
                       </Popconfirm>
                     ) },
@@ -422,15 +444,15 @@ export default function FleetCostPage() {
             children: (
               <Table className="fleet-table" size="small" rowKey="dispatch_order_id" pagination={false} dataSource={trips.filter((t) => t.n_expenses > 0 && t.cost_status === 'open')}
                 columns={[
-                  { title: 'Lệnh', dataIndex: 'code', width: 130, render: (v: string, t: TripCostRow) => <a style={{ ...MONO, fontWeight: 600 }} onClick={() => navigate(`/logistics/dispatch/${t.dispatch_order_id}`)}>{v}</a> },
+                  { title: 'Lệnh', dataIndex: 'code', width: 130, render: (v: string, t: TripCostRow) => <a style={{ ...MONO, fontWeight: 600 }} onClick={() => openDispatch(t.dispatch_order_id, t.code)}>{v}</a> },
                   { title: 'Ngày đi', dataIndex: 'dispatch_date', width: 100, render: fmtDate },
-                  { title: 'Tài xế', dataIndex: 'driver_name', width: 160, render: (v: string | null) => v || '–' },
-                  { title: 'Xe', dataIndex: 'tractor_plate', width: 110, render: (v: string | null) => <span style={MONO}>{v || '–'}</span> },
+                  { title: 'Tài xế', dataIndex: 'driver_name', width: 160, render: (v: string | null) => v || DASH },
+                  { title: 'Xe', dataIndex: 'tractor_plate', width: 110, render: (v: string | null) => <span style={MONO}>{v || DASH}</span> },
                   { title: 'Số khoản', dataIndex: 'n_expenses', width: 90, align: 'right' as const },
                   { title: 'Chi được tính', width: 150, align: 'right' as const, render: (_: unknown, t: TripCostRow) => <Pair vnd={t.counted_vnd} lak={t.counted_lak} tone={BRAND} bold /> },
                   { title: 'Chứng từ', dataIndex: 'n_missing_receipt', width: 120, render: (v: number) => v ? <Tag color="orange" style={{ margin: 0 }}>thiếu {v}</Tag> : <Tag color="green" style={{ margin: 0 }}>đủ</Tag> },
                   { title: 'ĐNTT', width: 130, render: (_: unknown, t: TripCostRow) => t.payment_request_code ? <Tag color="geekblue" style={{ margin: 0, ...MONO }}>{t.payment_request_code}</Tag> : <Text type="secondary">chưa lập</Text> },
-                  { title: '', render: (_: unknown, t: TripCostRow) => <Button size="small" onClick={() => navigate(`/logistics/dispatch/${t.dispatch_order_id}`)}>Mở lệnh</Button> },
+                  { title: '', render: (_: unknown, t: TripCostRow) => <Button size="small" onClick={() => openDispatch(t.dispatch_order_id, t.code)}>Mở lệnh</Button> },
                 ]}
                 locale={{ emptyText: 'Không có chuyến nào chờ duyệt' }} />
             ),
@@ -447,6 +469,7 @@ export default function FleetCostPage() {
           },
         ]} />
       </Card>
+      </PageState>
 
       {/* ── Modal: chi tạm ứng ── */}
       <Modal title="Chi tạm ứng cho tài xế" open={advOpen} onOk={saveAdvance} confirmLoading={saving} onCancel={() => setAdvOpen(false)} okText="Ghi tạm ứng" cancelText="Huỷ" destroyOnHidden>
@@ -462,7 +485,7 @@ export default function FleetCostPage() {
           {advCurrencyWatch === 'LAK' && <Form.Item name="fx_rate_vnd" label="1 LAK = ? ₫" rules={[{ required: true, message: 'Cần tỷ giá để khấu trừ khi thanh toán' }]} style={{ width: 200 }}><InputNumber min={0.0001} step={0.01} style={{ width: '100%' }} /></Form.Item>}
           <Form.Item name="dispatch_order_id" label="Gắn chuyến (tuỳ chọn)">
             <Select allowClear showSearch placeholder="Lệnh trong tháng của tài xế này"
-              options={trips.filter((t) => !advDriverWatch || t.driver_id === advDriverWatch).map((t) => ({ value: t.dispatch_order_id, label: `${t.code} · ${dayjs(t.dispatch_date).format('DD/MM')} · ${t.destination || t.route_name || TRIP_TYPE_LABELS[t.trip_type as TripType] || ''}` }))}
+              options={trips.filter((t) => !advDriverWatch || t.driver_id === advDriverWatch).map((t) => ({ value: t.dispatch_order_id, label: `${t.code} · ${fmtD(t.dispatch_date)} · ${t.destination || t.route_name || TRIP_TYPE_LABELS[t.trip_type as TripType] || ''}` }))}
               filterOption={(i, o) => String(o?.label || '').toLowerCase().includes(i.toLowerCase())} />
           </Form.Item>
           <Form.Item name="paid_by_name" label="Người chi tiền"><Input maxLength={100} /></Form.Item>
@@ -492,7 +515,7 @@ export default function FleetCostPage() {
               columns={[
                 { title: 'Lệnh', dataIndex: 'code', width: 120, render: (v: string) => <span style={{ ...MONO, fontWeight: 600 }}>{v}</span> },
                 { title: 'Đi – về', width: 110, render: (_: unknown, t: TripCostRow) => `${fmtD(t.dispatch_date)}${t.return_date ? ` – ${fmtD(t.return_date)}` : ''}` },
-                { title: 'Hành trình', render: (_: unknown, t: TripCostRow) => t.route_name || [t.pickup_location, t.destination].filter(Boolean).join(' → ') || '–' },
+                { title: 'Hành trình', render: (_: unknown, t: TripCostRow) => t.route_name || [t.pickup_location, t.destination].filter(Boolean).join(' → ') || DASH },
                 { title: 'Khoản', dataIndex: 'n_expenses', width: 70, align: 'right' as const },
                 { title: 'Duyệt CP', width: 100, render: (_: unknown, t: TripCostRow) => t.cost_status === 'reviewed' ? <Tag color="green" style={{ margin: 0 }}>đã khoá</Tag> : <Tag color="gold" style={{ margin: 0 }}>chưa</Tag> },
                 { title: 'Chi được tính (₫)', width: 150, align: 'right' as const, render: (_: unknown, t: TripCostRow) => <b style={MONO}>{fmtAmt(t.counted_driver_vnd_equiv)}</b> },

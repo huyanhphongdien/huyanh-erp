@@ -30,8 +30,8 @@ import {
   DealWeighbridgeSummary,
   DealWmsOverview,
 } from '../../services/b2b/dealWmsService'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import PageState from '../common/PageState'
+import { fmtDate, fmtKg, fmtNum, fmtPct, fmtVnd, fmtVndNum } from '../../utils/format'
 
 const { Text } = Typography
 
@@ -39,17 +39,11 @@ const { Text } = Typography
 // HELPERS
 // ============================================
 
-const formatDate = (dateStr: string | null): string => {
-  if (!dateStr) return '-'
-  return format(new Date(dateStr), 'dd/MM/yyyy', { locale: vi })
-}
-
+// Rút gọn có chủ đích cho cột hẹp: ≥ 1 tấn → "T", nhỏ hơn → kg (số theo vi-VN).
 const formatWeight = (kg: number): string => {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)} T`
-  return `${kg.toLocaleString('vi-VN')} kg`
+  if (kg >= 1000) return `${fmtNum(kg / 1000, 1)} T`
+  return `${fmtKg(kg, 3)} kg`
 }
-
-const fmtMoney = (v: number | null): string => (v ? v.toLocaleString('vi-VN') : '0')
 
 // Ô thống kê nhỏ trong dải stats
 const StatChip = ({ label, value }: { label: string; value: string }) => (
@@ -59,12 +53,17 @@ const StatChip = ({ label, value }: { label: string; value: string }) => (
   </div>
 )
 
+// Trạng thái phiếu nhập kho (draft/confirmed/cancelled) + phiếu cân (weighing_gross/
+// weighing_tare/completed — mã thật của weighbridge_tickets.status; trước đây thiếu 2 mã
+// "đang cân" nên cột TT in thẳng 'weighing_tare'). pending/in_progress giữ cho dữ liệu cũ.
 const STATUS_COLORS: Record<string, string> = {
   draft: 'default',
   confirmed: 'green',
   cancelled: 'red',
   pending: 'orange',
   in_progress: 'blue',
+  weighing_gross: 'blue',
+  weighing_tare: 'gold',
   completed: 'green',
 }
 
@@ -74,6 +73,8 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Đã hủy',
   pending: 'Chờ cân',
   in_progress: 'Đang cân',
+  weighing_gross: 'Chờ cân L1',
+  weighing_tare: 'Chờ cân L2',
   completed: 'Hoàn thành',
 }
 
@@ -88,6 +89,8 @@ interface DealWmsTabProps {
 const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [stockIns, setStockIns] = useState<DealStockInSummary[]>([])
   const [weighbridges, setWeighbridges] = useState<DealWeighbridgeSummary[]>([])
   const [overview, setOverview] = useState<DealWmsOverview | null>(null)
@@ -96,6 +99,7 @@ const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
     const loadData = async () => {
       try {
         setLoading(true)
+        setLoadError(null)
         const [sis, wbs, ov] = await Promise.all([
           dealWmsService.getStockInsByDeal(dealId),
           dealWmsService.getWeighbridgeByDeal(dealId),
@@ -106,15 +110,21 @@ const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
         setOverview(ov)
       } catch (error) {
         console.error('Load DealWmsTab error:', error)
+        setLoadError(error)
       } finally {
         setLoading(false)
       }
     }
     loadData()
-  }, [dealId])
+  }, [dealId, reloadKey])
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>
+  }
+
+  // Lỗi xét TRƯỚC trống — đừng báo "chưa có dữ liệu nhập kho" khi thật ra tải hỏng
+  if (loadError) {
+    return <PageState error={loadError} onRetry={() => setReloadKey(k => k + 1)} />
   }
 
   if (!overview) {
@@ -128,7 +138,7 @@ const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
   const remainingKg = targetKg - deliveredKg
   const isEnough = targetKg > 0 && deliveredKg >= targetKg
   const isOver = targetKg > 0 && deliveredKg > targetKg * 1.001
-  const fmtT = (kg: number) => (kg / 1000).toFixed(2)
+  const fmtT = (kg: number) => fmtNum(kg / 1000, 2)
   const progressTag = isOver
     ? { color: 'orange', label: `Vượt ${fmtT(-remainingKg)} T` }
     : isEnough
@@ -168,7 +178,7 @@ const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
         <Col xs={12} sm={6}>
           <Statistic
             title="Đã nhận"
-            value={(overview.total_received_kg / 1000).toFixed(1)}
+            value={fmtNum(overview.total_received_kg / 1000, 1)}
             suffix="tấn"
             valueStyle={{ color: '#1B4D3E' }}
           />
@@ -229,7 +239,7 @@ const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
           {
             title: 'Ngày xác nhận',
             dataIndex: 'confirmed_at',
-            render: (d: string | null) => formatDate(d),
+            render: (d: string | null) => fmtDate(d),
           },
         ]}
         size="small"
@@ -259,10 +269,10 @@ const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
             {/* Dải thống kê */}
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12, padding: '10px 14px', background: '#FAFAFA', border: '1px solid #f0f0f0', borderRadius: 8 }}>
               <StatChip label="Số phiếu" value={String(weighbridges.length)} />
-              <StatChip label="Tổng Net" value={`${(totalNet / 1000).toFixed(2)} T`} />
-              <StatChip label="Tổng khô" value={`${(totalDry / 1000).toFixed(2)} T`} />
-              <StatChip label="DRC bình quân" value={avgDrc != null ? `${avgDrc}%` : '—'} />
-              <StatChip label="Tổng giá trị" value={`${fmtMoney(totalValue)} đ`} />
+              <StatChip label="Tổng Net" value={`${fmtNum(totalNet / 1000, 2)} T`} />
+              <StatChip label="Tổng khô" value={`${fmtNum(totalDry / 1000, 2)} T`} />
+              <StatChip label="DRC bình quân" value={fmtPct(avgDrc, 1)} />
+              <StatChip label="Tổng giá trị" value={fmtVnd(totalValue)} />
             </div>
 
             <Table
@@ -273,24 +283,24 @@ const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
               scroll={{ x: 'max-content' }}
               columns={[
                 { title: '#', width: 40, align: 'center' as const, render: (_: any, __: any, i: number) => i + 1 },
-                { title: 'Ngày', dataIndex: 'completed_at', width: 95, render: (d: string | null, r: any) => formatDate(d || r.created_at) },
+                { title: 'Ngày', dataIndex: 'completed_at', width: 95, render: (d: string | null, r: any) => fmtDate(d || r.created_at) },
                 { title: 'Mã cân', dataIndex: 'code', width: 130 },
                 { title: 'Xe', dataIndex: 'vehicle_plate', width: 90 },
-                { title: 'Net (kg)', dataIndex: 'net_weight', align: 'right' as const, render: (v: number | null) => v ? v.toLocaleString('vi-VN') : '-' },
-                { title: 'DRC', dataIndex: 'drc', align: 'center' as const, width: 60, render: (v: number | null) => v != null ? `${v}%` : '-' },
-                { title: 'KL khô (kg)', dataIndex: 'dry_weight', align: 'right' as const, render: (v: number | null) => v != null ? v.toLocaleString('vi-VN') : '-' },
-                { title: 'Thành tiền', dataIndex: 'amount', align: 'right' as const, render: (v: number | null) => v != null ? v.toLocaleString('vi-VN') : '-' },
-                { title: 'Cộng dồn (kg)', dataIndex: '_cum', align: 'right' as const, render: (v: number) => <Text type="secondary">{v.toLocaleString('vi-VN')}</Text> },
+                { title: 'Net (kg)', dataIndex: 'net_weight', align: 'right' as const, render: (v: number | null) => fmtKg(v) },
+                { title: 'DRC', dataIndex: 'drc', align: 'center' as const, width: 60, render: (v: number | null) => fmtPct(v, 2) },
+                { title: 'KL khô (kg)', dataIndex: 'dry_weight', align: 'right' as const, render: (v: number | null) => fmtKg(v) },
+                { title: 'Thành tiền (₫)', dataIndex: 'amount', align: 'right' as const, render: (v: number | null) => fmtVndNum(v) },
+                { title: 'Cộng dồn (kg)', dataIndex: '_cum', align: 'right' as const, render: (v: number) => <Text type="secondary">{fmtKg(v)}</Text> },
                 { title: 'TT', dataIndex: 'status', width: 100, render: (s: string) => (<Tag color={STATUS_COLORS[s] || 'default'}>{STATUS_LABELS[s] || s}</Tag>) },
               ]}
               summary={() => (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={{ background: '#FFFBEB' }}>
                     <Table.Summary.Cell index={0} colSpan={4}><Text strong>TỔNG CỘNG</Text></Table.Summary.Cell>
-                    <Table.Summary.Cell index={4} align="right"><Text strong>{totalNet.toLocaleString('vi-VN')}</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={4} align="right"><Text strong>{fmtKg(totalNet)}</Text></Table.Summary.Cell>
                     <Table.Summary.Cell index={5} />
-                    <Table.Summary.Cell index={6} align="right"><Text strong>{totalDry.toLocaleString('vi-VN')}</Text></Table.Summary.Cell>
-                    <Table.Summary.Cell index={7} align="right"><Text strong style={{ color: '#92400E' }}>{totalValue.toLocaleString('vi-VN')}</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={6} align="right"><Text strong>{fmtKg(totalDry)}</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={7} align="right"><Text strong style={{ color: '#92400E' }}>{fmtVndNum(totalValue)}</Text></Table.Summary.Cell>
                     <Table.Summary.Cell index={8} />
                     <Table.Summary.Cell index={9} />
                   </Table.Summary.Row>

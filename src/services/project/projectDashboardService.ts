@@ -11,6 +11,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
 
 // ============================================
 // INTERFACES
@@ -322,7 +323,8 @@ export const projectDashboardService = {
     // 2. Tasks đến hạn trong 7 ngày
     const weekLater = new Date()
     weekLater.setDate(weekLater.getDate() + 7)
-    const weekLaterStr = weekLater.toISOString().split('T')[0]
+    // Ngày theo giờ VN — toISOString() trước 7h sáng ra ngày hôm trước (UTC)
+    const weekLaterStr = toDateStrVN(weekLater)
 
     const { data: tasks } = await supabase
       .from('tasks')
@@ -481,8 +483,9 @@ export const projectDashboardService = {
     const today = new Date()
     const futureDate = new Date()
     futureDate.setDate(today.getDate() + days)
-    const todayStr = today.toISOString().split('T')[0]
-    const futureStr = futureDate.toISOString().split('T')[0]
+    // Ngày theo giờ VN — toISOString() trước 7h sáng ra ngày hôm trước (UTC)
+    const todayStr = toDateStrVN(today)
+    const futureStr = toDateStrVN(futureDate)
 
     let query = supabase
       .from('project_milestones')

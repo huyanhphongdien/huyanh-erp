@@ -47,6 +47,8 @@ import {
   REGION_OPTIONS,
 } from '../../../services/b2b/demandService'
 import { supabase } from '../../../lib/supabase'
+import { vndInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import dayjs from 'dayjs'
 
 const { Title, Text } = Typography
@@ -181,28 +183,26 @@ const Step1GeneralInfo = ({ form, onNext }: Step1Props) => {
 
         <Row gutter={24}>
           <Col xs={24} md={12}>
-            <Form.Item name="price_min" label="Giá tối thiểu (đ/kg)">
+            <Form.Item name="price_min" label="Giá tối thiểu (₫/kg)">
               <InputNumber
                 style={{ width: '100%' }}
                 min={0}
                 step={100}
-                placeholder="VD: 25,000"
-                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => value!.replace(/\$\s?|(,*)/g, '') as any}
-                addonAfter="đ/kg"
+                placeholder="VD: 25.000"
+                {...vndInputProps}
+                addonAfter="₫/kg"
               />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="price_max" label="Giá tối đa (đ/kg)">
+            <Form.Item name="price_max" label="Giá tối đa (₫/kg)">
               <InputNumber
                 style={{ width: '100%' }}
                 min={0}
                 step={100}
-                placeholder="VD: 35,000"
-                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => value!.replace(/\$\s?|(,*)/g, '') as any}
-                addonAfter="đ/kg"
+                placeholder="VD: 35.000"
+                {...vndInputProps}
+                addonAfter="₫/kg"
               />
             </Form.Item>
           </Col>
@@ -243,14 +243,13 @@ const Step1GeneralInfo = ({ form, onNext }: Step1Props) => {
             <Divider>Thông tin gia công</Divider>
             <Row gutter={24}>
               <Col xs={24} md={8}>
-                <Form.Item name="processing_fee_per_ton" label="Phí gia công (đ/tấn)">
+                <Form.Item name="processing_fee_per_ton" label="Phí gia công (₫/tấn)">
                   <InputNumber
                     style={{ width: '100%' }}
                     min={0}
-                    formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => value!.replace(/\$\s?|(,*)/g, '') as any}
+                    {...vndInputProps}
                     placeholder="Nhập phí gia công"
-                    addonAfter="đ/tấn"
+                    addonAfter="₫/tấn"
                   />
                 </Form.Item>
               </Col>
@@ -409,10 +408,10 @@ const Step2DetailsConfirm = ({
           {(values.price_min || values.price_max) && (
             <Descriptions.Item label="Khoảng giá">
               {values.price_min && values.price_max
-                ? `${values.price_min.toLocaleString('vi-VN')} - ${values.price_max.toLocaleString('vi-VN')} đ/kg`
+                ? `${values.price_min.toLocaleString('vi-VN')} - ${values.price_max.toLocaleString('vi-VN')} ₫/kg`
                 : values.price_min
-                  ? `>= ${values.price_min.toLocaleString('vi-VN')} đ/kg`
-                  : `<= ${values.price_max.toLocaleString('vi-VN')} đ/kg`}
+                  ? `>= ${values.price_min.toLocaleString('vi-VN')} ₫/kg`
+                  : `<= ${values.price_max.toLocaleString('vi-VN')} ₫/kg`}
             </Descriptions.Item>
           )}
           {values.deadline && (
@@ -427,7 +426,7 @@ const Step2DetailsConfirm = ({
           )}
           {values.demand_type === 'processing' && values.processing_fee_per_ton && (
             <Descriptions.Item label="Phí gia công">
-              {values.processing_fee_per_ton.toLocaleString('vi-VN')} đ/tấn
+              {values.processing_fee_per_ton.toLocaleString('vi-VN')} ₫/tấn
             </Descriptions.Item>
           )}
           {values.demand_type === 'processing' && values.expected_output_rate && (
@@ -533,6 +532,8 @@ const DemandCreatePage = () => {
         setWarehouses(data || [])
       } catch (error) {
         console.error('Error fetching warehouses:', error)
+        // Ô chọn kho trống vì LỖI chứ không phải không có kho — báo rõ
+        message.error(dichLoiHeThong(error, 'Không tải được danh sách kho NVL'))
       }
     }
 
@@ -573,7 +574,7 @@ const DemandCreatePage = () => {
         })
       } catch (error) {
         console.error('Error loading demand:', error)
-        message.error('Không thể tải nhu cầu')
+        message.error(dichLoiHeThong(error, 'Không thể tải nhu cầu'))
       } finally {
         setLoadingDemand(false)
       }
@@ -624,7 +625,7 @@ const DemandCreatePage = () => {
       message.success('Đã lưu nháp nhu cầu!')
     } catch (error) {
       console.error('Error creating demand:', error)
-      message.error('Không thể tạo nhu cầu')
+      message.error(dichLoiHeThong(error, 'Không thể tạo nhu cầu'))
     } finally {
       setSubmitting(false)
     }
@@ -644,7 +645,7 @@ const DemandCreatePage = () => {
       message.success('Đã tạo và đăng nhu cầu!')
     } catch (error) {
       console.error('Error creating and publishing demand:', error)
-      message.error('Không thể tạo nhu cầu')
+      message.error(dichLoiHeThong(error, 'Không thể tạo nhu cầu'))
     } finally {
       setSubmitting(false)
     }
@@ -660,7 +661,7 @@ const DemandCreatePage = () => {
       navigate(`/b2b/demands/${editId}`)
     } catch (error) {
       console.error('Error updating demand:', error)
-      message.error('Không thể cập nhật nhu cầu')
+      message.error(dichLoiHeThong(error, 'Không thể cập nhật nhu cầu'))
     } finally {
       setSubmitting(false)
     }

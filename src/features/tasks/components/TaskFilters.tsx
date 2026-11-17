@@ -11,6 +11,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, X, ChevronDown, ChevronUp, Lock } from 'lucide-react';
+import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS } from '../../../types';
+import { addDaysStr, toDateStrVN, todayVN } from '../../../utils/dateVN';
+import { fmtDate } from '../../../utils/format';
 
 // ============================================================================
 // TYPES
@@ -62,20 +65,21 @@ export const DEFAULT_FILTERS: TaskFiltersValue = {
 };
 
 // ✅ STATUS_OPTIONS - Khớp với constraint: draft, in_progress, paused, finished, cancelled
+// Nhãn đọc từ TASK_STATUS_LABELS (types/index.ts) — một chữ cho cả hệ ("Đang làm", không "Đang thực hiện")
 const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Nháp', color: 'bg-gray-100 text-gray-600' },
-  { value: 'in_progress', label: 'Đang thực hiện', color: 'bg-blue-100 text-blue-700' },
-  { value: 'paused', label: 'Tạm dừng', color: 'bg-yellow-100 text-yellow-700' },
-  { value: 'finished', label: 'Hoàn thành', color: 'bg-green-100 text-green-700' },
-  { value: 'cancelled', label: 'Đã hủy', color: 'bg-red-100 text-red-700' },
+  { value: 'draft', label: TASK_STATUS_LABELS.draft, color: 'bg-gray-100 text-gray-600' },
+  { value: 'in_progress', label: TASK_STATUS_LABELS.in_progress, color: 'bg-blue-100 text-blue-700' },
+  { value: 'paused', label: TASK_STATUS_LABELS.paused, color: 'bg-yellow-100 text-yellow-700' },
+  { value: 'finished', label: TASK_STATUS_LABELS.finished, color: 'bg-green-100 text-green-700' },
+  { value: 'cancelled', label: TASK_STATUS_LABELS.cancelled, color: 'bg-red-100 text-red-700' },
 ];
 
 // ✅ PRIORITY_OPTIONS - Khớp với constraint: low, medium, high, urgent
 const PRIORITY_OPTIONS = [
-  { value: 'low', label: 'Thấp', color: 'bg-gray-100 text-gray-700' },
-  { value: 'medium', label: 'Trung bình', color: 'bg-blue-100 text-blue-700' },
-  { value: 'high', label: 'Cao', color: 'bg-orange-100 text-orange-700' },
-  { value: 'urgent', label: 'Khẩn cấp', color: 'bg-red-100 text-red-700' },
+  { value: 'low', label: TASK_PRIORITY_LABELS.low, color: 'bg-gray-100 text-gray-700' },
+  { value: 'medium', label: TASK_PRIORITY_LABELS.medium, color: 'bg-blue-100 text-blue-700' },
+  { value: 'high', label: TASK_PRIORITY_LABELS.high, color: 'bg-orange-100 text-orange-700' },
+  { value: 'urgent', label: TASK_PRIORITY_LABELS.urgent, color: 'bg-red-100 text-red-700' },
 ];
 
 // ============================================================================
@@ -417,12 +421,10 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({
                 icon="⚠️"
                 active={false}
                 onClick={() => {
-                  // Quá hạn = due_date < today (không bao gồm hôm nay)
-                  const today = new Date();
-                  const yesterday = new Date(today);
-                  yesterday.setDate(today.getDate() - 1);
-                  const yesterdayStr = yesterday.toISOString().split('T')[0];
-                  
+                  // Quá hạn = due_date < today (không bao gồm hôm nay) — ngày theo giờ VN
+                  // (toISOString cũ ra ngày UTC: trước 7h sáng bị lùi thêm 1 ngày)
+                  const yesterdayStr = addDaysStr(todayVN(), -1);
+
                   onChange({ 
                     ...DEFAULT_FILTERS,
                     due_date_to: yesterdayStr,
@@ -436,7 +438,7 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({
                 icon="📅"
                 active={false}
                 onClick={() => {
-                  const today = new Date().toLocaleDateString('sv-SE');
+                  const today = todayVN();
                   onChange({ ...DEFAULT_FILTERS, due_date_from: today, due_date_to: today });
                 }}
               />
@@ -447,18 +449,20 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({
                 onClick={() => {
                   const today = new Date();
                   const startOfWeek = new Date(today);
-                  startOfWeek.setDate(today.getDate() - today.getDay() + 1);
+                  // Thứ 2 của tuần hiện tại (Chủ nhật thuộc tuần đang chạy, không nhảy sang tuần sau)
+                  const dow = today.getDay();
+                  startOfWeek.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
                   const endOfWeek = new Date(startOfWeek);
                   endOfWeek.setDate(startOfWeek.getDate() + 6);
-                  onChange({ 
-                    ...DEFAULT_FILTERS, 
-                    due_date_from: startOfWeek.toISOString().split('T')[0],
-                    due_date_to: endOfWeek.toISOString().split('T')[0],
+                  onChange({
+                    ...DEFAULT_FILTERS,
+                    due_date_from: toDateStrVN(startOfWeek),
+                    due_date_to: toDateStrVN(endOfWeek),
                   });
                 }}
               />
               <QuickFilterButton
-                label="Đang thực hiện"
+                label={TASK_STATUS_LABELS.in_progress}
                 icon="🔄"
                 active={safeValue.status.includes('in_progress')}
                 onClick={() => onChange({ ...DEFAULT_FILTERS, status: ['in_progress'] })}
@@ -526,7 +530,7 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({
           )}
           {(safeValue.due_date_from || safeValue.due_date_to) && (
             <FilterTag 
-              label={`Hạn: ${safeValue.due_date_from || '...'} → ${safeValue.due_date_to || '...'}`}
+              label={`Hạn: ${safeValue.due_date_from ? fmtDate(safeValue.due_date_from) : '...'} → ${safeValue.due_date_to ? fmtDate(safeValue.due_date_to) : '...'}`}
               onRemove={() => onChange({ ...safeValue, due_date_from: null, due_date_to: null })}
             />
           )}

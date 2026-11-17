@@ -26,6 +26,12 @@ import {
   type CreatePaymentInput,
   type OrderPaymentBreakdown,
 } from '../../../services/sales/salesOrderPaymentService'
+import { fmtUsd, fmtDate, usdInputProps } from '../../../utils/format'
+import { vndInputProps } from '../../../services/sales/salesMoney'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
+// Luật chọn lô / loại khoản thu DÙNG CHUNG với QuickPayModal (audit 17/11/2026)
+import { LotSelect, LOT_PAY_STATUS_TAG, oldestUnpaidLot, defaultPaymentType } from './payments/LotPaymentFields'
 
 interface Props {
   orderId: string
@@ -34,16 +40,15 @@ interface Props {
   onSaved: () => void
 }
 
-const fmtUSD = (v: number) => new Intl.NumberFormat('en-US', {
-  style: 'currency', currency: 'USD', maximumFractionDigits: 2,
-}).format(v)
-
-const fmtDate = (d: string | undefined | null) => d ? dayjs(d).format('DD/MM/YYYY') : '—'
+/** USD giữ cent: tiền về đối chiếu sao kê ngân hàng. */
+const fmtUSD = (v: number) => fmtUsd(v, 2)
 
 export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit, onSaved }: Props) {
   const [payments, setPayments] = useState<SalesOrderPayment[]>([])
   const [breakdown, setBreakdown] = useState<OrderPaymentBreakdown | null>(null)
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có khoản thu nào" — trước đây toast rồi hiện màn trống giả
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<SalesOrderPayment | null>(null)
   const [saving, setSaving] = useState(false)
@@ -52,14 +57,15 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
   const load = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const [data, bd] = await Promise.all([
         salesOrderPaymentService.listByOrder(orderId),
         salesOrderPaymentService.getLotBreakdown(orderId).catch(() => null),
       ])
       setPayments(data)
       setBreakdown(bd)
-    } catch (e: any) {
-      message.error(e.message || 'Không thể tải lịch sử thanh toán')
+    } catch (e: unknown) {
+      setLoadError(e || true)
     } finally {
       setLoading(false)
     }
@@ -74,32 +80,32 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
   const isPaid = totalValueUsd > 0 && totalPaid >= totalValueUsd
   const totalFee = payments.reduce((s, p) => s + Number(p.fee_amount || 0), 0)
 
-  /**
-   * Lô còn nợ CŨ NHẤT — mặc định khi mở form thêm khoản thu.
-   * Cùng luật với QuickPayModal; hai màn lệch nhau là hai thói quen nhập khác nhau.
-   * ⚠ Không chia đều tiền cho các lô: chia ĐỀU chính là prorata đội tên khác.
-   */
-  const oldestUnpaidLot = (): number | null => {
-    if (!breakdown?.hasLots) return null
-    const owing = breakdown.lots
-      .filter((l) => l.lotValue - l.paidAmount > 0.01)
-      .sort((a, b) => a.lotNo - b.lotNo)
-    return owing.length ? owing[0].lotNo : null
-  }
+  // Lô còn nợ cũ nhất + loại khoản thu mặc định: luật CHUNG ở payments/LotPaymentFields
+  // (trước đây chép tay 2 bản ở đây và QuickPayModal, đã lệch mặc định loại khoản thu).
+  const suggestType = (amount: number | null | undefined, lotNo: number | null | undefined): PaymentType =>
+    defaultPaymentType({ totalPaid, orderOutstanding: remaining, amount, lotNo })
 
   const openAdd = () => {
     setEditing(null)
     form.resetFields()
     // Chọn sẵn lô nợ cũ nhất: bỏ trống ô lô KHÔNG được là đường dễ nhất nữa. Trước đây
     // mặc định là "cả đơn" nên chưa khoản thu nào trong hệ thống có số lô.
-    const lot = oldestUnpaidLot()
+    const lot = oldestUnpaidLot(breakdown)
     form.setFieldsValue({
       payment_date: dayjs(),
       currency: 'USD',
       lot_no: lot,
-      payment_type: remaining > 0 ? (totalPaid === 0 ? 'deposit' : 'installment') : 'other',
+      payment_type: suggestType(null, lot),
     })
     setModalOpen(true)
+  }
+
+  /** Gõ số tiền / đổi lô khi THÊM mới → gợi ý lại loại khoản thu (trừ khi người nhập đã tự chọn). */
+  const onFormValuesChange = (changed: Record<string, unknown>) => {
+    if (editing) return
+    if (!('amount' in changed) && !('lot_no' in changed)) return
+    if (form.isFieldTouched('payment_type')) return
+    form.setFieldsValue({ payment_type: suggestType(form.getFieldValue('amount'), form.getFieldValue('lot_no')) })
   }
 
   const openEdit = (p: SalesOrderPayment) => {
@@ -140,8 +146,8 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
       load()
       onSaved()
     } catch (e: any) {
-      if (e.errorFields) return
-      message.error(e.message || 'Không thể lưu')
+      if (e?.errorFields) return
+      message.error(dichLoiHeThong(e, 'Không thể lưu khoản thu'))
     } finally {
       setSaving(false)
     }
@@ -153,8 +159,8 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
       message.success('Đã xóa khoản thu')
       load()
       onSaved()
-    } catch (e: any) {
-      message.error(e.message || 'Không thể xóa')
+    } catch (e: unknown) {
+      message.error(dichLoiHeThong(e, 'Không thể xóa khoản thu'))
     }
   }
 
@@ -173,6 +179,8 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 16 }}><Spin size="small" /></div>
+      ) : loadError ? (
+        <PageState error={loadError} onRetry={load} minHeight={100} />
       ) : payments.length === 0 ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có khoản thu nào" style={{ margin: '12px 0' }} />
       ) : (
@@ -220,7 +228,12 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
               {canEdit && (
                 <Space size={2}>
                   <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openEdit(p)} />
-                  <Popconfirm title="Xóa khoản thu?" onConfirm={() => handleDelete(p.id)}>
+                  <Popconfirm
+                    title="Xóa khoản thu này?"
+                    description={`${fmtUSD(Number(p.amount))} ngày ${fmtDate(p.payment_date)} — số đã thu và trạng thái thanh toán của đơn sẽ tính lại.`}
+                    okText="Xóa khoản thu" cancelText="Không" okButtonProps={{ danger: true }}
+                    onConfirm={() => handleDelete(p.id)}
+                  >
                     <Button size="small" type="text" danger icon={<DeleteOutlined />} />
                   </Popconfirm>
                 </Space>
@@ -262,11 +275,10 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
                   {breakdown.unattributedPaid > 0 && <span style={{ color: '#999' }}> · {fmtUSD(breakdown.unattributedPaid)} chưa gán lô</span>}
                 </div>
                 {breakdown.lots.map((l) => {
-                  const c = l.status === 'paid' ? 'green' : l.status === 'partial' ? 'gold' : 'red'
-                  const lbl = l.status === 'paid' ? 'đã thu' : l.status === 'partial' ? 'thu 1 phần' : 'chưa thu'
+                  const st = LOT_PAY_STATUS_TAG[l.status]
                   return (
                     <div key={l.lotNo} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '1px 0' }}>
-                      <span>Lô {l.lotNo} <Tag color={c} style={{ margin: 0 }}>{lbl}</Tag></span>
+                      <span>Lô {l.lotNo} <Tag color={st.color} style={{ margin: 0 }}>{st.label}</Tag></span>
                       <span style={{ color: '#666' }}>{fmtUSD(l.paidAmount)} / {fmtUSD(l.lotValue)}</span>
                     </div>
                   )
@@ -288,55 +300,40 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
         cancelText="Hủy"
         width={560}
       >
-        <Form form={form} layout="vertical" size="small">
-          {/* ⚠ LUÔN hiện ô này. Bản cũ ẩn hẳn khi đơn chưa chia lô — mà đó là đa số đơn,
-              nên hầu hết người nhập chưa từng thấy ô này và không ai có thói quen ghi thu
-              kèm lô. Đơn chưa chia lô thì khoá ô + chỉ đường, VẪN CHO LƯU. */}
-          {breakdown?.hasLots ? (
-            <Form.Item label="Thu cho lô nào?" name="lot_no"
-              tooltip="Đã chọn sẵn lô còn nợ cũ nhất. Đổi nếu khách trả cho lô khác; chọn 'Cả đơn' khi tiền gộp nhiều lô.">
-              <Select
-                options={[
-                  ...breakdown.lots.map((l) => ({
-                    value: l.lotNo,
-                    label: `Lô ${l.lotNo} — trị giá ${fmtUSD(l.lotValue)} · còn nợ ${fmtUSD(Math.max(0, l.lotValue - l.paidAmount))}`,
-                  })),
-                  // "Cả đơn" xuống CUỐI: vẫn chọn được, chỉ thôi làm mặc định.
-                  { value: null, label: 'Cả đơn — chưa quy được về lô' },
-                ]} />
-            </Form.Item>
-          ) : (
-            <Form.Item label="Thu cho lô nào?"
-              tooltip="Đơn chưa chia lô nên khoản thu chỉ ghi được ở mức cả đơn.">
-              <Select disabled placeholder="Đơn này chưa chia lô" />
-            </Form.Item>
-          )}
+        <Form form={form} layout="vertical" size="small" onValuesChange={onFormValuesChange}>
+          {/* ⚠ LUÔN hiện ô này (LotSelect dùng chung với QuickPayModal). Đơn chưa chia lô thì
+              khoá ô + chỉ đường, VẪN CHO LƯU. */}
+          <Form.Item label="Thu cho lô nào?" name="lot_no"
+            tooltip={breakdown?.hasLots
+              ? "Đã chọn sẵn lô còn nợ cũ nhất. Đổi nếu khách trả cho lô khác; chọn 'Cả đơn' khi tiền gộp nhiều lô."
+              : 'Đơn chưa chia lô nên khoản thu chỉ ghi được ở mức cả đơn.'}>
+            <LotSelect breakdown={breakdown} />
+          </Form.Item>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
             <Form.Item label="Ngày trả" name="payment_date" rules={[{ required: true }]}>
               <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
             </Form.Item>
-            <Form.Item label="Loại khoản thu" name="payment_type" rules={[{ required: true }]}>
+            <Form.Item label="Loại khoản thu" name="payment_type" rules={[{ required: true }]}
+              tooltip="Gợi ý tự động theo số tiền & lô (tất toán / trả dần / đặt cọc) — đổi tay được.">
               <Select
                 options={Object.entries(PAYMENT_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
               />
             </Form.Item>
-            <Form.Item label="Số tiền" name="amount" rules={[{ required: true, type: 'number', min: 0.01 }]}>
-              <InputNumber style={{ width: '100%' }} min={0} step={0.01} placeholder="0.00" />
+            <Form.Item label="Số tiền (USD)" name="amount" rules={[{ required: true, type: 'number', min: 0.01, message: 'Nhập số tiền đã thu' }]}>
+              <InputNumber style={{ width: '100%' }} min={0} placeholder="0.00" {...usdInputProps} />
             </Form.Item>
-            <Form.Item label="Currency" name="currency" initialValue="USD">
-              <Select options={[
-                { value: 'USD', label: 'USD' },
-                { value: 'EUR', label: 'EUR' },
-                { value: 'JPY', label: 'JPY' },
-                { value: 'CNY', label: 'CNY' },
-                { value: 'VND', label: 'VND' },
-              ]} />
+            {/* ⚠ Khoá USD: hệ thống cộng `amount` như USD (so với total_value_usd, amount_vnd = amount ×
+                tỷ giá). Bản cũ cho chọn EUR/JPY/CNY/VND nhưng vẫn cộng như USD → 35 triệu VNĐ thành
+                $35 triệu "đã thu đủ". Tiền về bằng VNĐ: nhập số USD quy đổi + tỷ giá bên cạnh. */}
+            <Form.Item label="Đồng tiền" name="currency" initialValue="USD"
+              tooltip="Công nợ đơn bán tính bằng USD. Tiền về bằng VNĐ: nhập số USD quy đổi và ghi tỷ giá.">
+              <Select disabled options={[{ value: 'USD', label: 'USD' }]} />
             </Form.Item>
             <Form.Item label="Tỷ giá USD/VND (nếu cần)" name="exchange_rate">
-              <InputNumber style={{ width: '100%' }} min={0} step={1} placeholder="25000" />
+              <InputNumber style={{ width: '100%' }} min={0} step={1} placeholder="25.000" {...vndInputProps} />
             </Form.Item>
             <Form.Item label="Phí NH (USD)" name="fee_amount">
-              <InputNumber style={{ width: '100%' }} min={0} step={0.01} placeholder="0" />
+              <InputNumber style={{ width: '100%' }} min={0} placeholder="0" {...usdInputProps} />
             </Form.Item>
           </div>
           <Form.Item label="Ngân hàng nhận" name="bank_name">

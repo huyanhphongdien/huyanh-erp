@@ -20,6 +20,7 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
+import { toDateStrVN } from '../utils/dateVN'
 
 export interface AttendanceScore {
   employee_id: string
@@ -100,7 +101,8 @@ export const attendancePerformanceService = {
     const weights = await loadConfig('attendance_weights', DEFAULT_ATTENDANCE_WEIGHTS)
 
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-    const endDate = new Date(year, month, 0).toISOString().split('T')[0]
+    // Ngày cuối tháng theo LỊCH — toISOString (UTC) lùi về ngày hôm trước → chấm điểm sót ngày cuối tháng
+    const endDate = toDateStrVN(new Date(year, month, 0))
 
     // ATT-1 fix: bỏ shift_start, shift_end (không tồn tại) — dùng late_minutes
     // và early_leave_minutes (cột phút thật trong schema)

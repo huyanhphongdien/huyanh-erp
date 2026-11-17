@@ -46,6 +46,12 @@ import { ExtensionRequestModal } from '../../features/tasks/components/Extension
 import { isTaskOverdue as isOverdueUtil } from '../../utils/taskUtils';
 import QuickEvalModal from '../../components/tasks/QuickEvalModal';
 import { RATING_LABELS, calculateRating } from '../../types/evaluation.types';
+import { TASK_PRIORITY_LABELS } from '../../types';
+import { message } from 'antd';
+import PageState from '../../components/common/PageState';
+import { fmtDate } from '../../utils/format';
+import { toDateStrVN } from '../../utils/dateVN';
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -127,11 +133,12 @@ const TABS: TabConfig[] = [
   },
 ];
 
+// Nhãn ưu tiên lấy MỘT nguồn từ TASK_PRIORITY_LABELS (types/index.ts) — màu + thứ tự là của riêng trang
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string; sortOrder: number }> = {
-  urgent: { label: 'Khẩn cấp', color: 'text-red-700', bg: 'bg-red-100', sortOrder: 1 },
-  high: { label: 'Cao', color: 'text-orange-700', bg: 'bg-orange-100', sortOrder: 2 },
-  medium: { label: 'Trung bình', color: 'text-blue-700', bg: 'bg-blue-100', sortOrder: 3 },
-  low: { label: 'Thấp', color: 'text-gray-600', bg: 'bg-gray-100', sortOrder: 4 },
+  urgent: { label: TASK_PRIORITY_LABELS.urgent, color: 'text-red-700', bg: 'bg-red-100', sortOrder: 1 },
+  high: { label: TASK_PRIORITY_LABELS.high, color: 'text-orange-700', bg: 'bg-orange-100', sortOrder: 2 },
+  medium: { label: TASK_PRIORITY_LABELS.medium, color: 'text-blue-700', bg: 'bg-blue-100', sortOrder: 3 },
+  low: { label: TASK_PRIORITY_LABELS.low, color: 'text-gray-600', bg: 'bg-gray-100', sortOrder: 4 },
 };
 
 // Nhãn xếp loại lấy MỘT nguồn từ RATING_LABELS (evaluation.types.ts) — màu chữ là của riêng trang
@@ -156,14 +163,7 @@ const QUICK_PROGRESS_OPTIONS = [25, 50, 75, 100];
 // HELPER FUNCTIONS
 // ============================================================================
 
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-}
+const formatDate = fmtDate;
 
 function isOverdue(dueDate: string | null | undefined, status: string): boolean {
   return isOverdueUtil(dueDate, status);
@@ -181,9 +181,14 @@ function isThisWeek(dateStr: string | null | undefined): boolean {
   const date = new Date(dateStr);
   const today = new Date();
   const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay() + 1);
+  // Thứ 2 → CN của tuần hiện tại, trọn ngày. Bản cũ giữ giờ hiện tại (việc hạn sáng thứ 2 bị loại)
+  // và Chủ nhật lại nhảy sang tuần sau.
+  const dow = today.getDay();
+  weekStart.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+  weekStart.setHours(0, 0, 0, 0);
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
   return date >= weekStart && date <= weekEnd;
 }
 
@@ -231,7 +236,8 @@ const ProgressUpdateModal: React.FC<{
       await onUpdate(task.id, progress);
       onClose();
     } catch (error) {
-      // Silent
+      // Trước đây nuốt im lặng: modal đứng yên, người dùng tưởng đã lưu
+      message.error(dichLoiHeThong(error, 'Không cập nhật được tiến độ'));
     } finally {
       setSaving(false);
     }
@@ -373,6 +379,8 @@ const MyTasksPage: React.FC = () => {
   const { user } = useAuthStore();
 
   const [tasks, setTasks] = useState<MyTask[]>([]);
+  // Lỗi tải danh sách — trước đây nuốt rồi hiện "Không có công việc" như thật
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -399,7 +407,11 @@ const MyTasksPage: React.FC = () => {
     try {
       const response = await myTasksService.getMyTasks(user.employee_id);
       setTasks(response.data || []);
-    } catch { setTasks([]); }
+      setLoadError(null);
+    } catch (e) {
+      // Giữ danh sách cũ (nếu có) + báo lỗi kèm nút Thử lại — KHÔNG hiện trống giả
+      setLoadError(e);
+    }
   }, [user?.employee_id]);
 
   const fetchApprovalInfo = useCallback(async () => {
@@ -624,7 +636,8 @@ const MyTasksPage: React.FC = () => {
         const next7Days = Array.from({ length: 7 }, (_, i) => {
           const d = new Date(today)
           d.setDate(today.getDate() + i)
-          const dateStr = d.toISOString().split('T')[0]
+          // Ngày theo giờ VN — toISOString() của nửa đêm địa phương ra ngày HÔM TRƯỚC (UTC) → lịch lệch 1 ô
+          const dateStr = toDateStrVN(d)
           const count = tasks.filter(t => {
             if (!t.due_date || t.status === 'finished' || t.status === 'cancelled') return false
             const td = t.due_date.split('T')[0]
@@ -646,7 +659,7 @@ const MyTasksPage: React.FC = () => {
         const weeklyData = Array.from({ length: 7 }, (_, i) => {
           const d = new Date(weekStart)
           d.setDate(weekStart.getDate() + i)
-          const dateStr = d.toISOString().split('T')[0]
+          const dateStr = toDateStrVN(d)
           const completed = tasks.filter(t => {
             if (!t.completed_date) return false
             const cd = typeof t.completed_date === 'string' ? t.completed_date.split('T')[0] : ''
@@ -755,7 +768,7 @@ const MyTasksPage: React.FC = () => {
           <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <CalendarDays className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-semibold text-gray-700">Deadline sắp tới (7 ngày)</span>
+              <span className="text-sm font-semibold text-gray-700">Sắp đến hạn (7 ngày tới)</span>
             </div>
             <div className="space-y-2">
               {upcoming.map(t => {
@@ -779,7 +792,7 @@ const MyTasksPage: React.FC = () => {
                       t.priority === 'high' ? 'bg-orange-100 text-orange-700' :
                       'bg-gray-100 text-gray-500'
                     }`}>
-                      {t.priority === 'urgent' ? 'Khẩn' : t.priority === 'high' ? 'Cao' : ''}
+                      {t.priority === 'urgent' ? TASK_PRIORITY_LABELS.urgent : t.priority === 'high' ? TASK_PRIORITY_LABELS.high : ''}
                     </span>
                   </div>
                 )
@@ -849,8 +862,13 @@ const MyTasksPage: React.FC = () => {
           <ParticipationRequestsTab onCountChange={(count) => setParticipationRequestsCount(count)} />
         ) : (
           <>
+            {!!loadError && (
+              <div className="p-3 sm:p-4">
+                <PageState error={loadError} onRetry={handleRefresh} minHeight={0} />
+              </div>
+            )}
             {filteredTasks.length === 0 ? (
-              <EmptyState
+              loadError ? null : <EmptyState
                 icon={searchTerm ? <Search className="w-7 h-7 sm:w-8 sm:h-8" /> : <FileText className="w-7 h-7 sm:w-8 sm:h-8" />}
                 title={searchTerm ? 'Không tìm thấy' : 'Không có công việc'}
                 description={searchTerm ? 'Thử thay đổi từ khóa' : 'Khi có công việc mới sẽ hiển thị ở đây'}

@@ -16,13 +16,17 @@ import {
   Checkbox, message, Empty, Input, Tooltip, Popconfirm, Switch,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
+import { stdPagination } from '../../../components/common/tableDefaults'
 import {
   PlusOutlined, DeleteOutlined, ReloadOutlined, UserOutlined,
   StarFilled, StarOutlined, SearchOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import { partnerAssignmentService, type PartnerAssignment } from '../../../services/b2b/partnerAssignmentService'
-import { partnerService, type Partner } from '../../../services/b2b/partnerService'
+import { partnerService, TIER_LABELS, TIER_COLORS, type Partner } from '../../../services/b2b/partnerService'
+import EnumTag from '../../../components/common/EnumTag'
 import { useAuthStore } from '../../../stores/authStore'
 import { B2BSectionTabs, PARTNER_TABS } from '../../../components/b2b/B2BSectionTabs'
 
@@ -51,6 +55,8 @@ export default function PartnerAssignmentsPage() {
   const [partners, setPartners] = useState<Partner[]>([])
   const [employees, setEmployees] = useState<EmployeeWithUser[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có phân công nào" (audit 17/11/2026)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [search, setSearch] = useState('')
   const [filterUser, setFilterUser] = useState<string>('')
 
@@ -64,6 +70,7 @@ export default function PartnerAssignmentsPage() {
   // ── Load all ──
   const loadAll = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const [assigns, parts, { data: emps }] = await Promise.all([
         partnerAssignmentService.getAll(),
@@ -79,7 +86,8 @@ export default function PartnerAssignmentsPage() {
       setPartners(parts)
       setEmployees((emps || []) as EmployeeWithUser[])
     } catch (e: any) {
-      message.error('Lỗi tải dữ liệu: ' + (e?.message || ''))
+      setLoadError(e)
+      message.error(dichLoiHeThong(e, 'Lỗi tải dữ liệu'))
     } finally {
       setLoading(false)
     }
@@ -171,7 +179,7 @@ export default function PartnerAssignmentsPage() {
       setModalOpen(false)
       loadAll()
     } catch (e: any) {
-      message.error('Lưu thất bại: ' + (e?.message || ''))
+      message.error(dichLoiHeThong(e, 'Lưu thất bại'))
     } finally {
       setModalSaving(false)
     }
@@ -183,7 +191,7 @@ export default function PartnerAssignmentsPage() {
       message.success('Đã xóa phân công')
       loadAll()
     } catch (e: any) {
-      message.error('Xóa thất bại: ' + (e?.message || ''))
+      message.error(dichLoiHeThong(e, 'Xóa thất bại'))
     }
   }
 
@@ -192,7 +200,7 @@ export default function PartnerAssignmentsPage() {
       await partnerAssignmentService.setPrimary(row.id, isPrimary)
       loadAll()
     } catch (e: any) {
-      message.error('Đổi primary thất bại: ' + (e?.message || ''))
+      message.error(dichLoiHeThong(e, 'Đổi người phụ trách chính thất bại'))
     }
   }
 
@@ -221,8 +229,9 @@ export default function PartnerAssignmentsPage() {
             <div style={{ fontWeight: 600 }}>{r.partner_name}</div>
             <Text type="secondary" style={{ fontSize: 11 }}>{r.partner_code}</Text>
           </div>
+          {/* Hạng đại lý: nhãn + màu từ partnerService (trước in mã thô 'gold'/'silver'…) */}
           {r.partner_tier && (
-            <Tag color="purple" style={{ fontSize: 10 }}>{r.partner_tier}</Tag>
+            <EnumTag value={r.partner_tier} labels={TIER_LABELS} colors={TIER_COLORS} style={{ fontSize: 10 }} />
           )}
         </Space>
       ),
@@ -349,15 +358,17 @@ export default function PartnerAssignmentsPage() {
 
       {/* Table */}
       <Card size="small" style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
+        <PageState error={!loading && loadError} onRetry={loadAll}>
         <Table<EnrichedRow>
           dataSource={filteredRows}
           columns={columns}
           rowKey="id"
           loading={loading}
           size="small"
-          pagination={{ pageSize: 30, showSizeChanger: false, showTotal: (t) => `${t} phân công` }}
+          pagination={stdPagination(20)}
           locale={{ emptyText: <Empty description="Chưa có phân công nào — bấm 'Thêm phân công' để bắt đầu" /> }}
         />
+        </PageState>
       </Card>
 
       {/* Add modal */}

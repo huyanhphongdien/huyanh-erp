@@ -1,7 +1,10 @@
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { performanceService, employeeService } from '../../services'
 import { Button, Input, Select, Card } from '../../components/ui'
+import { fmtDate } from '../../utils/format'
+import { EmployeePicker } from '../employees/EmployeePicker'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 // Define types inline to avoid import issues
 interface PerformanceReviewScore {
@@ -103,17 +106,11 @@ function toFormData(data: PerformanceReview | null | undefined): PerformanceRevi
   }
 }
 
-// Format date for display
-function formatDate(dateString: string): string {
-  try {
-    return new Date(dateString).toLocaleDateString('vi-VN')
-  } catch {
-    return dateString
-  }
-}
+// Format date for display — chuẩn DD/MM/YYYY dùng chung
+const formatDate = fmtDate
 
 export function PerformanceReviewForm({ initialData, onSuccess, onCancel }: Props) {
-  const { register, handleSubmit, formState: { errors } } = useForm<PerformanceReviewFormData>({
+  const { register, control, handleSubmit, formState: { errors } } = useForm<PerformanceReviewFormData>({
     defaultValues: toFormData(initialData)
   })
 
@@ -222,22 +219,30 @@ export function PerformanceReviewForm({ initialData, onSuccess, onCancel }: Prop
   }
 
   // Create mode
-  const employeeOptions = [
-    { value: '', label: '-- Chọn nhân viên --' },
-    ...(employees?.data || []).map((e: { id: string; code: string; full_name: string }) => ({ 
-      value: e.id, 
-      label: `${e.code} - ${e.full_name}` 
-    }))
-  ]
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <Select
-        label="Nhân viên *"
-        {...register('employee_id', { required: 'Vui lòng chọn nhân viên' })}
-        error={errors.employee_id?.message}
-        options={employeeOptions}
-      />
+      <div className="w-full">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Nhân viên *</label>
+        {/* Gõ tên/mã để tìm (không dấu cũng được) — thay <select> native 1000 dòng */}
+        <Controller
+          name="employee_id"
+          control={control}
+          rules={{ required: 'Vui lòng chọn nhân viên' }}
+          render={({ field }) => (
+            <EmployeePicker
+              employees={employees?.data || []}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              invalid={!!errors.employee_id}
+              size="large"
+            />
+          )}
+        />
+        {errors.employee_id && (
+          <p className="mt-1 text-sm text-danger">{errors.employee_id.message}</p>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <Input
@@ -303,7 +308,7 @@ export function PerformanceReviewForm({ initialData, onSuccess, onCancel }: Prop
 
       {createMutation.isError && (
         <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-          Có lỗi xảy ra: {(createMutation.error as Error)?.message || 'Không thể tạo đánh giá'}
+          {dichLoiHeThong(createMutation.error, 'Không thể tạo đánh giá')}
         </div>
       )}
 

@@ -49,6 +49,10 @@ import {
 
 import TaskParticipantsSection from '../../features/tasks/components/TaskParticipantsSection';
 import { RATING_LABELS } from '../../types/evaluation.types';
+import { message } from 'antd';
+import { taskStatusLabel, taskStatusTone, taskPriorityLabel, taskPriorityTone, toneClasses } from '../../features/tasks/taskUi';
+import { fmtDate, fmtDateTime } from '../../utils/format';
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -112,20 +116,7 @@ interface Approval {
 // CONSTANTS
 // ============================================================================
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  draft: { label: 'Nháp', color: 'text-gray-600', bgColor: 'bg-gray-100' },
-  in_progress: { label: 'Đang làm', color: 'text-blue-600', bgColor: 'bg-blue-100' },
-  paused: { label: 'Tạm dừng', color: 'text-yellow-600', bgColor: 'bg-yellow-100' },
-  finished: { label: 'Hoàn thành', color: 'text-green-600', bgColor: 'bg-green-100' },
-  cancelled: { label: 'Đã hủy', color: 'text-red-600', bgColor: 'bg-red-100' },
-};
-
-const PRIORITY_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  low: { label: 'Thấp', color: 'text-gray-600', bgColor: 'bg-gray-100' },
-  medium: { label: 'Trung bình', color: 'text-blue-600', bgColor: 'bg-blue-100' },
-  high: { label: 'Cao', color: 'text-orange-600', bgColor: 'bg-orange-100' },
-  urgent: { label: 'Khẩn cấp', color: 'text-red-600', bgColor: 'bg-red-100' },
-};
+// Nhãn + màu trạng thái / ưu tiên: MỘT nguồn TASK_STATUS_* / TASK_PRIORITY_* (types/index.ts) qua taskUi
 
 // Nhãn xếp loại lấy MỘT nguồn từ RATING_LABELS (evaluation.types.ts);
 // key là giá trị thật trong DB ('excellent'/'good'/...), màu chữ là của riêng trang.
@@ -141,21 +132,21 @@ const RATING_CONFIG: Record<string, { label: string; color: string }> = {
 // ============================================================================
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const config = STATUS_CONFIG[status] || STATUS_CONFIG.draft;
+  const tone = taskStatusTone(status);
   return (
-    <span className={`inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${config.bgColor} ${config.color}`}>
+    <span className={`inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${tone.bg} ${tone.text}`}>
       <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-current mr-1.5 sm:mr-2" />
-      {config.label}
+      {taskStatusLabel(status)}
     </span>
   );
 };
 
 const PriorityBadge: React.FC<{ priority: string }> = ({ priority }) => {
-  const config = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.medium;
+  const tone = taskPriorityTone(priority);
   return (
-    <span className={`inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${config.bgColor} ${config.color}`}>
+    <span className={`inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${tone.bg} ${tone.text}`}>
       <Flag className="w-3 h-3 mr-1" />
-      {config.label}
+      {taskPriorityLabel(priority)}
     </span>
   );
 };
@@ -348,7 +339,7 @@ const TaskDetailPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Error fetching task:', err);
-      setError(err.message || 'Có lỗi xảy ra khi tải dữ liệu');
+      setError(dichLoiHeThong(err, 'Có lỗi xảy ra khi tải dữ liệu'));
     } finally {
       setLoading(false);
     }
@@ -373,7 +364,7 @@ const TaskDetailPage: React.FC = () => {
       if (error) throw error;
       navigate('/tasks', { replace: true });
     } catch (err: any) {
-      alert('Có lỗi xảy ra khi xóa công việc: ' + err.message);
+      message.error(dichLoiHeThong(err, 'Có lỗi xảy ra khi xóa công việc'));
     } finally {
       setActionLoading(false);
       setShowDeleteDialog(false);
@@ -388,7 +379,7 @@ const TaskDetailPage: React.FC = () => {
       if (error) throw error;
       await fetchTaskDetail();
     } catch (err: any) {
-      alert('Có lỗi xảy ra khi hủy công việc: ' + err.message);
+      message.error(dichLoiHeThong(err, 'Có lỗi xảy ra khi hủy công việc'));
     } finally {
       setActionLoading(false);
       setShowCancelDialog(false);
@@ -421,7 +412,10 @@ const TaskDetailPage: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-[400px] px-4">
         <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-red-500 mb-3 sm:mb-4" />
         <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 text-center">{error || 'Không tìm thấy công việc'}</h2>
-        <button onClick={() => navigate(-1)} className="text-blue-600 hover:underline text-sm sm:text-base">Quay lại</button>
+        <div className="flex items-center gap-4">
+          {error && <button onClick={fetchTaskDetail} className="text-blue-600 hover:underline text-sm sm:text-base">Thử lại</button>}
+          <button onClick={() => navigate(-1)} className="text-blue-600 hover:underline text-sm sm:text-base">Quay lại</button>
+        </div>
       </div>
     );
   }
@@ -455,7 +449,7 @@ const TaskDetailPage: React.FC = () => {
               <StatusBadge status={task.status} />
               <PriorityBadge priority={task.priority} />
               {task.evaluation_status && task.evaluation_status !== 'none' && (
-                <span className={`px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium ${getEvaluationStatusColor(task.evaluation_status)}`}>
+                <span className={`px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium ${toneClasses(getEvaluationStatusColor(task.evaluation_status)).bg} ${toneClasses(getEvaluationStatusColor(task.evaluation_status)).text}`}>
                   {getEvaluationStatusLabel(task.evaluation_status)}
                 </span>
               )}
@@ -518,9 +512,10 @@ const TaskDetailPage: React.FC = () => {
               <InfoRow icon={<Building2 className="w-4 h-4" />} label="Phòng ban" value={task.department?.name} />
               <InfoRow icon={<User className="w-4 h-4" />} label="Người giao" value={task.assigner?.full_name} />
               <InfoRow icon={<User className="w-4 h-4" />} label="Người thực hiện" value={task.assignee?.full_name} />
-              <InfoRow icon={<Calendar className="w-4 h-4" />} label="Ngày bắt đầu" value={task.start_date ? new Date(task.start_date).toLocaleDateString('vi-VN') : null} />
-              <InfoRow icon={<Calendar className="w-4 h-4" />} label="Hạn hoàn thành" value={task.due_date ? new Date(task.due_date).toLocaleString('vi-VN') : null} />
-              <InfoRow icon={<CheckCircle className="w-4 h-4" />} label="Ngày hoàn thành" value={task.completed_date ? new Date(task.completed_date).toLocaleString('vi-VN') : null} />
+              {/* Hạn / ngày xong là NGÀY (lưu nửa đêm UTC) — toLocaleString cũ in kèm giờ "07:00:00" gây hiểu nhầm */}
+              <InfoRow icon={<Calendar className="w-4 h-4" />} label="Ngày bắt đầu" value={task.start_date ? fmtDate(task.start_date) : null} />
+              <InfoRow icon={<Calendar className="w-4 h-4" />} label="Hạn hoàn thành" value={task.due_date ? fmtDate(task.due_date) : null} />
+              <InfoRow icon={<CheckCircle className="w-4 h-4" />} label="Ngày hoàn thành" value={task.completed_date ? fmtDate(task.completed_date) : null} />
             </div>
           </div>
 
@@ -577,7 +572,7 @@ const TaskDetailPage: React.FC = () => {
                   </div>
                 )}
                 <div className="text-[10px] sm:text-xs text-gray-400 pt-2">
-                  Gửi bởi: {selfEvaluation.employee?.full_name} · {selfEvaluation.submitted_at && new Date(selfEvaluation.submitted_at).toLocaleString('vi-VN')}
+                  Gửi bởi: {selfEvaluation.employee?.full_name} · {selfEvaluation.submitted_at && fmtDateTime(selfEvaluation.submitted_at)}
                 </div>
               </div>
             </div>
@@ -624,7 +619,7 @@ const TaskDetailPage: React.FC = () => {
                   </div>
                 )}
                 <div className="text-[10px] sm:text-xs text-gray-400 pt-2">
-                  Duyệt bởi: {approval.approver?.full_name} · {approval.approved_at && new Date(approval.approved_at).toLocaleString('vi-VN')}
+                  Duyệt bởi: {approval.approver?.full_name} · {approval.approved_at && fmtDateTime(approval.approved_at)}
                 </div>
               </div>
             </div>
@@ -657,16 +652,16 @@ const TaskDetailPage: React.FC = () => {
             <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
               <div className="flex justify-between gap-2">
                 <span className="text-gray-500">Ngày tạo</span>
-                <span className="font-medium text-right">{task.created_at ? new Date(task.created_at).toLocaleString('vi-VN') : '-'}</span>
+                <span className="font-medium text-right">{fmtDateTime(task.created_at)}</span>
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-gray-500">Cập nhật</span>
-                <span className="font-medium text-right">{task.updated_at ? new Date(task.updated_at).toLocaleString('vi-VN') : '-'}</span>
+                <span className="font-medium text-right">{fmtDateTime(task.updated_at)}</span>
               </div>
               {task.completed_date && (
                 <div className="flex justify-between gap-2">
                   <span className="text-gray-500">Hoàn thành</span>
-                  <span className="font-medium text-green-600 text-right">{new Date(task.completed_date).toLocaleString('vi-VN')}</span>
+                  <span className="font-medium text-green-600 text-right">{fmtDate(task.completed_date)}</span>
                 </div>
               )}
             </div>
@@ -686,19 +681,12 @@ const TaskDetailPage: React.FC = () => {
                   <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Phê duyệt đánh giá
                 </button>
               )}
-              {permissions?.canMarkComplete && (
-                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-green-700 bg-green-50 active:bg-green-100 rounded-lg transition-colors">
-                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Đánh dấu hoàn thành
-                </button>
-              )}
-              {permissions?.canPause && (
-                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-yellow-700 bg-yellow-50 active:bg-yellow-100 rounded-lg transition-colors">
-                  <Pause className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Tạm dừng công việc
-                </button>
-              )}
-              {permissions?.canResume && (
-                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-blue-700 bg-blue-50 active:bg-blue-100 rounded-lg transition-colors">
-                  <Play className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Tiếp tục công việc
+              {/* 3 nút "Đánh dấu hoàn thành / Tạm dừng / Tiếp tục" cũ KHÔNG có onClick (bấm không làm gì).
+                  Các thao tác này chạy thật ở trang chi tiết chuẩn /tasks/:id → dẫn sang đó. */}
+              {(permissions?.canMarkComplete || permissions?.canPause || permissions?.canResume) && (
+                <button onClick={() => navigate(`/tasks/${task.id}`)} className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-blue-700 bg-blue-50 active:bg-blue-100 rounded-lg transition-colors">
+                  {permissions?.canResume ? <Play className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" /> : permissions?.canMarkComplete ? <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" /> : <Pause className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />}
+                  Hoàn thành / tạm dừng / tiếp tục — mở trang chi tiết
                 </button>
               )}
               {permissions?.canCancel && (

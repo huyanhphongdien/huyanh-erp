@@ -25,6 +25,19 @@ export function addDaysStr(dateStr: string, delta: number): string {
   return toDateStrVN(dt)
 }
 
+/**
+ * Mốc đầu / cuối một NGÀY VN ('YYYY-MM-DD') để lọc cột timestamptz qua PostgREST. DB chạy giờ UTC: chuỗi
+ * không offset như `${d}T00:00:00` bị hiểu là 0h UTC = 7h sáng VN → bản ghi tạo 0h–7h lọt sang ngày hôm trước.
+ * Giá trị không phải 'YYYY-MM-DD' (đã là timestamp) giữ nguyên.
+ */
+const isDayStr = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
+export function vnDayStartTs(day: string): string {
+  return isDayStr(day) ? `${day}T00:00:00+07:00` : day
+}
+export function vnDayEndTs(day: string): string {
+  return isDayStr(day) ? `${day}T23:59:59.999+07:00` : day
+}
+
 /** Duyệt từng ngày [from..to] (chuỗi 'YYYY-MM-DD', bao cả hai đầu) — thay vòng lặp toISOString. */
 export function eachDayStr(from: string, to: string): string[] {
   const out: string[] = []

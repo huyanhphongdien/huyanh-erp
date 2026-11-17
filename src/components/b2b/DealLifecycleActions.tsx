@@ -24,6 +24,8 @@ import {
   startProduction,
   finishProduction,
 } from '../../services/b2b/dealLifecycleService'
+import { fmtKg, fmtNum, fmtVnd, fmtVndNum } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 interface DealLifecycleActionsProps {
   deal: {
@@ -75,12 +77,12 @@ export default function DealLifecycleActions({
     setSubmitting(true)
     try {
       await setSampleDrc({ deal_id: deal.id, sample_drc: vals.sample_drc })
-      message.success(`Đã ghi sample DRC = ${vals.sample_drc}%`)
+      message.success(`Đã ghi DRC mẫu = ${fmtNum(vals.sample_drc, 2)}%`)
       setOpenSample(false)
       sampleForm.resetFields()
       onRefresh?.()
     } catch (e: unknown) {
-      message.error(`Lỗi: ${e instanceof Error ? e.message : String(e)}`)
+      message.error(dichLoiHeThong(e, 'Lưu DRC mẫu thất bại'))
     } finally {
       setSubmitting(false)
     }
@@ -94,7 +96,7 @@ export default function DealLifecycleActions({
       setOpenStart(false)
       onRefresh?.()
     } catch (e: unknown) {
-      message.error(`Lỗi: ${e instanceof Error ? e.message : String(e)}`)
+      message.error(dichLoiHeThong(e, 'Bắt đầu sản xuất thất bại'))
     } finally {
       setSubmitting(false)
     }
@@ -108,14 +110,12 @@ export default function DealLifecycleActions({
         deal_id: deal.id,
         finished_product_kg: vals.finished_product_kg,
       })
-      const drcStr = res.actual_drc.toFixed(2)
-      const grossStr = res.final_gross_vnd.toLocaleString('vi-VN')
-      message.success(`SX xong: actual DRC=${drcStr}%, giá cuối=${grossStr}đ`)
+      message.success(`SX xong: DRC thực tế ${fmtNum(res.actual_drc, 2)}%, giá cuối ${fmtVnd(res.final_gross_vnd)}`)
       setOpenFinish(false)
       finishForm.resetFields()
       onRefresh?.()
     } catch (e: unknown) {
-      message.error(`Lỗi: ${e instanceof Error ? e.message : String(e)}`)
+      message.error(dichLoiHeThong(e, 'Chốt KL thành phẩm thất bại'))
     } finally {
       setSubmitting(false)
     }
@@ -146,7 +146,7 @@ export default function DealLifecycleActions({
             onClick={() => setOpenSample(true)}
             style={{ background: '#0ea5e9', borderColor: '#0ea5e9' }}
           >
-            Nhập sample DRC
+            Nhập DRC mẫu
           </Button>
         )}
         {showStartBtn && (
@@ -166,7 +166,7 @@ export default function DealLifecycleActions({
             onClick={() => setOpenFinish(true)}
             style={{ background: '#16a34a', borderColor: '#16a34a' }}
           >
-            Hoàn tất sản xuất + QC final
+            Hoàn tất sản xuất + QC cuối
           </Button>
         )}
       </div>
@@ -174,25 +174,25 @@ export default function DealLifecycleActions({
       {/* ───── Modal 1: Sample DRC ───── */}
       <Modal
         open={openSample}
-        title="🧪 Nhập sample DRC (QC sau nhập kho)"
+        title="🧪 Nhập DRC mẫu (QC sau nhập kho)"
         onCancel={() => setOpenSample(false)}
         onOk={handleSampleDrc}
-        okText="Lưu sample DRC"
+        okText="Lưu DRC mẫu"
         confirmLoading={submitting}
         destroyOnClose
       >
         <Alert
           type="info"
           showIcon
-          message="QC lấy mẫu mủ ngay sau khi nhập kho, đo DRC sample để BGĐ có cơ sở duyệt Deal."
+          message="QC lấy mẫu mủ ngay sau khi nhập kho, đo DRC mẫu để BGĐ có cơ sở duyệt Deal."
           style={{ marginBottom: 16 }}
         />
         <Form form={sampleForm} layout="vertical" preserve={false}>
           <Form.Item
-            label="Sample DRC (%)"
+            label="DRC mẫu (%)"
             name="sample_drc"
             rules={[
-              { required: true, message: 'Nhập sample DRC' },
+              { required: true, message: 'Nhập DRC mẫu' },
               { type: 'number', min: 0.01, max: 100, message: 'DRC ∈ (0, 100]' },
             ]}
             tooltip="VD: 35.5 cho mủ tạp, 60+ cho mủ nước. QC đo từ mẫu lấy ngẫu nhiên."
@@ -228,9 +228,9 @@ export default function DealLifecycleActions({
           description={
             <Space direction="vertical" size={4}>
               <span>Deal: <strong>{deal.deal_number}</strong></span>
-              <span>NL đầu vào: <strong>{deal.quantity_kg.toLocaleString('vi-VN')} kg</strong> (mủ tươi)</span>
-              <span>Sample DRC đã chốt: <strong>{deal.sample_drc}%</strong></span>
-              <span>Sau khi bấm: <code>production_started_at</code> = NOW(). Khi xong SX → bấm "Hoàn tất" để nhập KL thành phẩm.</span>
+              <span>NL đầu vào: <strong>{fmtKg(deal.quantity_kg, 3)} kg</strong> (mủ tươi)</span>
+              <span>DRC mẫu đã chốt: <strong>{fmtNum(deal.sample_drc, 2)}%</strong></span>
+              <span>Sau khi bấm: hệ thống ghi giờ bắt đầu sản xuất là bây giờ. Khi xong SX → bấm "Hoàn tất" để nhập KL thành phẩm.</span>
             </Space>
           }
         />
@@ -239,10 +239,10 @@ export default function DealLifecycleActions({
       {/* ───── Modal 3: Finish production + QC final ───── */}
       <Modal
         open={openFinish}
-        title="✅ Hoàn tất sản xuất + QC final"
+        title="✅ Hoàn tất sản xuất + QC cuối"
         onCancel={() => setOpenFinish(false)}
         onOk={handleFinishProduction}
-        okText="Chốt KL thành phẩm + Auto-compute giá cuối"
+        okText="Chốt KL thành phẩm + tự tính giá cuối"
         confirmLoading={submitting}
         destroyOnClose
         width={560}
@@ -253,9 +253,9 @@ export default function DealLifecycleActions({
           message={
             <Space direction="vertical" size={4}>
               <span><strong>Deal:</strong> {deal.deal_number}</span>
-              <span><strong>NL đầu vào:</strong> {deal.quantity_kg.toLocaleString('vi-VN')} kg</span>
-              <span><strong>Đơn giá:</strong> {(deal.unit_price ?? 0).toLocaleString('vi-VN')} đ/kg</span>
-              <span><strong>Sample DRC (QC trước SX):</strong> {deal.sample_drc}%</span>
+              <span><strong>NL đầu vào:</strong> {fmtKg(deal.quantity_kg, 3)} kg</span>
+              <span><strong>Đơn giá:</strong> {fmtVndNum(deal.unit_price)} ₫/kg</span>
+              <span><strong>DRC mẫu (QC trước SX):</strong> {fmtNum(deal.sample_drc, 2)}%</span>
             </Space>
           }
           style={{ marginBottom: 16 }}
@@ -268,7 +268,7 @@ export default function DealLifecycleActions({
               { required: true, message: 'Nhập KL thành phẩm' },
               { type: 'number', min: 0.01, message: 'KL phải > 0' },
             ]}
-            tooltip="Đo TP sau khi SX xong. ERP tự compute actual DRC = finished / NL × 100, giá cuối = NL × actual_drc × đơn giá."
+            tooltip="Đo TP sau khi SX xong. ERP tự tính DRC thực tế = KL thành phẩm / NL × 100, giá cuối = NL × DRC thực tế × đơn giá."
           >
             <InputNumber
               style={{ width: '100%' }}
@@ -290,19 +290,19 @@ export default function DealLifecycleActions({
                 <Alert
                   type={isVariant ? 'warning' : 'success'}
                   showIcon
-                  message="Preview giá cuối"
+                  message="Xem trước giá cuối"
                   description={
                     <Space direction="vertical" size={2}>
-                      <span>Actual DRC: <strong>{preview.actualDrc.toFixed(2)}%</strong></span>
+                      <span>DRC thực tế: <strong>{fmtNum(preview.actualDrc, 2)}%</strong></span>
                       {preview.sampleVariance && (
                         <span>
-                          Variance vs Sample: <strong>{preview.sampleVariance}%</strong>
+                          Lệch so với DRC mẫu: <strong>{fmtNum(Number(preview.sampleVariance), 2)}%</strong>
                           {isVariant && ' ⚠️ > 3%'}
                         </span>
                       )}
                       <span>
                         Giá cuối: <strong style={{ color: '#16a34a' }}>
-                          {preview.finalGross.toLocaleString('vi-VN')} đ
+                          {fmtVnd(preview.finalGross)}
                         </strong>
                       </span>
                     </Space>

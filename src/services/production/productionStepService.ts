@@ -12,9 +12,19 @@ import { supabase } from '../../lib/supabase'
 export interface StepTemplate {
   step_number: number
   step_name: string
-  param_fields: { key: string; label: string; type: 'number' | 'text' | 'select'; unit?: string; options?: string[] }[]
+  /** option_labels: nhãn tiếng Việt cho từng mã của ô chọn (mã lưu DB giữ nguyên — 'yes'/'passed'… không đổi). */
+  param_fields: { key: string; label: string; type: 'number' | 'text' | 'select'; unit?: string; options?: string[]; option_labels?: Record<string, string> }[]
   estimated_minutes: number
 }
+
+/** Nhãn hiển thị của một giá trị thông số (ô chọn → tiếng Việt; còn lại giữ nguyên). Đợt 3 audit UI 17/11/2026:
+ *  trang theo dõi công đoạn đang in thẳng 'yes' / 'no' / 'passed' / 'formic' cho người vận hành. */
+export function stepParamLabel(field: StepTemplate['param_fields'][number] | undefined, value: unknown): string {
+  const v = value === null || value === undefined ? '' : String(value)
+  return field?.option_labels?.[v] ?? v
+}
+
+const YES_NO_LABELS: Record<string, string> = { yes: 'Có', no: 'Không' }
 
 export const SVR_STEP_TEMPLATES: StepTemplate[] = [
   {
@@ -48,7 +58,7 @@ export const SVR_STEP_TEMPLATES: StepTemplate[] = [
   {
     step_number: 4, step_name: 'Đánh đông', estimated_minutes: 720,
     param_fields: [
-      { key: 'acid_type', label: 'Loại acid', type: 'select', options: ['formic', 'acetic'] },
+      { key: 'acid_type', label: 'Loại acid', type: 'select', options: ['formic', 'acetic'], option_labels: { formic: 'Acid formic', acetic: 'Acid acetic' } },
       { key: 'acid_concentration', label: 'Nồng độ', type: 'number', unit: '%' },
       { key: 'acid_volume_liters', label: 'Lượng acid', type: 'number', unit: 'lít' },
       { key: 'ph_value', label: 'pH', type: 'number' },
@@ -68,7 +78,7 @@ export const SVR_STEP_TEMPLATES: StepTemplate[] = [
     param_fields: [
       { key: 'crumb_size', label: 'Kích thước cốm', type: 'text' },
       { key: 'wash_count', label: 'Số lần rửa', type: 'number' },
-      { key: 'vibration_ok', label: 'Sàng rung OK', type: 'select', options: ['yes', 'no'] },
+      { key: 'vibration_ok', label: 'Sàng rung OK', type: 'select', options: ['yes', 'no'], option_labels: YES_NO_LABELS },
     ],
   },
   {
@@ -76,8 +86,8 @@ export const SVR_STEP_TEMPLATES: StepTemplate[] = [
     param_fields: [
       { key: 'temperature_c', label: 'Nhiệt độ', type: 'number', unit: '°C' },
       { key: 'duration_hours', label: 'Thời gian', type: 'number', unit: 'giờ' },
-      { key: 'dryer_zone', label: 'Ngăn sấy', type: 'select', options: ['1', '2'] },
-      { key: 'moisture_check', label: 'Kiểm ẩm OK', type: 'select', options: ['yes', 'no'] },
+      { key: 'dryer_zone', label: 'Ngăn sấy', type: 'select', options: ['1', '2'], option_labels: { '1': 'Ngăn 1', '2': 'Ngăn 2' } },
+      { key: 'moisture_check', label: 'Kiểm ẩm OK', type: 'select', options: ['yes', 'no'], option_labels: YES_NO_LABELS },
     ],
   },
   {
@@ -85,7 +95,7 @@ export const SVR_STEP_TEMPLATES: StepTemplate[] = [
     param_fields: [
       { key: 'bale_weight_kg', label: 'KL mỗi bành', type: 'number', unit: 'kg' },
       { key: 'bale_count', label: 'Số bành', type: 'number' },
-      { key: 'cooling_ok', label: 'Làm nguội OK', type: 'select', options: ['yes', 'no'] },
+      { key: 'cooling_ok', label: 'Làm nguội OK', type: 'select', options: ['yes', 'no'], option_labels: YES_NO_LABELS },
     ],
   },
   {
@@ -99,13 +109,13 @@ export const SVR_STEP_TEMPLATES: StepTemplate[] = [
       { key: 'nitrogen_percent', label: 'Nitơ', type: 'number', unit: '%' },
       { key: 'dirt_percent', label: 'Tạp chất (Po)', type: 'number', unit: '%' },
       { key: 'lovibond', label: 'Lovibond (3L)', type: 'number' },
-      { key: 'qc_result', label: 'Kết quả', type: 'select', options: ['passed', 'warning', 'failed'] },
+      { key: 'qc_result', label: 'Kết quả', type: 'select', options: ['passed', 'warning', 'failed'], option_labels: { passed: 'Đạt', warning: 'Cảnh báo', failed: 'Không đạt' } },
     ],
   },
   {
     step_number: 10, step_name: 'Đóng gói & Nhập kho', estimated_minutes: 120,
     param_fields: [
-      { key: 'package_type', label: 'Loại bao', type: 'select', options: ['PE', 'kraft'] },
+      { key: 'package_type', label: 'Loại bao', type: 'select', options: ['PE', 'kraft'], option_labels: { PE: 'Bao PE', kraft: 'Bao giấy kraft' } },
       { key: 'label_grade', label: 'Nhãn grade', type: 'text' },
       { key: 'pallet_count', label: 'Số pallet', type: 'number' },
       { key: 'total_weight_kg', label: 'Tổng KL', type: 'number', unit: 'kg' },

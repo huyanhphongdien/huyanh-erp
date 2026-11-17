@@ -27,6 +27,7 @@ import { SubtasksList } from './components/SubtasksList'
 import { ParentTaskInfo } from './components/ParentTaskInfo'
 import subtaskService from '../../services/subtaskService'
 import { insertAutoApproval } from '../../services/approvalService'
+import { computeAutoScore } from '../../services/taskScoring'
 import { AttachmentSection } from './components/AttachmentSection'
 import { CommentSection } from './components/CommentSection'
 import { ActivityTimeline } from './components/ActivityTimeline'
@@ -208,40 +209,40 @@ export function TaskViewPage() {
         const { error } = await supabase.from('tasks').update({
           status: 'finished', progress: 100,
           completed_date: new Date().toLocaleDateString('sv-SE'),
-          self_score: 100, final_score: 80,
+          self_score: 100, final_score: computeAutoScore('recurring'),
           evaluation_status: 'approved',
         }).eq('id', id)
         if (error) throw error
         await insertAutoApproval({ task_id: id!, approver_id: approverId, source: 'recurring', self_score: 100 })
         if (t?.parent_task_id) await subtaskService.recalculateParent(t.parent_task_id)
         await refetch()
-        message.success('Hoàn thành! (Tự động 80 điểm)')
+        message.success(`Hoàn thành! (Tự động ${computeAutoScore('recurring')} điểm)`)
       } else if (isSelf) {
         // ★ Self (tự giao): auto-approve 85 điểm (×0.85), KHÔNG popup
         const { error } = await supabase.from('tasks').update({
           status: 'finished', progress: 100,
           completed_date: new Date().toLocaleDateString('sv-SE'),
-          self_score: 100, final_score: 85,
+          self_score: 100, final_score: computeAutoScore('self'),
           evaluation_status: 'approved',
         }).eq('id', id)
         if (error) throw error
         await insertAutoApproval({ task_id: id!, approver_id: approverId, source: 'self', self_score: 100 })
         if (t?.parent_task_id) await subtaskService.recalculateParent(t.parent_task_id)
         await refetch()
-        message.success('Hoàn thành! (Tự giao — 85 điểm)')
+        message.success(`Hoàn thành! (Tự giao — ${computeAutoScore('self')} điểm)`)
       } else if (isProject) {
         // ★ Project: auto-approve 90 điểm (×0.90), đã check evidence ở trên
         const { error } = await supabase.from('tasks').update({
           status: 'finished', progress: 100,
           completed_date: new Date().toLocaleDateString('sv-SE'),
-          self_score: 100, final_score: 90,
+          self_score: 100, final_score: computeAutoScore('project'),
           evaluation_status: 'approved',
         }).eq('id', id)
         if (error) throw error
         await insertAutoApproval({ task_id: id!, approver_id: approverId, source: 'project', self_score: 100 })
         if (t?.parent_task_id) await subtaskService.recalculateParent(t.parent_task_id)
         await refetch()
-        message.success('Hoàn thành! (Dự án — 90 điểm)')
+        message.success(`Hoàn thành! (Dự án — ${computeAutoScore('project')} điểm)`)
       } else if (isAssignee) {
         // ★ Assigned: đưa thẳng vào phê duyệt, bỏ tự đánh giá
         const { error } = await supabase.from('tasks').update({
@@ -275,7 +276,7 @@ export function TaskViewPage() {
         const { error } = await supabase.from('tasks').update({
           status: 'finished', progress: 100,
           completed_date: new Date().toLocaleDateString('sv-SE'),
-          self_score: 100, final_score: 100,
+          self_score: 100, final_score: computeAutoScore('deptmanager'),
           evaluation_status: 'approved',
         }).eq('id', id)
         if (error) throw error
@@ -284,7 +285,7 @@ export function TaskViewPage() {
           await subtaskService.recalculateParent(t.parent_task_id)
         }
         await refetch()
-        message.success('QL đã hoàn thành công việc! (100 điểm)')
+        message.success(`QL đã hoàn thành công việc! (${computeAutoScore('deptmanager')} điểm)`)
       }
     } catch (err) {
       console.error('Mark complete failed:', err)
@@ -746,29 +747,29 @@ export function TaskViewPage() {
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
                     completed_date: new Date().toLocaleDateString('sv-SE'),
-                    self_score: 100, final_score: 80,
+                    self_score: 100, final_score: computeAutoScore('recurring'),
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
                   await insertAutoApproval({ task_id: t.id, approver_id: approverId2, source: 'recurring', self_score: 100 })
-                  message.success('Hoàn thành! (Tự động 80 điểm)')
+                  message.success(`Hoàn thành! (Tự động ${computeAutoScore('recurring')} điểm)`)
                 } else if (isSelf2) {
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
                     completed_date: new Date().toLocaleDateString('sv-SE'),
-                    self_score: 100, final_score: 85,
+                    self_score: 100, final_score: computeAutoScore('self'),
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
                   await insertAutoApproval({ task_id: t.id, approver_id: approverId2, source: 'self', self_score: 100 })
-                  message.success('Hoàn thành! (Tự giao — 85 điểm)')
+                  message.success(`Hoàn thành! (Tự giao — ${computeAutoScore('self')} điểm)`)
                 } else if (isProject2) {
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
                     completed_date: new Date().toLocaleDateString('sv-SE'),
-                    self_score: 100, final_score: 90,
+                    self_score: 100, final_score: computeAutoScore('project'),
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
                   await insertAutoApproval({ task_id: t.id, approver_id: approverId2, source: 'project', self_score: 100 })
-                  message.success('Hoàn thành! (Dự án — 90 điểm)')
+                  message.success(`Hoàn thành! (Dự án — ${computeAutoScore('project')} điểm)`)
                 } else if (isAssignee2) {
                   await supabase.from('tasks').update({
                     status: 'pending_review', progress: 100,
@@ -782,11 +783,11 @@ export function TaskViewPage() {
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
                     completed_date: new Date().toLocaleDateString('sv-SE'),
-                    self_score: 100, final_score: 85,
+                    self_score: 100, final_score: computeAutoScore('self'),
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
                   await insertAutoApproval({ task_id: t.id, approver_id: approverId2, source: 'self', self_score: 100 })
-                  message.success('Công việc đã hoàn thành! (85 điểm)')
+                  message.success(`Công việc đã hoàn thành! (${computeAutoScore('self')} điểm)`)
                 }
               }
 

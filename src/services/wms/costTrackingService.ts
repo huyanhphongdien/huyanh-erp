@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
 
 // ============================================================================
 // TYPES
@@ -268,7 +269,7 @@ export const costTrackingService = {
     // Tính ngày bắt đầu
     const startDate = new Date()
     startDate.setMonth(startDate.getMonth() - months)
-    const startStr = startDate.toISOString().split('T')[0]
+    const startStr = toDateStrVN(startDate)   // giờ VN — toISOString() lệch −1 ngày trước 7h sáng
 
     const { data: batches, error } = await supabase
       .from('stock_batches')

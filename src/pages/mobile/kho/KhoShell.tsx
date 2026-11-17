@@ -1,6 +1,6 @@
 // ============================================================================
-// KhoShell — vỏ mobile "Kho NVL" cho thủ kho: .ops-root + 3 tab (Lô NVL / Nhập / Chèn)
-// + FAB quẹt QR (tem lô, mã lô chèn, mã phiếu chèn). Route: /m/kho/*
+// KhoShell — vỏ mobile "Kho NVL" cho thủ kho: .ops-root + 5 tab (Lô NVL / Nhập / Kiểm kê / Chèn / Thành phẩm)
+// + FAB quẹt QR (tem lô, mã lô chèn, mã phiếu chèn, pallet HC). Vỏ dùng ops-*, nội dung các màn dùng kmx-*. Route: /m/kho/*
 // File: src/pages/mobile/kho/KhoShell.tsx
 // ============================================================================
 import { useState } from 'react'
@@ -8,6 +8,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import OpsQrScanner from '../OpsQrScanner'
 import { rawStockService } from '../../../services/wms/rawStockService'
 import { mixService } from '../../../services/wms/mixService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { parseKhoScan } from './khoCommon'
 import '../opsTheme.css'
 import './khoMix.css'
@@ -35,6 +36,7 @@ export default function KhoShell() {
   const showFab = loc.pathname === '/m/kho'   // tab Chèn: đã có 'Quét tem CH' trong màn Lấy, nút nổi che nội dung
   // Màn sâu của hàng chèn (lấy / phiếu / ký) chạy toàn màn hình, không có thanh tab dưới (theo mockup 30/10)
   const deep = /^\/m\/kho\/(chen\/.+|xuat|tp\/.+)/.test(loc.pathname)
+  const fab = showFab && !deep   // có FAB → .kho-fab nhấc toast (kmx-toast) lên trên nút, khỏi che nút quẹt QR
 
   async function onDetect(raw: string) {
     setScan(false)
@@ -49,22 +51,22 @@ export default function KhoShell() {
       const exact = hits.find((h) => h.batch_no.toUpperCase() === p.value) ?? (hits.length === 1 ? hits[0] : null)
       if (exact) { nav(`/m/kho/lo/${exact.batch_id}`); return }
       setNote(`Không tìm thấy "${p.value}"`)
-    } catch (e: any) { setNote(e?.message || 'Không đọc được mã') }
+    } catch (e: any) { setNote(dichLoiHeThong(e, 'Không đọc được mã')) }
     setTimeout(() => setNote(null), 3500)
   }
 
   return (
-    <div className={`ops-root kho-root${deep ? ' kho-deep' : ''}`}>
+    <div className={`ops-root kho-root${deep ? ' kho-deep' : ''}${fab ? ' kho-fab' : ''}`}>
       <Outlet />
-      {note && <div className="ops-card" role="status" style={{ position: 'absolute', left: 12, right: 12, bottom: 'calc(90px + env(safe-area-inset-bottom))', background: 'var(--red-bg)', color: 'var(--red)', fontWeight: 700, zIndex: 22 }}>{note}</div>}
-      {showFab && !deep && <button className="ops-fab" onClick={() => setScan(true)} aria-label="Quẹt QR lô">📷</button>}
+      {note && <div className="kmx-toast err" role="alert"><span style={{ flex: 1, minWidth: 0, padding: '6px 0' }}>{note}</span></div>}
+      {fab && <button className="ops-fab" onClick={() => setScan(true)} aria-label="Quẹt QR lô">📷</button>}
       {!deep && <nav className="ops-botnav">
         {TABS.map((t) => {
           const on = t.exact ? loc.pathname === t.to || loc.pathname === t.to + '/' || t.also.some((a) => loc.pathname.startsWith(a)) : loc.pathname.startsWith(t.to)
           return <button key={t.to} className={`it${on ? ' on' : ''}`} onClick={() => nav(t.to)}><span className="ico">{t.ico}</span>{t.label}</button>
         })}
       </nav>}
-      {scan && <OpsQrScanner onClose={() => setScan(false)} onDetect={onDetect} />}
+      {scan && <OpsQrScanner onClose={() => setScan(false)} onDetect={onDetect} title="Quẹt tem lô / pallet" hint="Hoặc gõ mã trên tem (vd NVL-PD-…, CH-PD-…, HC7)" placeholder="NVL-… · CH-… · HC7" />}
     </div>
   )
 }

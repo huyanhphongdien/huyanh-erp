@@ -15,15 +15,23 @@ import {
   CalendarOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../lib/supabase'
+import PageState from '../common/PageState'
+import { fmtDate, fmtNum, fmtVnd, isVnd } from '../../utils/format'
 
+// Hợp đồng Portal (b2b.contracts) chỉ hiện ở tab này → map giữ tại chỗ, màu theo quy ước
+// (chờ = vàng, chờ ký sau khi đã duyệt = xanh dương, hiệu lực = xanh lá, hết hạn = đỏ).
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   draft: { label: 'Nháp', color: 'default' },
-  pending_review: { label: 'Chờ duyệt', color: 'warning' },
-  pending_signature: { label: 'Chờ ký', color: 'processing' },
-  active: { label: 'Có hiệu lực', color: 'success' },
-  expired: { label: 'Hết hạn', color: 'error' },
+  pending_review: { label: 'Chờ duyệt', color: 'gold' },
+  pending_signature: { label: 'Chờ ký', color: 'blue' },
+  active: { label: 'Có hiệu lực', color: 'green' },
+  expired: { label: 'Hết hạn', color: 'red' },
   terminated: { label: 'Đã chấm dứt', color: 'default' },
 }
+
+// Giá trị HĐ theo đồng tiền của HĐ: VND → "1.234.567 ₫"; đồng khác giữ mã tiền sau số
+const fmtContractValue = (v: number, currency?: string | null) =>
+  isVnd(currency || 'VND') ? fmtVnd(v) : `${fmtNum(v, 2)} ${currency}`
 
 const TYPE_MAP: Record<string, string> = {
   purchase: 'Mua bán',
@@ -33,7 +41,7 @@ const TYPE_MAP: Record<string, string> = {
 }
 
 export default function DealContractTab({ dealId }: { dealId: string }) {
-  const { data: contracts = [], isLoading } = useQuery({
+  const { data: contracts = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['deal-contracts', dealId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -48,6 +56,8 @@ export default function DealContractTab({ dealId }: { dealId: string }) {
   })
 
   if (isLoading) return <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+  // Lỗi xét TRƯỚC trống — trước đây lỗi tải hiện thành "Chưa có hợp đồng"
+  if (isError) return <PageState error={error} onRetry={() => refetch()} />
   if (contracts.length === 0) return <Empty description="Chưa có hợp đồng" image={Empty.PRESENTED_IMAGE_SIMPLE} />
 
   return (
@@ -60,7 +70,7 @@ export default function DealContractTab({ dealId }: { dealId: string }) {
             <span><FileProtectOutlined style={{ marginRight: 8 }} />{ct.contract_number || 'Hợp đồng'}</span>
           } extra={
             <Space>
-              <Tag color={isExpired && ct.status === 'active' ? 'error' : st.color}>
+              <Tag color={isExpired && ct.status === 'active' ? 'red' : st.color}>
                 {isExpired && ct.status === 'active' ? 'Hết hạn' : st.label}
               </Tag>
               {ct.file_url && (
@@ -72,12 +82,12 @@ export default function DealContractTab({ dealId }: { dealId: string }) {
           }>
             <Descriptions size="small" column={{ xs: 1, sm: 2 }} labelStyle={{ fontWeight: 600, color: '#666' }}>
               <Descriptions.Item label="Loại HĐ">{TYPE_MAP[ct.contract_type] || ct.contract_type || '—'}</Descriptions.Item>
-              <Descriptions.Item label="Giá trị">{ct.total_value ? `${Number(ct.total_value).toLocaleString('vi-VN')} ${ct.currency || 'VND'}` : '—'}</Descriptions.Item>
-              <Descriptions.Item label="Ngày ký">{ct.signed_date || '—'}</Descriptions.Item>
-              <Descriptions.Item label="Hiệu lực">{ct.effective_date || '—'}</Descriptions.Item>
+              <Descriptions.Item label="Giá trị">{ct.total_value ? fmtContractValue(Number(ct.total_value), ct.currency) : '—'}</Descriptions.Item>
+              <Descriptions.Item label="Ngày ký">{fmtDate(ct.signed_date)}</Descriptions.Item>
+              <Descriptions.Item label="Hiệu lực">{fmtDate(ct.effective_date)}</Descriptions.Item>
               <Descriptions.Item label="Hết hạn">
-                {ct.expiry_date || '—'}
-                {isExpired && <Tag color="error" style={{ marginLeft: 8 }}>Đã hết hạn</Tag>}
+                {fmtDate(ct.expiry_date)}
+                {isExpired && <Tag color="red" style={{ marginLeft: 8 }}>Đã hết hạn</Tag>}
               </Descriptions.Item>
               {ct.file_name && <Descriptions.Item label="File">{ct.file_name}</Descriptions.Item>}
             </Descriptions>
@@ -92,7 +102,7 @@ export default function DealContractTab({ dealId }: { dealId: string }) {
                     <div style={{ fontSize: 13, fontWeight: 600 }}>Nhà máy</div>
                     {ct.factory_signed_at ? (
                       <div style={{ fontSize: 11, color: '#52c41a' }}>
-                        <CheckCircleOutlined /> Đã ký {new Date(ct.factory_signed_at).toLocaleDateString('vi-VN')}
+                        <CheckCircleOutlined /> Đã ký {fmtDate(ct.factory_signed_at)}
                       </div>
                     ) : (
                       <div style={{ fontSize: 11, color: '#faad14' }}><WarningOutlined /> Chưa ký</div>
@@ -105,7 +115,7 @@ export default function DealContractTab({ dealId }: { dealId: string }) {
                     <div style={{ fontSize: 13, fontWeight: 600 }}>Đại lý</div>
                     {ct.partner_signed_at ? (
                       <div style={{ fontSize: 11, color: '#52c41a' }}>
-                        <CheckCircleOutlined /> Đã ký {new Date(ct.partner_signed_at).toLocaleDateString('vi-VN')}
+                        <CheckCircleOutlined /> Đã ký {fmtDate(ct.partner_signed_at)}
                       </div>
                     ) : (
                       <div style={{ fontSize: 11, color: '#faad14' }}><WarningOutlined /> Chưa ký</div>

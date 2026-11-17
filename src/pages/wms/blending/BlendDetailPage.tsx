@@ -49,17 +49,15 @@ import {
   BLEND_STATUS_COLORS,
 } from '../../../services/wms/wms.types'
 import { supabase } from '../../../lib/supabase'
+import EnumTag from '../../../components/common/EnumTag'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtDateTime } from '../../../utils/format'
+import { BATCH_QC_STATUS_LABELS, BATCH_QC_STATUS_COLORS } from '../qc/qcLabels'
 
 const { Title, Text } = Typography
 
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-function formatDateTime(d: string | null | undefined): string {
-  if (!d) return '—'
-  return new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
+// Ngày-giờ: fmtDateTime của utils/format (bỏ formatDateTime chép riêng — Đợt 3 audit UI).
 
 // ============================================================================
 // COMPONENT
@@ -100,7 +98,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
       const data = await blendingService.getById(id)
       setOrder(data)
     } catch (err: any) {
-      setError(err.message || 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không tải được lệnh phối trộn'))
     } finally {
       setLoading(false)
     }
@@ -114,13 +112,18 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
   useEffect(() => {
     const load = async () => {
       try {
-        const { data } = await supabase
+        const { data, error: whErr } = await supabase
           .from('warehouses')
           .select('id, name, code')
           .eq('is_active', true)
           .order('code')
+        if (whErr) throw whErr
         if (data) setWarehouses(data)
-      } catch (err) { console.error(err) }
+      } catch (err) {
+        console.error(err)
+        // Không có danh sách kho thì nút "Hoàn thành" không bấm được (bắt buộc chọn kho) — nói ra
+        message.error(dichLoiHeThong(err, 'Không tải được danh sách kho'))
+      }
     }
     load()
   }, [])
@@ -134,7 +137,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
       message.success('Đã mô phỏng thành công')
       loadOrder()
     } catch (err: any) {
-      message.error(err.message || 'Không thể mô phỏng')
+      message.error(dichLoiHeThong(err, 'Không mô phỏng được'))
     } finally {
       setActionLoading(false)
     }
@@ -146,7 +149,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
       title: 'Duyệt lệnh phối trộn?',
       content: 'Lệnh sẽ chuyển sang trạng thái "Đã duyệt".',
       okText: 'Duyệt',
-      okButtonProps: { style: { background: '#1B4D3E', borderColor: '#1B4D3E' } },
+      cancelText: 'Đóng',
       onOk: async () => {
         setActionLoading(true)
         try {
@@ -154,7 +157,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
           message.success('Đã duyệt lệnh phối trộn')
           loadOrder()
         } catch (err: any) {
-          message.error(err.message || 'Không thể duyệt')
+          message.error(dichLoiHeThong(err, 'Không duyệt được lệnh phối trộn'))
         } finally {
           setActionLoading(false)
         }
@@ -168,7 +171,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
       title: 'Bắt đầu phối trộn?',
       content: 'Lệnh sẽ chuyển sang trạng thái "Đang trộn".',
       okText: 'Bắt đầu',
-      okButtonProps: { style: { background: '#1B4D3E', borderColor: '#1B4D3E' } },
+      cancelText: 'Đóng',
       onOk: async () => {
         setActionLoading(true)
         try {
@@ -176,7 +179,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
           message.success('Đã bắt đầu phối trộn')
           loadOrder()
         } catch (err: any) {
-          message.error(err.message || 'Không thể bắt đầu')
+          message.error(dichLoiHeThong(err, 'Không bắt đầu được phối trộn'))
         } finally {
           setActionLoading(false)
         }
@@ -197,7 +200,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
       setShowCompleteModal(false)
       loadOrder()
     } catch (err: any) {
-      message.error(err.message || 'Không thể hoàn thành')
+      message.error(dichLoiHeThong(err, 'Không hoàn thành được phối trộn'))
     } finally {
       setActionLoading(false)
     }
@@ -209,6 +212,8 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
       title: 'Hủy lệnh phối trộn?',
       content: 'Lệnh sẽ bị hủy và không thể khôi phục.',
       okText: 'Hủy lệnh',
+      // Nút đóng KHÔNG ghi "Hủy" (mặc định vi_VN) — đứng cạnh "Hủy lệnh" là hai nút cùng chữ
+      cancelText: 'Giữ lệnh',
       okButtonProps: { danger: true },
       onOk: async () => {
         setActionLoading(true)
@@ -217,7 +222,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
           message.success('Đã hủy lệnh phối trộn')
           loadOrder()
         } catch (err: any) {
-          message.error(err.message || 'Không thể hủy')
+          message.error(dichLoiHeThong(err, 'Không hủy được lệnh phối trộn'))
         } finally {
           setActionLoading(false)
         }
@@ -241,7 +246,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
       setQcNotes('')
       loadOrder()
     } catch (err: any) {
-      message.error(err.message || 'Không thể ghi nhận QC')
+      message.error(dichLoiHeThong(err, 'Không ghi nhận được QC'))
     } finally {
       setActionLoading(false)
     }
@@ -254,8 +259,10 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
   if (!order) {
     return (
       <div style={{ padding: 24 }}>
-        {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon />}
-        <Empty description="Không tìm thấy lệnh phối trộn" />
+        {/* Lỗi tải ≠ "không tìm thấy": lỗi thì hiện lỗi + Thử lại */}
+        {error
+          ? <PageState error={error} onRetry={loadOrder} />
+          : <Empty description="Không tìm thấy lệnh phối trộn" />}
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <Button onClick={() => navigate('/wms/blending')}>Quay lại</Button>
         </div>
@@ -323,10 +330,10 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
           ) : '—'}
         </Descriptions.Item>
         <Descriptions.Item label="Người duyệt">{order.approved_by || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Ngày duyệt">{formatDateTime(order.approved_at)}</Descriptions.Item>
+        <Descriptions.Item label="Ngày duyệt">{fmtDateTime(order.approved_at)}</Descriptions.Item>
         <Descriptions.Item label="Người trộn">{order.blended_by || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Ngày trộn">{formatDateTime(order.blended_at)}</Descriptions.Item>
-        <Descriptions.Item label="Ngày tạo">{formatDateTime(order.created_at)}</Descriptions.Item>
+        <Descriptions.Item label="Ngày trộn">{fmtDateTime(order.blended_at)}</Descriptions.Item>
+        <Descriptions.Item label="Ngày tạo">{fmtDateTime(order.created_at)}</Descriptions.Item>
         {order.notes && <Descriptions.Item label="Ghi chú" span={3}>{order.notes}</Descriptions.Item>}
       </Descriptions>
 
@@ -504,17 +511,14 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
       title: 'Kết quả',
       dataIndex: 'result',
       key: 'result',
-      render: (v: string) => {
-        const colorMap: Record<string, string> = { passed: 'success', warning: 'warning', failed: 'error' }
-        const labelMap: Record<string, string> = { passed: 'Đạt', warning: 'Cảnh báo', failed: 'Không đạt' }
-        return <Tag color={colorMap[v] || 'default'}>{labelMap[v] || v}</Tag>
-      },
+      // passed/warning/failed — cùng bộ chữ với QC của lô (qcLabels), một cách viết "Đạt"
+      render: (v: string) => <EnumTag value={v} labels={BATCH_QC_STATUS_LABELS} colors={BATCH_QC_STATUS_COLORS} />,
     },
     {
       title: 'Ngày',
       dataIndex: 'tested_at',
       key: 'tested_at',
-      render: (v: string | null) => <Text type="secondary" style={{ fontSize: 12 }}>{formatDateTime(v)}</Text>,
+      render: (v: string | null) => <Text type="secondary" style={{ fontSize: 12 }}>{fmtDateTime(v)}</Text>,
     },
     {
       title: 'Ghi chú',
@@ -531,7 +535,6 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
           type="primary"
           icon={<ExperimentOutlined />}
           onClick={() => setShowQCModal(true)}
-          style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
         >
           Ghi nhận QC
         </Button>
@@ -579,7 +582,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
             <GradeBadge grade={order.target_grade} size="small" />
           </Space>
           <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
-            {formatDateTime(order.created_at)}
+            {fmtDateTime(order.created_at)}
           </Text>
         </Col>
         <Col>
@@ -595,7 +598,6 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
                 icon={<CheckCircleOutlined />}
                 onClick={handleApprove}
                 loading={actionLoading}
-                style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
               >
                 Duyệt
               </Button>
@@ -606,7 +608,6 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
                 icon={<PlayCircleOutlined />}
                 onClick={handleStartBlending}
                 loading={actionLoading}
-                style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
               >
                 Bắt đầu trộn
               </Button>
@@ -620,7 +621,6 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
                   setShowCompleteModal(true)
                 }}
                 loading={actionLoading}
-                style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
               >
                 Hoàn thành
               </Button>
@@ -671,7 +671,8 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
           />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <Text strong style={{ display: 'block', marginBottom: 4 }}>Kho xuất *</Text>
+          {/* output_warehouse_id = kho NHẬN lô thành phẩm sau trộn (nhãn cũ "Kho xuất" đọc ngược nghĩa) */}
+          <Text strong style={{ display: 'block', marginBottom: 4 }}>Kho nhận thành phẩm *</Text>
           <Select
             value={completeWarehouse || undefined}
             onChange={setCompleteWarehouse}

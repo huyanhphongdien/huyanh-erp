@@ -16,6 +16,14 @@
 import { supabase } from '../../lib/supabase'
 import { onProductionFinish } from './intakeProductionService'
 import { b2bNotificationService } from './b2bNotificationService'
+import { DEAL_STATUS_LABELS, PURCHASE_TYPE_LABELS } from './dealService'
+import { fmtKg, fmtVnd } from '../../utils/format'
+
+// Nhãn tiếng Việt cho câu báo lỗi — không in mã thô 'processing'/'drc_after_production'
+const statusText = (s: string | null | undefined) =>
+  (s && DEAL_STATUS_LABELS[s as keyof typeof DEAL_STATUS_LABELS]) || s || '—'
+const flowText = (p: string | null | undefined) =>
+  (p && PURCHASE_TYPE_LABELS[p as keyof typeof PURCHASE_TYPE_LABELS]) || p || 'Tiêu chuẩn'
 
 // Helper — lookup partner_id from deal for notification routing
 async function _getPartnerId(dealId: string): Promise<string | null> {
@@ -38,7 +46,7 @@ export interface SetSampleDrcInput {
 
 export async function setSampleDrc(input: SetSampleDrcInput): Promise<void> {
   if (input.sample_drc <= 0 || input.sample_drc > 100) {
-    throw new Error(`sample_drc=${input.sample_drc}% phải ∈ (0, 100]`)
+    throw new Error(`DRC mẫu ${input.sample_drc}% không hợp lệ — phải lớn hơn 0 và không quá 100%`)
   }
 
   // Verify deal eligibility
@@ -48,15 +56,15 @@ export async function setSampleDrc(input: SetSampleDrcInput): Promise<void> {
     .eq('id', input.deal_id)
     .maybeSingle()
   if (fetchErr) throw fetchErr
-  if (!deal) throw new Error(`Deal ${input.deal_id} không tồn tại`)
+  if (!deal) throw new Error('Không tìm thấy deal — có thể đã bị xoá')
   if (deal.purchase_type !== 'drc_after_production') {
-    throw new Error(`Sample DRC chỉ áp dụng cho Chạy đầu ra (deal này: ${deal.purchase_type})`)
+    throw new Error(`DRC mẫu chỉ áp dụng cho deal Chạy đầu ra (deal này: ${flowText(deal.purchase_type)})`)
   }
   if (deal.status !== 'processing') {
-    throw new Error(`Deal phải ở status=processing (sau nhập kho, trước BGĐ duyệt) — hiện tại: ${deal.status}`)
+    throw new Error(`Deal phải ở trạng thái "${DEAL_STATUS_LABELS.processing}" (sau nhập kho, trước BGĐ duyệt) — hiện tại: "${statusText(deal.status)}"`)
   }
   if ((deal.stock_in_count ?? 0) === 0) {
-    throw new Error('Phải nhập kho ít nhất 1 batch trước khi nhập sample DRC')
+    throw new Error('Phải nhập kho ít nhất 1 lô trước khi nhập DRC mẫu')
   }
 
   const { error } = await supabase
@@ -64,7 +72,7 @@ export async function setSampleDrc(input: SetSampleDrcInput): Promise<void> {
     .update({ sample_drc: Number(input.sample_drc.toFixed(2)) })
     .eq('id', input.deal_id)
 
-  if (error) throw new Error(`Update sample_drc thất bại: ${error.message}`)
+  if (error) throw new Error(`Lưu DRC mẫu thất bại: ${error.message}`)
 
   // Notify Partner (fire-and-forget, không block flow)
   const partnerId = await _getPartnerId(input.deal_id)
@@ -73,8 +81,8 @@ export async function setSampleDrc(input: SetSampleDrcInput): Promise<void> {
     audience: 'partner',
     partner_id: partnerId,
     deal_id: input.deal_id,
-    title: '🧪 Đã ghi nhận Sample DRC',
-    message: `Nhà máy đã đo sample DRC = ${input.sample_drc.toFixed(2)}% trên lô hàng nhập kho. Đợi BGĐ duyệt Deal.`,
+    title: '🧪 Đã ghi nhận DRC mẫu',
+    message: `Nhà máy đã đo DRC mẫu = ${input.sample_drc.toFixed(2)}% trên lô hàng nhập kho. Đợi BGĐ duyệt Deal.`,
     link_url: `/portal/deals/${input.deal_id}`,
   })
 }
@@ -90,15 +98,15 @@ export async function startProduction(dealId: string): Promise<void> {
     .eq('id', dealId)
     .maybeSingle()
   if (fetchErr) throw fetchErr
-  if (!deal) throw new Error(`Deal ${dealId} không tồn tại`)
+  if (!deal) throw new Error('Không tìm thấy deal — có thể đã bị xoá')
   if (deal.purchase_type !== 'drc_after_production') {
-    throw new Error(`Start production chỉ áp dụng cho Chạy đầu ra (deal này: ${deal.purchase_type})`)
+    throw new Error(`Bắt đầu sản xuất chỉ áp dụng cho deal Chạy đầu ra (deal này: ${flowText(deal.purchase_type)})`)
   }
   if (deal.status !== 'accepted') {
-    throw new Error(`Deal phải ở status=accepted mới start production (hiện tại: ${deal.status})`)
+    throw new Error(`Deal phải ở trạng thái "${DEAL_STATUS_LABELS.accepted}" mới bắt đầu sản xuất được (hiện tại: "${statusText(deal.status)}")`)
   }
   if (deal.production_started_at) {
-    throw new Error('Đã bắt đầu sản xuất từ trước. Không start lại.')
+    throw new Error('Đã bắt đầu sản xuất từ trước — không bắt đầu lại.')
   }
 
   // Check advance acknowledged (đại lý đã nhận) trước khi start
@@ -110,7 +118,7 @@ export async function startProduction(dealId: string): Promise<void> {
     (a: { status: string }) => ['acknowledged', 'paid'].includes(a.status),
   )
   if (!hasAdvanceConfirmed) {
-    throw new Error('Chưa có tạm ứng nào đã xác nhận. Đại lý cần ack advance trước khi start SX.')
+    throw new Error('Chưa có tạm ứng nào được xác nhận. Đại lý cần xác nhận đã nhận tạm ứng trước khi bắt đầu SX.')
   }
 
   const { error } = await supabase
@@ -118,7 +126,7 @@ export async function startProduction(dealId: string): Promise<void> {
     .update({ production_started_at: new Date().toISOString() })
     .eq('id', dealId)
 
-  if (error) throw new Error(`Start production thất bại: ${error.message}`)
+  if (error) throw new Error(`Bắt đầu sản xuất thất bại: ${error.message}`)
 
   // Notify Partner — nhà máy bắt đầu SX, đại lý biết để theo dõi
   const partnerId = await _getPartnerId(dealId)
@@ -128,7 +136,7 @@ export async function startProduction(dealId: string): Promise<void> {
     partner_id: partnerId,
     deal_id: dealId,
     title: '🏭 Nhà máy đã bắt đầu sản xuất',
-    message: 'Lô hàng của bạn đang được sản xuất. Khi hoàn thành QC final, ERP sẽ ghi giá cuối theo DRC thực tế.',
+    message: 'Lô hàng của bạn đang được sản xuất. Khi hoàn thành QC cuối, ERP sẽ ghi giá cuối theo DRC thực tế.',
     link_url: `/portal/deals/${dealId}`,
   })
 }
@@ -150,12 +158,12 @@ export async function finishProduction(input: FinishProductionInput) {
     .select('id, production_started_at, finished_product_kg')
     .eq('id', input.deal_id)
     .maybeSingle()
-  if (!deal) throw new Error(`Deal ${input.deal_id} không tồn tại`)
+  if (!deal) throw new Error('Không tìm thấy deal — có thể đã bị xoá')
   if (!deal.production_started_at) {
-    throw new Error('Chưa start production. Phải bấm "Bắt đầu sản xuất" trước.')
+    throw new Error('Chưa bắt đầu sản xuất. Phải bấm "Bắt đầu sản xuất" trước.')
   }
   if (deal.finished_product_kg && deal.finished_product_kg > 0) {
-    throw new Error(`Đã có finished_product_kg=${deal.finished_product_kg} kg. Không finish lại.`)
+    throw new Error(`Đã chốt KL thành phẩm ${fmtKg(deal.finished_product_kg, 3)} kg — không chốt lại.`)
   }
 
   const result = await onProductionFinish({
@@ -168,7 +176,6 @@ export async function finishProduction(input: FinishProductionInput) {
   if (result.success) {
     const partnerId = await _getPartnerId(input.deal_id)
     const drcStr = result.actual_drc.toFixed(2)
-    const grossStr = result.final_gross_vnd.toLocaleString('vi-VN')
 
     void b2bNotificationService.notify({
       type: 'production_finished',
@@ -176,7 +183,7 @@ export async function finishProduction(input: FinishProductionInput) {
       partner_id: partnerId,
       deal_id: input.deal_id,
       title: '✅ Sản xuất xong — giá cuối chốt',
-      message: `Actual DRC = ${drcStr}%. Giá cuối = ${grossStr}đ. Đợi nhà máy quyết toán + thanh toán.`,
+      message: `DRC thực tế = ${drcStr}%. Giá cuối = ${fmtVnd(result.final_gross_vnd)}. Đợi nhà máy quyết toán + thanh toán.`,
       link_url: `/portal/deals/${input.deal_id}`,
     })
   }

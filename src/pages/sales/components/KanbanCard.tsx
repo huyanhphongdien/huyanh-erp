@@ -17,7 +17,8 @@ import { remainingTons, type LotProgress } from '../../../services/logistics/dis
 import LotProgressBadge, { DispatchChips } from '../../../components/sales/LotProgressBadge'
 import LotChipStrip, { mergeLotAxes } from '../../../components/sales/LotChipStrip'
 import type { OrderLotMoney } from '../../../services/sales/salesOrderPaymentService'
-import { soDisplayCode } from '../../../services/sales/salesTypes'
+import { soDisplayCode, PAYMENT_STATUS_LABELS } from '../../../services/sales/salesTypes'
+import { fmtMoney, isVnd } from '../../../services/sales/salesMoney'
 
 export interface KanbanOrder {
   id: string
@@ -28,6 +29,9 @@ export interface KanbanOrder {
   quantity_tons: number | null
   status: string           // cần để kẹp "đã giao xong" khi tính Còn thiếu
   total_value_usd: number | null
+  /** Tuỳ chọn: có thì thẻ hiện tiền theo ĐÚNG đồng tiền của đơn (đơn VNĐ không gắn "$"). */
+  currency?: string | null
+  total_value_vnd?: number | null
   payment_status: string | null       // unpaid | partial | paid — tiền về
   actual_payment_amount: number | null // USD đã thu thực tế
   delivery_date: string | null
@@ -104,9 +108,11 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }
         <span style={{ fontSize: 12, fontWeight: 600, color: '#111111', fontFamily: 'JetBrains Mono, monospace' }}>
           {soDisplayCode(order)}
         </span>
-        {order.total_value_usd != null && (
+        {(isVnd(order.currency) ? order.total_value_vnd != null : order.total_value_usd != null) && (
           <span style={{ fontSize: 10, color: '#6b7280' }}>
-            ${(order.total_value_usd / 1000).toFixed(0)}K
+            {isVnd(order.currency)
+              ? fmtMoney(order.total_value_vnd, 'VND', { compact: true })
+              : fmtMoney(order.total_value_usd, 'USD', { compact: true })}
           </span>
         )}
       </div>
@@ -168,9 +174,9 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }
           const b = paymentBucket(order)
           if (b === 'none') return null
           let ring = false
-          const [color, txtBase] = b === 'paid'    ? ['#15803d', 'Đã thu tiền']
-                                : b === 'partial' ? ['#1d4ed8', 'Thu 1 phần']
-                                :                   ['#b45309', 'Chưa thu tiền']
+          // Nhãn dùng chung PAYMENT_STATUS_LABELS (salesTypes) — cùng chữ với Sổ lô / Dòng tiền
+          const color = b === 'paid' ? '#15803d' : b === 'partial' ? '#1d4ed8' : '#b45309'
+          const txtBase = PAYMENT_STATUS_LABELS[b]
           let txt = txtBase
           // Đơn ĐÃ có tiền về nhưng KHÔNG đồng nào gắn số lô: máng của mọi viên đều rỗng
           // trong khi chấm này lại xanh — hai thứ cạnh nhau nói ngược nhau.
@@ -226,10 +232,10 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }
             fontWeight: 500,
           }}>
             {daysToETD < 0
-              ? `ETD ${Math.abs(daysToETD)}d trước`
+              ? `ETD qua ${Math.abs(daysToETD)} ngày`
               : daysToETD === 0
                 ? 'ETD hôm nay'
-                : `ETD ${daysToETD}d`}
+                : `ETD còn ${daysToETD} ngày`}
           </span>
         )}
       </div>

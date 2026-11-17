@@ -13,10 +13,11 @@ import { mixService, MIX_LOT_STATUS_COLORS, MIX_LOT_STATUS_LABELS, MIX_SOURCE_LA
 import { useMixRole } from '../../../hooks/useMixRole'
 import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { fmtKg, fmtDateTime, todayLocal } from '../../../utils/format'   // fmtKg không làm tròn kg (chủ DN 31/10)
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { stdPagination } from '../../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
-const fmtKg = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: Math.max(d, 1), minimumFractionDigits: 0 }))   // không làm tròn kg (chủ DN 31/10): giữ số lẻ khi có
-const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
 const GRADES = ['SVR 3L', 'SVR 5', 'SVR 10', 'SVR 20', 'SVR CV50', 'SVR CV60', 'SVR L', 'RSS 3', 'SBR 1502', 'Khác']
 
@@ -56,7 +57,7 @@ export default function MixStockPage() {
     try {
       const [l, b, m] = await Promise.all([mixService.listLots(facilityId, includeDone), mixService.balance(facilityId), mixService.movements(facilityId, 14)])
       setLots(l); setBalance(b); setMoves(m)
-    } catch (e: any) { setError(e?.message || 'Không tải được kho chèn') }
+    } catch (e: any) { setError(dichLoiHeThong(e, 'Không tải được kho chèn')) }
     finally { setLoading(false) }
   }, [facilityId, includeDone])
 
@@ -77,7 +78,7 @@ export default function MixStockPage() {
         receivedDate: form.receivedDate || null, note: form.note.trim() || null, soLo: form.soLo.trim().toUpperCase(),
       })
       message.success('Đã nhập lô chèn'); setOpen(false); setForm({ ...EMPTY, receivedDate: todayLocal() }); await load()
-    } catch (e: any) { message.error(e?.message || 'Không nhập được') }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Không nhập được')) }
     finally { setSaving(false) }
   }
 
@@ -95,7 +96,7 @@ export default function MixStockPage() {
   ]
 
   const moveCols: ColumnsType<MixMovement> = [
-    { title: 'Thời điểm', dataIndex: 'thoi_diem', key: 'thoi_diem', render: (v) => new Date(v).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) },
+    { title: 'Thời điểm', dataIndex: 'thoi_diem', key: 'thoi_diem', render: (v) => fmtDateTime(v) },
     { title: 'Loại', dataIndex: 'loai', key: 'loai', render: (v) => ({ nhap_lo: <Tag color="green">Nhập lô</Tag>, lay: <Tag color="blue">Lấy</Tag>, tra: <Tag color="gold">Trả</Tag> } as any)[v] },
     { title: 'Lô', dataIndex: 'lot_code', key: 'lot_code', render: (v) => <Text code>{v}</Text> },
     { title: 'Phiếu', dataIndex: 'issue_code', key: 'issue_code', render: (v, r) => (v ? <a onClick={() => navigate(`/wms/chen/phieu/${r.issue_id}`)}><Text code>{v}</Text></a> : '—') },
@@ -128,7 +129,7 @@ export default function MixStockPage() {
             </Space>
           </Col>
         </Row>
-        {error && <Alert type="error" showIcon message={error} />}
+        {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={load}>Thử lại</Button>} />}
         {!canWrite && !mixRole.loading && <Alert type="warning" showIcon message="Chỉ QS được phân công (hoặc BGĐ) mới nhập lô chèn. Phân công ở tab Phân công." />}
 
         <Row gutter={[12, 12]}>
@@ -139,12 +140,12 @@ export default function MixStockPage() {
         </Row>
 
         <Card size="small" bodyStyle={{ padding: 0 }} title="Lô chèn">
-          <Table<MixLot> rowKey="id" columns={columns} dataSource={lots} size="small" loading={loading} pagination={{ pageSize: 20, showSizeChanger: false }}
-            locale={{ emptyText: 'Chưa có lô chèn. Lô tự tạo khi QS lấy theo nguồn + số lô (SQL p15); "Nhập trước" chỉ dùng cho SBR về kho.' }} />
+          <Table<MixLot> rowKey="id" columns={columns} dataSource={lots} size="small" loading={loading} pagination={stdPagination(20)}
+            locale={{ emptyText: error ? 'Không tải được — xem lỗi phía trên' : 'Chưa có lô chèn. Lô tự tạo khi QS lấy theo nguồn + số lô; "Nhập trước" chỉ dùng cho SBR về kho.' }} />
         </Card>
 
         <Card size="small" bodyStyle={{ padding: 0 }} title="Sổ chuyển động kho chèn · 14 ngày">
-          <Table<MixMovement> rowKey={(r) => `${r.loai}-${r.lot_id}-${r.issue_id ?? ''}-${r.thoi_diem}`} columns={moveCols} dataSource={moves} size="small" pagination={{ pageSize: 15, showSizeChanger: false }} locale={{ emptyText: 'Chưa có chuyển động' }} />
+          <Table<MixMovement> rowKey={(r) => `${r.loai}-${r.lot_id}-${r.issue_id ?? ''}-${r.thoi_diem}`} columns={moveCols} dataSource={moves} size="small" pagination={stdPagination(20)} locale={{ emptyText: 'Chưa có chuyển động' }} />
         </Card>
 
         <Modal open={open} title={`Nhập trước lô chèn (SBR về kho, hàng nhập sẵn) · ${facilityCode}`} onCancel={() => setOpen(false)} onOk={submit} okText="Nhập kho chèn" cancelText="Hủy" confirmLoading={saving} width={640}>

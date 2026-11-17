@@ -32,6 +32,12 @@ import {
 import { useNavigate } from 'react-router-dom'
 import rubberSupplierService from '../../../services/rubber/rubberSupplierService'
 import { Hac13CodeDisplay } from '../../../components/master-data/Hac13CodeDisplay'
+import PageState from '../../../components/common/PageState'
+import { LimitNotice } from '../../../components/common/tableDefaults'
+import { fmtNum, fmtKg, fmtPct, fmtDate } from '../../../utils/format'
+
+/** Trần tải một lần (lọc/sắp xếp phía máy) — chạm trần thì báo, không im lặng mất NCC. */
+const LOAD_LIMIT = 200
 
 // ============================================================================
 // TYPES (match rubber_suppliers table)
@@ -116,15 +122,15 @@ const SORT_OPTIONS = [
 // HELPERS
 // ============================================================================
 
-function formatWeight(kg: number): string {
-  if (kg >= 1000000) return `${(kg / 1000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.')} tấn`
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)} tấn`
-  return `${kg.toLocaleString('vi-VN')} kg`
+// Rút gọn cho thẻ hẹp: ≥ 1 tấn thì ghi tấn (≥ 1.000 tấn bỏ số lẻ) — số theo vi-VN qua format.ts
+function formatWeight(kg: number | null | undefined): string {
+  if (kg === null || kg === undefined) return '—'
+  if (kg >= 1000000) return `${fmtNum(kg / 1000, 0)} tấn`
+  if (kg >= 1000) return `${fmtNum(kg / 1000, 1)} tấn`
+  return `${fmtKg(kg)} kg`
 }
 
-function formatNumber(num: number): string {
-  return num.toLocaleString('vi-VN')
-}
+const formatNumber = (num: number | null | undefined): string => fmtNum(num)
 
 function renderStars(rating: number): React.ReactNode {
   return (
@@ -227,7 +233,7 @@ const SupplierCard: React.FC<{
             </div>
             <div className="text-center">
               <div className="text-[14px] font-bold font-mono text-[#8B5E3C]">
-                {supplier.avg_drc ? `${supplier.avg_drc.toFixed(1)}%` : '—'}
+                {supplier.avg_drc ? fmtPct(supplier.avg_drc, 1) : '—'}
               </div>
               <div className="text-[10px] text-gray-400">DRC TB</div>
             </div>
@@ -251,7 +257,7 @@ const SupplierCard: React.FC<{
               💰 {paymentConf.label}
             </span>
             <span className="text-[11px] text-gray-400">
-              {new Date(supplier.created_at).toLocaleDateString('vi-VN')}
+              {fmtDate(supplier.created_at)}
             </span>
           </div>
         </div>
@@ -269,6 +275,8 @@ export default function RubberSupplierListPage() {
 
   const [suppliers, setSuppliers] = useState<RubberSupplier[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có NCC mủ" (finding #2) — giữ lỗi để hiện khối lỗi + Thử lại
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [searchText, setSearchText] = useState('')
   const [activeFilter, setActiveFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<string>('name')
@@ -278,10 +286,11 @@ export default function RubberSupplierListPage() {
   // ✅ V2: Load data từ service thật
   const loadSuppliers = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const result = await rubberSupplierService.getAll({
         page: 1,
-        pageSize: 200,
+        pageSize: LOAD_LIMIT,
       })
       // Service trả về { data, total, ... } hoặc array trực tiếp
       const list = Array.isArray(result) ? result : (result.data || [])
@@ -289,6 +298,7 @@ export default function RubberSupplierListPage() {
     } catch (err) {
       console.error('Lỗi tải NCC mủ:', err)
       setSuppliers([])
+      setLoadError(err || 'Không tải được danh sách NCC')
     } finally {
       setLoading(false)
     }
@@ -371,7 +381,7 @@ export default function RubberSupplierListPage() {
               icon={<Scale size={14} className="text-white" />} color="bg-[#A0714B]" />
             <StatCard label="Giao dịch" value={formatNumber(totalTx)}
               icon={<Truck size={14} className="text-white" />} color="bg-[#6B4423]" />
-            <StatCard label="DRC TB" value={avgDrc > 0 ? `${avgDrc.toFixed(1)}%` : '—'}
+            <StatCard label="DRC TB" value={avgDrc > 0 ? fmtPct(avgDrc, 1) : '—'}
               icon={<Droplets size={14} className="text-white" />} color="bg-[#D97706]" />
           </div>
         </div>
@@ -446,7 +456,10 @@ export default function RubberSupplierListPage() {
 
       {/* SUPPLIER LIST */}
       <div className="px-4 mt-2 space-y-3">
-        {loading ? (
+        {!loading && !loadError && <LimitNotice shown={suppliers.length} limit={LOAD_LIMIT} what="NCC" />}
+        {!loading && loadError ? (
+          <PageState error={loadError} onRetry={loadSuppliers} />
+        ) : loading ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="bg-white rounded-[14px] border border-gray-100 p-4 animate-pulse">
               <div className="flex gap-3">

@@ -31,10 +31,15 @@ import {
 } from '../../../services/wms/qcRejectService'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { useAuthStore } from '../../../stores/authStore'
+import PageState from '../../../components/common/PageState'
+import { stdPagination, LimitNotice } from '../../../components/common/tableDefaults'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtNum } from '../../../utils/format'
 
 const { Title, Text } = Typography
 
-const fmt = (n: number) => n.toLocaleString('vi-VN')
+/** Sổ nạp một cục N dòng gần nhất — chạm trần thì báo (LimitNotice), đừng im lặng mất dòng cũ. */
+const GIOI_HAN_DONG = 300
 
 /** '25.0 – 29.5' hoặc '30' hoặc '' — hiện đúng cái sổ ghi, không bịa thêm số. */
 const dai = (min: number | null, max: number | null): string => {
@@ -55,13 +60,16 @@ export default function QCRejectPage() {
   const [moForm, setMoForm] = useState(false)
   const [dangSua, setDangSua] = useState<QCReject | null>(null)
   const [form] = Form.useForm()
+  // Lỗi đọc sổ → khối lỗi + Thử lại; "Sổ chưa có dòng nào" chỉ khi đọc được mà rỗng
+  const [loiNap, setLoiNap] = useState<unknown>(null)
 
   const nap = async () => {
     if (!facilityId) return
     setLoading(true)
+    setLoiNap(null)
     try {
       const [rs, tl, gy, vg] = await Promise.all([
-        qcRejectService.list({ facilityId, limit: 300 }),
+        qcRejectService.list({ facilityId, limit: GIOI_HAN_DONG }),
         qcRejectService.getTheoLo(facilityId),
         qcRejectService.goiYMaNguyenLieu().catch(() => []),
         qcRejectService.getVongTaiChe(facilityId).catch(() => []),
@@ -71,7 +79,7 @@ export default function QCRejectPage() {
       setGoiYMa(gy)
       setVong(vg)
     } catch (e) {
-      message.error('Không đọc được sổ: ' + (e as Error).message)
+      setLoiNap(e)
     } finally {
       setLoading(false)
     }
@@ -139,7 +147,7 @@ export default function QCRejectPage() {
       await nap()
     } catch (e) {
       if ((e as { errorFields?: unknown }).errorFields) return   // lỗi validate, form tự hiện
-      message.error('Không lưu được: ' + (e as Error).message)
+      message.error(dichLoiHeThong(e, 'Không lưu được dòng sổ'))
     }
   }
 
@@ -199,7 +207,7 @@ export default function QCRejectPage() {
             title="Xoá dòng này?" okText="Xoá" cancelText="Thôi" okButtonProps={{ danger: true }}
             onConfirm={async () => {
               try { await qcRejectService.remove(r.id); message.success('Đã xoá'); await nap() }
-              catch (e) { message.error((e as Error).message) }
+              catch (e) { message.error(dichLoiHeThong(e, 'Không xoá được dòng sổ')) }
             }}
           >
             <Button size="small" type="text" danger icon={<DeleteOutlined />} />
@@ -231,6 +239,8 @@ export default function QCRejectPage() {
         </Col>
       </Row>
 
+      {/* Đọc sổ lỗi thì ẩn dãy thẻ — "0 lô" lúc lỗi là con số giả */}
+      {!loiNap && (
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         <Col xs={12} md={6}>
           <Card size="small">
@@ -262,6 +272,7 @@ export default function QCRejectPage() {
           </Card>
         </Col>
       </Row>
+      )}
 
       {vongTong.tong > 0 && (
         <Card
@@ -273,7 +284,7 @@ export default function QCRejectPage() {
             <Col xs={12} md={6}>
               <Text type="secondary" style={{ fontSize: 12 }}>HÀNG KHÔNG ĐẠT LÀM RA</Text>
               <div>
-                <Text strong style={{ fontSize: 20, color: '#cf1322' }}>{fmt(vongTong.khongDat)}</Text>
+                <Text strong style={{ fontSize: 20, color: '#cf1322' }}>{fmtNum(vongTong.khongDat)}</Text>
                 <Text type="secondary"> bành</Text>
               </div>
               {vongTong.tong > 0 && (
@@ -285,7 +296,7 @@ export default function QCRejectPage() {
             <Col xs={12} md={6}>
               <Text type="secondary" style={{ fontSize: 12 }}>ĐÃ ĐEM ĐI XỬ LÝ</Text>
               <div>
-                <Text strong style={{ fontSize: 20 }}>{fmt(vongTong.demXuLy)}</Text>
+                <Text strong style={{ fontSize: 20 }}>{fmtNum(vongTong.demXuLy)}</Text>
                 <Text type="secondary"> bành</Text>
               </div>
               <Text type="secondary" style={{ fontSize: 12 }}>trộn hoặc chạy lò lại</Text>
@@ -293,14 +304,14 @@ export default function QCRejectPage() {
             <Col xs={12} md={6}>
               <Text type="secondary" style={{ fontSize: 12 }}>HÀNG ĐẠT LÀM RA</Text>
               <div>
-                <Text strong style={{ fontSize: 20 }}>{fmt(vongTong.dat)}</Text>
+                <Text strong style={{ fontSize: 20 }}>{fmtNum(vongTong.dat)}</Text>
                 <Text type="secondary"> bành</Text>
               </div>
             </Col>
             <Col xs={24} md={6}>
               <Text type="secondary" style={{ fontSize: 12 }}>TỔNG NHẬP</Text>
               <div>
-                <Text strong style={{ fontSize: 20 }}>{fmt(vongTong.tong)}</Text>
+                <Text strong style={{ fontSize: 20 }}>{fmtNum(vongTong.tong)}</Text>
                 <Text type="secondary"> bành</Text>
               </div>
               <Text type="secondary" style={{ fontSize: 12 }}>gồm cả hàng không đạt</Text>
@@ -322,14 +333,19 @@ export default function QCRejectPage() {
       <Card size="small" style={{ marginBottom: 12 }}>
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center' }}><Spin /></div>
+        ) : loiNap ? (
+          <PageState error={dichLoiHeThong(loiNap, 'Không đọc được sổ hàng không đạt')} onRetry={() => void nap()} />
         ) : hienThi.length === 0 ? (
           <Empty description="Sổ chưa có dòng nào — bấm “Ghi dòng mới” để bắt đầu" />
         ) : (
-          <Table<QCReject>
-            rowKey="id" dataSource={hienThi} columns={cols}
-            size="small" pagination={{ pageSize: 25, showSizeChanger: false }}
-            scroll={{ x: 1100 }}
-          />
+          <>
+            <LimitNotice shown={rows.length} limit={GIOI_HAN_DONG} />
+            <Table<QCReject>
+              rowKey="id" dataSource={hienThi} columns={cols}
+              size="small" pagination={stdPagination(20)}
+              scroll={{ x: 1100 }}
+            />
+          </>
         )}
       </Card>
 

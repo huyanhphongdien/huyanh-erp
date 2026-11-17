@@ -10,13 +10,18 @@ import { sendSimpleEmail } from '../emailService'
 import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue } from './mixService'
 import type { RawPhoto } from './rawPhotoService'
 import { rawLotService, type RawLotTongKet } from './rawLotService'
+import { fmtKg, fmtNum, fmtDate, fmtDateShort } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const APP_URL = 'https://huyanhrubber.vn'
-const kg = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: Math.max(d, 1), minimumFractionDigits: 0 }))   // không làm tròn kg (chủ DN 31/10): giữ số lẻ khi có
-const kg1 = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }))
+// Định dạng: 4 hàm trùng nghĩa lấy từ utils/format (Đợt 3 audit UI, kết quả y hệt — kg không làm tròn, chủ DN 31/10).
+// pct / dt / hm GIỮ riêng vì mail này là bản dự phòng của edge function mix-lenh-report: "12,5 %", "HH:mm DD/MM/YYYY",
+// giờ rỗng = '' đúng như bản server — đổi một bên thì đổi cả hai.
+const kg = fmtKg
+const kg1 = (n: number | null | undefined) => fmtNum(n, 1)
 const pct = (n: number | null | undefined) => (n === null || n === undefined ? '—' : `${n.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} %`)
-const d = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString('vi-VN') : '—')
-const dd = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }) : '—')
+const d = fmtDate        // 'DD/MM/YYYY' — khớp ddate của bản server (trước '5/11/2026' không đệm 0)
+const dd = fmtDateShort  // 'DD/MM'
 const dt = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—')
 const hm = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '')
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -186,7 +191,7 @@ export async function guiMailTongKet(to: string[], m: MailTongKet): Promise<{ ok
   const ok: string[] = []; const loi: { email: string; msg: string }[] = []
   for (const email of to) {
     const r = await sendSimpleEmail({ to: email, subject: m.subject, html: m.html })
-    if (r.success) ok.push(email); else loi.push({ email, msg: r.error?.message || 'không gửi được' })
+    if (r.success) ok.push(email); else loi.push({ email, msg: dichLoiHeThong(r.error, 'không gửi được') })
   }
   return { ok, loi }
 }

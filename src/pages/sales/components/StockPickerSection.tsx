@@ -17,13 +17,18 @@ import {
   CheckCircleOutlined, DeleteOutlined, ShoppingCartOutlined,
   ThunderboltOutlined, ClearOutlined,
 } from '@ant-design/icons'
-import dayjs from 'dayjs'
 import {
   stockAllocationService,
   type AvailableBatch,
   type StockAllocation,
 } from '../../../services/sales/stockAllocationService'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
+// Nhãn/màu QC của lô dùng chung (đang ở dealWmsService) — không in mã thô 'passed'/'pending'
+import { QC_STATUS_LABELS, QC_STATUS_COLORS } from '../../../services/b2b/dealWmsService'
+import { EnumTag } from '../../../components/common/EnumTag'
+import PageState from '../../../components/common/PageState'
+import { fmtDate } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 interface Props {
   order: SalesOrder
@@ -35,6 +40,8 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
   const [available, setAvailable] = useState<AvailableBatch[]>([])
   const [existing, setExisting] = useState<StockAllocation[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Không có lô trong kho" (bản cũ: toast rồi khuyên "Cần tạo Lệnh sản xuất" — kết luận sai)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [allocating, setAllocating] = useState(false)
   // Map batchId → quantity selected by user
   const [selections, setSelections] = useState<Record<string, number>>({})
@@ -42,9 +49,11 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
   const targetKg = Number(order.quantity_kg || (order.quantity_tons || 0) * 1000)
 
   const load = useCallback(async () => {
-    if (!order.grade) return
+    // Đơn chưa có grade: không có gì để tìm — tắt vòng tải (trước đây quay mãi)
+    if (!order.grade) { setLoading(false); return }
     try {
       setLoading(true)
+      setLoadError(null)
       const [avail, existing] = await Promise.all([
         stockAllocationService.findAvailable({
           rubber_grade: order.grade,
@@ -55,8 +64,8 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
       ])
       setAvailable(avail)
       setExisting(existing)
-    } catch (e: any) {
-      message.error(e.message || 'Không tải được danh sách kho')
+    } catch (e: unknown) {
+      setLoadError(e || true)
     } finally {
       setLoading(false)
     }
@@ -152,8 +161,8 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
       setSelections({})
       load()
       onSaved()
-    } catch (e: any) {
-      message.error(e.message || 'Không thể cấp phát')
+    } catch (e: unknown) {
+      message.error(dichLoiHeThong(e, 'Không thể cấp phát'))
     } finally {
       setAllocating(false)
     }
@@ -165,8 +174,8 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
       message.success('Đã hoàn lại lô về kho')
       load()
       onSaved()
-    } catch (e: any) {
-      message.error(e.message || 'Không thể release')
+    } catch (e: unknown) {
+      message.error(dichLoiHeThong(e, 'Không hoàn lại được lô về kho'))
     }
   }
 
@@ -226,7 +235,8 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
       width: 50,
       render: (_, r) => (
         canEdit && r.status === 'reserved' && (
-          <Popconfirm title="Hoàn lại lô này về kho?" onConfirm={() => handleRelease(r.id)}>
+          <Popconfirm title="Hoàn lại lô này về kho?" description="Lô được trả về tồn kho, không còn gán cho đơn này."
+            okText="Hoàn lại" cancelText="Không" okButtonProps={{ danger: true }} onConfirm={() => handleRelease(r.id)}>
             <Button size="small" type="text" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         )
@@ -244,7 +254,7 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
         <Space direction="vertical" size={0}>
           <Tag color="green">{v}</Tag>
           <span style={{ fontSize: 10, color: '#999' }}>
-            Nhập: {r.received_date ? dayjs(r.received_date).format('DD/MM/YYYY') : '—'}
+            Nhập: {fmtDate(r.received_date)}
           </span>
         </Space>
       ),
@@ -261,11 +271,7 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
       dataIndex: 'qc_status',
       key: 'qc',
       width: 90,
-      render: (v) => (
-        <Tag color={v === 'passed' ? 'green' : v === 'pending' ? 'orange' : 'default'}>
-          {v || '—'}
-        </Tag>
-      ),
+      render: (v) => <EnumTag value={v} labels={QC_STATUS_LABELS} colors={QC_STATUS_COLORS} />,
     },
     {
       title: 'Tồn (kg)',
@@ -305,6 +311,14 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
     return (
       <Card size="small" style={{ marginBottom: 16 }}>
         <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
+      </Card>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <Card size="small" style={{ marginBottom: 16 }} title="Cấp phát từ kho thành phẩm (Make-to-Stock)">
+        <PageState error={loadError} onRetry={load} minHeight={120} />
       </Card>
     )
   }
@@ -450,7 +464,8 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
           )}
           <Popconfirm
             title="Cấp phát các lô đã chọn?"
-            description={`Sẽ trừ ${selectedTotal.toLocaleString('vi-VN')} kg khỏi kho và gán vào đơn. Status đơn sẽ chuyển sang "Sẵn sàng".`}
+            description={`Sẽ trừ ${selectedTotal.toLocaleString('vi-VN')} kg khỏi kho và gán vào đơn. Trạng thái đơn sẽ chuyển sang "Sẵn sàng".`}
+            okText="Cấp phát" cancelText="Không"
             onConfirm={handleAllocate}
             disabled={!isSufficient || isOverAllocated}
           >

@@ -102,6 +102,32 @@ export interface LeaveBatchResult {
   errors: Array<{ id: string; error: string }>
 }
 
+// ★ Một đơn công tác như BusinessTripPage hiển thị
+export interface BusinessTripRow {
+  id: string
+  employee_id: string
+  request_number: string
+  start_date: string
+  end_date: string
+  total_days: number
+  trip_destination: string
+  trip_purpose: string
+  trip_with: string
+  reason: string
+  status: string
+  created_by: string
+  created_at: string
+  employee?: { id: string; code: string; full_name: string }
+  creator?: { id: string; full_name: string }
+}
+
+export interface BusinessTripEmployee {
+  id: string
+  code: string
+  full_name: string
+  department_id: string
+}
+
 // ★ Input tạo đơn công tác (BusinessTripPage) — 1 đơn cho mỗi nhân viên được chọn
 export interface BusinessTripCreateInput {
   employee_ids: string[]
@@ -133,6 +159,13 @@ const LEAVE_SELECT = `
   ),
   leave_type:leave_types!leave_requests_leave_type_id_fkey(id, code, name, color),
   approver:employees!leave_requests_approved_by_fkey(id, full_name)
+`
+
+// Select cho màn Đơn công tác (người được gán + người gán)
+const BUSINESS_TRIP_SELECT = `
+  *,
+  employee:employees!leave_requests_employee_id_fkey(id, code, full_name),
+  creator:employees!leave_requests_approved_by_fkey(id, full_name)
 `
 
 // ============================================================================
@@ -211,9 +244,10 @@ export const leaveRequestService = {
         .eq('id', approverId)
         .maybeSingle()
 
+      // Lỗi đọc ≠ "không có đơn": ném lên để LeaveApprovalPage hiện khối lỗi + Thử lại
       if (approverError) {
         console.error('[leaveRequestService] Error fetching approver:', approverError)
-        return []
+        throw approverError
       }
 
       if (!approver) {
@@ -299,14 +333,14 @@ export const leaveRequestService = {
 
       if (error) {
         console.error('[leaveRequestService] getPendingApprovals error:', error)
-        return []
+        throw error
       }
 
       console.log(`[leaveRequestService] Found ${data?.length || 0} requests for approval`)
       return data || []
     } catch (error) {
       console.error('[leaveRequestService] getPendingApprovals exception:', error)
-      return []
+      throw error
     }
   },
 
@@ -662,12 +696,12 @@ export const leaveRequestService = {
 
       if (error) {
         console.error('[leaveRequestService] getApprovalHistory error:', error)
-        return []
+        throw error
       }
       return data || []
     } catch (error) {
       console.error('[leaveRequestService] getApprovalHistory exception:', error)
-      return []
+      throw error
     }
   },
 
@@ -855,6 +889,63 @@ export const leaveRequestService = {
 
     const { error } = await supabase.from('leave_requests').delete().eq('id', id)
     if (error) throw error
+  },
+
+  /**
+   * Danh sách đơn công tác cho BusinessTripPage (chuyển từ query inline trong trang).
+   * NV thường: đơn của mình. TP/PP/BGĐ: đơn của NV đang làm trong phòng (không lọc nếu phòng trống — như bản cũ).
+   * Lỗi đọc → NÉM lên để trang hiện khối lỗi, không giả làm "Chưa có đơn công tác".
+   */
+  async getBusinessTrips(employeeId: string, isManager: boolean, departmentId: string | null): Promise<BusinessTripRow[]> {
+    const { data: typeRow, error: typeErr } = await supabase
+      .from('leave_types')
+      .select('id')
+      .eq('code', 'BUSINESS_TRIP')
+      .maybeSingle()
+    if (typeErr) throw typeErr
+    if (!typeRow?.id) return []
+
+    let query = supabase
+      .from('leave_requests')
+      .select(BUSINESS_TRIP_SELECT)
+      .eq('leave_type_id', typeRow.id)
+      .in('status', ['approved', 'pending'])
+      .order('created_at', { ascending: false })
+
+    if (!isManager) {
+      // NV chỉ xem của mình
+      query = query.eq('employee_id', employeeId)
+    } else if (departmentId) {
+      // Manager: xem NV trong phòng
+      const { data: deptEmps, error: deptErr } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('department_id', departmentId)
+        .eq('status', 'active')
+      if (deptErr) throw deptErr
+      if (deptEmps && deptEmps.length > 0) {
+        query = query.in('employee_id', deptEmps.map(e => e.id))
+      }
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+    return (data || []) as unknown as BusinessTripRow[]
+  },
+
+  /** NV có thể gán công tác: BGĐ (level ≤ 3) thấy toàn công ty, TP/PP chỉ phòng mình. */
+  async getBusinessTripEmployees(departmentId: string | null, userLevel: number): Promise<BusinessTripEmployee[]> {
+    let query = supabase
+      .from('employees')
+      .select('id, code, full_name, department_id')
+      .eq('status', 'active')
+      .order('full_name')
+    if (departmentId && userLevel > 3) {
+      query = query.eq('department_id', departmentId)
+    }
+    const { data, error } = await query
+    if (error) throw error
+    return (data || []) as BusinessTripEmployee[]
   },
 
   // ==========================================================================

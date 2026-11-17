@@ -14,6 +14,8 @@ import {
   ChevronRight as ChevR, AlertTriangle, User, Package,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { fmtNum, fmtSigned, fmtDateShort } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -49,18 +51,16 @@ interface RubberProfile {
 // HELPERS
 // ============================================================================
 
+// Thẻ hẹp: rút gọn tấn (T) — số theo vi-VN qua format.ts (toFixed cũ ra dấu CHẤM thập phân)
 function fmtWeight(kg?: number | null): string {
-  if (!kg) return '–'
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}T`
-  return `${Math.round(kg).toLocaleString('vi-VN')} kg`
+  if (!kg) return '—'
+  if (kg >= 1000) return `${fmtNum(kg / 1000, 1)}T`
+  return `${fmtNum(kg)} kg`
 }
-function fmtDate(s?: string): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-}
+const fmtDate = (s?: string): string => fmtDateShort(s)   // 'DD/MM' cho thẻ
 function fmtPercent(p?: number | null): string {
-  if (p == null) return '–'
-  return `${p >= 0 ? '+' : ''}${p.toFixed(2)}%`
+  if (p == null) return '—'
+  return `${fmtSigned(p, 2)}%`
 }
 function getMonthLabel(y: number, m: number) { return `Tháng ${m}/${y}` }
 
@@ -238,7 +238,7 @@ const RubberProfileListPage: React.FC = () => {
       setProfiles((data || []) as RubberProfile[])
     } catch (err: unknown) {
       console.error('Lỗi tải lý lịch phiếu:', err)
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu'))
     } finally {
       setLoading(false)
     }

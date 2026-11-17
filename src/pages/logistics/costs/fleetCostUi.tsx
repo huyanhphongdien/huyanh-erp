@@ -7,9 +7,13 @@
 
 import type { CSSProperties, ReactNode } from 'react'
 import { Tag, Typography } from 'antd'
+import { LockOutlined } from '@ant-design/icons'
 import './fleetCost.css'
-import { fmtAmt } from '../../../services/logistics/fleetCostService'
+import {
+  fmtAmt, tripCostState, TRIP_COST_STATE_COLORS, TRIP_COST_STATE_LABELS, type CostStatus,
+} from '../../../services/logistics/fleetCostService'
 import { FLEET_PR_STATUS_COLORS, FLEET_PR_STATUS_LABELS, type FleetPrStatus } from '../../../services/logistics/fleetPaymentRequestService'
+import { DASH } from '../../../utils/format'
 
 const { Text } = Typography
 
@@ -23,7 +27,9 @@ export const INK_2 = '#6b7280'
 
 export const MONO: CSSProperties = { fontFamily: "'JetBrains Mono', Consolas, ui-monospace, monospace", fontVariantNumeric: 'tabular-nums' }
 
-/** InputNumber: dấu chấm ngăn nghìn kiểu Việt. */
+/** InputNumber: dấu chấm ngăn nghìn kiểu Việt (cùng regex với vndInputProps của utils/format).
+ *  Cố ý KHÔNG thay bằng vndInputProps: parser của nó biến ô XOÁ TRẮNG thành 0, còn ở đây ô trống
+ *  vẫn là null — km đồng hồ / cước thuê chưa nhập phải là "chưa ghi", không phải số 0. */
 export const thousands = {
   formatter: (v: string | number | undefined) => (v === undefined || v === null || v === '' ? '' : `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')),
   parser: (v: string | undefined) => (v ? v.replace(/\./g, '') : '') as unknown as number,
@@ -31,7 +37,7 @@ export const thousands = {
 
 /** Hai đồng tiền trên 2 dòng: VNĐ trên, LAK dưới (bỏ dòng 0). */
 export function Pair({ vnd, lak, tone, bold }: { vnd: number; lak: number; tone?: string; bold?: boolean }) {
-  if (!vnd && !lak) return <Text type="secondary">–</Text>
+  if (!vnd && !lak) return <Text type="secondary">{DASH}</Text>
   return (
     <div style={{ textAlign: 'right', ...MONO, color: tone, fontWeight: bold ? 700 : undefined }}>
       {vnd ? <div>{fmtAmt(vnd)} ₫</div> : null}
@@ -70,6 +76,17 @@ export function PageHeader({ title, subtitle, extra }: { title: ReactNode; subti
 
 export function PrStatusTag({ status, style }: { status: FleetPrStatus; style?: CSSProperties }) {
   return <Tag color={FLEET_PR_STATUS_COLORS[status]} style={{ margin: 0, fontWeight: 600, ...style }}>{FLEET_PR_STATUS_LABELS[status]}</Tag>
+}
+
+/** Trạng thái chi phí CHUYẾN (Chưa nhập chi phí / Chờ kế toán duyệt / Đã duyệt) — nhãn + màu một nguồn
+ *  TRIP_COST_STATE_* (fleetCostService); Sổ chi phí và khối chi phí trong chi tiết lệnh cùng dùng. */
+export function TripCostTag({ costStatus, nExpenses, suffix }: { costStatus?: CostStatus | null; nExpenses: number; suffix?: ReactNode }) {
+  const st = tripCostState(costStatus, nExpenses)
+  return (
+    <Tag icon={st === 'reviewed' ? <LockOutlined /> : undefined} color={TRIP_COST_STATE_COLORS[st]} style={{ margin: 0 }}>
+      {TRIP_COST_STATE_LABELS[st]}{suffix}
+    </Tag>
+  )
 }
 
 /** Tên cột 2 tầng: tên chính + dòng phụ nhỏ (đơn vị / cách tính). Dùng với bảng class .fleet-table. */

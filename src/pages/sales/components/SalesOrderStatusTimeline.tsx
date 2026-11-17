@@ -18,6 +18,7 @@ import {
 } from '@ant-design/icons'
 import type { SalesOrder, SalesOrderStatus } from '../../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS } from '../../../services/sales/salesTypes'
+import { fmtDate } from '../../../utils/format'
 
 const { Text } = Typography
 
@@ -44,51 +45,53 @@ const NEXT_STEP_HINTS: Record<Exclude<SalesOrderStatus, 'cancelled' | 'paid'>, {
   actionLabel: string
   tabKey: string
 }> = {
+  // tabKey phải trỏ ĐÚNG tab có nút/ô nhập của bước đó (audit 17/11/2026: draft từng trỏ 'info',
+  // ready từng trỏ 'shipping' trong khi tạo container/chia lô đã dồn về tab Đóng gói).
   draft: {
     message: 'Bước tiếp: Xác nhận đơn hàng với khách',
-    description: 'Kiểm tra hợp đồng (giá, số lượng, điều khoản L/C, Incoterm) → click "Xác nhận" để chuyển sang Đã xác nhận.',
+    description: 'Kiểm tra hợp đồng (giá, số lượng, điều khoản L/C, Incoterm) → bấm "Xác nhận" ở tab Hợp đồng để chuyển sang Đã xác nhận.',
     actionLabel: 'Mở tab Hợp đồng',
-    tabKey: 'info',
+    tabKey: 'contract',
   },
   confirmed: {
     message: 'Bước tiếp: Lấy hàng — chọn 1 trong 2 cách',
-    description: 'A) Cấp phát từ kho (nếu kho có sẵn TP cùng grade) — bấm "⚡ Cấp phát nhanh (FIFO)". B) Tạo Lệnh sản xuất (nếu cần làm mới) — chọn batch NVL.',
+    description: 'A) Cấp phát từ kho (nếu kho có sẵn thành phẩm cùng grade) — bấm "⚡ Cấp phát nhanh (FIFO)". B) Tạo Lệnh sản xuất (nếu cần làm mới) — chọn lô NVL.',
     actionLabel: 'Mở tab Sản xuất',
     tabKey: 'production',
   },
   producing: {
     message: 'Bước tiếp: Theo dõi tiến độ sản xuất',
-    description: 'Lệnh SX đang chạy qua các stages (chuẩn bị NVL → cán → cuộn → bảo quản). Khi hoàn thành tất cả → mark "Sẵn sàng".',
+    description: 'Lệnh SX đang chạy qua các công đoạn (chuẩn bị NVL → cán → cuộn → bảo quản). Khi xong hết → bấm "Sẵn sàng".',
     actionLabel: 'Mở tab Sản xuất',
     tabKey: 'production',
   },
   ready: {
     message: 'Bước tiếp: Tạo container + đóng gói',
-    description: 'Hàng đã sẵn sàng pick. Sang tab Vận chuyển/Đóng gói tạo container (tự động hoặc thủ công), gắn seal → status sẽ chuyển Đóng gói.',
-    actionLabel: 'Mở tab Vận chuyển',
-    tabKey: 'shipping',
+    description: 'Hàng đã sẵn sàng để xuất. Sang tab Đóng gói tạo container / chia lô (tự động hoặc thủ công), nhập số seal → trạng thái sẽ chuyển Đóng gói.',
+    actionLabel: 'Mở tab Đóng gói',
+    tabKey: 'packing',
   },
   packing: {
-    message: 'Bước tiếp: Cân ship tại trạm cân Phong Điền',
-    description: 'Container đã đóng gói + sealed. Tài xế chở đến trạm cân PD → cân OUT → tự động chuyển sang Đã xuất + cập nhật BL.',
+    message: 'Bước tiếp: Cân xuất tại trạm cân Phong Điền',
+    description: 'Container đã đóng hàng + niêm phong (seal). Tài xế chở đến trạm cân Phong Điền → cân xuất → tự động chuyển sang Đã xuất + cập nhật B/L.',
     actionLabel: 'Mở tab Vận chuyển',
     tabKey: 'shipping',
   },
   shipped: {
-    message: 'Bước tiếp: Theo dõi vận chuyển + cập nhật BL',
-    description: 'Hàng đã lên tàu. Logistics nhập số BL, vessel, ETD/ETA. Khi hàng đến cảng đích → mark "Đã giao".',
+    message: 'Bước tiếp: Theo dõi vận chuyển + cập nhật B/L',
+    description: 'Hàng đã lên tàu. Logistics nhập số B/L, tên tàu, ETD/ETA. Khi hàng đến cảng đích → bấm "Đã giao".',
     actionLabel: 'Mở tab Vận chuyển',
     tabKey: 'shipping',
   },
   delivered: {
     message: 'Bước tiếp: Lập Invoice gửi khách',
-    description: 'Khách đã nhận hàng. Kế toán generate Commercial Invoice + Packing List → gửi khách → mark "Đã lập HĐ".',
+    description: 'Khách đã nhận hàng. Kế toán lập Commercial Invoice + Packing List → gửi khách → bấm "Lập hóa đơn" để chuyển sang Đã lập HĐ.',
     actionLabel: 'Mở tab Tài chính',
     tabKey: 'finance',
   },
   invoiced: {
     message: 'Bước tiếp: Đợi khách thanh toán',
-    description: 'Invoice đã gửi. Theo dõi payment vào TK ngân hàng. Khi tổng tiền nhận = giá trị đơn → tự động chuyển "Đã thanh toán".',
+    description: 'Invoice đã gửi. Theo dõi tiền về tài khoản ngân hàng và ghi khoản thu. Khi tổng tiền đã thu = giá trị đơn → tự động chuyển "Đã thanh toán".',
     actionLabel: 'Mở tab Tài chính',
     tabKey: 'finance',
   },
@@ -114,9 +117,9 @@ export default function SalesOrderStatusTimeline({ order, onTabChange }: Props) 
 
   // Tooltip hiển thị timestamp khi có
   const stepTimestamp = (s: SalesOrderStatus): string | null => {
-    if (s === 'draft' && order.created_at) return new Date(order.created_at).toLocaleDateString('vi-VN')
-    if (s === 'confirmed' && order.confirmed_at) return new Date(order.confirmed_at).toLocaleDateString('vi-VN')
-    if (s === 'shipped' && order.shipped_at) return new Date(order.shipped_at).toLocaleDateString('vi-VN')
+    if (s === 'draft' && order.created_at) return fmtDate(order.created_at)
+    if (s === 'confirmed' && order.confirmed_at) return fmtDate(order.confirmed_at)
+    if (s === 'shipped' && order.shipped_at) return fmtDate(order.shipped_at)
     return null
   }
 
@@ -147,7 +150,7 @@ export default function SalesOrderStatusTimeline({ order, onTabChange }: Props) 
           showIcon
           icon={<WarningOutlined />}
           message="Đơn hàng đã hủy"
-          description="Đơn này đã bị hủy. Stock allocations (nếu có) đã được hoàn lại kho. Để tạo đơn mới, click 'Tạo đơn' từ list."
+          description="Đơn này đã bị hủy. Hàng đã cấp phát từ kho (nếu có) đã được hoàn lại kho. Muốn làm đơn mới, bấm 'Tạo đơn' ở Sổ đơn hàng."
           style={{ marginBottom: 0 }}
         />
       )}
@@ -210,7 +213,7 @@ export default function SalesOrderStatusTimeline({ order, onTabChange }: Props) 
               type="success"
               showIcon
               message="🎉 Đơn hàng hoàn tất"
-              description="Đã giao + lập invoice + thanh toán đủ. Đơn này khép sổ — không còn action nào."
+              description="Đã giao + lập Invoice + thu đủ tiền. Đơn này đã khép sổ — không còn việc gì phải làm."
               style={{ marginTop: 12 }}
             />
           )}

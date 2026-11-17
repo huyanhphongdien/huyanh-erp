@@ -8,6 +8,7 @@
 // ============================================================================
 import { useEffect, useState } from 'react'
 import { Modal, Form, Input, Select, Row, Col, Alert, message } from 'antd'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { EditOutlined } from '@ant-design/icons'
 import { partnerService, type Partner } from '../../../services/b2b/partnerService'
 import { supabase } from '../../../lib/supabase'
@@ -87,7 +88,7 @@ export default function PartnerEditModal({ open, partner, onClose, onSaved }: Pr
       if (e?.code === '23505' || msg.includes('uq_b2b_partners_national_id') || msg.toLowerCase().includes('duplicate')) {
         message.error('CCCD này đã thuộc đại lý khác — không thể trùng.')
       } else {
-        message.error(msg || 'Không cập nhật được đại lý')
+        message.error(dichLoiHeThong(e, 'Không cập nhật được đại lý'))
       }
     } finally {
       setSubmitting(false)

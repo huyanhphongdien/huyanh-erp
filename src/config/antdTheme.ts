@@ -9,29 +9,31 @@
  */
 
 import type { ThemeConfig } from 'antd';
+import { palette } from '../theme/palette';
 
 // ==========================================
 // COLOR PALETTE - Industrial Rubber Theme
+// Màu thương hiệu + trạng thái đọc từ src/theme/palette.js — CÙNG nguồn với Tailwind.
 // ==========================================
 export const colors = {
   // Primary - Industrial Green
-  primary: '#1B4D3E',
-  primaryHover: '#2D8B6E',
-  primaryActive: '#0D2E25',
-  primaryBg: '#E8F5F0',
-  
+  primary: palette.brand,
+  primaryHover: palette.brandHover,
+  primaryActive: palette.brandActive,
+  primaryBg: palette.brandBg,
+
   // Secondary
-  secondary: '#2D8B6E',
-  
+  secondary: palette.brandHover,
+
   // Accent
-  accent: '#E8A838',
+  accent: palette.accent,
   accentHover: '#D4922A',
-  
+
   // Status Colors
-  success: '#52c41a',
-  warning: '#faad14',
-  error: '#ff4d4f',
-  info: '#1890ff',
+  success: palette.success,
+  warning: palette.warning,
+  error: palette.danger,
+  info: palette.info,
   
   // Tier Colors (for partner badges)
   tierDiamond: '#B8860B',

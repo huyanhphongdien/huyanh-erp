@@ -76,6 +76,21 @@ export function toUsdEquivalent(amount: number, currency?: string | null, exchan
 }
 
 /**
+ * Tỷ giá quy đổi đơn VNĐ phải là số đồng của 1 USD. Gõ "1" thì USD quy đổi = nguyên số VNĐ và công nợ/dashboard
+ * (cộng bằng USD) phình hàng tỷ đô. Khoảng rộng — chỉ để bắt gõ nhầm, không phải kiểm tỷ giá thị trường.
+ */
+export const VND_PER_USD_MIN = 10_000
+export const VND_PER_USD_MAX = 50_000
+export function vndRateError(rate: number | null | undefined): string | null {
+  const r = Number(rate) || 0
+  if (r <= 0) return 'Đơn bán nội địa (VNĐ) phải nhập tỷ giá VND/USD để quy đổi báo cáo'
+  if (r < VND_PER_USD_MIN || r > VND_PER_USD_MAX) {
+    return `Tỷ giá ${r.toLocaleString('vi-VN')} VND/USD không hợp lý — gõ số đồng của 1 USD (vd 25.400)`
+  }
+  return null
+}
+
+/**
  * Cặp tổng ghi vào sales_orders từ (đồng tiền, tấn, đơn giá, tỷ giá).
  * USD: {usd: tấn×giá, vnd: usd×tỷ giá | null} · VND: {vnd: tấn×giá, usd: vnd÷tỷ giá | null}
  */
@@ -99,9 +114,30 @@ export function orderTotals(
   }
 }
 
-/** Props formatter/parser cho antd InputNumber khi nhập VND: 35000000 ⇄ "35.000.000". */
+/**
+ * Props formatter/parser cho antd InputNumber khi nhập VND: 35000000 ⇄ "35.000.000", 25385.5 ⇄ "25.385,5".
+ * Kiểu Việt: chấm ngăn nghìn, PHẨY thập phân. Bản cũ chèn chấm cả vào phần lẻ ("15.239.902.5") rồi parser xoá mọi
+ * chấm → rời ô thành ×10 (tỷ giá lẻ, thành tiền = SL lẻ × giá). Ô trống → null (không ép 0).
+ */
 export const vndInputProps = {
-  formatter: (v: string | number | undefined) =>
-    v === undefined || v === null || v === '' ? '' : String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '.'),
-  parser: (v: string | undefined) => (v ? Number(v.replace(/\./g, '').replace(/,/g, '')) : 0) as unknown as number,
+  formatter: (v: string | number | undefined) => {
+    if (v === undefined || v === null || v === '') return ''
+    const [i, f] = String(v).split('.')
+    return i.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (f !== undefined ? `,${f}` : '')
+  },
+  parser: (v: string | undefined) => {
+    let s = (v ?? '').replace(/[^\d.,-]/g, '')
+    if (s === '' || s === '-') return '' as unknown as number
+    const commas = (s.match(/,/g) || []).length
+    if (commas > 1) s = s.replace(/,/g, '')                              // "1,234,567" kiểu Anh: phẩy ngăn nghìn
+    else if (commas === 1) s = s.replace(/\./g, '').replace(',', '.')    // "25.385,5": chấm nghìn, phẩy lẻ
+    else {
+      // Chỉ có chấm: nhóm nghìn Việt luôn đủ 3 số — nhóm cuối khác 3 số ("25385.5", "25.385.5") là dấu thập phân
+      const parts = s.split('.')
+      const last = parts[parts.length - 1]
+      s = parts.length > 1 && last.length !== 3 ? `${parts.slice(0, -1).join('')}.${last}` : parts.join('')
+    }
+    const n = Number(s)
+    return (Number.isFinite(n) ? n : '') as unknown as number
+  },
 }

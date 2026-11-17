@@ -32,25 +32,27 @@ import {
   CreateSubtaskInput,
 } from '../../../services/subtaskService'
 import { supabase } from '../../../lib/supabase'
+import { TASK_PRIORITY_LABELS } from '../../../types'
+import { taskStatusLabel, taskStatusTone, taskPriorityLabel, taskPriorityTone } from '../taskUi'
+import { fmtDate } from '../../../utils/format'
+import { isTaskOverdue } from '../../../utils/taskUtils'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ============================================================================
 // STATUS CONFIG
+// Nhãn + màu: MỘT nguồn TASK_STATUS_* / TASK_PRIORITY_* (types/index.ts) qua taskUi.
+// Bản chép cũ THIẾU 'finished' (trạng thái kết thúc hiện hành) → việc con đã xong hiện "Nháp".
+// Ở đây chỉ giữ icon riêng của danh sách.
 // ============================================================================
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  draft: { label: 'Nháp', color: 'text-gray-600', bg: 'bg-gray-100', icon: Clock },
-  in_progress: { label: 'Đang làm', color: 'text-blue-600', bg: 'bg-blue-100', icon: Clock },
-  pending_review: { label: 'Chờ duyệt', color: 'text-yellow-600', bg: 'bg-yellow-100', icon: AlertCircle },
-  completed: { label: 'Hoàn thành', color: 'text-green-600', bg: 'bg-green-100', icon: CheckCircle },
-  cancelled: { label: 'Đã hủy', color: 'text-red-600', bg: 'bg-red-100', icon: X },
-  paused: { label: 'Tạm dừng', color: 'text-orange-600', bg: 'bg-orange-100', icon: AlertTriangle },
-}
-
-const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  low: { label: 'Thấp', color: 'text-gray-600', bg: 'bg-gray-100' },
-  medium: { label: 'Trung bình', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  high: { label: 'Cao', color: 'text-orange-600', bg: 'bg-orange-100' },
-  urgent: { label: 'Khẩn cấp', color: 'text-red-600', bg: 'bg-red-100' },
+const STATUS_ICONS: Record<string, any> = {
+  draft: Clock,
+  in_progress: Clock,
+  pending_review: AlertCircle,
+  completed: CheckCircle,
+  finished: CheckCircle,
+  cancelled: X,
+  paused: AlertTriangle,
 }
 
 // ============================================================================
@@ -191,10 +193,7 @@ export function SubtasksList({
 
   // ========== HELPERS ==========
   
-  const formatDate = (date?: string | null) => {
-    if (!date) return '-'
-    return new Date(date).toLocaleDateString('vi-VN')
-  }
+  const formatDate = fmtDate
 
   const getTaskDisplayName = (task: SubtaskItem) => {
     return task.title || task.name || 'Không có tiêu đề'
@@ -284,7 +283,7 @@ export function SubtasksList({
               parentStartDate={parentStartDate}
               parentDueDate={parentDueDate}
               isLoading={createMutation.isPending}
-              error={createMutation.error?.message}
+              error={createMutation.error ? dichLoiHeThong(createMutation.error, 'Không tạo được công việc con') : undefined}
               onSubmit={(data) => createMutation.mutate(data)}
               onCancel={() => {
                 setShowAddForm(false)
@@ -323,14 +322,15 @@ export function SubtasksList({
           {!isLoading && subtasks.length > 0 && (
             <div className="divide-y divide-gray-100">
               {subtasks.map((task) => {
-                const status = STATUS_CONFIG[task.status] || STATUS_CONFIG.draft
-                const priority = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium
-                const StatusIcon = status.icon
-                
-                const isOverdue = task.due_date && 
-                  new Date(task.due_date) < new Date() && 
-                  task.status !== 'completed' && 
-                  task.status !== 'cancelled'
+                const statusTone = taskStatusTone(task.status)
+                const status = { label: taskStatusLabel(task.status), bg: statusTone.bg, color: statusTone.text }
+                const priorityTone = taskPriorityTone(task.priority)
+                const priority = { label: taskPriorityLabel(task.priority), bg: priorityTone.bg, color: priorityTone.text }
+                const StatusIcon = STATUS_ICONS[task.status] || Clock
+
+                // Hạn tính hết NGÀY (bản cũ so new Date(due) < now → việc hạn hôm nay bị "Quá hạn" từ 7h sáng)
+                // và việc 'finished' (đã xong) không còn bị gắn "Quá hạn"
+                const isOverdue = isTaskOverdue(task.due_date, task.status)
 
                 const violatesParentDueDate = parentDueDate && task.due_date && 
                   new Date(task.due_date) > new Date(parentDueDate)
@@ -443,7 +443,7 @@ export function SubtasksList({
         <DeleteConfirmModal
           taskName={subtasks.find((t) => t.id === deleteId)?.name || ''}
           isLoading={deleteMutation.isPending}
-          error={deleteMutation.error?.message}
+          error={deleteMutation.error ? dichLoiHeThong(deleteMutation.error, 'Không xóa được công việc con') : undefined}
           onConfirm={() => deleteMutation.mutate(deleteId)}
           onCancel={() => {
             setDeleteId(null)
@@ -518,10 +518,7 @@ function AddSubtaskForm({
   }, [departmentId])
 
   // Format helpers
-  const formatDateVN = (date: string | null | undefined) => {
-    if (!date) return ''
-    return new Date(date).toLocaleDateString('vi-VN')
-  }
+  const formatDateVN = (date: string | null | undefined) => (date ? fmtDate(date) : '')
 
   const formatDateForInput = (date: string | null | undefined) => {
     if (!date) return ''
@@ -659,7 +656,7 @@ function AddSubtaskForm({
         </div>
 
         {/* Row 3: Department & Assignee */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">
               <Building className="w-3 h-3 inline mr-1" />
@@ -707,8 +704,8 @@ function AddSubtaskForm({
           </div>
         </div>
 
-        {/* Row 4: Priority & Dates */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* Row 4: Priority & Dates — 1 cột trên điện thoại */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Độ ưu tiên</label>
             <select
@@ -716,10 +713,9 @@ function AddSubtaskForm({
               onChange={(e) => setPriority(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             >
-              <option value="low">Thấp</option>
-              <option value="medium">Trung bình</option>
-              <option value="high">Cao</option>
-              <option value="urgent">Khẩn cấp</option>
+              {(Object.keys(TASK_PRIORITY_LABELS) as (keyof typeof TASK_PRIORITY_LABELS)[]).map(p => (
+                <option key={p} value={p}>{TASK_PRIORITY_LABELS[p]}</option>
+              ))}
             </select>
           </div>
           <div>

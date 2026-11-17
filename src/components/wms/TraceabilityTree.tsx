@@ -19,6 +19,7 @@ import {
 } from '@ant-design/icons'
 import type { DataNode } from 'antd/es/tree'
 import { traceabilityService, type TraceNode, type TraceNodeType } from '../../services/wms/traceabilityService'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Text } = Typography
 
@@ -190,8 +191,8 @@ const TraceabilityTree: React.FC<TraceabilityTreeProps> = ({ batchId, dealId, di
 
         setTraceData(result)
       } catch (err: any) {
-        console.error('Loi truy xuat nguon goc:', err)
-        setError(err?.message || 'Không thể truy xuất nguồn gốc')
+        console.error('Lỗi truy xuất nguồn gốc:', err)
+        setError(dichLoiHeThong(err, 'Không thể truy xuất nguồn gốc'))
       } finally {
         setLoading(false)
       }

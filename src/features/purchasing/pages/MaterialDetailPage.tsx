@@ -43,6 +43,10 @@ import {
 import { supplierService, type Supplier } from '../../../services/supplierService'
 import MaterialForm from './components/materials/MaterialForm'
 import MaterialVariants from './components/materials/MaterialVariants'
+import { App as AntdApp } from 'antd'
+import { fmtVnd as formatCurrency, fmtDate as formatDate, fmtNum } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { vndToInputText, vndInputToNumber } from '../moneyInput'
 
 // Tabs - Thêm 'variants'
 type TabType = 'info' | 'variants' | 'suppliers' | 'history'
@@ -50,15 +54,19 @@ type TabType = 'info' | 'variants' | 'suppliers' | 'history'
 const MaterialDetailPage: React.FC = () => {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const { message, modal } = AntdApp.useApp()
 
   // State
   const [material, setMaterial] = useState<Material | null>(null)
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "không tìm thấy vật tư" — trước đây nuốt lỗi rồi báo không tìm thấy
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('info')
 
   // Suppliers state
   const [suppliers, setSuppliers] = useState<MaterialSupplier[]>([])
   const [loadingSuppliers, setLoadingSuppliers] = useState(false)
+  const [suppliersError, setSuppliersError] = useState<string | null>(null)
   const [availableSuppliers, setAvailableSuppliers] = useState<Supplier[]>([])
   const [showAddSupplier, setShowAddSupplier] = useState(false)
   const [addSupplierForm, setAddSupplierForm] = useState<Partial<MaterialSupplierFormData>>({
@@ -79,10 +87,12 @@ const MaterialDetailPage: React.FC = () => {
     if (!id) return
     try {
       setLoading(true)
+      setLoadError(null)
       const data = await materialService.getById(id)
       setMaterial(data)
     } catch (error) {
       console.error('Error fetching material:', error)
+      setLoadError(dichLoiHeThong(error, 'Không tải được thông tin vật tư'))
     } finally {
       setLoading(false)
     }
@@ -93,10 +103,12 @@ const MaterialDetailPage: React.FC = () => {
     if (!id) return
     try {
       setLoadingSuppliers(true)
+      setSuppliersError(null)
       const data = await materialService.getSuppliers(id)
       setSuppliers(data)
     } catch (error) {
       console.error('Error fetching suppliers:', error)
+      setSuppliersError(dichLoiHeThong(error, 'Không tải được danh sách nhà cung cấp của vật tư'))
     } finally {
       setLoadingSuppliers(false)
     }
@@ -145,23 +157,30 @@ const MaterialDetailPage: React.FC = () => {
       fetchSuppliers()
       fetchMaterial()
     } catch (error: any) {
-      alert(error.message || 'Có lỗi xảy ra')
+      message.error(dichLoiHeThong(error, 'Không thêm được nhà cung cấp'))
     } finally {
       setSavingSupplier(false)
     }
   }
 
-  // Handle remove supplier
-  const handleRemoveSupplier = async (supplierId: string) => {
-    if (!confirm('Bạn có chắc muốn xóa nhà cung cấp này?')) return
-
-    try {
-      await materialService.removeSupplier(supplierId)
-      fetchSuppliers()
-      fetchMaterial()
-    } catch (error: any) {
-      alert(error.message || 'Có lỗi xảy ra')
-    }
+  // Handle remove supplier — GỠ liên kết NCC khỏi vật tư (không xoá NCC khỏi danh mục; câu hỏi cũ "xóa nhà cung cấp" sai nghĩa)
+  const handleRemoveSupplier = (ms: MaterialSupplier) => {
+    modal.confirm({
+      title: `Gỡ ${ms.supplier?.name || 'nhà cung cấp này'} khỏi vật tư?`,
+      content: 'Chỉ gỡ liên kết NCC – vật tư (đơn giá, SL tối thiểu, thời gian giao). Nhà cung cấp vẫn còn trong danh mục NCC.',
+      okText: 'Gỡ khỏi vật tư',
+      okButtonProps: { danger: true },
+      cancelText: 'Không',
+      onOk: async () => {
+        try {
+          await materialService.removeSupplier(ms.id)
+          fetchSuppliers()
+          fetchMaterial()
+        } catch (error: any) {
+          message.error(dichLoiHeThong(error, 'Không gỡ được nhà cung cấp'))
+        }
+      },
+    })
   }
 
   // Handle set preferred supplier
@@ -173,24 +192,11 @@ const MaterialDetailPage: React.FC = () => {
       fetchSuppliers()
       fetchMaterial()
     } catch (error: any) {
-      alert(error.message || 'Có lỗi xảy ra')
+      message.error(dichLoiHeThong(error, 'Không đặt được NCC ưu tiên'))
     }
   }
 
-  // Format currency
-  const formatCurrency = (value?: number | null) => {
-    if (value == null) return '-'
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(value)
-  }
-
-  // Format date
-  const formatDate = (date?: string) => {
-    if (!date) return '-'
-    return new Date(date).toLocaleDateString('vi-VN')
-  }
+  // formatCurrency = fmtVnd · formatDate = fmtDate (utils/format, null → '—') — bản tự viết cũ đã xoá
 
   // Helper: Get stock safely
   const getStock = (mat: Material): number => {
@@ -213,8 +219,24 @@ const MaterialDetailPage: React.FC = () => {
     return (
       <div className="p-6">
         <div className="text-center py-12">
-          <Package className="w-12 h-12 text-gray-300 mx-auto" />
-          <p className="mt-2 text-gray-500">Không tìm thấy vật tư</p>
+          {loadError ? (
+            <>
+              <AlertTriangle className="w-12 h-12 text-red-400 mx-auto" />
+              <p className="mt-2 font-semibold text-red-700">Không tải được vật tư</p>
+              <p className="text-sm text-red-600">{loadError}</p>
+              <button
+                onClick={() => fetchMaterial()}
+                className="mt-4 mr-4 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Thử lại
+              </button>
+            </>
+          ) : (
+            <>
+              <Package className="w-12 h-12 text-gray-300 mx-auto" />
+              <p className="mt-2 text-gray-500">Không tìm thấy vật tư</p>
+            </>
+          )}
           <button
             onClick={() => navigate('/purchasing/materials')}
             className="mt-4 text-blue-600 hover:underline"
@@ -252,7 +274,7 @@ const MaterialDetailPage: React.FC = () => {
               ) : (
                 <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
                   <PowerOff className="w-3 h-3" />
-                  Ngưng
+                  Ngưng hoạt động
                 </span>
               )}
               {isLowStock && (
@@ -412,13 +434,13 @@ const MaterialDetailPage: React.FC = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500">Hiện tại</span>
                   <span className={`text-xl font-bold ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>
-                    {stockValue.toLocaleString('vi-VN')}
+                    {fmtNum(stockValue, 3)}
                     {isLowStock && <AlertTriangle className="w-4 h-4 inline ml-1" />}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500">Tối thiểu</span>
-                  <span className="font-medium">{minStockValue.toLocaleString('vi-VN')}</span>
+                  <span className="font-medium">{fmtNum(minStockValue, 3)}</span>
                 </div>
                 <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div 
@@ -541,12 +563,14 @@ const MaterialDetailPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Đơn giá (VNĐ)
                   </label>
+                  {/* Ô tiền: chấm ngăn nghìn khi gõ */}
                   <input
-                    type="number"
-                    value={addSupplierForm.unit_price ?? ''}
-                    onChange={(e) => setAddSupplierForm(prev => ({ 
-                      ...prev, 
-                      unit_price: e.target.value ? parseFloat(e.target.value) : undefined 
+                    type="text"
+                    inputMode="numeric"
+                    value={vndToInputText(addSupplierForm.unit_price)}
+                    onChange={(e) => setAddSupplierForm(prev => ({
+                      ...prev,
+                      unit_price: vndInputToNumber(e.target.value)
                     }))}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="0"
@@ -601,6 +625,18 @@ const MaterialDetailPage: React.FC = () => {
             <div className="flex justify-center py-8">
               <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
             </div>
+          ) : suppliersError ? (
+            // Lỗi xét TRƯỚC trống — không báo "Chưa có nhà cung cấp nào" khi thực ra tải lỗi
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+              <p className="font-semibold text-red-700">Không tải được dữ liệu</p>
+              <p className="text-sm text-red-600">{suppliersError}</p>
+              <button
+                onClick={() => fetchSuppliers()}
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-100"
+              >
+                <RefreshCw className="w-4 h-4" /> Thử lại
+              </button>
+            </div>
           ) : suppliers.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-8 text-center">
               <Building2 className="w-12 h-12 text-gray-300 mx-auto" />
@@ -639,7 +675,7 @@ const MaterialDetailPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {ms.min_order_qty?.toLocaleString('vi-VN') || '-'}
+                        {fmtNum(ms.min_order_qty, 3)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {ms.lead_time_days ? `${ms.lead_time_days} ngày` : '-'}
@@ -659,9 +695,9 @@ const MaterialDetailPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
-                          onClick={() => handleRemoveSupplier(ms.id)}
+                          onClick={() => handleRemoveSupplier(ms)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Xóa"
+                          title="Gỡ NCC khỏi vật tư"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

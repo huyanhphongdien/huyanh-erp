@@ -38,6 +38,9 @@ import {
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import productionService from '../../../services/wms/productionService'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtDateTime } from '../../../utils/format'
 import type { ProductionOrder, ProductionStageProgress } from '../../../services/wms/wms.types'
 import {
   STAGE_NAMES,
@@ -68,6 +71,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
   const [stage, setStage] = useState<ProductionStageProgress | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0) // bấm "Thử lại" khi tải lỗi
   const [actionLoading, setActionLoading] = useState(false)
   const [operators, setOperators] = useState<{ id: string; full_name: string }[]>([])
 
@@ -185,13 +189,13 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
           .order('full_name')
         if (emps) setOperators(emps)
       } catch (err: any) {
-        setError(err.message || 'Không thể tải du lieu')
+        setError(dichLoiHeThong(err, 'Không tải được dữ liệu công đoạn'))
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [id, stageNumber])
+  }, [id, stageNumber, reloadKey])
 
   const doCompleteStage = async () => {
     if (!id) return
@@ -220,10 +224,10 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
         qc_notes: qcNotes || undefined,
         notes: notes || undefined,
       })
-      message.success(`Hoàn thành cong doan ${stageNumber}: ${STAGE_NAMES[stageNumber]}`)
+      message.success(`Hoàn thành công đoạn ${stageNumber}: ${STAGE_NAMES[stageNumber]}`)
       navigate(`/wms/production/${id}`)
     } catch (err: any) {
-      setError(err.message || 'Không thể hoàn thành cong doan')
+      setError(dichLoiHeThong(err, 'Không hoàn thành được công đoạn'))
     } finally {
       setActionLoading(false)
     }
@@ -236,7 +240,6 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
       content: 'Số liệu sẽ được lưu và khoá lại, không sửa được sau khi hoàn thành.',
       okText: 'Hoàn thành',
       cancelText: 'Huỷ',
-      okButtonProps: { style: { background: '#1B4D3E', borderColor: '#1B4D3E' } },
       onOk: doCompleteStage,
     })
   }
@@ -256,8 +259,10 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
   if (!order || !stage) {
     return (
       <div style={{ padding: 24 }}>
-        {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon />}
-        <Empty description="Không tìm thấy cong doan" />
+        {/* Lỗi tải ≠ "không tìm thấy": lỗi thì hiện lỗi + Thử lại, chỉ báo "không tìm thấy" khi tải được mà không có */}
+        {error
+          ? <PageState error={error} onRetry={() => setReloadKey((k) => k + 1)} />
+          : <Empty description="Không tìm thấy công đoạn" />}
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <Button onClick={() => navigate(`/wms/production/${id}`)}>Quay lại</Button>
         </div>
@@ -301,20 +306,20 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
       )}
 
       {isCompleted && (
-        <Alert type="success" message="Công đoạn nay da hoan thanh" showIcon style={{ marginBottom: 16, borderRadius: 8 }} />
+        <Alert type="success" message="Công đoạn này đã hoàn thành" showIcon style={{ marginBottom: 16, borderRadius: 8 }} />
       )}
 
       {/* Stage info */}
       <Card style={{ borderRadius: 12, marginBottom: 16 }}>
         <Descriptions size="small" column={3}>
           <Descriptions.Item label="Bắt đầu">
-            {stage.started_at ? new Date(stage.started_at).toLocaleString('vi-VN') : '—'}
+            {fmtDateTime(stage.started_at)}
           </Descriptions.Item>
           <Descriptions.Item label="Hoàn thành">
-            {stage.completed_at ? new Date(stage.completed_at).toLocaleString('vi-VN') : '—'}
+            {fmtDateTime(stage.completed_at)}
           </Descriptions.Item>
           <Descriptions.Item label="Thời gian">
-            {stage.duration_hours != null ? `${stage.duration_hours} gio` : '—'}
+            {stage.duration_hours != null ? `${stage.duration_hours} giờ` : '—'}
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -328,7 +333,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
             <Space>
               <ThunderboltOutlined style={{ color: '#2D8B6E' }} />
               <span>NVL đã tiêu thụ</span>
-              <Tag color="green" style={{ marginLeft: 8 }}>LIVE</Tag>
+              <Tag color="green" style={{ marginLeft: 8 }}>Trực tiếp</Tag>
             </Space>
           }
         >
@@ -368,7 +373,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
           </Row>
           {nvlStats.last_update && (
             <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
-              Cập nhật gần nhất: {new Date(nvlStats.last_update).toLocaleString('vi-VN')}
+              Cập nhật gần nhất: {fmtDateTime(nvlStats.last_update)}
             </Text>
           )}
           {nvlStats.consumed_kg > nvlStats.allocated_kg && (
@@ -387,7 +392,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
         <Row gutter={24}>
           <Col span={12}>
             <div style={{ marginBottom: 16 }}>
-              <Text strong>Luong vao (kg)</Text>
+              <Text strong>Lượng vào (kg)</Text>
               <InputNumber
                 value={inputQty}
                 onChange={setInputQty}
@@ -401,7 +406,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
           </Col>
           <Col span={12}>
             <div style={{ marginBottom: 16 }}>
-              <Text strong>Luong ra (kg)</Text>
+              <Text strong>Lượng ra (kg)</Text>
               <InputNumber
                 value={outputQty}
                 onChange={setOutputQty}
@@ -418,7 +423,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
         <Row gutter={24}>
           <Col span={12}>
             <div style={{ marginBottom: 16 }}>
-              <Text strong>DRC vao (%)</Text>
+              <Text strong>DRC vào (%)</Text>
               <InputNumber
                 value={inputDrc}
                 onChange={setInputDrc}
@@ -449,7 +454,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
           <Row gutter={24}>
             <Col span={8}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>Nhiet do TB (°C)</Text>
+                <Text strong>Nhiệt độ TB (°C)</Text>
                 <InputNumber
                   value={temperature}
                   onChange={setTemperature}
@@ -462,7 +467,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
             </Col>
             <Col span={8}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>Do am TB (%)</Text>
+                <Text strong>Độ ẩm TB (%)</Text>
                 <InputNumber
                   value={humidity}
                   onChange={setHumidity}
@@ -475,7 +480,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
             </Col>
             <Col span={8}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>So ngay say</Text>
+                <Text strong>Số ngày sấy</Text>
                 <InputNumber
                   value={durationDays}
                   onChange={setDurationDays}
@@ -490,7 +495,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
         )}
 
         <div style={{ marginBottom: 16 }}>
-          <Text strong>Nguoi thao tac</Text>
+          <Text strong>Người thao tác</Text>
           <Select
             value={operatorId || undefined}
             onChange={setOperatorId}
@@ -508,7 +513,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
         <Card size="small" style={{ marginBottom: 16, background: '#fafafa', borderRadius: 8 }}>
           <Space direction="vertical" style={{ width: '100%' }}>
             <Checkbox checked={qcPassed} onChange={e => setQcPassed(e.target.checked)} disabled={isCompleted}>
-              <Text strong>QC checkpoint dat</Text>
+              <Text strong>Đạt kiểm tra QC công đoạn</Text>
             </Checkbox>
             <Input.TextArea
               value={qcNotes}
@@ -525,7 +530,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
           <Input.TextArea
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            placeholder="Ghi chú cong doan..."
+            placeholder="Ghi chú công đoạn..."
             rows={2}
             style={{ marginTop: 4 }}
             disabled={isCompleted}
@@ -540,7 +545,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
             <Col span={12}>
               <Card bodyStyle={{ padding: 12 }}>
                 <Statistic
-                  title="Hao hut (kg)"
+                  title="Hao hụt (kg)"
                   value={weightLoss}
                   valueStyle={{
                     fontSize: 20,
@@ -555,7 +560,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
             <Col span={12}>
               <Card bodyStyle={{ padding: 12 }}>
                 <Statistic
-                  title="Thay doi DRC (%)"
+                  title="Thay đổi DRC (%)"
                   value={drcChange > 0 ? `+${drcChange}` : String(drcChange)}
                   valueStyle={{
                     fontSize: 20,
@@ -581,9 +586,8 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
             onClick={handleCompleteStage}
             loading={actionLoading}
             icon={<CheckCircleOutlined />}
-            style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
           >
-            Hoàn thành cong doan
+            Hoàn thành công đoạn
           </Button>
         </Space>
       )}

@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
 import type {
   StockBatch,
   WMSPaginationParams,
@@ -83,7 +84,7 @@ export interface UpdateCheckItemData {
  */
 async function generateCode(): Promise<string> {
   const today = new Date()
-  const dateStr = today.toISOString().split('T')[0].replace(/-/g, '')
+  const dateStr = toDateStrVN(today).replace(/-/g, '')   // ngày VN — UTC trước 7h sáng ra mã ngày hôm qua
   const prefix = `KK-${dateStr}`
 
   // Tìm sequence cao nhất trong ngày (nếu lưu trong DB)

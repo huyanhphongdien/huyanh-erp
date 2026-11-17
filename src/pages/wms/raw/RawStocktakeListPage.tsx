@@ -7,19 +7,22 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, Col, DatePicker, Input, Modal, Row, Space, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { ArrowLeftOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, PlusOutlined, ReloadOutlined, MobileOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { rawStocktakeService, RAW_STOCKTAKE_STATUS_COLORS, RAW_STOCKTAKE_STATUS_LABELS, type RawStocktake } from '../../../services/wms/rawStocktakeService'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import { useRawRole } from '../../../hooks/useRawRole'
+import { useIsPhone } from '../../../hooks/useIsPhone'
+import { fmtKg, fmtSigned, fmtDate } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { stdPagination } from '../../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
-const fmtKg = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }))
-const fmtSigned = (n: number | null | undefined) => (n === null || n === undefined ? '—' : (n > 0 ? '+' : '') + fmtKg(n))
 
 export default function RawStocktakeListPage() {
   const navigate = useNavigate()
+  const isPhone = useIsPhone()
   const rawRole = useRawRole()
   const { data: facilities } = useActiveFacilities()
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined)
@@ -42,7 +45,7 @@ export default function RawStocktakeListPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try { setRows(await rawStocktakeService.list(facilityId)) }
-    catch (e: any) { setError(e?.message || 'Không tải được danh sách kiểm kê') }
+    catch (e: any) { setError(dichLoiHeThong(e, 'Không tải được danh sách kiểm kê')) }
     finally { setLoading(false) }
   }, [facilityId])
 
@@ -59,14 +62,14 @@ export default function RawStocktakeListPage() {
       const msg = e?.message || 'Không tạo được'
       if (/phiếu cân sẵn sàng chưa nhập/.test(msg)) {
         Modal.confirm({ title: 'Còn phiếu cân chưa nhập kho', content: `${msg}. Vẫn tạo kiểm kê? (những phiếu đó sẽ nằm ngoài tồn kiểm kê và bị khoá kỳ nếu duyệt)`, okText: 'Vẫn tạo', cancelText: 'Để nhập trước', onOk: () => create(true) })
-      } else message.error(msg)
+      } else message.error(dichLoiHeThong(e, 'Không tạo được phiếu kiểm kê'))
     }
     finally { setCreating(false) }
   }
 
   const columns: ColumnsType<RawStocktake> = [
     { title: 'Phiếu', dataIndex: 'code', key: 'code', render: (v, r) => <a onClick={() => navigate(`/wms/nvl/kiem-ke/${r.id}`)}><Text code strong>{v}</Text></a> },
-    { title: 'Ngày kiểm kê', dataIndex: 'ngay_kiem_ke', key: 'ngay_kiem_ke', render: (v) => dayjs(v).format('DD/MM/YYYY') },
+    { title: 'Ngày kiểm kê', dataIndex: 'ngay_kiem_ke', key: 'ngay_kiem_ke', render: (v) => fmtDate(v) },
     { title: 'Lô', dataIndex: 'so_lo', key: 'so_lo', align: 'right', render: (v, r) => r.so_lo_chua_dem > 0 ? <span>{v} <Text type="warning">({r.so_lo_chua_dem} chưa đếm)</Text></span> : v },
     { title: 'Sổ khô (kg)', dataIndex: 'book_dry_kg', key: 'book_dry_kg', align: 'right', render: (v) => fmtKg(v) },
     { title: 'Đếm khô (kg)', dataIndex: 'counted_dry_kg', key: 'counted_dry_kg', align: 'right', render: (v) => fmtKg(v) },
@@ -96,9 +99,15 @@ export default function RawStocktakeListPage() {
             </Space>
           </Col>
         </Row>
-        {error && <Alert type="error" showIcon message={error} description="Kiểm tra đã chạy migration wms_nvl_p3_kiem_ke_can_doi.sql chưa." />}
+        {isPhone && (
+          <Alert type="info" showIcon message="Đang mở trên điện thoại — bản điện thoại đếm từng lô dễ hơn"
+            action={<Button size="small" type="primary" icon={<MobileOutlined />} onClick={() => navigate('/m/kho/kiem-ke')}>Mở bản điện thoại</Button>} />
+        )}
+        {error && <Alert type="error" showIcon message={error} description="Nếu vẫn lỗi sau khi thử lại, chụp màn hình gửi quản trị."
+          action={<Button size="small" onClick={load}>Thử lại</Button>} />}
         <Card size="small" bodyStyle={{ padding: 0 }}>
-          <Table<RawStocktake> rowKey="id" columns={columns} dataSource={rows} size="small" loading={loading} pagination={{ pageSize: 20, showSizeChanger: false }} />
+          <Table<RawStocktake> rowKey="id" columns={columns} dataSource={rows} size="small" loading={loading} pagination={stdPagination(20)}
+            locale={error ? { emptyText: 'Không tải được — xem lỗi phía trên' } : undefined} />
         </Card>
       </Space>
       <Modal open={open} title="Tạo phiếu kiểm kê" onCancel={() => setOpen(false)} onOk={() => create()} okText="Tạo" cancelText="Hủy" confirmLoading={creating}>

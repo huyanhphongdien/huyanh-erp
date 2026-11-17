@@ -9,37 +9,40 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  Alert, Breadcrumb, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Select, Skeleton, Space, Table, Tag, Tooltip, Typography, message,
+  Alert, Breadcrumb, Button, Card, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Select, Skeleton, Space, Table, Tag, Tooltip, Typography, message,
 } from 'antd'
 import {
   ArrowLeftOutlined, CheckCircleOutlined, DeleteOutlined, DollarOutlined, EditOutlined, LockOutlined, PlusOutlined, PrinterOutlined, SendOutlined, StopOutlined, UndoOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useAuthStore } from '../../../stores/authStore'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import { isFinanceUser } from '../../../lib/financeAccess'
 import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { DASH, fmtDate as fmtD, fmtDateTime as fmtDt } from '../../../utils/format'
+import PageState from '../../../components/common/PageState'
 import { fmtAmt } from '../../../services/logistics/fleetCostService'
 import {
-  fleetPaymentRequestService, FLEET_PR_METHOD_LABELS,
-  type FleetPaymentRequest, type FleetPaymentRequestLine, type FleetPrPaymentMethod,
+  fleetPaymentRequestService, FLEET_PR_METHOD_LABELS, FLEET_PR_LINE_TYPE_COLORS, FLEET_PR_LINE_TYPE_LABELS,
+  type FleetPaymentRequest, type FleetPaymentRequestLine, type FleetPrLineType, type FleetPrPaymentMethod,
 } from '../../../services/logistics/fleetPaymentRequestService'
 import { AMBER, BRAND, INK_2, Kpi, MONO, OK, PrStatusTag, RED, thousands } from './fleetCostUi'
 
 const { Text } = Typography
-const fmtD = (iso?: string | null) => (iso ? dayjs(iso).format('DD/MM/YYYY') : '–')
-const fmtDt = (iso?: string | null) => (iso ? dayjs(iso).format('DD/MM/YYYY HH:mm') : '–')
-const LINE_TYPE: Record<string, { label: string; color: string }> = {
-  trip: { label: 'Chuyến', color: 'blue' }, advance: { label: 'Trừ tạm ứng', color: 'orange' }, manual: { label: 'Khoản tay', color: 'default' },
-}
 
-export default function FleetPaymentRequestDetailPage() {
-  const { id } = useParams<{ id: string }>()
+// Nhận id qua prop để mở được dạng TAB (khuôn DispatchDetailPage) khi trang được đăng ký ở tabRegistry;
+// vào thẳng bằng URL thì lấy từ useParams như cũ.
+export default function FleetPaymentRequestDetailPage({ id: propId }: { id?: string } = {}) {
+  const { id: paramId } = useParams<{ id: string }>()
+  const id = propId || paramId
   const navigate = useNavigate()
+  const openTab = useOpenTab()
   const user = useAuthStore((s) => s.user)
   const canApprove = isFinanceUser(user)
   const [req, setReq] = useState<FleetPaymentRequest | null>(null)
   const [lines, setLines] = useState<FleetPaymentRequestLine[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState<unknown>(null)
   const [acting, setActing] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
   const [infoForm] = Form.useForm()
@@ -50,31 +53,37 @@ export default function FleetPaymentRequestDetailPage() {
   const load = useCallback(async () => {
     if (!id) return
     setLoading(true)
+    setLoadErr(null)
     try {
       const res = await fleetPaymentRequestService.getById(id)
       if (!res) { message.error('Không tìm thấy đề nghị'); navigate('/logistics/costs'); return }
       setReq(res.request); setLines(res.lines)
-    } catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi tải')) }
+    } catch (e: any) {
+      // Lần đầu hỏng → khối lỗi + Thử lại (trước: khung xương quay mãi); tải lại sau thao tác hỏng → báo nổi.
+      setLoadErr(e)
+      message.error(dichLoiHeThong(e, 'Lỗi tải đề nghị thanh toán'))
+    }
     finally { setLoading(false) }
   }, [id, navigate])
   useEffect(() => { load() }, [load])
 
-  const act = async (fn: () => Promise<unknown>, okMsg: string) => {
+  /** true = thành công (hộp nhập chỉ đóng khi lưu được — trước đây lưu lỗi vẫn đóng, mất phần vừa gõ). */
+  const act = async (fn: () => Promise<unknown>, okMsg: string, reload = true): Promise<boolean> => {
     setActing(true)
-    try { await fn(); message.success(okMsg); load() }
-    catch (e: any) { message.error(dichLoiHeThong(e, 'Thao tác thất bại')) }
+    try { await fn(); message.success(okMsg); if (reload) load(); return true }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Thao tác thất bại')); return false }
     finally { setActing(false) }
   }
 
   const openInfo = () => {
     if (!req) return
-    infoForm.setFieldsValue({ request_date: req.request_date, payee_name: req.payee_name || '', payment_method: req.payment_method, payee_account: req.payee_account || '', title: req.title || '', reason: req.reason || '', note: req.note || '' })
+    infoForm.setFieldsValue({ request_date: req.request_date ? dayjs(req.request_date) : null, payee_name: req.payee_name || '', payment_method: req.payment_method, payee_account: req.payee_account || '', title: req.title || '', reason: req.reason || '', note: req.note || '' })
     setInfoOpen(true)
   }
   const saveInfo = async () => {
     const v = await infoForm.validateFields()
-    await act(() => fleetPaymentRequestService.updateRequest(req!.id, v), 'Đã lưu')
-    setInfoOpen(false)
+    // DatePicker trả dayjs → gửi lại 'YYYY-MM-DD' như ô ngày cũ (theo lịch máy, không qua toISOString).
+    if (await act(() => fleetPaymentRequestService.updateRequest(req!.id, { ...v, request_date: v.request_date ? v.request_date.format('YYYY-MM-DD') : undefined }), 'Đã lưu')) setInfoOpen(false)
   }
   const openLine = (l?: FleetPaymentRequestLine) => {
     setEditingLine(l || null)
@@ -83,24 +92,29 @@ export default function FleetPaymentRequestDetailPage() {
   }
   const saveLine = async () => {
     const v = await lineForm.validateFields()
-    await act(async () => {
+    const ok = await act(async () => {
       if (editingLine) await fleetPaymentRequestService.updateLine(editingLine.id, { description: v.description, amount: editingLine.line_type === 'advance' ? -Math.abs(v.amount) : v.amount, note: v.note })
       else await fleetPaymentRequestService.addManualLine(req!.id, { description: v.description, amount: v.amount, note: v.note })
     }, editingLine ? 'Đã sửa dòng' : 'Đã thêm dòng')
-    setLineOpen(false)
+    if (ok) setLineOpen(false)
   }
 
+  if (!loading && loadErr && !req) return <div style={{ padding: 20, maxWidth: 1400, margin: '0 auto' }}><Card><PageState error={loadErr} onRetry={load} /></Card></div>
   if (loading || !req) return <div style={{ padding: 20, maxWidth: 1400, margin: '0 auto' }}><Card><Skeleton active /></Card></div>
   const editable = req.status === 'draft'
   const [y, m] = (req.period_ym || '').split('-')
 
   const columns = [
     { title: '#', width: 44, render: (_: unknown, __: FleetPaymentRequestLine, i: number) => i + 1 },
-    { title: 'Loại', dataIndex: 'line_type', width: 110, render: (v: string) => <Tag color={LINE_TYPE[v]?.color} style={{ margin: 0 }}>{LINE_TYPE[v]?.label || v}</Tag> },
+    { title: 'Loại', dataIndex: 'line_type', width: 110, render: (v: FleetPrLineType) => <Tag color={FLEET_PR_LINE_TYPE_COLORS[v]} style={{ margin: 0 }}>{FLEET_PR_LINE_TYPE_LABELS[v] || v}</Tag> },
     { title: 'Nội dung', dataIndex: 'description', render: (v: string, l: FleetPaymentRequestLine) => (
       <div>
         <div>{v}</div>
-        {l.dispatch_order && <a style={{ ...MONO, fontSize: 12 }} onClick={() => navigate(`/logistics/dispatch/${l.dispatch_order!.id}`)}>mở lệnh {l.dispatch_order.code}</a>}
+        {/* Mở lệnh thành TAB (khuôn Sổ lệnh) — navigate() đè mất tab đang mở */}
+        {l.dispatch_order && <a style={{ ...MONO, fontSize: 12 }} onClick={() => openTab({
+          key: `dispatch-${l.dispatch_order!.id}`, title: `Lệnh ${l.dispatch_order!.code}`, componentId: 'dispatch-detail',
+          props: { id: l.dispatch_order!.id }, path: `/logistics/dispatch/${l.dispatch_order!.id}`,
+        })}>mở lệnh {l.dispatch_order.code}</a>}
       </div>
     ) },
     { title: 'ĐVT', dataIndex: 'unit', width: 70, align: 'center' as const, render: (v: string | null) => v || '' },
@@ -167,8 +181,9 @@ export default function FleetPaymentRequestDetailPage() {
                 <Button danger icon={<StopOutlined />}>Huỷ</Button>
               </Popconfirm>
             )}
+            {/* reload=false: phiếu đã xoá, tải lại sẽ báo nhầm "Không tìm thấy đề nghị" ngay sau "Đã xoá" */}
             {req.status === 'draft' && (
-              <Popconfirm title="Xoá hẳn phiếu nháp?" onConfirm={() => act(async () => { await fleetPaymentRequestService.remove(req.id); navigate('/logistics/costs') }, 'Đã xoá')} okText="Xoá" cancelText="Huỷ">
+              <Popconfirm title="Xoá hẳn phiếu nháp?" description="Chuyến và tạm ứng trong phiếu được nhả để gom phiếu khác." okButtonProps={{ danger: true }} onConfirm={() => act(async () => { await fleetPaymentRequestService.remove(req.id); navigate('/logistics/costs') }, 'Đã xoá phiếu nháp', false)} okText="Xoá" cancelText="Huỷ">
                 <Button danger type="text" icon={<DeleteOutlined />} />
               </Popconfirm>
             )}
@@ -186,12 +201,12 @@ export default function FleetPaymentRequestDetailPage() {
       <Card title="Thông tin phiếu" size="small" style={{ marginBottom: 14 }}>
         <Descriptions size="small" column={{ xs: 1, sm: 2, md: 4 }} labelStyle={{ fontWeight: 600, fontSize: 12 }}>
           <Descriptions.Item label="Ngày phiếu">{fmtD(req.request_date)}</Descriptions.Item>
-          <Descriptions.Item label="Kỳ chi phí">{m ? `Tháng ${m}/${y}` : '–'}</Descriptions.Item>
-          <Descriptions.Item label="Tài xế">{req.driver?.full_name || '–'}</Descriptions.Item>
-          <Descriptions.Item label="Người nhận tiền">{req.payee_name || '–'}</Descriptions.Item>
+          <Descriptions.Item label="Kỳ chi phí">{m ? `Tháng ${m}/${y}` : DASH}</Descriptions.Item>
+          <Descriptions.Item label="Tài xế">{req.driver?.full_name || DASH}</Descriptions.Item>
+          <Descriptions.Item label="Người nhận tiền">{req.payee_name || DASH}</Descriptions.Item>
           <Descriptions.Item label="Hình thức">{FLEET_PR_METHOD_LABELS[req.payment_method]}</Descriptions.Item>
-          <Descriptions.Item label="Tài khoản nhận">{req.payee_account || '–'}</Descriptions.Item>
-          <Descriptions.Item label="Lý do" span={2}>{req.reason || '–'}</Descriptions.Item>
+          <Descriptions.Item label="Tài khoản nhận">{req.payee_account || DASH}</Descriptions.Item>
+          <Descriptions.Item label="Lý do" span={2}>{req.reason || DASH}</Descriptions.Item>
           {req.note && <Descriptions.Item label="Ghi chú" span={4}>{req.note}</Descriptions.Item>}
         </Descriptions>
       </Card>
@@ -214,7 +229,7 @@ export default function FleetPaymentRequestDetailPage() {
       <Modal title="Thông tin phiếu" open={infoOpen} onOk={saveInfo} confirmLoading={acting} onCancel={() => setInfoOpen(false)} okText="Lưu" cancelText="Huỷ" destroyOnHidden>
         <Form form={infoForm} layout="vertical" style={{ marginTop: 12 }}>
           <Space size={12} style={{ display: 'flex' }} align="start">
-            <Form.Item name="request_date" label="Ngày phiếu" rules={[{ required: true }]} style={{ width: 160 }}><Input type="date" /></Form.Item>
+            <Form.Item name="request_date" label="Ngày phiếu" rules={[{ required: true, message: 'Chọn ngày phiếu' }]} style={{ width: 160 }}><DatePicker format="DD/MM/YYYY" allowClear={false} style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="payee_name" label="Người nhận tiền" style={{ flex: 1 }}><Input maxLength={120} /></Form.Item>
           </Space>
           <Space size={12} style={{ display: 'flex' }} align="start">

@@ -51,6 +51,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { useUnsavedWarning } from '../../hooks/useUnsavedWarning'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 const MONO_FONT = "'JetBrains Mono', monospace"
@@ -133,14 +134,14 @@ const StockCheckPage = () => {
         warehouse_id: selectedWarehouse,
         created_by: user?.employee_id || user?.id,
         notes: countMode === 'cycle'
-          ? `Kiểm kê theo vị trí (${selectedLocationIds.length} ví trí)`
+          ? `Kiểm kê theo vị trí (${selectedLocationIds.length} vị trí)`
           : '',
         location_ids: countMode === 'cycle' ? selectedLocationIds : undefined,
       })
       setStockCheck(check)
       setStep('checking')
     } catch (err: any) {
-      message.error(err.message || 'Lỗi tạo kiểm kê')
+      message.error(dichLoiHeThong(err, 'Lỗi tạo kiểm kê'))
     } finally {
       setCreating(false)
     }
@@ -176,7 +177,7 @@ const StockCheckPage = () => {
       setShowOnlyDiscrepancy(false)
       navigate('/wms/vat-tu')
     } catch (err: any) {
-      message.error(err.message || 'Lỗi hoàn tất kiểm kê')
+      message.error(dichLoiHeThong(err, 'Lỗi hoàn tất kiểm kê'))
     } finally {
       setSaving(false)
     }

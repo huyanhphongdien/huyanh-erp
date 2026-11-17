@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
 
 // ============================================
 // TYPES
@@ -317,7 +318,8 @@ export const ledgerService = {
    */
   async createManualEntry(entryData: LedgerCreateData): Promise<LedgerEntry> {
     const now = new Date()
-    const entryDateStr = entryData.entry_date || now.toISOString().split('T')[0]
+    // Ngày theo giờ VN — toISOString() (UTC) ra hôm qua nếu ghi sổ trước 07:00 sáng
+    const entryDateStr = entryData.entry_date || toDateStrVN(now)
     const entryDate = new Date(entryDateStr)
     const entryType = entryData.entry_type || 'adjustment'
 

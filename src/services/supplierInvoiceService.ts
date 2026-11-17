@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
+import { fmtVnd } from '../utils/format';
 
 // ============================================================================
 // TYPES
@@ -147,16 +148,18 @@ export const INVOICE_STATUS = {
   CANCELLED: 'cancelled',
 } as const;
 
+// Nhãn khớp INVOICE_PAYMENT_STATUS_LABELS (invoicePaymentService) — cùng nghĩa thì cùng chữ;
+// màu theo luật dòng tiền: chờ = vàng · một phần = cam · đủ = xanh lá · huỷ = đỏ
 export const INVOICE_STATUS_LABELS: Record<string, string> = {
   pending: 'Chờ thanh toán',
   partial: 'Thanh toán một phần',
-  paid: 'Đã thanh toán',
+  paid: 'Đã thanh toán đủ',
   cancelled: 'Đã hủy',
 };
 
 export const INVOICE_STATUS_COLORS: Record<string, string> = {
-  pending: 'orange',
-  partial: 'blue',
+  pending: 'gold',
+  partial: 'orange',
   paid: 'green',
   cancelled: 'red',
 };
@@ -217,13 +220,10 @@ export function calculateInvoiceTotals(items: InvoiceItemFormData[]): {
 }
 
 /**
- * Format số tiền VND
+ * Format số tiền VND — giữ tên cũ, ruột đi qua utils/format ("1.234.567 ₫", null → "—")
  */
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-  }).format(amount);
+export function formatCurrency(amount: number | null | undefined): string {
+  return fmtVnd(amount);
 }
 
 /**

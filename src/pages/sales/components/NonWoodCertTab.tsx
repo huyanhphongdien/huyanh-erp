@@ -5,6 +5,7 @@
 
 import { useState, useEffect, type ReactNode } from 'react'
 import { Spin, Button, Space, Typography, Result, message } from 'antd'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { PrinterOutlined, FileWordOutlined, FileProtectOutlined } from '@ant-design/icons'
 import { documentService, type NonWoodCertData } from '../../../services/sales/documentService'
 import { nonWoodCertDoc, saveDocx } from '../../../services/sales/docxExport'
@@ -27,7 +28,7 @@ export default function NonWoodCertTab({ orderId, lotNo = 0 }: { orderId: string
         const r = await documentService.getNonWoodCertData(orderId, lotNo)
         if (!cancelled) setD(r)
       } catch (e: any) {
-        if (!cancelled) { setError(true); message.error(e?.message || 'Lỗi tải Non-Wood Certificate') }
+        if (!cancelled) { setError(true); message.error(dichLoiHeThong(e, 'Lỗi tải Non-Wood Certificate')) }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -35,7 +36,7 @@ export default function NonWoodCertTab({ orderId, lotNo = 0 }: { orderId: string
     return () => { cancelled = true }
   }, [orderId, lotNo])
 
-  if (loading) return <Spin tip="Loading..." />
+  if (loading) return <Spin tip="Đang tải..." />
   if (error || !d) return <Result icon={<FileProtectOutlined />} title="Non-Wood Packing Certificate" subTitle="Chưa tải được dữ liệu" />
 
   const row = (k: string, v: ReactNode) => (

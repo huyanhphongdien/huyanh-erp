@@ -4,31 +4,30 @@
 // ============================================================================
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Row, Col, Statistic, Table, Tag, Button, Typography, Empty, Spin, Alert, message } from 'antd'
+import { Card, Row, Col, Statistic, Table, Button, Typography, Empty, Spin, Alert } from 'antd'
 import { ReloadOutlined, BankOutlined, WarningFilled, RightOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
 import FinanceLendingTabs from './FinanceLendingTabs'
-import { loanService, CIC_LABEL, CIC_COLOR, CIC_BG, type FinLoanComputed } from '../../services/finance/loanService'
+import { loanService, CIC_BG, type FinLoanComputed } from '../../services/finance/loanService'
 import { depositService, ALERT_LABEL, ALERT_COLOR, type FinDepositComputed } from '../../services/finance/depositService'
+import { fmtVnd, fmtVndNum, fmtTy, fmtDate } from '../../utils/format'
+import PageState from '../../components/common/PageState'
+import { pill, hanText, CicPill } from './finUi'
 
 const { Title, Text } = Typography
-
-const fmtVnd = (n: number) => (n || 0).toLocaleString('vi-VN')
-const fmtTy = (n: number) => `${((n || 0) / 1_000_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} tỷ`
-const fDate = (s?: string | null) => (s ? dayjs(s).format('DD/MM/YYYY') : '—')
 
 export default function FinanceLoanDashboard() {
   const navigate = useNavigate()
   const [loans, setLoans] = useState<FinLoanComputed[]>([])
   const [deposits, setDeposits] = useState<FinDepositComputed[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setLoading(true); setLoadError(null)
     try {
       const [l, d] = await Promise.all([loanService.list(), depositService.list()])
       setLoans(l); setDeposits(d)
-    } catch (e: any) { message.error('Lỗi tải dữ liệu: ' + (e?.message || e)) }
+    } catch (e) { setLoadError(e) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
@@ -67,19 +66,17 @@ export default function FinanceLoanDashboard() {
       total: sum(active),
       secure: sum(active.filter((d) => d.purpose === 'dam_bao_vay')),
       urgentCount: urgent.length,
+      urgentOverdue: urgent.some((d) => d.alert === 'overdue'),
       nearCount: active.filter((d) => d.alert === 'soon' || d.alert === 'due' || d.alert === 'overdue').length,
       urgent,
     }
   }, [deposits])
 
-  const cicTag = (l: FinLoanComputed) => (
-    <span style={{ display: 'inline-block', background: CIC_COLOR[l.cic], color: '#fff', fontWeight: 700, fontSize: 12, padding: '2px 9px', borderRadius: 5, whiteSpace: 'nowrap' }}>
-      {(l.cic === 'red' || l.cic === 'orange' || l.cic === 'overdue') && l.overdue_days >= 1 ? `quá ${l.overdue_days}d · ` : ''}
-      {CIC_LABEL[l.cic]}
-    </span>
-  )
+  const cicTag = (l: FinLoanComputed) => <CicPill loan={l} />
 
   if (loading) return <div style={{ padding: 60, textAlign: 'center' }}><Spin size="large" /></div>
+  // Lỗi tải: KHÔNG được rơi xuống "Không có khoản nào sát mốc nhảy nhóm 👍" (báo an toàn giả)
+  if (loadError) return <div style={{ padding: '20px 24px' }}><FinanceLendingTabs /><PageState error={loadError} onRetry={load} /></div>
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -96,7 +93,7 @@ export default function FinanceLoanDashboard() {
       <Row gutter={[12, 12]}>
         <Col xs={12} md={6}>
           <Card size="small"><Statistic title="Tổng dư nợ" value={fmtTy(k.totalActive)} valueStyle={{ color: '#1B4D3E', fontWeight: 800 }} />
-            <Text type="secondary" style={{ fontSize: 12 }}>{fmtVnd(k.totalActive)} đ</Text></Card>
+            <Text type="secondary" style={{ fontSize: 12 }}>{fmtVnd(k.totalActive)}</Text></Card>
         </Col>
         <Col xs={12} md={6}>
           <Card size="small"><Statistic title="Đến hạn ≤ 7 ngày" value={fmtTy(k.totalDue7)} valueStyle={{ color: '#ca8a04', fontWeight: 800 }} />
@@ -123,9 +120,9 @@ export default function FinanceLoanDashboard() {
               onRow={(r) => ({ onClick: () => navigate(`/finance/loans?focus=${r.id}`), style: { cursor: 'pointer', background: CIC_BG[r.cic] } })}
               columns={[
                 { title: 'Ngân hàng', dataIndex: 'bank', render: (v, r) => <span><b>{v}</b>{r.loan_no ? <Text type="secondary"> · {r.loan_no}</Text> : ''}</span> },
-                { title: 'Còn lại', dataIndex: 'remaining', align: 'right', render: (v) => <b style={{ color: '#92400E' }}>{fmtVnd(v)}</b> },
-                { title: 'Đến hạn', dataIndex: 'due_date', align: 'center', render: fDate },
-                { title: 'Mốc nhảy nhóm', dataIndex: 'jump_date', align: 'center', render: (v) => <Text type="danger">{fDate(v)}</Text> },
+                { title: 'Còn lại', dataIndex: 'remaining', align: 'right', render: (v) => <b style={{ color: '#92400E' }}>{fmtVndNum(v)}</b> },
+                { title: 'Đến hạn', dataIndex: 'due_date', align: 'center', render: (v) => fmtDate(v) },
+                { title: 'Mốc nhảy nhóm', dataIndex: 'jump_date', align: 'center', render: (v) => <Text type="danger">{fmtDate(v)}</Text> },
                 { title: 'Trạng thái', key: 'cic', render: (_, r) => cicTag(r) },
               ]} />
           )}
@@ -139,8 +136,8 @@ export default function FinanceLoanDashboard() {
               : <Table rowKey="bank" size="small" pagination={false} dataSource={k.banks}
                   columns={[
                     { title: 'Ngân hàng', dataIndex: 'bank', render: (v, r) => <span><b>{v}</b> <Text type="secondary">({r.count})</Text></span> },
-                    { title: 'Dư nợ', dataIndex: 'remaining', align: 'right', render: (v) => fmtVnd(v) },
-                    { title: 'Đến hạn ≤7d', dataIndex: 'due7', align: 'right', render: (v) => v ? <Text type="warning">{fmtVnd(v)}</Text> : '—' },
+                    { title: 'Dư nợ', dataIndex: 'remaining', align: 'right', render: (v) => fmtVndNum(v) },
+                    { title: 'Đến hạn ≤7 ngày', dataIndex: 'due7', align: 'right', render: (v) => v ? <Text type="warning">{fmtVndNum(v)}</Text> : '—' },
                   ]} />}
           </Card>
         </Col>
@@ -152,8 +149,8 @@ export default function FinanceLoanDashboard() {
                   onRow={(r) => ({ onClick: () => navigate(`/finance/loans?focus=${r.id}`), style: { cursor: 'pointer' } })}
                   columns={[
                     { title: 'Ngân hàng', dataIndex: 'bank', render: (v) => <b>{v}</b> },
-                    { title: 'Còn lại', dataIndex: 'remaining', align: 'right', render: (v) => fmtVnd(v) },
-                    { title: 'Đến hạn', dataIndex: 'due_date', align: 'center', render: (v, r) => <span>{fDate(v)} <Text type="secondary" style={{ fontSize: 11 }}>({r.overdue_days >= 0 ? `quá ${r.overdue_days}d` : `còn ${-r.overdue_days}d`})</Text></span> },
+                    { title: 'Còn lại', dataIndex: 'remaining', align: 'right', render: (v) => fmtVndNum(v) },
+                    { title: 'Đến hạn', dataIndex: 'due_date', align: 'center', render: (v, r) => <span>{fmtDate(v)} <Text type="secondary" style={{ fontSize: 11 }}>({hanText(-r.overdue_days)})</Text></span> },
                     { title: '', key: 'cic', align: 'center', render: (_, r) => cicTag(r) },
                   ]} />}
           </Card>
@@ -166,23 +163,23 @@ export default function FinanceLoanDashboard() {
         <Button type="link" size="small" onClick={() => navigate('/finance/deposits')}>Quản lý <RightOutlined /></Button>
       </div>
       <Row gutter={[12, 12]}>
-        <Col xs={12} md={6}><Card size="small"><Statistic title="Tổng tiền gửi" value={fmtTy(dep.total)} valueStyle={{ color: '#1B4D3E', fontWeight: 800 }} /><Text type="secondary" style={{ fontSize: 12 }}>{fmtVnd(dep.total)} đ</Text></Card></Col>
+        <Col xs={12} md={6}><Card size="small"><Statistic title="Tổng tiền gửi" value={fmtTy(dep.total)} valueStyle={{ color: '#1B4D3E', fontWeight: 800 }} /><Text type="secondary" style={{ fontSize: 12 }}>{fmtVnd(dep.total)}</Text></Card></Col>
         <Col xs={12} md={6}><Card size="small"><Statistic title="Đảm bảo khoản vay" value={fmtTy(dep.secure)} valueStyle={{ color: '#1677ff', fontWeight: 800 }} /></Card></Col>
-        <Col xs={12} md={6}><Card size="small" style={{ background: dep.urgentCount ? '#fff7ed' : undefined }}><Statistic title="Cần tái tục gấp" value={dep.urgentCount} suffix="HĐ" valueStyle={{ color: dep.urgentCount ? '#dc2626' : '#16a34a', fontWeight: 800 }} /></Card></Col>
-        <Col xs={12} md={6}><Card size="small"><Statistic title="Sắp đáo hạn ≤30d" value={dep.nearCount} suffix="HĐ" valueStyle={{ color: '#ca8a04', fontWeight: 800 }} /></Card></Col>
+        <Col xs={12} md={6}><Card size="small" style={{ background: dep.urgentCount ? '#fff7ed' : undefined }}><Statistic title="Cần tái tục gấp" value={dep.urgentCount} suffix="HĐ" valueStyle={{ color: !dep.urgentCount ? ALERT_COLOR.ok : dep.urgentOverdue ? ALERT_COLOR.overdue : ALERT_COLOR.due, fontWeight: 800 }} /></Card></Col>
+        <Col xs={12} md={6}><Card size="small"><Statistic title="Sắp đáo hạn ≤30 ngày" value={dep.nearCount} suffix="HĐ" valueStyle={{ color: '#ca8a04', fontWeight: 800 }} /></Card></Col>
       </Row>
       {dep.urgent.length > 0 && (
         <Card size="small" style={{ marginTop: 12, borderColor: '#fed7aa' }}
           title={<span style={{ color: '#ea580c', fontWeight: 700 }}><WarningFilled /> HĐTG cần tái tục gấp — quên là bị tất toán ép</span>}
           extra={<Button size="small" onClick={() => navigate('/finance/deposits')}>Xem tất cả <RightOutlined /></Button>}>
           <Table rowKey="id" size="small" pagination={false} dataSource={dep.urgent.slice(0, 8)}
-            onRow={() => ({ onClick: () => navigate('/finance/deposits'), style: { cursor: 'pointer' } })}
+            onRow={(r) => ({ onClick: () => navigate(`/finance/deposits?focus=${r.id}`), style: { cursor: 'pointer' } })}
             columns={[
               { title: 'Ngân hàng', dataIndex: 'bank', render: (v, r) => <span><b>{v}</b>{r.holder ? <Text type="secondary"> · {r.holder}</Text> : ''}</span> },
-              { title: 'Số tiền', dataIndex: 'amount', align: 'right', render: (v) => <b>{fmtVnd(v)}</b> },
-              { title: 'Đáo hạn', dataIndex: 'effective_maturity', align: 'center', render: (v, r) => <span>{fDate(v)} <Text type="secondary" style={{ fontSize: 11 }}>({(r.days_to_maturity ?? 0) >= 0 ? `còn ${r.days_to_maturity}d` : `quá ${-(r.days_to_maturity ?? 0)}d`})</Text></span> },
-              { title: '', key: 'al', align: 'center', render: (_, r) => <span style={{ display: 'inline-block', background: ALERT_COLOR[r.alert], color: '#fff', fontWeight: 700, fontSize: 12, padding: '2px 9px', borderRadius: 5, whiteSpace: 'nowrap' }}>{ALERT_LABEL[r.alert]}</span> },
-            ] as any} />
+              { title: 'Số tiền', dataIndex: 'amount', align: 'right', render: (v) => <b>{fmtVndNum(v)}</b> },
+              { title: 'Đáo hạn', dataIndex: 'effective_maturity', align: 'center', render: (v, r) => <span>{fmtDate(v)} <Text type="secondary" style={{ fontSize: 11 }}>({hanText(r.days_to_maturity ?? 0)})</Text></span> },
+              { title: '', key: 'al', align: 'center', render: (_, r) => pill(ALERT_COLOR[r.alert], ALERT_LABEL[r.alert]) },
+            ]} />
         </Card>
       )}
     </div>

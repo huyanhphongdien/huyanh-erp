@@ -12,47 +12,27 @@ import { useOpenTab } from '../../../hooks/useOpenTab'
 import { useFacilityFilter } from '../../../stores/facilityFilterStore'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import transferService, { type InterFacilityTransfer, type TransferStatus } from '../../../services/wms/transferService'
+import { TRANSFER_STATUS_LABELS as STATUS_LABELS, TRANSFER_STATUS_COLORS as STATUS_COLORS } from './transferLabels'
+import { fmtDate, fmtDateTime, fmtKg, fmtNum } from '../../../utils/format'
 
 const { Text } = Typography
 const PRIMARY = '#1B4D3E'
 
-const STATUS_LABELS: Record<TransferStatus, string> = {
-  draft: 'Nháp',
-  picking: 'Đang lấy',
-  picked: 'Đã lấy',
-  in_transit: 'Đang vận chuyển',
-  arrived: 'Đã đến — chờ cân',
-  received: 'Hoàn tất',
-  cancelled: 'Hủy',
-  rejected: 'Từ chối (hao hụt cao)',
-}
+/** Trần tải một lần (getAll pageSize) — chạm trần thì AdvancedDataTable báo */
+const LOAD_LIMIT = 200
 
-const STATUS_COLORS: Record<TransferStatus, string> = {
-  draft: 'default',
-  picking: 'processing',
-  picked: 'cyan',
-  in_transit: 'warning',
-  arrived: 'gold',
-  received: 'success',
-  cancelled: 'default',
-  rejected: 'error',
-}
-
-const formatDate = (d: string | null | undefined) =>
-  d ? new Date(d).toLocaleDateString('vi-VN') : '—'
-
-const formatDateTime = (d: string | null | undefined) =>
-  d ? new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
+const formatDate = (d: string | null | undefined) => fmtDate(d)
+const formatDateTime = (d: string | null | undefined) => fmtDateTime(d)
 
 export default function TransferListPage() {
   const navigate = useNavigate()
   const openTab = useOpenTab()
   const { currentFacilityId, setCurrentFacilityId } = useFacilityFilter()
 
-  const { data: transfersResult, isLoading, refetch } = useQuery({
+  const { data: transfersResult, isLoading, error, refetch } = useQuery({
     queryKey: ['transfers-all', currentFacilityId],
     queryFn: async () => {
-      const res = await transferService.getAll({ pageSize: 200 })
+      const res = await transferService.getAll({ pageSize: LOAD_LIMIT })
       return res.data
     },
     staleTime: 30000,
@@ -120,11 +100,14 @@ export default function TransferListPage() {
         <Space size={4} direction="vertical" style={{ alignItems: 'flex-start' }}>
           <Tag color={STATUS_COLORS[v]}>{STATUS_LABELS[v] || v}</Tag>
           {r.needs_approval && r.status === 'arrived' && (
-            <Tag color="red" style={{ margin: 0, fontSize: 10 }}>Cần BGD duyệt</Tag>
+            <Tag color="red" style={{ margin: 0, fontSize: 10 }}>Cần BGĐ duyệt</Tag>
           )}
         </Space>
       ),
-      exportRender: (v) => STATUS_LABELS[v as TransferStatus] || v,
+      exportRender: (v, r) => {
+        const label = STATUS_LABELS[v as TransferStatus] || v
+        return r.needs_approval && r.status === 'arrived' ? `${label} — cần BGĐ duyệt` : label
+      },
     },
     {
       key: 'vehicle',
@@ -140,7 +123,7 @@ export default function TransferListPage() {
       width: 120,
       align: 'right',
       sortable: true,
-      render: (v) => v ? Number(v).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : '—',
+      render: (v) => v != null ? fmtKg(Number(v)) : '—',
     },
     {
       key: 'weight_in',
@@ -148,7 +131,7 @@ export default function TransferListPage() {
       dataIndex: 'weight_in_kg',
       width: 120,
       align: 'right',
-      render: (v) => v ? Number(v).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : '—',
+      render: (v) => v != null ? fmtKg(Number(v)) : '—',
     },
     {
       key: 'loss',
@@ -163,11 +146,11 @@ export default function TransferListPage() {
         return (
           <Space size={2} direction="vertical" style={{ alignItems: 'flex-end' }}>
             <Tag color={ok ? 'success' : 'error'} style={{ margin: 0 }}>
-              {v.toFixed(2)}%
+              {fmtNum(v, 2)}%
             </Tag>
             {r.loss_kg != null && (
               <Text type="secondary" style={{ fontSize: 10 }}>
-                {r.loss_kg.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg
+                {fmtKg(r.loss_kg)} kg
               </Text>
             )}
           </Space>
@@ -218,7 +201,7 @@ export default function TransferListPage() {
               title="🚛 Đang vận chuyển"
               value={inTransitCount}
               valueStyle={{ color: '#faad14', fontSize: 22 }}
-              suffix={inTransitCount > 0 ? <Text type="secondary" style={{ fontSize: 12 }}>({(totalInTransitWeight / 1000).toFixed(1)} T)</Text> : null}
+              suffix={inTransitCount > 0 ? <Text type="secondary" style={{ fontSize: 12 }}>({fmtNum(totalInTransitWeight / 1000, 1)} tấn)</Text> : null}
             />
           </Card>
         </Col>
@@ -229,7 +212,7 @@ export default function TransferListPage() {
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #ff4d4f' }}>
-            <Statistic title="⚠️ Cần BGD duyệt" value={needsApprovalCount} valueStyle={{ color: '#ff4d4f', fontSize: 22 }} />
+            <Statistic title="⚠️ Cần BGĐ duyệt" value={needsApprovalCount} valueStyle={{ color: '#ff4d4f', fontSize: 22 }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
@@ -244,12 +227,15 @@ export default function TransferListPage() {
         dataSource={filtered}
         rowKey="id"
         loading={isLoading}
+        error={error}
+        loadLimit={LOAD_LIMIT}
         title="Phiếu chuyển kho liên nhà máy"
         dateRangeField="created_at"
         onRefresh={() => refetch()}
         exportFileName="Phieu_Chuyen_Kho"
         pageSize={50}
         onRowClick={openDetail}
+        emptyText="Chưa có phiếu chuyển kho nào"
       />
     </div>
   )

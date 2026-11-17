@@ -4,9 +4,13 @@
 // Module: Kho (WMS) - Huy Anh Rubber ERP
 // Phase 11: Dự báo tồn kho & cấu hình cảnh báo
 // Mô tả: Dự báo tồn kho theo grade và tổng thể
+// ⚠ Cấu hình cảnh báo (AlertConfig) lưu ở localStorage CỦA TRÌNH DUYỆT (key 'wms_alert_config'):
+//   ngưỡng chỉ áp dụng trên máy đã lưu — cảnh báo do từng máy tự tính (alertService đọc
+//   CHÍNH cấu hình này qua getConfig()). Lưu chung toàn hệ cần bảng settings (chưa có — chờ owner).
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
 
 // ============================================================================
 // TYPES
@@ -64,6 +68,9 @@ export const DEFAULT_ALERT_CONFIG: AlertConfig = {
 
 const ALERT_CONFIG_KEY = 'wms_alert_config'
 
+/** Khoá nhóm cho lô chưa có grade — trang hiện thẳng khoá này khi không có nhãn grade (trước là 'unknown'). */
+const NO_GRADE = 'Chưa phân hạng'
+
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -104,7 +111,7 @@ export const forecastService = {
     // Group current stock by grade
     const gradeStock: Record<string, number> = {}
     for (const row of batchData || []) {
-      const grade = (row as any).rubber_grade || 'unknown'
+      const grade = (row as any).rubber_grade || NO_GRADE
       const qty = Number((row as any).quantity_remaining) || 0
       gradeStock[grade] = (gradeStock[grade] || 0) + qty
     }
@@ -112,7 +119,7 @@ export const forecastService = {
     // 2. Get stock-out transactions from last 30 days for consumption rate
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    const fromDate = thirtyDaysAgo.toISOString().substring(0, 10)
+    const fromDate = toDateStrVN(thirtyDaysAgo)
 
     const { data: txData, error: txErr } = await supabase
       .from('inventory_transactions')
@@ -135,7 +142,7 @@ export const forecastService = {
 
       if (!bgErr && batchGrades) {
         for (const b of batchGrades) {
-          batchGradeMap[(b as any).id] = (b as any).rubber_grade || 'unknown'
+          batchGradeMap[(b as any).id] = (b as any).rubber_grade || NO_GRADE
         }
       }
     }
@@ -144,7 +151,7 @@ export const forecastService = {
     const gradeConsumption: Record<string, number> = {}
     for (const tx of txData || []) {
       const batchId = (tx as any).batch_id as string
-      const grade = batchGradeMap[batchId] || 'unknown'
+      const grade = batchGradeMap[batchId] || NO_GRADE
       const qty = Number((tx as any).quantity) || 0
       gradeConsumption[grade] = (gradeConsumption[grade] || 0) + qty
     }
@@ -154,7 +161,7 @@ export const forecastService = {
     const results: GradeForecast[] = []
 
     for (const grade of allGrades) {
-      if (grade === 'unknown' && !gradeStock[grade]) continue
+      if (grade === NO_GRADE && !gradeStock[grade]) continue
 
       const current_stock_kg = gradeStock[grade] || 0
       const totalConsumed = gradeConsumption[grade] || 0
@@ -168,7 +175,7 @@ export const forecastService = {
         days_until_empty = Math.round(current_stock_kg / avg_daily_consumption_kg)
         const emptyDate = new Date()
         emptyDate.setDate(emptyDate.getDate() + days_until_empty)
-        forecast_date_empty = emptyDate.toISOString().substring(0, 10)
+        forecast_date_empty = toDateStrVN(emptyDate)
 
         if (days_until_empty <= config.stockout_warning_days) {
           recommendation = 'CRITICAL'
@@ -221,7 +228,7 @@ export const forecastService = {
     // 2. Get transactions from last 30 days
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    const fromDate = thirtyDaysAgo.toISOString().substring(0, 10)
+    const fromDate = toDateStrVN(thirtyDaysAgo)
 
     const { data: txData, error: txErr } = await supabase
       .from('inventory_transactions')
@@ -256,21 +263,23 @@ export const forecastService = {
   },
 
   /**
-   * Get alert config from localStorage
+   * Cấu hình cảnh báo của TRÌNH DUYỆT NÀY (localStorage, thiếu thì lấy mặc định).
+   * alertService dùng chung nguồn này — đừng đọc key 'wms_alert_config' ở chỗ khác.
    */
   getConfig(): AlertConfig {
     return getAlertConfig()
   },
 
   /**
-   * Save alert config to localStorage
+   * Lưu cấu hình — CHỈ trên trình duyệt này (localStorage), không tới máy người khác.
+   * Màn gọi hàm này phải nói rõ "chỉ áp dụng trên máy này".
    */
   saveConfig(config: AlertConfig): void {
     localStorage.setItem(ALERT_CONFIG_KEY, JSON.stringify(config))
   },
 
   /**
-   * Reset config to defaults
+   * Đặt lại mặc định — cũng CHỈ trên trình duyệt này.
    */
   resetConfig(): AlertConfig {
     localStorage.removeItem(ALERT_CONFIG_KEY)

@@ -25,6 +25,7 @@ import {
 import type { DealCardMetadata } from '../../types/b2b.types'
 import { PRODUCT_TYPE_LABELS } from '../../services/b2b/chatMessageService'
 import dayjs from 'dayjs'
+import { fmtKg, fmtNum, fmtVnd } from '../../utils/format'
 
 const { Text } = Typography
 const { TextArea } = Input
@@ -50,14 +51,6 @@ interface RecordDeliveryModalProps {
   loading?: boolean
   deal: DealCardMetadata | null
   partnerName?: string
-}
-
-// ============================================
-// HELPERS
-// ============================================
-
-const formatCurrency = (value: number): string => {
-  return value.toLocaleString('vi-VN')
 }
 
 // ============================================
@@ -137,11 +130,11 @@ const RecordDeliveryModal = ({
         </Row>
         <Row justify="space-between" style={{ marginBottom: 4 }}>
           <Text type="secondary">SL theo deal</Text>
-          <Text strong>{quantityTons} tấn ({formatCurrency(deal.quantity_kg)} kg)</Text>
+          <Text strong>{fmtNum(quantityTons, 3)} tấn ({fmtKg(deal.quantity_kg, 3)} kg)</Text>
         </Row>
         <Row justify="space-between">
           <Text type="secondary">Giá trị Deal</Text>
-          <Text strong>{formatCurrency(deal.estimated_value)} VNĐ</Text>
+          <Text strong>{fmtVnd(deal.estimated_value)}</Text>
         </Row>
       </div>
 

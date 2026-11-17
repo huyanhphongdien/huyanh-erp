@@ -17,8 +17,11 @@ const numOrNull = (v: unknown): number | null => { if (v === null || v === undef
 export type RawIssueStatus = 'draft' | 'submitted' | 'qc_confirmed' | 'received' | 'cancelled'
 export type RawIssuePurpose = 'production' | 'sale' | 'transfer'
 
+// Bước 2 ghi "QC" (không phải "QS"): fn_nvl_duoc_ky('qc_confirm') = phòng HAP-QC hoặc raw_qc_signers —
+// cùng luật và cùng chữ với bước 2 của Sổ ca ('QC đã xác nhận') và hàng chèn ('QC đã duyệt').
+// Ở hàng chèn "QS" là người KHAI BÁO bước 1 — dùng "QS" ở đây là gọi nhầm sang vai khác (audit 17/11/2026).
 export const RAW_ISSUE_STATUS_LABELS: Record<RawIssueStatus, string> = {
-  draft: 'Nháp · đang cân', submitted: 'Bên giao đã ký', qc_confirmed: 'QS đã xác nhận', received: 'Thủ kho đã nhận · đã trừ sổ', cancelled: 'Đã hủy',
+  draft: 'Nháp · đang cân', submitted: 'Bên giao đã ký', qc_confirmed: 'QC đã xác nhận', received: 'Thủ kho đã nhận · đã trừ sổ', cancelled: 'Đã hủy',
 }
 export const RAW_ISSUE_STATUS_COLORS: Record<RawIssueStatus, string> = {
   draft: 'default', submitted: 'blue', qc_confirmed: 'gold', received: 'green', cancelled: 'red',

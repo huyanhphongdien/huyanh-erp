@@ -42,9 +42,15 @@ import {
   Target,
   BarChart3,
   GripVertical,
+  PauseCircle,
 } from 'lucide-react'
 import { projectTaskService } from '../../services/project/projectTaskService'
 import { useAuthStore } from '../../stores/authStore'
+import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS } from '../../types'
+import PageState from '../../components/common/PageState'
+import { LimitNotice } from '../../components/common/tableDefaults'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDateShort } from '../../utils/format'
 import type {
   ProjectTask,
   ProjectTaskFilter,
@@ -61,31 +67,55 @@ import type {
 
 type ViewMode = 'by_phase' | 'kanban' | 'list'
 
+// Icon + lớp màu là của màn này; CHỮ đọc từ TASK_STATUS_LABELS / TASK_PRIORITY_LABELS (src/types/index.ts —
+// một nguồn cho cả module Công việc, Đợt 3 audit UI 17/11/2026). Bản chép cũ thiếu mã thật pending_review/paused
+// nên việc đang chờ duyệt hiện thành "Chờ làm". todo/pending/review là mã cũ của module dự án — giữ để đọc dữ liệu cũ.
 const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
-  draft:      { label: 'Nháp',      color: 'text-gray-500',   bgColor: 'bg-gray-100',  icon: <Circle className="w-3.5 h-3.5" /> },
+  draft:      { label: TASK_STATUS_LABELS.draft,          color: 'text-gray-500',   bgColor: 'bg-gray-100',  icon: <Circle className="w-3.5 h-3.5" /> },
   todo:       { label: 'Chờ làm',    color: 'text-gray-600',   bgColor: 'bg-gray-100',  icon: <Circle className="w-3.5 h-3.5" /> },
   pending:    { label: 'Chờ xử lý',  color: 'text-amber-600',  bgColor: 'bg-amber-50',  icon: <Clock className="w-3.5 h-3.5" /> },
-  in_progress:{ label: 'Đang làm',   color: 'text-blue-600',   bgColor: 'bg-blue-50',   icon: <Loader2 className="w-3.5 h-3.5 animate-spin" /> },
-  review:     { label: 'Chờ duyệt',  color: 'text-purple-600', bgColor: 'bg-purple-50', icon: <Eye className="w-3.5 h-3.5" /> },
-  completed:  { label: 'Hoàn thành', color: 'text-emerald-600',bgColor: 'bg-emerald-50',icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-  finished:   { label: 'Hoàn thành', color: 'text-emerald-600',bgColor: 'bg-emerald-50',icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-  cancelled:  { label: 'Đã hủy',    color: 'text-red-500',    bgColor: 'bg-red-50',    icon: <X className="w-3.5 h-3.5" /> },
+  in_progress:{ label: TASK_STATUS_LABELS.in_progress,    color: 'text-blue-600',   bgColor: 'bg-blue-50',   icon: <Loader2 className="w-3.5 h-3.5 animate-spin" /> },
+  pending_review: { label: TASK_STATUS_LABELS.pending_review, color: 'text-purple-600', bgColor: 'bg-purple-50', icon: <Eye className="w-3.5 h-3.5" /> },
+  review:     { label: TASK_STATUS_LABELS.pending_review, color: 'text-purple-600', bgColor: 'bg-purple-50', icon: <Eye className="w-3.5 h-3.5" /> },
+  completed:  { label: TASK_STATUS_LABELS.completed,      color: 'text-emerald-600',bgColor: 'bg-emerald-50',icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
+  finished:   { label: TASK_STATUS_LABELS.finished,       color: 'text-emerald-600',bgColor: 'bg-emerald-50',icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
+  paused:     { label: TASK_STATUS_LABELS.paused,         color: 'text-amber-600',  bgColor: 'bg-amber-50',  icon: <PauseCircle className="w-3.5 h-3.5" /> },
+  on_hold:    { label: TASK_STATUS_LABELS.on_hold,        color: 'text-amber-600',  bgColor: 'bg-amber-50',  icon: <PauseCircle className="w-3.5 h-3.5" /> },
+  cancelled:  { label: TASK_STATUS_LABELS.cancelled,      color: 'text-red-500',    bgColor: 'bg-red-50',    icon: <X className="w-3.5 h-3.5" /> },
   overdue:    { label: 'Quá hạn',    color: 'text-red-600',    bgColor: 'bg-red-50',    icon: <AlertTriangle className="w-3.5 h-3.5" /> },
 }
 
+// Ô lọc trạng thái: chỉ các mã có thật trong bảng tasks (bản cũ liệt kê cả todo/review — chọn vào luôn ra rỗng).
+// Một lựa chọn có thể gom nhiều mã (Hoàn thành = completed + finished).
+const STATUS_FILTERS: { value: string; label: string; codes: TaskStatus[] }[] = [
+  { value: 'draft',          label: TASK_STATUS_LABELS.draft,          codes: ['draft'] },
+  { value: 'in_progress',    label: TASK_STATUS_LABELS.in_progress,    codes: ['in_progress'] },
+  { value: 'pending_review', label: TASK_STATUS_LABELS.pending_review, codes: ['pending_review', 'review'] },
+  { value: 'overdue',        label: 'Quá hạn',                         codes: ['overdue'] },
+  { value: 'paused',         label: TASK_STATUS_LABELS.paused,         codes: ['paused'] },
+  { value: 'completed',      label: TASK_STATUS_LABELS.completed,      codes: ['completed', 'finished'] },
+  { value: 'cancelled',      label: TASK_STATUS_LABELS.cancelled,      codes: ['cancelled'] },
+]
+
 const PRIORITY_CONFIG: Record<TaskPriority, { label: string; color: string; dot: string }> = {
-  urgent: { label: 'Khẩn cấp', color: 'text-red-600',    dot: 'bg-red-500' },
-  high:   { label: 'Cao',      color: 'text-orange-600',  dot: 'bg-orange-500' },
-  medium: { label: 'Trung bình',color: 'text-blue-600',   dot: 'bg-blue-500' },
-  low:    { label: 'Thấp',     color: 'text-gray-500',    dot: 'bg-gray-400' },
+  urgent: { label: TASK_PRIORITY_LABELS.urgent, color: 'text-red-600',    dot: 'bg-red-500' },
+  high:   { label: TASK_PRIORITY_LABELS.high,   color: 'text-orange-600',  dot: 'bg-orange-500' },
+  medium: { label: TASK_PRIORITY_LABELS.medium, color: 'text-blue-600',   dot: 'bg-blue-500' },
+  low:    { label: TASK_PRIORITY_LABELS.low,    color: 'text-gray-500',    dot: 'bg-gray-400' },
 }
 
+// Cột Kanban gom theo mã THẬT: trước đây cột "Chờ duyệt" lọc 'review' (không ai ghi) và "Hoàn thành" thiếu
+// 'finished' → việc chờ duyệt / đã duyệt xong biến mất khỏi Kanban. Việc mang mã 'overdue' vẫn là việc chưa xong
+// → nằm ở "Đang làm" (thẻ có nhãn đỏ Quá hạn).
 const KANBAN_COLUMNS: { key: TaskStatus[]; label: string; headerColor: string }[] = [
   { key: ['draft', 'pending'],  label: 'Chờ làm',    headerColor: 'border-gray-400' },
-  { key: ['in_progress'],      label: 'Đang làm',   headerColor: 'border-blue-500' },
-  { key: ['review'],           label: 'Chờ duyệt',  headerColor: 'border-purple-500' },
-  { key: ['completed'], label: 'Hoàn thành', headerColor: 'border-emerald-500' },
+  { key: ['in_progress', 'overdue'], label: 'Đang làm',   headerColor: 'border-blue-500' },
+  { key: ['pending_review', 'review'], label: 'Chờ duyệt',  headerColor: 'border-purple-500' },
+  { key: ['completed', 'finished'], label: 'Hoàn thành', headerColor: 'border-emerald-500' },
 ]
+
+// Trần tải một lần (getTasksByProject pageSize) — chạm trần thì báo, đừng im lặng mất dòng
+const TASK_LOAD_LIMIT = 200
 
 // ============================================================================
 // PROPS
@@ -120,8 +150,8 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
   const [milestones, setMilestones] = useState<{ id: string; name: string; due_date: string; status: string }[]>([])
   
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  
+  const [error, setError] = useState<unknown>(null)
+
   // Filters
   const [filterPhase, setFilterPhase] = useState<string>('')
   const [filterStatus, setFilterStatus] = useState<string>('')
@@ -151,10 +181,10 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
         projectTaskService.getTasksByProject({
           project_id: projectId,
           phase_id: filterPhase || undefined,
-          status: filterStatus as TaskStatus || undefined,
+          status: STATUS_FILTERS.find(f => f.value === filterStatus)?.codes,
           assignee_id: filterAssignee || undefined,
           search: searchQuery || undefined,
-          pageSize: 200,
+          pageSize: TASK_LOAD_LIMIT,
         }),
         projectTaskService.getTaskStats(projectId),
         projectTaskService.getProjectPhases(projectId),
@@ -174,7 +204,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       }
     } catch (err: any) {
       console.error('[ProjectTasksPage] Load error:', err)
-      setError(err.message || 'Không thể tải danh sách tasks')
+      setError(err || 'Không tải được danh sách công việc')
     } finally {
       setLoading(false)
     }
@@ -255,7 +285,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       await loadData()
     } catch (err: any) {
       console.error('Status update failed:', err)
-      message.error(err?.message || 'Không lưu được trạng thái, thử lại')
+      message.error(dichLoiHeThong(err, 'Không lưu được trạng thái, thử lại'))
     }
   }
 
@@ -267,7 +297,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       await loadData()
     } catch (err: any) {
       console.error('Bulk update failed:', err)
-      message.error(err?.message || 'Không cập nhật được các task đã chọn, thử lại')
+      message.error(dichLoiHeThong(err, 'Không cập nhật được các công việc đã chọn, thử lại'))
     }
   }
 
@@ -277,7 +307,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       await loadData()
     } catch (err: any) {
       console.error('Sync failed:', err)
-      message.error(err?.message || 'Không đồng bộ được tiến độ, thử lại')
+      message.error(dichLoiHeThong(err, 'Không đồng bộ được tiến độ, thử lại'))
     }
   }
 
@@ -301,7 +331,8 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
 
   /** Badge trạng thái task */
   const StatusBadge: React.FC<{ status: TaskStatus }> = ({ status }) => {
-    const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.todo
+    // Mã lạ: hiện nhãn trung tính (không còn rơi về "Chờ làm" — sai nghĩa)
+    const cfg = STATUS_CONFIG[status] || { ...STATUS_CONFIG.todo, label: TASK_STATUS_LABELS[status] ?? status }
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${cfg.color} ${cfg.bgColor}`}>
         {cfg.icon}
@@ -383,7 +414,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
               {task.due_date && (
                 <span className={`text-[11px] flex items-center gap-0.5 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                   <Calendar className="w-3 h-3" />
-                  {new Date(task.due_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                  {fmtDateShort(task.due_date)}
                   {isOverdue && ' ⚠'}
                 </span>
               )}
@@ -462,13 +493,13 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       return (
         <div className="text-center py-12">
           <Target className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-[14px]">Chưa có tasks nào trong dự án</p>
+          <p className="text-gray-500 text-[14px]">Chưa có công việc nào trong dự án</p>
           <button
             onClick={() => setShowCreateModal(true)}
             className="mt-3 px-4 py-2 bg-[#1B4D3E] text-white text-[13px] rounded-lg hover:bg-[#153F33] transition-colors"
           >
             <Plus className="w-4 h-4 inline mr-1" />
-            Tạo task đầu tiên
+            Tạo công việc đầu tiên
           </button>
         </div>
       )
@@ -501,7 +532,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
                 )}
 
                 <span className="text-[13px] font-semibold text-gray-800 flex-1 text-left">
-                  {isNoPhase ? 'Chưa phân phase' : phase?.name || key}
+                  {isNoPhase ? 'Chưa gắn giai đoạn' : phase?.name || key}
                 </span>
 
                 <span className="text-[11px] text-gray-500 mr-1">
@@ -522,7 +553,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
               {expanded && (
                 <div className="border-t border-gray-100 p-2 space-y-1.5">
                   {phaseTasks.length === 0 ? (
-                    <p className="text-[12px] text-gray-400 text-center py-4">Chưa có task trong phase này</p>
+                    <p className="text-[12px] text-gray-400 text-center py-4">Chưa có công việc trong giai đoạn này</p>
                   ) : (
                     phaseTasks.map(task => (
                       <TaskCard key={task.id} task={task} />
@@ -536,7 +567,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
                     className="w-full flex items-center justify-center gap-1 py-2 text-[12px] text-gray-400 hover:text-[#1B4D3E] hover:bg-gray-50 rounded transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Thêm task
+                    Thêm công việc
                   </button>
                 </div>
               )}
@@ -568,7 +599,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           <div className="px-2 pb-2 space-y-1.5 max-h-[60vh] overflow-y-auto">
             {col.tasks.length === 0 ? (
               <div className="text-center py-6 text-[12px] text-gray-400">
-                Không có task
+                Không có công việc
               </div>
             ) : (
               col.tasks.map(task => (
@@ -600,13 +631,13 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
                   className="w-3.5 h-3.5 rounded border-gray-300 text-[#1B4D3E] focus:ring-[#1B4D3E]"
                 />
               </th>
-              <th className="text-left text-[11px] font-semibold text-gray-500 uppercase px-3 py-2">Tên task</th>
-              <th className="text-left text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-28">Phase</th>
+              <th className="text-left text-[11px] font-semibold text-gray-500 uppercase px-3 py-2">Tên công việc</th>
+              <th className="text-left text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-28">Giai đoạn</th>
               <th className="text-left text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-28">Người thực hiện</th>
               <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-24">Ưu tiên</th>
               <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-24">Trạng thái</th>
               <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-20">Tiến độ</th>
-              <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-24">Deadline</th>
+              <th className="text-center text-[11px] font-semibold text-gray-500 uppercase px-3 py-2 w-24">Hạn</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -653,9 +684,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
                     <MiniProgress value={task.progress} />
                   </td>
                   <td className={`px-3 py-2 text-center text-[12px] ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-                    {task.due_date
-                      ? new Date(task.due_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-                      : '—'}
+                    {fmtDateShort(task.due_date)}
                   </td>
                 </tr>
               )
@@ -675,7 +704,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
         <div className="text-center py-12">
           <Target className="w-10 h-10 text-gray-300 mx-auto mb-2" />
           <p className="text-[13px] text-gray-500">
-            {hasActiveFilters ? 'Không tìm thấy task phù hợp' : 'Chưa có task nào'}
+            {hasActiveFilters ? 'Không tìm thấy công việc phù hợp' : 'Chưa có công việc nào'}
           </p>
         </div>
       )}
@@ -712,7 +741,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       } catch (err: any) {
         console.error('Create task failed:', err)
         // Giữ modal mở + hiện lỗi cạnh nút Lưu để người dùng biết chưa lưu được
-        setSubmitError(err?.message || 'Không tạo được task, thử lại')
+        setSubmitError(dichLoiHeThong(err, 'Không tạo được công việc, thử lại'))
       } finally {
         setSaving(false)
       }
@@ -726,7 +755,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
         >
           {/* Header */}
           <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between z-10">
-            <h3 className="text-[15px] font-bold text-gray-900">Tạo Task mới</h3>
+            <h3 className="text-[15px] font-bold text-gray-900">Tạo công việc mới</h3>
             <button onClick={() => setShowCreateModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
               <X className="w-5 h-5 text-gray-500" />
             </button>
@@ -736,7 +765,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           <div className="p-4 space-y-4">
             {/* Tên task */}
             <div>
-              <label className="block text-[12px] font-medium text-gray-600 mb-1">Tên task *</label>
+              <label className="block text-[12px] font-medium text-gray-600 mb-1">Tên công việc *</label>
               <input
                 type="text"
                 value={form.name || ''}
@@ -762,20 +791,20 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
             {/* Phase + Milestone */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[12px] font-medium text-gray-600 mb-1">Phase</label>
+                <label className="block text-[12px] font-medium text-gray-600 mb-1">Giai đoạn</label>
                 <select
                   value={form.phase_id || ''}
                   onChange={e => setForm(f => ({ ...f, phase_id: e.target.value || undefined }))}
                   className="w-full px-3 py-2.5 text-[15px] border border-gray-300 rounded-lg focus:border-[#1B4D3E] outline-none bg-white"
                 >
-                  <option value="">— Chọn phase —</option>
+                  <option value="">— Chọn giai đoạn —</option>
                   {phases.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-[12px] font-medium text-gray-600 mb-1">Milestone</label>
+                <label className="block text-[12px] font-medium text-gray-600 mb-1">Mốc</label>
                 <select
                   value={form.milestone_id || ''}
                   onChange={e => setForm(f => ({ ...f, milestone_id: e.target.value || undefined }))}
@@ -830,7 +859,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-[12px] font-medium text-gray-600 mb-1">Deadline</label>
+                <label className="block text-[12px] font-medium text-gray-600 mb-1">Hạn hoàn thành</label>
                 <input
                   type="date"
                   value={form.due_date || ''}
@@ -873,7 +902,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
                 className="flex-1 py-2.5 text-[14px] text-white bg-[#1B4D3E] rounded-lg hover:bg-[#153F33] disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Tạo task
+                Tạo công việc
               </button>
             </div>
           </div>
@@ -886,25 +915,9 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
   // MAIN RENDER
   // ========================================================================
 
-  if (loading && tasks.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 animate-spin text-[#1B4D3E]" />
-        <span className="ml-2 text-[14px] text-gray-500">Đang tải tasks...</span>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-2" />
-        <p className="text-red-600 text-[14px]">{error}</p>
-        <button onClick={loadData} className="mt-3 px-4 py-2 text-[13px] text-[#1B4D3E] bg-gray-100 rounded-lg hover:bg-gray-200">
-          Thử lại
-        </button>
-      </div>
-    )
+  if ((loading && tasks.length === 0) || error) {
+    // Lỗi xét TRƯỚC — PageState dịch lỗi Supabase/mạng sang tiếng Việt + nút Thử lại
+    return <PageState loading={loading && tasks.length === 0 && !error} error={error} onRetry={loadData} minHeight={240} />
   }
 
   return (
@@ -917,9 +930,9 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
         {/* View mode toggle */}
         <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
           {([
-            { key: 'by_phase' as ViewMode, icon: <FolderTree className="w-4 h-4" />, label: 'Phase' },
+            { key: 'by_phase' as ViewMode, icon: <FolderTree className="w-4 h-4" />, label: 'Giai đoạn' },
             { key: 'kanban' as ViewMode, icon: <Columns3 className="w-4 h-4" />, label: 'Kanban' },
-            { key: 'list' as ViewMode, icon: <LayoutList className="w-4 h-4" />, label: 'List' },
+            { key: 'list' as ViewMode, icon: <LayoutList className="w-4 h-4" />, label: 'Danh sách' },
           ]).map(v => (
             <button
               key={v.key}
@@ -941,7 +954,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Tìm task..."
+            placeholder="Tìm công việc..."
             className="w-full pl-8 pr-3 py-2 text-[13px] border border-gray-300 rounded-lg focus:border-[#1B4D3E] focus:ring-1 focus:ring-[#1B4D3E] outline-none"
           />
         </div>
@@ -977,7 +990,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           className="flex items-center gap-1 px-3 py-2 text-[13px] text-white bg-[#1B4D3E] rounded-lg hover:bg-[#153F33] transition-colors"
         >
           <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Tạo task</span>
+          <span className="hidden sm:inline">Tạo công việc</span>
         </button>
       </div>
 
@@ -989,7 +1002,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
             onChange={e => setFilterPhase(e.target.value)}
             className="px-3 py-2 text-[13px] border border-gray-300 rounded-lg bg-white focus:border-[#1B4D3E] outline-none"
           >
-            <option value="">Tất cả phases</option>
+            <option value="">Tất cả giai đoạn</option>
             {phases.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
@@ -1001,8 +1014,8 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
             className="px-3 py-2 text-[13px] border border-gray-300 rounded-lg bg-white focus:border-[#1B4D3E] outline-none"
           >
             <option value="">Tất cả trạng thái</option>
-            {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-              <option key={key} value={key}>{cfg.label}</option>
+            {STATUS_FILTERS.map(f => (
+              <option key={f.value} value={f.value}>{f.label}</option>
             ))}
           </select>
 
@@ -1033,7 +1046,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       {selectedTasks.size > 0 && (
         <div className="flex items-center gap-2 mb-3 p-2.5 bg-[#1B4D3E]/5 border border-[#1B4D3E]/20 rounded-lg">
           <span className="text-[12px] text-[#1B4D3E] font-medium">
-            Đã chọn {selectedTasks.size} task
+            Đã chọn {selectedTasks.size} công việc
           </span>
           <div className="flex-1" />
           <button
@@ -1056,6 +1069,9 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           </button>
         </div>
       )}
+
+      {/* Chạm trần tải một lần → báo, đừng im lặng mất việc cũ */}
+      <LimitNotice shown={tasks.length} limit={TASK_LOAD_LIMIT} what="công việc" />
 
       {/* View content */}
       {viewMode === 'by_phase' && <ByPhaseView />}

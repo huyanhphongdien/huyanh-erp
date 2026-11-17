@@ -10,6 +10,9 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { Button, Tooltip, message, Popconfirm, Spin } from 'antd'
 import { FilePdfOutlined, PaperClipOutlined, EyeOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
+import { fmtDateTime } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
 
 interface ShipDoc {
   id: string
@@ -21,24 +24,29 @@ interface ShipDoc {
 }
 
 const fmtSize = (b?: number | null) => (b ? `${Math.round(b / 1024)} KB` : '')
-const fmtTime = (s: string) => new Date(s).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+// Ngày-giờ chuẩn 'DD/MM HH:mm' (toLocaleString('vi-VN') in giờ trước ngày)
+const fmtTime = (s: string) => fmtDateTime(s)
 const isImg = (n?: string | null) => /\.(png|jpe?g|gif|webp|bmp|heic)$/i.test(n || '')
 
 export default function ShippingDocsSection({ orderId, canEdit }: { orderId: string; canEdit: boolean }) {
   const [docs, setDocs] = useState<ShipDoc[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có tài liệu vận chuyển"
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
+    setLoadError(null)
+    const { data, error } = await supabase
       .from('sales_order_documents')
       .select('id, doc_name, file_name, file_url, file_size, created_at')
       .eq('sales_order_id', orderId)
       .eq('doc_type', 'shipping')
       .order('created_at', { ascending: false })
-    setDocs((data as ShipDoc[]) || [])
+    if (error) setLoadError(error)
+    else setDocs((data as ShipDoc[]) || [])
     setLoading(false)
   }, [orderId])
 
@@ -70,7 +78,7 @@ export default function ShippingDocsSection({ orderId, canEdit }: { orderId: str
         if (insErr) throw insErr
         ok++
       } catch (e: unknown) {
-        message.error(`Upload "${f.name}" lỗi: ${e instanceof Error ? e.message : String(e)}`)
+        message.error(dichLoiHeThong(e, `Tải lên "${f.name}" thất bại`))
       }
     }
     setUploading(false)
@@ -79,7 +87,7 @@ export default function ShippingDocsSection({ orderId, canEdit }: { orderId: str
 
   const handleDelete = async (d: ShipDoc) => {
     const { error } = await supabase.from('sales_order_documents').delete().eq('id', d.id)
-    if (error) { message.error('Xóa lỗi: ' + error.message); return }
+    if (error) { message.error(dichLoiHeThong(error, 'Xóa tài liệu thất bại')); return }
     message.success('Đã xóa')
     load()
   }
@@ -120,6 +128,8 @@ export default function ShippingDocsSection({ orderId, canEdit }: { orderId: str
 
       {loading ? (
         <div style={{ padding: 16, textAlign: 'center' }}><Spin size="small" /></div>
+      ) : loadError ? (
+        <PageState error={loadError} onRetry={load} minHeight={90} />
       ) : docs.length === 0 ? (
         <div style={{ fontSize: 12, color: '#bfbfbf', padding: '6px 0' }}>Chưa có tài liệu vận chuyển.</div>
       ) : (
@@ -144,7 +154,8 @@ export default function ShippingDocsSection({ orderId, canEdit }: { orderId: str
                 <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => d.file_url && window.open(d.file_url, '_blank')} />
               </Tooltip>
               {canEdit && (
-                <Popconfirm title="Xóa tài liệu này?" okText="Xóa" cancelText="Hủy" onConfirm={() => handleDelete(d)}>
+                <Popconfirm title="Xóa tài liệu này?" description="File bị gỡ khỏi đơn — tab Chứng từ cũng không còn thấy."
+                  okText="Xóa" cancelText="Không" okButtonProps={{ danger: true }} onConfirm={() => handleDelete(d)}>
                   <Button type="text" size="small" danger icon={<DeleteOutlined />} />
                 </Popconfirm>
               )}

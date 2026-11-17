@@ -45,6 +45,10 @@ import {
   type ProjectUser,
   type ProjectForPermission,
 } from '../../utils/projectPermissions'
+import { fmtDateShort } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
+import { PROJECT_STATUS_LABELS, PROJECT_PRIORITY_LABELS } from '../../services/project/project.types'
 
 // ============================================================================
 // TYPES
@@ -96,12 +100,14 @@ interface PaginationInfo {
 // CONSTANTS
 // ============================================================================
 
+// Nhãn đọc từ project.types (một nguồn — Đợt 3 audit UI 17/11/2026). Bản chép cũ ghi "Đang chạy"/"Lập KH"
+// trong khi chi tiết dự án ghi "Đang thực hiện"/"Lập kế hoạch". Lớp màu/icon vẫn là của màn này.
 const STATUS_TABS = [
   { key: 'all',         label: 'Tất cả',      icon: FolderKanban },
-  { key: 'in_progress', label: 'Đang chạy',   icon: BarChart3 },
-  { key: 'planning',    label: 'Lập kế hoạch', icon: FileEdit },
-  { key: 'completed',   label: 'Hoàn thành',  icon: CheckCircle2 },
-  { key: 'on_hold',     label: 'Tạm dừng',    icon: PauseCircle },
+  { key: 'in_progress', label: PROJECT_STATUS_LABELS.in_progress, icon: BarChart3 },
+  { key: 'planning',    label: PROJECT_STATUS_LABELS.planning,    icon: FileEdit },
+  { key: 'completed',   label: PROJECT_STATUS_LABELS.completed,   icon: CheckCircle2 },
+  { key: 'on_hold',     label: PROJECT_STATUS_LABELS.on_hold,     icon: PauseCircle },
 ] as const
 
 const STATUS_CONFIG: Record<ProjectStatus, {
@@ -111,43 +117,43 @@ const STATUS_CONFIG: Record<ProjectStatus, {
   icon: React.ReactNode
 }> = {
   draft: {
-    label: 'Nháp',
+    label: PROJECT_STATUS_LABELS.draft,
     className: 'bg-gray-50 text-gray-600 border-gray-200',
     borderColor: '#9CA3AF',
     icon: <FileEdit className="w-3 h-3" />,
   },
   planning: {
-    label: 'Lập KH',
+    label: PROJECT_STATUS_LABELS.planning,
     className: 'bg-blue-50 text-blue-600 border-blue-200',
     borderColor: '#2563EB',
     icon: <Target className="w-3 h-3" />,
   },
   approved: {
-    label: 'Đã duyệt',
+    label: PROJECT_STATUS_LABELS.approved,
     className: 'bg-indigo-50 text-indigo-600 border-indigo-200',
     borderColor: '#4F46E5',
     icon: <CheckCircle2 className="w-3 h-3" />,
   },
   in_progress: {
-    label: 'Đang chạy',
+    label: PROJECT_STATUS_LABELS.in_progress,
     className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     borderColor: '#16A34A',
     icon: <BarChart3 className="w-3 h-3" />,
   },
   on_hold: {
-    label: 'Tạm dừng',
+    label: PROJECT_STATUS_LABELS.on_hold,
     className: 'bg-amber-50 text-amber-600 border-amber-200',
     borderColor: '#F59E0B',
     icon: <PauseCircle className="w-3 h-3" />,
   },
   completed: {
-    label: 'Hoàn thành',
+    label: PROJECT_STATUS_LABELS.completed,
     className: 'bg-green-50 text-green-700 border-green-200',
     borderColor: '#16A34A',
     icon: <CheckCircle2 className="w-3 h-3" />,
   },
   cancelled: {
-    label: 'Đã hủy',
+    label: PROJECT_STATUS_LABELS.cancelled,
     className: 'bg-red-50 text-red-600 border-red-200',
     borderColor: '#DC2626',
     icon: <Ban className="w-3 h-3" />,
@@ -160,15 +166,15 @@ const PRIORITY_CONFIG: Record<ProjectPriority, {
   borderColor: string
   dotColor: string
 }> = {
-  critical: { label: 'Khẩn cấp', color: 'text-red-600',    borderColor: '#DC2626', dotColor: 'bg-red-500' },
-  high:     { label: 'Cao',      color: 'text-orange-600', borderColor: '#EA580C', dotColor: 'bg-orange-500' },
-  medium:   { label: 'Trung bình', color: 'text-blue-600',  borderColor: '#2563EB', dotColor: 'bg-blue-500' },
-  low:      { label: 'Thấp',     color: 'text-gray-500',   borderColor: '#9CA3AF', dotColor: 'bg-gray-400' },
+  critical: { label: PROJECT_PRIORITY_LABELS.critical, color: 'text-red-600',    borderColor: '#DC2626', dotColor: 'bg-red-500' },
+  high:     { label: PROJECT_PRIORITY_LABELS.high,     color: 'text-orange-600', borderColor: '#EA580C', dotColor: 'bg-orange-500' },
+  medium:   { label: PROJECT_PRIORITY_LABELS.medium,   color: 'text-blue-600',  borderColor: '#2563EB', dotColor: 'bg-blue-500' },
+  low:      { label: PROJECT_PRIORITY_LABELS.low,      color: 'text-gray-500',   borderColor: '#9CA3AF', dotColor: 'bg-gray-400' },
 }
 
 const SORT_OPTIONS = [
   { key: 'created_at_desc',   label: 'Mới nhất' },
-  { key: 'planned_end_asc',   label: 'Deadline gần' },
+  { key: 'planned_end_asc',   label: 'Hạn chót gần nhất' },
   { key: 'progress_pct_desc', label: 'Tiến độ cao → thấp' },
   { key: 'progress_pct_asc',  label: 'Tiến độ thấp → cao' },
   { key: 'name_asc',          label: 'Tên A → Z' },
@@ -178,24 +184,8 @@ const SORT_OPTIONS = [
 // HELPERS
 // ============================================================================
 
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-function formatShortDate(dateStr?: string): string {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-}
-
-function formatBudget(amount: number, currency: string = 'VND'): string {
-  if (!amount) return '—'
-  if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1)} tỷ`
-  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(0)} triệu`
-  return amount.toLocaleString('vi-VN') + ' ' + currency
-}
+// formatDate / formatShortDate / formatBudget cục bộ đã bỏ (formatDate, formatBudget không còn ai gọi)
+// → dùng fmtDateShort của src/utils/format.ts
 
 function getDaysRemaining(endDateStr?: string): { days: number; label: string; color: string } | null {
   if (!endDateStr) return null
@@ -440,7 +430,7 @@ const ProjectCard: React.FC<{
             {!deadline && project.planned_end && (
               <span className="inline-flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
-                {formatShortDate(project.planned_end)}
+                {fmtDateShort(project.planned_end)}
               </span>
             )}
           </div>
@@ -512,7 +502,7 @@ const ProjectTableRow: React.FC<{
       </td>
       <td className="px-4 py-3 text-right">
         <div className="text-[13px]">
-          <span className="text-gray-700">{formatShortDate(project.planned_end)}</span>
+          <span className="text-gray-700">{fmtDateShort(project.planned_end)}</span>
           {deadline && (
             <p className={`text-[11px] font-medium mt-0.5 ${deadline.color}`}>
               {deadline.label}
@@ -540,6 +530,8 @@ export const ProjectListPage: React.FC = () => {
   // State
   const [projects, setProjects] = useState<ProjectListItem[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải: trước đây chỉ toast rồi hiện "Không tìm thấy dự án — tạo dự án đầu tiên" như thật
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card')
   const [activeTab, setActiveTab] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -586,6 +578,7 @@ export const ProjectListPage: React.FC = () => {
 
   const loadProjects = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       let query = supabase
         .from('projects')
@@ -653,7 +646,7 @@ export const ProjectListPage: React.FC = () => {
       })
     } catch (err: any) {
       console.error('Load projects failed:', err)
-      message.error(err?.message || 'Không tải được danh sách dự án, thử lại')
+      setLoadError(err || 'Không tải được danh sách dự án')
     } finally {
       setLoading(false)
     }
@@ -747,7 +740,8 @@ export const ProjectListPage: React.FC = () => {
         ? 'Phê duyệt dự án'
         : approvalDialog.toStatus === 'in_progress'
         ? 'Bắt đầu thực hiện dự án'
-        : `Chuyển trạng thái dự án sang ${approvalDialog.toStatus}`
+        // Nhãn tiếng Việt (PROJECT_STATUS_LABELS) — trước đây ghi mã thô "on_hold"/"cancelled" vào nhật ký hoạt động
+        : `Chuyển trạng thái dự án sang ${PROJECT_STATUS_LABELS[approvalDialog.toStatus] ?? approvalDialog.toStatus}`
 
       await supabase.from('project_activities').insert({
         project_id: proj.id,
@@ -764,7 +758,7 @@ export const ProjectListPage: React.FC = () => {
       setApprovalDialog({ isOpen: false, project: null, toStatus: 'approved' })
     } catch (e: any) {
       console.error('Quick approval failed:', e)
-      throw new Error(e?.message || 'Phê duyệt thất bại')
+      throw new Error(dichLoiHeThong(e, 'Phê duyệt thất bại'))
     }
   }
 
@@ -967,8 +961,13 @@ export const ProjectListPage: React.FC = () => {
           </div>
         )}
 
-        {/* Empty state */}
-        {!loading && projects.length === 0 && (
+        {/* Lỗi tải (+ Thử lại) — xét TRƯỚC trống */}
+        {!loading && !!loadError && (
+          <PageState error={loadError} onRetry={loadProjects} minHeight={240} />
+        )}
+
+        {/* Empty state — chỉ khi tải THÀNH CÔNG mà rỗng */}
+        {!loading && !loadError && projects.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
               <FolderKanban className="w-8 h-8 text-gray-400" />
@@ -998,7 +997,7 @@ export const ProjectListPage: React.FC = () => {
         )}
 
         {/* CARD VIEW */}
-        {!loading && projects.length > 0 && viewMode === 'card' && (
+        {!loading && !loadError && projects.length > 0 && viewMode === 'card' && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {projects.map(project => (
               <ProjectCard
@@ -1013,7 +1012,7 @@ export const ProjectListPage: React.FC = () => {
         )}
 
         {/* TABLE VIEW */}
-        {!loading && projects.length > 0 && viewMode === 'table' && (
+        {!loading && !loadError && projects.length > 0 && viewMode === 'table' && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -1025,7 +1024,7 @@ export const ProjectListPage: React.FC = () => {
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider min-w-[160px]">Tiến độ</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Trạng thái</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Ưu tiên</th>
-                    <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Deadline</th>
+                    <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Hạn chót</th>
                     <th className="w-8" />
                   </tr>
                 </thead>
@@ -1065,7 +1064,7 @@ export const ProjectListPage: React.FC = () => {
         )}
 
         {/* Result count — card view */}
-        {!loading && projects.length > 0 && viewMode === 'card' && (
+        {!loading && !loadError && projects.length > 0 && viewMode === 'card' && (
           <div className="mt-4 text-center text-[13px] text-gray-400">
             Hiển thị {projects.length} / {pagination.total} dự án
           </div>

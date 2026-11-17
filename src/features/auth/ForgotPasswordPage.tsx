@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { Button, Input, Card } from '../../components/ui'
+import { dichLoiAuth } from '../../utils/dichLoiAuth'
 
 export function ForgotPasswordPage() {
   const { forgotPassword, isLoading, error, clearError } = useAuthStore()
@@ -62,7 +63,7 @@ export function ForgotPasswordPage() {
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-danger">{error}</p>
+              <p className="text-sm text-danger">{dichLoiAuth(error, 'Không gửi được email đặt lại mật khẩu — thử lại sau')}</p>
             </div>
           )}
 

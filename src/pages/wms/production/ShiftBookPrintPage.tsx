@@ -36,6 +36,7 @@ import {
   shiftBookService, computeTotals,
   type ShiftBook, type ShiftLine, type ShiftMaterial, type TonKho,
 } from '../../../services/wms/shiftBookService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const bd = '1px solid #000'
 const cell: React.CSSProperties = { padding: '3px 5px' }
@@ -62,6 +63,9 @@ export default function ShiftBookPrintPage() {
   const [lines, setLines] = useState<ShiftLine[]>([])
   const [materials, setMaterials] = useState<ShiftMaterial[]>([])
   const [balance, setBalance] = useState<Record<string, TonKho>>({})
+  // Nạp lỗi: vẫn hiện tờ (in tay được) nhưng PHẢI báo — trước đây im lặng, tờ in ra trống/thiếu dòng
+  // mà tiêu đề vẫn như phiếu thật.
+  const [loiNap, setLoiNap] = useState<unknown>(null)
 
   useEffect(() => {
     let huy = false
@@ -82,8 +86,9 @@ export default function ShiftBookPrintPage() {
             if (!huy) setBalance(b)
           }
         }
-      } catch {
-        /* không đọc được thì vẫn in được tờ trống */
+      } catch (e) {
+        /* không đọc được thì vẫn in được tờ trống — nhưng báo ra ở dải đỏ (no-print) bên dưới */
+        if (!huy) setLoiNap(e)
       } finally {
         if (!huy) setLoading(false)
       }
@@ -126,6 +131,21 @@ export default function ShiftBookPrintPage() {
           <Printer size={16} /> In phiếu
         </button>
       </div>
+
+      {loiNap != null && (
+        <div className="no-print bg-red-50 text-red-800 border-b border-red-200 px-4 py-2 text-sm flex items-center gap-3">
+          <span className="flex-1">
+            {blank ? 'Không đọc được danh mục hàng' : 'Không đọc được phiếu'} — {dichLoiHeThong(loiNap, 'lỗi khi tải')}.
+            {' '}Tờ bên dưới có thể đang TRỐNG hoặc thiếu dòng — đừng in thay cho phiếu thật.
+          </span>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-3 py-1 rounded border border-red-300 bg-white hover:bg-red-100 text-sm font-medium"
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
 
       <div className="no-print bg-gray-200 min-h-[calc(100vh-56px)] py-6 px-4 flex justify-center">
         <div className="bg-white shadow-md" style={{ width: '210mm', minHeight: '297mm', padding: '12mm' }}>

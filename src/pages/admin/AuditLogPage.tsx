@@ -1,6 +1,9 @@
 // ============================================================================
-// AuditLogPage — Lịch sử ai sửa gì (Admin/BGĐ only)
+// AuditLogPage — Nhật ký hệ thống: lịch sử ai sửa gì (Admin/BGĐ only)
 // File: src/pages/admin/AuditLogPage.tsx
+// 17/11/2026 (Đợt 3 audit UI): lỗi tải hiện khối lỗi + Thử lại (trước: rơi xuống "Không có sự kiện nào"),
+// thẻ thống kê lỗi hiện "—" thay vì 0, quyền xem khớp menu (Admin hoặc level ≤ 3), nhãn tiếng Việt.
+// Giờ hiển thị GIỮ giây (HH:mm:ss) — nhật ký kiểm toán cần thứ tự từng giây, ngoại lệ có chủ ý so với chuẩn 'DD/MM HH:mm'.
 // ============================================================================
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -14,6 +17,11 @@ import {
   type AuditLogListParams,
 } from '../../services/auditLogService'
 import { useAuthStore } from '../../stores/authStore'
+import PageState from '../../components/common/PageState'
+import { fmtNum } from '../../utils/format'
+// Cùng luật với Sidebar (mục 'Nhật ký hệ thống (BGĐ)' executiveOnly): Admin luôn thấy, còn lại level ≤ 3.
+// Ai là Admin: MỘT nguồn src/lib/adminAccess.ts (Sidebar + Tài chính dùng chung) — đừng chép lại danh sách email.
+import { isAdminUser } from '../../lib/adminAccess'
 
 const { RangePicker } = DatePicker
 
@@ -29,13 +37,17 @@ const ACTION_META: Record<string, { label: string; color: string; icon: React.Re
 
 export default function AuditLogPage() {
   const user = useAuthStore(s => s.user)
+  const isAdmin = isAdminUser(user)
   const userLevel = (user as any)?.position_level ?? 7
-  const isAuthorized = userLevel <= 3   // Admin/BGĐ (level 1-3)
+  // Trước đây chỉ xét level ≤ 3 → Admin có level > 3 (hoặc chưa gán chức vụ) thấy mục menu nhưng bấm vào bị chặn
+  const isAuthorized = isAdmin || userLevel <= 3   // Admin / BGĐ (level 1-3)
 
   const [entries, setEntries] = useState<AuditLogEntry[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ today: 0, last_7d: 0, last_30d: 0, by_action: { INSERT: 0, UPDATE: 0, DELETE: 0 } })
+  const [loadError, setLoadError] = useState<unknown>(null)
+  // null = chưa tải được → thẻ hiện "—" (không hiện 0 giả)
+  const [stats, setStats] = useState<{ today: number; last_7d: number; last_30d: number; by_action: { INSERT: number; UPDATE: number; DELETE: number } } | null>(null)
 
   // Filters
   const [tableName, setTableName] = useState<string>('all')
@@ -65,8 +77,11 @@ export default function AuditLogPage() {
       const res = await auditLogService.getList(params)
       setEntries(res.data)
       setTotal(res.total)
+      setLoadError(null)
     } catch (e: any) {
       console.error(e)
+      // Lỗi tải ≠ "không có sự kiện" — hiện khối lỗi + Thử lại
+      setLoadError(e)
     } finally {
       setLoading(false)
     }
@@ -78,7 +93,7 @@ export default function AuditLogPage() {
 
   useEffect(() => {
     if (isAuthorized) {
-      auditLogService.getStats().then(setStats).catch(console.error)
+      auditLogService.getStats().then(setStats).catch((e) => { console.error(e); setStats(null) })
     }
   }, [isAuthorized])
 
@@ -88,7 +103,7 @@ export default function AuditLogPage() {
         <Shield size={48} style={{ color: '#cf1322', margin: '0 auto 16px' }} />
         <h2 style={{ color: '#cf1322' }}>Không có quyền truy cập</h2>
         <p style={{ color: '#6b7280' }}>
-          Audit Log chỉ dành cho <strong>Admin</strong> và <strong>Ban Giám Đốc</strong> (level 1-3).
+          Nhật ký hệ thống chỉ dành cho <strong>Admin</strong> và <strong>Ban Giám Đốc</strong> (level 1-3).
           <br />
           Liên hệ Admin nếu cần quyền.
         </p>
@@ -103,7 +118,7 @@ export default function AuditLogPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Shield size={20} style={{ color: '#1B4D3E' }} />
             <span style={{ color: '#1B4D3E', fontSize: 17, fontWeight: 700 }}>
-              Audit Log — Lịch sử ai chỉnh sửa gì
+              Nhật ký hệ thống — Lịch sử ai chỉnh sửa gì
             </span>
             <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginLeft: 8 }}>
               (chỉ Admin + BGĐ thấy)
@@ -112,7 +127,7 @@ export default function AuditLogPage() {
         }
         extra={
           <Button icon={<RefreshCw size={14} />} onClick={fetchData} loading={loading} size="small">
-            Refresh
+            Tải lại
           </Button>
         }
         style={{ borderRadius: 12 }}
@@ -125,12 +140,12 @@ export default function AuditLogPage() {
           gap: 10,
           marginBottom: 14,
         }}>
-          <StatCard label="Sự kiện hôm nay" value={stats.today} color="#1B4D3E" />
-          <StatCard label="7 ngày" value={stats.last_7d} color="#0a72ef" />
-          <StatCard label="30 ngày" value={stats.last_30d} color="#6366f1" />
-          <StatCard label="🟢 Tạo mới (30d)" value={stats.by_action.INSERT} color="#10b981" />
-          <StatCard label="🔵 Cập nhật (30d)" value={stats.by_action.UPDATE} color="#0a72ef" />
-          <StatCard label="🔴 Xóa (30d)" value={stats.by_action.DELETE} color="#cf1322" />
+          <StatCard label="Sự kiện hôm nay" value={stats?.today} color="#1B4D3E" />
+          <StatCard label="7 ngày" value={stats?.last_7d} color="#0a72ef" />
+          <StatCard label="30 ngày" value={stats?.last_30d} color="#6366f1" />
+          <StatCard label="🟢 Tạo mới (30 ngày)" value={stats?.by_action.INSERT} color="#10b981" />
+          <StatCard label="🔵 Cập nhật (30 ngày)" value={stats?.by_action.UPDATE} color="#0a72ef" />
+          <StatCard label="🔴 Xóa (30 ngày)" value={stats?.by_action.DELETE} color="#cf1322" />
         </div>
 
         {/* Filters */}
@@ -150,7 +165,7 @@ export default function AuditLogPage() {
             style={{ width: 200 }}
             size="small"
             options={[
-              { value: 'all', label: 'Tất cả module' },
+              { value: 'all', label: 'Tất cả phân hệ' },
               { value: 'sales_orders', label: '📦 Đơn hàng bán' },
             ]}
           />
@@ -160,7 +175,7 @@ export default function AuditLogPage() {
             style={{ width: 140 }}
             size="small"
             options={[
-              { value: 'all', label: 'Tất cả action' },
+              { value: 'all', label: 'Tất cả thao tác' },
               { value: 'INSERT', label: '🟢 Tạo mới' },
               { value: 'UPDATE', label: '🔵 Cập nhật' },
               { value: 'DELETE', label: '🔴 Xóa' },
@@ -193,22 +208,24 @@ export default function AuditLogPage() {
           />
         </div>
 
-        {/* Table */}
+        {/* Table — lỗi xét TRƯỚC trống */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
+        ) : loadError ? (
+          <PageState error={loadError} onRetry={fetchData} />
         ) : entries.length === 0 ? (
-          <Empty description="Không có sự kiện nào khớp filter" style={{ padding: 40 }} />
+          <Empty description="Không có sự kiện nào khớp bộ lọc" style={{ padding: 40 }} />
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', minWidth: 1100 }}>
               <thead>
                 <tr style={{ background: '#fafafa', textAlign: 'left' }}>
                   <Th>Thời gian</Th>
-                  <Th>Module</Th>
-                  <Th>Action</Th>
+                  <Th>Phân hệ</Th>
+                  <Th>Thao tác</Th>
                   <Th>Bản ghi</Th>
                   <Th>Người sửa</Th>
-                  <Th>Field thay đổi</Th>
+                  <Th>Trường thay đổi</Th>
                   <Th align="right">Chi tiết</Th>
                 </tr>
               </thead>
@@ -272,7 +289,7 @@ export default function AuditLogPage() {
         )}
 
         {/* Pagination */}
-        {total > pageSize && (
+        {!loadError && total > pageSize && (
           <div style={{ marginTop: 14, textAlign: 'right' }}>
             <Pagination
               current={page}
@@ -333,11 +350,11 @@ function Td({ children, align = 'left' }: TdProps) {
   )
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatCard({ label, value, color }: { label: string; value: number | null | undefined; color: string }) {
   return (
     <div style={{ padding: '10px 14px', background: '#fff', border: '1px solid #e4e4e7', borderLeft: `3px solid ${color}`, borderRadius: 8 }}>
       <div style={{ fontSize: 11, color: '#6b7280' }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color }}>{fmtNum(value)}</div>
     </div>
   )
 }
@@ -349,11 +366,11 @@ function DetailView({ entry }: { entry: AuditLogEntry }) {
       <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8, fontSize: 13, marginBottom: 16 }}>
         <strong>Thời gian:</strong>
         <span>{dayjs(entry.changed_at).format('DD/MM/YYYY HH:mm:ss')}</span>
-        <strong>Module:</strong>
+        <strong>Phân hệ:</strong>
         <span>{TABLE_LABELS[entry.table_name] || entry.table_name}</span>
         <strong>Bản ghi:</strong>
         <code style={{ fontFamily: 'monospace' }}>{entry.record_code}</code>
-        <strong>Action:</strong>
+        <strong>Thao tác:</strong>
         <Tag color={ACTION_META[entry.action]?.color}>{ACTION_META[entry.action]?.label}</Tag>
         <strong>Người sửa:</strong>
         <div>
@@ -366,15 +383,15 @@ function DetailView({ entry }: { entry: AuditLogEntry }) {
 
       <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12 }}>
         <h4 style={{ fontSize: 13, color: '#374151', marginBottom: 8 }}>
-          Field thay đổi ({fields.length})
+          Trường thay đổi ({fields.length})
         </h4>
         {fields.length === 0 ? (
-          <Empty description="Không có field nào thay đổi" />
+          <Empty description="Không có trường nào thay đổi" />
         ) : (
           <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#fafafa' }}>
-                <Th>Field</Th>
+                <Th>Trường</Th>
                 <Th>Giá trị cũ</Th>
                 <Th>→</Th>
                 <Th>Giá trị mới</Th>

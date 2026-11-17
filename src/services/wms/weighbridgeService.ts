@@ -20,6 +20,26 @@ import type {
 // CONSTANTS
 // ============================================================================
 
+/**
+ * Nhãn + màu TRẠNG THÁI PHIẾU CÂN — MỘT bản cho mọi màn ERP (Lịch sử cân, Chi tiết phiếu,
+ * tab Nhập kho của Deal…). Đợt 3 audit UI (17/11/2026): các bản chép tay đã trôi chữ
+ * ('Chờ cân L1' vs 'Chờ cân lần 1') — chốt 'Chờ cân lần 1 / lần 2' (lần 1 có thể là xe rỗng
+ * với phiếu XUẤT). pages/wms/weighbridge/weighbridgeLabels.ts chỉ cần re-export (giữ tên).
+ */
+export const WEIGHBRIDGE_STATUS_LABELS: Record<WeighbridgeStatus, string> = {
+  weighing_gross: 'Chờ cân lần 1',
+  weighing_tare: 'Chờ cân lần 2',
+  completed: 'Hoàn tất',
+  cancelled: 'Đã hủy',
+}
+
+export const WEIGHBRIDGE_STATUS_COLORS: Record<WeighbridgeStatus, string> = {
+  weighing_gross: 'blue',
+  weighing_tare: 'gold',
+  completed: 'green',
+  cancelled: 'red',
+}
+
 const TICKET_SELECT = `
   *,
   images:weighbridge_images(*)
@@ -40,6 +60,20 @@ const TICKET_LIST_SELECT = `
 // ============================================================================
 // HELPERS
 // ============================================================================
+
+/**
+ * Mốc đầu / cuối một NGÀY theo GIỜ MÁY (VN / Lào, UTC+7) → ISO UTC để so cột timestamptz.
+ * Trước 17/11/2026 ghép `${ngày}T00:00:00.000Z` = 0h UTC = 7h sáng VN → phiếu cân xong
+ * trước 7h sáng bị tính sang ngày hôm trước ("Hoàn tất hôm nay", "Tấn nay", lọc theo ngày).
+ * Chỉ quy đổi chuỗi 'YYYY-MM-DD'; giá trị khác giữ cách ghép cũ.
+ */
+const isDayStr = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
+function dayStartIso(day: string): string {
+  return isDayStr(day) ? new Date(`${day}T00:00:00`).toISOString() : day
+}
+function dayEndIso(day: string): string {
+  return isDayStr(day) ? new Date(`${day}T23:59:59.999`).toISOString() : day + 'T23:59:59.999Z'
+}
 
 /**
  * Tự sinh mã phiếu cân theo TỪNG NHÀ MÁY để KHÔNG trùng giữa các nhà máy:
@@ -218,7 +252,8 @@ async function updateTareWeight(
     .single()
 
   if (fetchError) throw fetchError
-  if (!ticket?.gross_weight) throw new Error('Chưa có Gross weight')
+  // Không ghi "(xe + hàng)": hàm cũng chạy cho phiếu XUẤT, mà lần 1 của XUẤT là xe rỗng
+  if (!ticket?.gross_weight) throw new Error('Chưa có số cân lần 1')
 
   // net mủ = (gross − pallet_gross) − (tare − pallet_tare). NHẬP: L1=gross, L2=tare.
   const palletGrossKg = Number((ticket as any).pallet_kg_gross || 0)
@@ -432,8 +467,8 @@ async function getAll(params: Omit<WMSPaginationParams, 'facility_id'> & {
   if (ticket_type) query = query.eq('ticket_type', ticket_type)
   else if (ticket_types && ticket_types.length) query = query.in('ticket_type', ticket_types)
   if (vehicle_plate) query = query.ilike('vehicle_plate', `%${vehicle_plate}%`)
-  if (from_date) query = query.gte('created_at', from_date)
-  if (to_date) query = query.lte('created_at', to_date + 'T23:59:59.999Z')
+  if (from_date) query = query.gte('created_at', dayStartIso(from_date))
+  if (to_date) query = query.lte('created_at', dayEndIso(to_date))
   if (facility_id) query = query.eq('facility_id', facility_id)
 
   if (search) {
@@ -644,8 +679,8 @@ async function getStats(
     .from('weighbridge_tickets')
     .select('net_weight', { count: 'exact' })
     .eq('status', 'completed')
-    .gte('completed_at', `${today}T00:00:00.000Z`)
-    .lte('completed_at', `${today}T23:59:59.999Z`)
+    .gte('completed_at', dayStartIso(today))
+    .lte('completed_at', dayEndIso(today))
   if (facilityId) todayQuery = todayQuery.eq('facility_id', facilityId)
   if (types) todayQuery = todayQuery.in('ticket_type', types)
   const { data: todayData, count: completedToday } = await todayQuery
@@ -660,8 +695,8 @@ async function getStats(
     .select('id', { count: 'exact', head: true })
     .neq('status', 'cancelled')
 
-  if (fromDate) totalQuery = totalQuery.gte('created_at', fromDate)
-  if (toDate) totalQuery = totalQuery.lte('created_at', toDate + 'T23:59:59.999Z')
+  if (fromDate) totalQuery = totalQuery.gte('created_at', dayStartIso(fromDate))
+  if (toDate) totalQuery = totalQuery.lte('created_at', dayEndIso(toDate))
   if (facilityId) totalQuery = totalQuery.eq('facility_id', facilityId)
   if (types) totalQuery = totalQuery.in('ticket_type', types)
 
@@ -702,8 +737,8 @@ async function getStatsByFacility(date?: string): Promise<Array<{
     .from('weighbridge_tickets')
     .select('facility_id, net_weight')
     .eq('status', 'completed')
-    .gte('completed_at', `${today}T00:00:00.000Z`)
-    .lte('completed_at', `${today}T23:59:59.999Z`)
+    .gte('completed_at', dayStartIso(today))
+    .lte('completed_at', dayEndIso(today))
 
   // Tickets đang cân (in-progress)
   const { data: inProgressRows } = await supabase

@@ -16,6 +16,8 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import type { GanttItem, GanttDependency, GanttData } from '../../services/project/ganttService'
+import { toDateStrVN } from '../../utils/dateVN'
+import { fmtDateShort } from '../../utils/format'
 
 // ============================================================================
 // TYPES
@@ -81,8 +83,9 @@ function parseDate(dateStr: string | null | undefined): Date | null {
   return isNaN(d.getTime()) ? null : d
 }
 
+// Ngày theo giờ máy (VN) — toISOString() đổi nửa đêm VN thành 17:00 hôm trước (UTC) nên vạch HÔM NAY lùi 1 ngày
 function formatDateStr(date: Date): string {
-  return date.toISOString().split('T')[0]
+  return toDateStrVN(date)
 }
 
 function addDaysToDate(date: Date, days: number): Date {
@@ -388,8 +391,8 @@ const GanttChart: React.FC<GanttChartProps> = ({
     return (
       <div className={`bg-white rounded-xl border border-gray-200 p-8 text-center ${className}`}>
         <ListTree className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-        <p className="text-[14px] text-gray-500">Chưa có dữ liệu Gantt Chart</p>
-        <p className="text-[12px] text-gray-400 mt-1">Thêm phases và tasks để hiển thị timeline</p>
+        <p className="text-[14px] text-gray-500">Chưa có dữ liệu Gantt</p>
+        <p className="text-[12px] text-gray-400 mt-1">Thêm giai đoạn và công việc để hiện dòng thời gian</p>
       </div>
     )
   }
@@ -402,10 +405,10 @@ const GanttChart: React.FC<GanttChartProps> = ({
       <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <ListTree className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">Gantt Chart</span>
+          <span className="text-sm font-medium text-gray-700">Biểu đồ Gantt</span>
           {data.critical_path.length > 0 && showCriticalPath && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">
-              Critical: {data.critical_path.length} items
+              Đường găng: {data.critical_path.length} mục
             </span>
           )}
         </div>
@@ -510,10 +513,10 @@ const GanttChart: React.FC<GanttChartProps> = ({
                   </span>
 
                   <span className="w-16 text-center text-xs text-gray-400 font-mono tabular-nums">
-                    {item.start ? item.start.slice(5) : '—'}
+                    {fmtDateShort(item.start)}
                   </span>
                   <span className="w-16 text-center text-xs text-gray-400 font-mono tabular-nums">
-                    {item.end ? item.end.slice(5) : '—'}
+                    {fmtDateShort(item.end)}
                   </span>
 
                   <span className={`w-10 text-center text-xs font-medium tabular-nums ${
@@ -743,20 +746,20 @@ const GanttChart: React.FC<GanttChartProps> = ({
       <div className="flex items-center gap-4 px-4 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500 overflow-x-auto">
         <span className="flex items-center gap-1.5">
           <span className="w-4 h-2 rounded-sm" style={{ backgroundColor: COLORS.phaseBar, opacity: 0.4 }} />
-          Phase
+          Giai đoạn
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-4 h-2 rounded" style={{ backgroundColor: COLORS.taskBar }} />
-          Task
+          Công việc
         </span>
         <span className="flex items-center gap-1.5">
           <Diamond className="w-3 h-3 text-amber-500" />
-          Milestone
+          Mốc
         </span>
         {showCriticalPath && (
           <span className="flex items-center gap-1.5">
             <AlertTriangle className="w-3 h-3 text-red-500" />
-            Critical Path
+            Đường găng
           </span>
         )}
         <span className="flex items-center gap-1.5">

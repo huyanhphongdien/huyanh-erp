@@ -10,6 +10,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { fmtKg } from '../../utils/format'
 
 export type TimelineStageStatus = 'done' | 'current' | 'pending' | 'skipped'
 
@@ -50,8 +51,9 @@ export async function getTimeline(dealId: string): Promise<ProductionTimeline> {
     .eq('id', dealId)
     .maybeSingle()
 
-  if (dErr) throw new Error(`Deal load failed: ${dErr.message}`)
-  if (!deal) throw new Error(`Deal not found: ${dealId}`)
+  // Ném nguyên lỗi Supabase để dichLoiHeThong ở UI đọc được mã lỗi (mạng/quyền...)
+  if (dErr) throw dErr
+  if (!deal) throw new Error('Không tìm thấy deal — có thể đã bị xoá')
 
   const d = deal as any
   const purchaseType = d.purchase_type || 'standard'
@@ -114,10 +116,10 @@ async function buildDrcAfterTimeline(d: any): Promise<ProductionTimeline> {
       timestamp: si?.confirmed_at || null,
     },
     {
-      key: 'qc_sample', label: 'QC sample DRC',
+      key: 'qc_sample', label: 'QC DRC mẫu',
       status: hasSampleDrc ? 'done' : (hasStockIn ? 'current' : 'pending'),
       timestamp: null,
-      note: hasSampleDrc ? `Sample: ${d.sample_drc}%` : undefined,
+      note: hasSampleDrc ? `DRC mẫu: ${d.sample_drc}%` : undefined,
     },
     {
       key: 'bgd_approved', label: 'BGĐ duyệt',
@@ -139,13 +141,13 @@ async function buildDrcAfterTimeline(d: any): Promise<ProductionTimeline> {
       key: 'production_finish', label: 'Ra thành phẩm',
       status: hasFinishedProduct ? 'done' : (hasProductionStart ? 'current' : 'pending'),
       timestamp: null,
-      note: hasFinishedProduct ? `${d.finished_product_kg} kg` : undefined,
+      note: hasFinishedProduct ? `${fmtKg(Number(d.finished_product_kg), 3)} kg` : undefined,
     },
     {
-      key: 'qc_final', label: 'QC final (actual DRC)',
+      key: 'qc_final', label: 'QC cuối (DRC thực tế)',
       status: hasActualDrc ? 'done' : (hasFinishedProduct ? 'current' : 'pending'),
       timestamp: null,
-      note: hasActualDrc ? `Actual: ${d.actual_drc}%` : undefined,
+      note: hasActualDrc ? `DRC thực tế: ${d.actual_drc}%` : undefined,
     },
     {
       key: 'settlement', label: 'Quyết toán',
@@ -198,12 +200,12 @@ async function buildStandardTimeline(d: any): Promise<ProductionTimeline> {
 
   const stages: TimelineStage[] = [
     { key: 'booked', label: 'Đặt phiếu', status: 'done', timestamp: d.created_at },
-    { key: 'qc_sample', label: 'QC sample', status: hasSampleDrc ? 'done' : 'current', timestamp: null },
+    { key: 'qc_sample', label: 'QC DRC mẫu', status: hasSampleDrc ? 'done' : 'current', timestamp: null },
     { key: 'bgd_approved', label: 'BGĐ duyệt', status: isAccepted ? 'done' : (hasSampleDrc ? 'current' : 'pending'), timestamp: null },
     { key: 'weighed', label: 'Đã cân', status: hasWeighed ? 'done' : (isAccepted ? 'current' : 'pending'), timestamp: (weighbridge.data as any)?.completed_at },
     { key: 'stock_in', label: 'Đã nhập kho', status: hasStockIn ? 'done' : (hasWeighed ? 'current' : 'pending'), timestamp: (stockIn.data as any)?.confirmed_at },
     { key: 'advance', label: 'Tạm ứng', status: hasAdvance ? 'done' : 'pending', timestamp: null },
-    { key: 'qc_actual', label: 'QC actual DRC', status: hasActualDrc ? 'done' : 'pending', timestamp: null },
+    { key: 'qc_actual', label: 'QC DRC thực tế', status: hasActualDrc ? 'done' : 'pending', timestamp: null },
     { key: 'settlement', label: 'Quyết toán', status: hasSettlement ? 'done' : (hasActualDrc ? 'current' : 'pending'), timestamp: (settlement.data as any)?.approved_at },
     { key: 'paid', label: 'Thanh toán', status: isSettled ? 'done' : (hasSettlement ? 'current' : 'pending'), timestamp: (settlement.data as any)?.paid_at },
   ]

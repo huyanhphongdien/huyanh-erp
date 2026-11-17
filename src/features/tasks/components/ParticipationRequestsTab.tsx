@@ -27,6 +27,10 @@ import {
   taskParticipantService,
   type PendingRequest,
 } from '../../../services/taskParticipantService'
+import { Input, Modal, message } from 'antd'
+import { taskPriorityLabel, taskPriorityTone } from '../taskUi'
+import { fmtDate } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -37,39 +41,11 @@ interface ParticipationRequestsTabProps {
 }
 
 // ============================================================================
-// PRIORITY CONFIG
-// ============================================================================
-
-const PRIORITY_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  low: { label: 'Thấp', color: 'text-gray-600', bgColor: 'bg-gray-100' },
-  medium: { label: 'Trung bình', color: 'text-blue-600', bgColor: 'bg-blue-100' },
-  high: { label: 'Cao', color: 'text-orange-600', bgColor: 'bg-orange-100' },
-  urgent: { label: 'Khẩn cấp', color: 'text-red-600', bgColor: 'bg-red-100' },
-}
-
-// ============================================================================
 // HELPER FUNCTIONS
+// Nhãn + màu ưu tiên: MỘT nguồn TASK_PRIORITY_* (types/index.ts) qua taskUi; ngày: utils/format
 // ============================================================================
 
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-}
-
-function _formatDateTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+const formatDate = fmtDate
 
 function getTimeAgo(dateStr: string): string {
   const date = new Date(dateStr)
@@ -97,7 +73,8 @@ const RequestCard: React.FC<{
   onView: () => void
   isProcessing: boolean
 }> = ({ request, onAccept, onReject, onView, isProcessing }) => {
-  const priorityConfig = PRIORITY_CONFIG[request.task_priority] || PRIORITY_CONFIG.medium
+  const priorityTone = taskPriorityTone(request.task_priority)
+  const priorityConfig = { label: taskPriorityLabel(request.task_priority), bgColor: priorityTone.bg, color: priorityTone.text }
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden">
@@ -236,7 +213,7 @@ const ParticipationRequestsTab: React.FC<ParticipationRequestsTabProps> = ({ onC
     )
 
     if (loadError) {
-      setError(loadError.message)
+      setError(dichLoiHeThong(loadError, 'Không tải được yêu cầu tham gia'))
     } else {
       setRequests(data)
       onCountChange?.(data.length)
@@ -258,28 +235,45 @@ const ParticipationRequestsTab: React.FC<ParticipationRequestsTabProps> = ({ onC
     if (result.success) {
       await loadRequests()
     } else {
-      alert(result.error || 'Không thể chấp nhận yêu cầu')
+      message.error(dichLoiHeThong(result.error, 'Không thể chấp nhận yêu cầu'))
     }
 
     setProcessingId(null)
   }
 
   // Handle reject
-  const handleReject = async (requestId: string) => {
-    const reason = prompt('Lý do từ chối (tùy chọn):')
-    if (reason === null) return // User cancelled
+  // Modal antd thay prompt()/alert() hệ thống (nút OK/Cancel tiếng Anh trên nhiều máy)
+  const handleReject = (requestId: string) => {
+    let reason = ''
+    Modal.confirm({
+      title: 'Từ chối yêu cầu tham gia?',
+      content: (
+        <div>
+          <p className="text-sm text-gray-600 mb-2">Bạn sẽ không tham gia công việc này. Lý do (tùy chọn):</p>
+          <Input.TextArea
+            rows={2}
+            placeholder="Ví dụ: đang quá tải việc trong tuần"
+            onChange={(e) => { reason = e.target.value }}
+          />
+        </div>
+      ),
+      okText: 'Từ chối',
+      cancelText: 'Không',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setProcessingId(requestId)
 
-    setProcessingId(requestId)
+        const result = await taskParticipantService.rejectRequest(requestId, reason.trim() || undefined)
 
-    const result = await taskParticipantService.rejectRequest(requestId, reason || undefined)
+        if (result.success) {
+          await loadRequests()
+        } else {
+          message.error(dichLoiHeThong(result.error, 'Không thể từ chối yêu cầu'))
+        }
 
-    if (result.success) {
-      await loadRequests()
-    } else {
-      alert(result.error || 'Không thể từ chối yêu cầu')
-    }
-
-    setProcessingId(null)
+        setProcessingId(null)
+      },
+    })
   }
 
   // Handle view task

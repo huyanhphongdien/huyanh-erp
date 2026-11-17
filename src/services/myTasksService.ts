@@ -12,6 +12,7 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
+import { vnDayStartTs } from '../utils/dateVN'
 
 // ============================================================================
 // TYPES
@@ -162,7 +163,7 @@ export const myTasksService = {
       if (!filter?.from_date && !filter?.to_date && !filter?.search) {
         const now = new Date()
         const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-        assigneeQuery = assigneeQuery.gte('created_at', monthStart + 'T00:00:00')
+        assigneeQuery = assigneeQuery.gte('created_at', vnDayStartTs(monthStart))
       }
 
       // Apply filters
@@ -534,7 +535,7 @@ export const myTasksService = {
 
     // ★ Chỉ thống kê tháng hiện tại
     const statsNow = new Date()
-    const monthStart = `${statsNow.getFullYear()}-${String(statsNow.getMonth() + 1).padStart(2, '0')}-01T00:00:00`
+    const monthStart = vnDayStartTs(`${statsNow.getFullYear()}-${String(statsNow.getMonth() + 1).padStart(2, '0')}-01`)
 
     // Query 1: Tasks là assignee
     const { data: assigneeTasks, error } = await supabase

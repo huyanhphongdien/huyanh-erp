@@ -52,7 +52,7 @@ const WMSReportsTabbedPage = () => {
       items={[
         {
           key: 'dashboard',
-          label: 'Dashboard',
+          label: 'Tổng quan',
           children: (
             <Suspense fallback={<TabFallback />}>
               <WMSReportDashboardPage />

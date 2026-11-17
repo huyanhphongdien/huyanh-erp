@@ -29,11 +29,16 @@ import {
 } from 'lucide-react';
 
 // Import path: 5 cấp lên từ components/suppliers/
-import { 
-  supplierService, 
+import {
+  supplierService,
   type SupplierQuotation,
-  type SupplierQuotationFormData 
+  type SupplierQuotationFormData
 } from '../../../../../services/supplierService';
+import { App as AntdApp } from 'antd';
+import { fmtVnd, fmtUsd, fmtDate } from '../../../../../utils/format';
+import { todayVN } from '../../../../../utils/dateVN';
+import { vndToInputText, vndInputToNumber } from '../../../moneyInput';
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -87,9 +92,11 @@ const getFileIcon = (fileType?: string): React.ReactNode => {
   return <FileText size={20} className="text-gray-500" />;
 };
 
+// So NGÀY LỊCH: báo giá còn hiệu lực hết ngày valid_until (trước đây new Date('YYYY-MM-DD') là 7h sáng giờ VN
+// → báo giá hết hạn hôm nay đã bị đánh "Hết hạn" từ 7h sáng)
 const isExpired = (validUntil?: string | null): boolean => {
   if (!validUntil) return false;
-  return new Date(validUntil) < new Date();
+  return validUntil.slice(0, 10) < todayVN();
 };
 
 // ============================================================================
@@ -234,7 +241,7 @@ const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
       onSuccess();
     } catch (err: any) {
       console.error('Save quotation error:', err);
-      setError(err.message || 'Không thể lưu báo giá');
+      setError(dichLoiHeThong(err, 'Không thể lưu báo giá'));
     } finally {
       setLoading(false);
       setUploading(false);
@@ -334,15 +341,30 @@ const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tổng giá trị</label>
-              <input
-                type="number"
-                name="total_amount"
-                value={formData.total_amount || ''}
-                onChange={handleChange}
-                min={0}
-                placeholder="0"
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              {formData.currency === 'USD' ? (
+                // USD cần số lẻ (cent) → giữ ô số
+                <input
+                  type="number"
+                  name="total_amount"
+                  value={formData.total_amount || ''}
+                  onChange={handleChange}
+                  min={0}
+                  step="0.01"
+                  placeholder="0"
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                // VND: chấm ngăn nghìn khi gõ (trước đây type=number không phân cách)
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  name="total_amount"
+                  value={vndToInputText(formData.total_amount || undefined)}
+                  onChange={(e) => setFormData(prev => ({ ...prev, total_amount: vndInputToNumber(e.target.value) }))}
+                  placeholder="0"
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Đơn vị tiền</label>
@@ -506,11 +528,12 @@ const QuotationCard: React.FC<QuotationCardProps> = ({
   const expired = isExpired(quotation.valid_until);
   const statusConfig = STATUS_OPTIONS.find(s => s.value === quotation.status) || STATUS_OPTIONS[0];
 
+  // VND/USD theo chuẩn chung utils/format; ngoại tệ khác (hiếm) giữ Intl để không gắn nhầm ký hiệu "$"
   const formatCurrency = (amount: number, currency: string = 'VND') => {
-    return new Intl.NumberFormat('vi-VN', { 
-      style: 'currency', 
-      currency 
-    }).format(amount);
+    const c = (currency || 'VND').toUpperCase();
+    if (c === 'VND') return fmtVnd(amount);
+    if (c === 'USD') return fmtUsd(amount);
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: c }).format(amount);
   };
 
   return (
@@ -583,12 +606,12 @@ const QuotationCard: React.FC<QuotationCardProps> = ({
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1 text-gray-600">
             <Calendar size={14} className="text-gray-400" />
-            {new Date(quotation.quotation_date).toLocaleDateString('vi-VN')}
+            {fmtDate(quotation.quotation_date)}
           </div>
           {quotation.valid_until && (
             <div className={`flex items-center gap-1 ${expired ? 'text-red-600' : 'text-gray-600'}`}>
               <Clock size={14} className={expired ? 'text-red-400' : 'text-gray-400'} />
-              HSD: {new Date(quotation.valid_until).toLocaleDateString('vi-VN')}
+              Hiệu lực đến: {fmtDate(quotation.valid_until)}
               {expired && <span className="text-xs">(Hết hạn)</span>}
             </div>
           )}
@@ -630,7 +653,7 @@ const QuotationCard: React.FC<QuotationCardProps> = ({
           {statusConfig.label}
         </span>
         <span className="text-xs text-gray-400">
-          {new Date(quotation.created_at).toLocaleDateString('vi-VN')}
+          {fmtDate(quotation.created_at)}
         </span>
       </div>
     </div>
@@ -642,6 +665,7 @@ const QuotationCard: React.FC<QuotationCardProps> = ({
 // ============================================================================
 
 export const SupplierQuotations: React.FC<SupplierQuotationsProps> = ({ supplierId }) => {
+  const { message } = AntdApp.useApp();
   const [quotations, setQuotations] = useState<SupplierQuotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -666,7 +690,7 @@ export const SupplierQuotations: React.FC<SupplierQuotationsProps> = ({ supplier
       setQuotations(data);
     } catch (err) {
       console.error('Load quotations error:', err);
-      setError('Không thể tải danh sách báo giá');
+      setError(dichLoiHeThong(err, 'Không thể tải danh sách báo giá'));
     } finally {
       setLoading(false);
     }
@@ -712,7 +736,7 @@ export const SupplierQuotations: React.FC<SupplierQuotationsProps> = ({ supplier
       loadQuotations();
     } catch (err) {
       console.error('Delete quotation error:', err);
-      alert('Không thể xóa báo giá');
+      message.error(dichLoiHeThong(err, 'Không thể xóa báo giá'));
     } finally {
       setDeleting(false);
     }

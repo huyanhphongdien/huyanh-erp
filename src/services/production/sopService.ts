@@ -40,11 +40,12 @@ export const SOP_CATEGORIES: Record<string, string> = {
   maintenance: 'Bảo trì', general: 'Chung',
 }
 
+// Màu tên antd theo quy ước EnumTag (Đợt 3 audit UI): nháp/lưu trữ xám · chờ duyệt vàng · đã duyệt xanh dương · đang áp dụng xanh lá
 export const SOP_STATUS: Record<string, { label: string; color: string }> = {
   draft: { label: 'Nháp', color: 'default' },
-  pending_review: { label: 'Chờ duyệt', color: 'warning' },
+  pending_review: { label: 'Chờ duyệt', color: 'gold' },
   approved: { label: 'Đã duyệt', color: 'blue' },
-  active: { label: 'Đang áp dụng', color: 'success' },
+  active: { label: 'Đang áp dụng', color: 'green' },
   archived: { label: 'Lưu trữ', color: 'default' },
 }
 
@@ -65,7 +66,7 @@ export const sopService = {
     ])
     if (docResult.error) throw docResult.error
     if (stepsResult.error) throw stepsResult.error
-    if (!docResult.data) throw new Error('SOP not found')
+    if (!docResult.data) throw new Error('Không tìm thấy quy trình SOP')
     return {
       ...docResult.data,
       department: Array.isArray(docResult.data.department) ? docResult.data.department[0] : docResult.data.department,

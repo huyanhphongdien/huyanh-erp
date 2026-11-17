@@ -13,20 +13,19 @@ import {
   ArrowLeftOutlined, EditOutlined, DeleteOutlined, PrinterOutlined, FileTextOutlined,
   SendOutlined, CheckCircleOutlined, DownOutlined, TruckOutlined, CarOutlined, IdcardOutlined,
 } from '@ant-design/icons'
-import dayjs from 'dayjs'
 import {
-  dispatchService, DISPATCH_STATUS_LABELS, dispatchCategoryLabel, isContainerTrip,
+  dispatchService, DISPATCH_STATUS_LABELS, DISPATCH_STATUS_COLORS, dispatchCategoryLabel, isContainerTrip,
   FETCH_RUBBER_LABELS, palletOutKg,
   type DispatchOrder, type DispatchLine, type DispatchStatus,
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { DASH, fmtDate, fmtPct, fmtVnd } from '../../../utils/format'
+import PageState from '../../../components/common/PageState'
 import DispatchCostSection from './DispatchCostSection'
 
 const { Title, Text } = Typography
 
-const STATUS_COLOR: Record<DispatchStatus, string> = {
-  draft: 'default', dispatched: 'blue', in_transit: 'gold', completed: 'green', cancelled: 'red',
-}
 // Chuyển trạng thái hợp lệ
 const NEXT_STATUS: Record<DispatchStatus, DispatchStatus[]> = {
   draft: ['dispatched', 'cancelled'],
@@ -47,16 +46,20 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
   const [order, setOrder] = useState<DispatchOrder | null>(null)
   const [lines, setLines] = useState<DispatchLine[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState<unknown>(null)
   const [weighing, setWeighing] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadErr(null)
     try {
       const res = await dispatchService.getById(id!)
       if (!res) { message.error('Không tìm thấy lệnh'); navigate('/logistics/dispatch'); return }
       setOrder(res.order); setLines(res.lines)
     } catch (e: any) {
-      message.error('Lỗi tải lệnh: ' + (e?.message || e))
+      // Lần đầu hỏng → khối lỗi + Thử lại (trước: khung xương quay mãi). Tải lại sau thao tác hỏng → báo nổi.
+      setLoadErr(e)
+      message.error(dichLoiHeThong(e, 'Lỗi tải lệnh'))
     }
     setLoading(false)
   }, [id])
@@ -69,7 +72,7 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
       message.success('Đã chuyển: ' + DISPATCH_STATUS_LABELS[next])
       load()
     } catch (e: any) {
-      message.error('Lỗi đổi trạng thái: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi đổi trạng thái'))
     }
   }
 
@@ -79,7 +82,7 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
       message.success('Đã xoá lệnh')
       navigate('/logistics/dispatch')
     } catch (e: any) {
-      message.error('Lỗi xoá: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi xoá lệnh'))
     }
   }
 
@@ -92,12 +95,15 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
         : 'Tất cả container đã được đánh dấu cân rồi')
       load()
     } catch (e: any) {
-      message.error('Lỗi đánh dấu: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi đánh dấu đã cân'))
     } finally {
       setWeighing(false)
     }
   }
 
+  if (!loading && loadErr && !order) {
+    return <div style={{ padding: 20, maxWidth: 1680, margin: '0 auto' }}><Card><PageState error={loadErr} onRetry={load} /></Card></div>
+  }
   if (loading || !order) {
     return <div style={{ padding: 20, maxWidth: 1680, margin: '0 auto' }}><Card><Skeleton active /></Card></div>
   }
@@ -120,22 +126,22 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
   const lineColumns = isPort
     ? [
         { title: '#', key: 'idx', width: 40, render: (_: any, __: any, i: number) => i + 1 },
-        { title: 'Hành trình', dataIndex: 'route', render: (v: string) => v || '–' },
-        { title: 'Lô', dataIndex: 'lot_code', render: (v: string) => v || '–' },
-        { title: 'Loại hàng', dataIndex: 'grade', render: (v: string) => v || '–' },
-        { title: 'Số container', dataIndex: 'container_no', render: (v: string) => v ? <b>{v}</b> : '–' },
-        { title: 'Seal', dataIndex: 'seal_no', render: (v: string) => v || '–' },
-        { title: 'Số kiện', dataIndex: 'package_count', width: 80, align: 'right' as const, render: (v: number) => v ?? '–' },
-        { title: 'KL net (KH)', dataIndex: 'weight_kg', width: 110, align: 'right' as const, render: (v: number) => v ? `${v.toLocaleString('vi-VN')} kg` : '–' },
+        { title: 'Hành trình', dataIndex: 'route', render: (v: string) => v || DASH },
+        { title: 'Lô', dataIndex: 'lot_code', render: (v: string) => v || DASH },
+        { title: 'Loại hàng', dataIndex: 'grade', render: (v: string) => v || DASH },
+        { title: 'Số container', dataIndex: 'container_no', render: (v: string) => v ? <b>{v}</b> : DASH },
+        { title: 'Seal', dataIndex: 'seal_no', render: (v: string) => v || DASH },
+        { title: 'Số kiện', dataIndex: 'package_count', width: 80, align: 'right' as const, render: (v: number) => v ?? DASH },
+        { title: 'KL net (KH)', dataIndex: 'weight_kg', width: 110, align: 'right' as const, render: (v: number) => v ? `${v.toLocaleString('vi-VN')} kg` : DASH },
         { title: 'GW (gross)', dataIndex: 'gross_weight_kg', width: 110, align: 'right' as const, render: (v: number | null) => v != null ? <b style={{ color: '#92400E' }}>{v.toLocaleString('vi-VN')} kg</b> : <span style={{ color: '#bbb' }}>—</span> },
         colWeighed,
       ]
     : [
         { title: '#', key: 'idx', width: 40, render: (_: any, __: any, i: number) => i + 1 },
-        { title: 'Hành trình', dataIndex: 'route', render: (v: string) => v || '–' },
-        { title: 'Nội dung / hàng hóa', dataIndex: 'grade', render: (v: string) => v || '–' },
-        { title: 'KL (kg)', dataIndex: 'weight_kg', width: 120, align: 'right' as const, render: (v: number) => v ? `${v.toLocaleString('vi-VN')} kg` : '–' },
-        { title: 'Ghi chú', dataIndex: 'note', render: (v: string) => v || '–' },
+        { title: 'Hành trình', dataIndex: 'route', render: (v: string) => v || DASH },
+        { title: 'Nội dung / hàng hóa', dataIndex: 'grade', render: (v: string) => v || DASH },
+        { title: 'KL (kg)', dataIndex: 'weight_kg', width: 120, align: 'right' as const, render: (v: number) => v ? `${v.toLocaleString('vi-VN')} kg` : DASH },
+        { title: 'Ghi chú', dataIndex: 'note', render: (v: string) => v || DASH },
       ]
 
   const nexts = NEXT_STATUS[order.status]
@@ -152,7 +158,7 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
           <Space align="center">
             <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/logistics/dispatch')} />
             <Title level={4} style={{ margin: 0 }}>{order.code}</Title>
-            <Tag color={STATUS_COLOR[order.status]}>{DISPATCH_STATUS_LABELS[order.status]}</Tag>
+            <Tag color={DISPATCH_STATUS_COLORS[order.status]}>{DISPATCH_STATUS_LABELS[order.status]}</Tag>
           </Space>
           <Space wrap>
             {lines.some(l => l.actual_weight_kg == null) && (
@@ -204,27 +210,27 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
         </div>
 
         <Descriptions bordered size="middle" column={{ xs: 1, sm: 2, md: 3 }} labelStyle={{ fontWeight: 600 }} style={{ marginBottom: 20 }}>
-          <Descriptions.Item label="Ngày điều động">{dayjs(order.dispatch_date).format('DD/MM/YYYY')}</Descriptions.Item>
+          <Descriptions.Item label="Ngày điều động">{fmtDate(order.dispatch_date)}</Descriptions.Item>
           <Descriptions.Item label="Loại chuyến">{dispatchCategoryLabel(order.trip_type, order.cargo_kind)}</Descriptions.Item>
-          <Descriptions.Item label="Đơn hàng bán">{order.sales_order ? <a onClick={() => navigate(`/sales/${order.sales_order_id}`)}>{soDisplayCode(order.sales_order)}</a> : '–'}</Descriptions.Item>
-          <Descriptions.Item label="Đầu kéo">{order.tractor_plate ? <Tag icon={<TruckOutlined />} color="blue">{order.tractor_plate}</Tag> : '–'}</Descriptions.Item>
-          <Descriptions.Item label="Rơ-moóc">{order.trailer_plate ? <Tag icon={<CarOutlined />} color="gold">{order.trailer_plate}</Tag> : '–'}</Descriptions.Item>
-          <Descriptions.Item label="Tài xế">{order.driver_name ? <Space size={4}><IdcardOutlined />{order.driver_name}{order.driver_phone && <Text type="secondary">· {order.driver_phone}</Text>}</Space> : '–'}</Descriptions.Item>
+          <Descriptions.Item label="Đơn hàng bán">{order.sales_order ? <a onClick={() => navigate(`/sales/${order.sales_order_id}`)}>{soDisplayCode(order.sales_order)}</a> : DASH}</Descriptions.Item>
+          <Descriptions.Item label="Đầu kéo">{order.tractor_plate ? <Tag icon={<TruckOutlined />} color="blue">{order.tractor_plate}</Tag> : DASH}</Descriptions.Item>
+          <Descriptions.Item label="Rơ-moóc">{order.trailer_plate ? <Tag icon={<CarOutlined />} color="gold">{order.trailer_plate}</Tag> : DASH}</Descriptions.Item>
+          <Descriptions.Item label="Tài xế">{order.driver_name ? <Space size={4}><IdcardOutlined />{order.driver_name}{order.driver_phone && <Text type="secondary">· {order.driver_phone}</Text>}</Space> : DASH}</Descriptions.Item>
           <Descriptions.Item label="Phương tiện">{order.is_hired
-            ? <Space size={4} wrap><Tag color="orange">🤝 Thuê ngoài</Tag>{order.hire_company || ''}{order.hire_cost ? <Text type="secondary">· cước {Number(order.hire_cost).toLocaleString('vi-VN')}đ</Text> : null}</Space>
+            ? <Space size={4} wrap><Tag color="orange">🤝 Thuê ngoài</Tag>{order.hire_company || ''}{order.hire_cost ? <Text type="secondary">· cước {fmtVnd(order.hire_cost)}</Text> : null}</Space>
             : <Tag color="green">Đội xe nhà</Tag>}</Descriptions.Item>
-          <Descriptions.Item label="Khách hàng">{order.customer_name || '–'}</Descriptions.Item>
-          <Descriptions.Item label={isPort ? 'Điểm giao / Cảng' : 'Điểm đến / nơi nhận'}>{order.destination || '–'}</Descriptions.Item>
+          <Descriptions.Item label="Khách hàng">{order.customer_name || DASH}</Descriptions.Item>
+          <Descriptions.Item label={isPort ? 'Điểm giao / Cảng' : 'Điểm đến / nơi nhận'}>{order.destination || DASH}</Descriptions.Item>
           {(order.pickup_location || order.pickup_contact) && (
             <Descriptions.Item label="📦 Điểm BỐC hàng">
-              <b>{order.pickup_location || '–'}</b>
+              <b>{order.pickup_location || DASH}</b>
               {order.pickup_contact ? <span style={{ color: '#64748b' }}> — LH: {order.pickup_contact}</span> : null}
             </Descriptions.Item>
           )}
-          <Descriptions.Item label="Căn cứ HĐ / Booking">{order.contract_ref || '–'}</Descriptions.Item>
-          <Descriptions.Item label="Người nhận">{order.recipient_name || '–'}</Descriptions.Item>
-          <Descriptions.Item label="SĐT người nhận">{order.recipient_phone || '–'}</Descriptions.Item>
-          <Descriptions.Item label="Lý do">{order.reason || '–'}</Descriptions.Item>
+          <Descriptions.Item label="Căn cứ HĐ / Booking">{order.contract_ref || DASH}</Descriptions.Item>
+          <Descriptions.Item label="Người nhận">{order.recipient_name || DASH}</Descriptions.Item>
+          <Descriptions.Item label="SĐT người nhận">{order.recipient_phone || DASH}</Descriptions.Item>
+          <Descriptions.Item label="Lý do">{order.reason || DASH}</Descriptions.Item>
           {order.note && <Descriptions.Item label="Ghi chú" span={3}>{order.note}</Descriptions.Item>}
         </Descriptions>
 
@@ -233,8 +239,8 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
           <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '12px 16px', marginBottom: 20 }}>
             <div style={{ fontWeight: 600, color: '#0369A1', marginBottom: 8 }}>🚚 Thông tin đi lấy mủ (app cân điền sẵn khi chọn lệnh)</div>
             <Space size={28} wrap>
-              <span>🌳 Loại mủ dự kiến: <Text strong>{order.fetch_rubber_type ? (FETCH_RUBBER_LABELS[order.fetch_rubber_type] || order.fetch_rubber_type) : '–'}</Text></span>
-              <span>🏷️ Mã lô dự kiến: <Text strong>{order.fetch_lot_code || '–'}</Text></span>
+              <span>🌳 Loại mủ dự kiến: <Text strong>{order.fetch_rubber_type ? (FETCH_RUBBER_LABELS[order.fetch_rubber_type] || order.fetch_rubber_type) : DASH}</Text></span>
+              <span>🏷️ Mã lô dự kiến: <Text strong>{order.fetch_lot_code || DASH}</Text></span>
               <span>📦 Pallet mang đi: <Text strong>{order.pallet_plastic_out || 0}</Text> nhựa (10kg) + <Text strong>{order.pallet_steel_out || 0}</Text> sắt (50kg) = <Text strong>{palletOutKg(order.pallet_plastic_out, order.pallet_steel_out).toLocaleString('vi-VN')} kg</Text></span>
             </Space>
 
@@ -250,7 +256,7 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
                   {order.tl_net_kg != null && order.pd_net_kg != null && (() => {
                     const diff = (order.pd_net_kg || 0) - (order.tl_net_kg || 0)
                     const pct = order.tl_net_kg ? Math.abs(diff) / order.tl_net_kg * 100 : 0
-                    return <> · chênh <Text strong style={{ color: pct > 1 ? '#dc2626' : '#15803d' }}>{diff > 0 ? '+' : ''}{diff.toLocaleString('vi-VN')} kg ({pct.toFixed(2)}%)</Text></>
+                    return <> · chênh <Text strong style={{ color: pct > 1 ? '#dc2626' : '#15803d' }}>{diff > 0 ? '+' : ''}{diff.toLocaleString('vi-VN')} kg ({fmtPct(pct, 2)})</Text></>
                   })()}
                 </span>
               </Space>

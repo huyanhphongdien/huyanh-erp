@@ -33,20 +33,22 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
-import { attendanceService } from '../../services/attendanceService'
+import {
+  attendanceService,
+  ATTENDANCE_STATUS_LABELS,
+  ATTENDANCE_FILTER_AUTO_CHECKOUT,
+  AUTO_CHECKOUT_LABEL,
+} from '../../services/attendanceService'
 import type { AttendanceRecord } from '../../services/attendanceService'
 import { CheckInOutWidget } from './CheckInOutWidget'
 import PageState from '../../components/common/PageState'
+import { TEAM_BADGE, TEAM_BADGE_DEFAULT } from './labels'
+import { toDateStrVN } from '../../utils/dateVN'
+import { fmtTime as formatTime } from '../../utils/format'
 
 // ============================================================
 // HELPERS
 // ============================================================
-
-function formatTime(iso: string | null): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-}
 
 function formatShiftTime(t: string): string {
   return t?.substring(0, 5) || ''
@@ -108,26 +110,40 @@ function getDefaultDateRange(): { from: string; to: string } {
   const to = new Date()
   const from = new Date()
   from.setDate(from.getDate() - 6)
+  // toDateStrVN: ngày theo giờ VN — toISOString (UTC) lùi 1 ngày trước 7h sáng
   return {
-    from: from.toISOString().split('T')[0],
-    to: to.toISOString().split('T')[0],
+    from: toDateStrVN(from),
+    to: toDateStrVN(to),
   }
 }
 
-// Status config
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  present: { label: 'Đúng giờ', className: 'bg-green-100 text-green-700' },
-  late: { label: 'Đi trễ', className: 'bg-amber-100 text-amber-700' },
-  early_leave: { label: 'Về sớm', className: 'bg-orange-100 text-orange-700' },
-  absent: { label: 'Vắng', className: 'bg-red-100 text-red-700' },
-  business_trip: { label: 'Công tác', className: 'bg-sky-100 text-sky-700' },
-  auto_checkout: { label: 'auto_checkout', className: 'bg-gray-100 text-gray-600' },
+// Tông màu theo trạng thái — NHÃN lấy từ attendanceService.ATTENDANCE_STATUS_LABELS (một nguồn).
+// Bản cũ thiếu 'leave' + 'late_and_early' → ngày nghỉ phép hiện thành "Đúng giờ"; còn có
+// 'absent'/'auto_checkout' là giá trị KHÔNG tồn tại trong cột status.
+const STATUS_CLASS: Record<string, string> = {
+  present: 'bg-green-100 text-green-700',
+  late: 'bg-amber-100 text-amber-700',
+  early_leave: 'bg-orange-100 text-orange-700',
+  late_and_early: 'bg-orange-100 text-orange-700',
+  business_trip: 'bg-sky-100 text-sky-700',
+  leave: 'bg-yellow-100 text-yellow-700',
 }
 
-const TEAM_BADGE: Record<string, string> = {
-  A: 'bg-blue-50 text-blue-700 border-blue-200',
-  B: 'bg-rose-50 text-rose-700 border-rose-200',
+function statusBadge(status: string | null | undefined): { label: string; className: string } {
+  const s = status || ''
+  return {
+    label: ATTENDANCE_STATUS_LABELS[s] ?? (s || '—'),
+    className: STATUS_CLASS[s] ?? 'bg-gray-100 text-gray-600',
+  }
 }
+
+// Bộ lọc trạng thái sinh từ CÙNG map với badge (desktop + mobile không lệch nhau nữa),
+// cộng "Tự chốt giờ ra" (lọc theo cột auto_checkout). Không có "Vắng": vắng không phải
+// một dòng chấm công — xem Bảng chấm công tháng (ký hiệu X).
+const STATUS_FILTER_OPTIONS = [
+  ...Object.entries(ATTENDANCE_STATUS_LABELS).map(([value, label]) => ({ value, label })),
+  { value: ATTENDANCE_FILTER_AUTO_CHECKOUT, label: AUTO_CHECKOUT_LABEL },
+]
 
 // ============================================================
 // COMPONENT
@@ -323,7 +339,7 @@ export default function AttendanceListPage() {
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-900">Bảng chấm công</h1>
         <p className="text-sm text-gray-500">
-          {scope === 'mine' ? 'Của tôi' : scope === 'department' ? 'Phòng ban của bạn' : 'Tất cả'}
+          Theo ngày — {scope === 'mine' ? 'Của tôi' : scope === 'department' ? 'Phòng ban của bạn' : 'Tất cả'}
         </p>
       </div>
 
@@ -355,7 +371,7 @@ export default function AttendanceListPage() {
         />
         <StatCard
           icon={Clock}
-          label="OT"
+          label="Tăng ca"
           value={formatMinutes(stats.totalOT)}
           color={stats.totalOT > 0 ? 'purple' : 'gray'}
         />
@@ -459,10 +475,9 @@ export default function AttendanceListPage() {
             className="hidden lg:block px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
           >
             <option value="all">Tất cả trạng thái</option>
-            <option value="present">Đúng giờ</option>
-            <option value="late">Đi trễ</option>
-            <option value="early_leave">Về sớm</option>
-            <option value="auto_checkout">Auto checkout</option>
+            {STATUS_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
           </select>
 
           {/* Shift filter (desktop) */}
@@ -534,10 +549,9 @@ export default function AttendanceListPage() {
                 className="flex-1 px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
               >
                 <option value="all">Trạng thái</option>
-                <option value="present">Đúng giờ</option>
-                <option value="late">Đi trễ</option>
-                <option value="early_leave">Về sớm</option>
-                <option value="auto_checkout">Auto checkout</option>
+                {STATUS_FILTER_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
               <select
                 value={shiftFilter}
@@ -579,12 +593,12 @@ export default function AttendanceListPage() {
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Nhân viên</th>
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Đội</th>
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Ca</th>
-                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Check-in</th>
-                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Check-out</th>
+                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Giờ vào</th>
+                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Giờ ra</th>
                 <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Giờ làm</th>
                 <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Trễ</th>
                 <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Về sớm</th>
-                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">OT</th>
+                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Tăng ca</th>
                 <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">GPS</th>
                 <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Trạng thái</th>
               </tr>
@@ -617,7 +631,7 @@ export default function AttendanceListPage() {
                   const effectiveWorking = getEffectiveWorkingMinutes(r)
                   const effectiveLate = getEffectiveLateMinutes(r)
                   const isLate = r.status === 'late' || effectiveLate > 0
-                  const statusCfg = STATUS_CONFIG[r.status] || STATUS_CONFIG.present
+                  const statusCfg = statusBadge(r.status)
 
                   return (
                     <tr key={r.id} className="active:bg-gray-50">
@@ -640,7 +654,7 @@ export default function AttendanceListPage() {
                       {/* Đội */}
                       <td className="px-3 py-2.5">
                         {team ? (
-                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold border ${TEAM_BADGE[team.code] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold border ${TEAM_BADGE[team.code] || TEAM_BADGE_DEFAULT}`}>
                             {team.name}
                           </span>
                         ) : (
@@ -675,7 +689,7 @@ export default function AttendanceListPage() {
                           {formatTime(r.check_out_time)}
                         </span>
                         {r.auto_checkout && (
-                          <span className="ml-1 text-[9px] text-gray-400">⚡</span>
+                          <span className="ml-1 text-[9px] text-gray-400" title={AUTO_CHECKOUT_LABEL}>⚡</span>
                         )}
                       </td>
 
@@ -760,7 +774,7 @@ export default function AttendanceListPage() {
                 const team = teamMembers[r.employee_id]
                 const effectiveWorking = getEffectiveWorkingMinutes(r)
                 const effectiveLate = getEffectiveLateMinutes(r)
-                const statusCfg = STATUS_CONFIG[r.status] || STATUS_CONFIG.present
+                const statusCfg = statusBadge(r.status)
 
                 return (
                   <div key={r.id} className="px-3 py-3 active:bg-gray-50">
@@ -778,7 +792,7 @@ export default function AttendanceListPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         {team && (
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${TEAM_BADGE[team.code] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${TEAM_BADGE[team.code] || TEAM_BADGE_DEFAULT}`}>
                             {team.code}
                           </span>
                         )}
@@ -811,16 +825,16 @@ export default function AttendanceListPage() {
                     {/* Row 3: Check-in/out/Working grid */}
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div>
-                        <div className="text-[10px] text-gray-400">Check-in</div>
+                        <div className="text-[10px] text-gray-400">Giờ vào</div>
                         <div className={`text-sm font-medium ${effectiveLate > 0 ? 'text-amber-600' : 'text-gray-700'}`}>
                           {formatTime(r.check_in_time)}
                         </div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-gray-400">Check-out</div>
+                        <div className="text-[10px] text-gray-400">Giờ ra</div>
                         <div className={`text-sm font-medium ${r.auto_checkout ? 'text-gray-400' : 'text-gray-700'}`}>
                           {formatTime(r.check_out_time)}
-                          {r.auto_checkout && <span className="ml-0.5 text-[9px]">⚡</span>}
+                          {r.auto_checkout && <span className="ml-0.5 text-[9px]" title={AUTO_CHECKOUT_LABEL}>⚡</span>}
                         </div>
                       </div>
                       <div>
@@ -846,7 +860,7 @@ export default function AttendanceListPage() {
                         )}
                         {(r.overtime_minutes || 0) > 0 && (
                           <span className="px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px] font-medium">
-                            OT {formatMinutes(r.overtime_minutes)}
+                            Tăng ca {formatMinutes(r.overtime_minutes)}
                           </span>
                         )}
                       </div>

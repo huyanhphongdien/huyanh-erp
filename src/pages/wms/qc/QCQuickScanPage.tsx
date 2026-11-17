@@ -1,24 +1,29 @@
 // ============================================================================
 // QC QUICK SCAN PAGE — Mobile-friendly QC with batch code input
 // File: src/pages/wms/qc/QCQuickScanPage.tsx
-// Phase 5: QC Nhanh - Quet QR / nhap ma lo -> QC nhanh
+// Phase 5: QC Nhanh - Quét QR / nhập mã lô -> QC nhanh
+// Đợt 3 audit UI (17/11/2026): bỏ ô chọn "Kết quả" — payload chưa bao giờ gửi nó,
+// qcService tự đánh giá theo Ngưỡng QC; ô chọn chỉ làm QC tưởng mình quyết định kết quả.
 // ============================================================================
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Card, Input, Button, Space, Typography, Spin, Result, Tag,
-  Radio, InputNumber, Collapse, Descriptions, List, message,
+  InputNumber, Collapse, Descriptions, List, message,
 } from 'antd'
 import {
   ScanOutlined, CheckCircleOutlined, ExperimentOutlined,
-  PrinterOutlined, ArrowLeftOutlined, ReloadOutlined,
+  PrinterOutlined, ReloadOutlined, InfoCircleOutlined,
 } from '@ant-design/icons'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtKg } from '../../../utils/format'
 import { batchService } from '../../../services/wms/batchService'
 import qcService from '../../../services/wms/qcService'
 import { supabase } from '../../../lib/supabase'
 import { dealWmsService } from '../../../services/b2b/dealWmsService'
 import type { StockBatch } from '../../../services/wms/wms.types'
+import { RUBBER_TYPE_LABELS } from '../../../services/wms/wms.types'
 import type { QCEvaluation } from '../../../services/wms/qcService'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import { QCBadge } from '../../../components/wms/QCInputForm'
@@ -54,10 +59,12 @@ const QCQuickScanPage = () => {
   const [searching, setSearching] = useState(false)
   const [batch, setBatch] = useState<StockBatch | null>(null)
   const [notFound, setNotFound] = useState(false)
+  // Lỗi khi tra lô (mạng/quyền) ≠ "không tìm thấy lô" — đừng bảo QC là mã sai khi thật ra mất mạng
+  const [searchError, setSearchError] = useState<unknown>(null)
+  const [lastSearch, setLastSearch] = useState('')
 
   // QC form state
   const [drcValue, setDrcValue] = useState<number | null>(null)
-  const [qcResult, setQcResult] = useState<'passed' | 'warning' | 'failed'>('passed')
   const [moisture, setMoisture] = useState<number | null>(null)
   const [dirtContent, setDirtContent] = useState<number | null>(null)
   const [ashContent, setAshContent] = useState<number | null>(null)
@@ -79,10 +86,11 @@ const QCQuickScanPage = () => {
 
     setSearching(true)
     setNotFound(false)
+    setSearchError(null)
+    setLastSearch(trimmed)
     setBatch(null)
     setEvaluation(null)
     setDrcValue(null)
-    setQcResult('passed')
     setMoisture(null)
     setDirtContent(null)
     setAshContent(null)
@@ -96,7 +104,7 @@ const QCQuickScanPage = () => {
       }
     } catch (err) {
       console.error('Search batch error:', err)
-      setNotFound(true)
+      setSearchError(err)
     } finally {
       setSearching(false)
     }
@@ -108,7 +116,7 @@ const QCQuickScanPage = () => {
 
   const handleSubmit = async () => {
     if (!batch || drcValue == null) {
-      message.warning('Vui long nhap gia tri DRC')
+      message.warning('Vui lòng nhập giá trị DRC')
       return
     }
 
@@ -147,7 +155,7 @@ const QCQuickScanPage = () => {
       if (res.supplierImpact) {
         const si = res.supplierImpact
         message.warning({
-          content: `NCC "${si.supplier_name}" giờ đạt ${si.overall_score.toFixed(0)}/100 (hạng ${si.grade}) — pass rate ${si.pass_rate.toFixed(0)}% trên ${si.total_batches} lô`,
+          content: `NCC "${si.supplier_name}" giờ đạt ${si.overall_score.toFixed(0)}/100 (hạng ${si.grade}) — tỉ lệ đạt ${si.pass_rate.toFixed(0)}% trên ${si.total_batches} lô`,
           duration: 6,
         })
       }
@@ -182,10 +190,10 @@ const QCQuickScanPage = () => {
         }
       } catch { /* non-blocking */ }
 
-      message.success('Da luu ket qua QC')
+      message.success('Đã lưu kết quả QC')
     } catch (err: any) {
       console.error('Submit QC error:', err)
-      message.error(err?.message || 'Loi khi luu ket qua QC')
+      message.error(dichLoiHeThong(err, 'Lỗi khi lưu kết quả QC'))
     } finally {
       setSaving(false)
     }
@@ -207,8 +215,8 @@ const QCQuickScanPage = () => {
     setBatch(null)
     setEvaluation(null)
     setNotFound(false)
+    setSearchError(null)
     setDrcValue(null)
-    setQcResult('passed')
     setMoisture(null)
     setDirtContent(null)
     setAshContent(null)
@@ -222,16 +230,11 @@ const QCQuickScanPage = () => {
 
   return (
     <div style={{ padding: 24, maxWidth: 720, margin: '0 auto', background: '#F7F5F2' }}>
-      {/* Header */}
+      {/* Header — trang sống trong tab "QC nhanh" của /wms/qc nên không có nút Quay lại */}
       <Space style={{ marginBottom: 16 }}>
-        <Button
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/wms/qc')}
-          type="text"
-        />
         <Title level={4} style={{ margin: 0, color: BRAND_COLOR }}>
           <ScanOutlined style={{ marginRight: 8 }} />
-          QC Nhanh
+          QC nhanh
         </Title>
       </Space>
 
@@ -239,8 +242,8 @@ const QCQuickScanPage = () => {
       <Card size="small" style={{ marginBottom: 16 }}>
         <Search
           ref={searchRef}
-          placeholder="Quet QR hoac nhap ma lo..."
-          enterButton={<><ScanOutlined /> Tim</>}
+          placeholder="Quét QR hoặc nhập mã lô..."
+          enterButton={<><ScanOutlined /> Tìm</>}
           size="large"
           onSearch={handleSearch}
           loading={searching}
@@ -250,13 +253,29 @@ const QCQuickScanPage = () => {
         />
       </Card>
 
+      {/* Lỗi tra lô (mạng/quyền) — KHÁC "không tìm thấy" */}
+      {searchError != null && (
+        <Card style={{ marginBottom: 16 }}>
+          <Result
+            status="error"
+            title="Không tra được lô"
+            subTitle={dichLoiHeThong(searchError, 'Có lỗi khi tìm lô')}
+            extra={
+              <Button icon={<ReloadOutlined />} onClick={() => handleSearch(lastSearch)} loading={searching}>
+                Thử lại
+              </Button>
+            }
+          />
+        </Card>
+      )}
+
       {/* Not Found */}
       {notFound && (
         <Card style={{ marginBottom: 16 }}>
           <Result
             status="warning"
-            title="Khong tim thay lo"
-            subTitle="Vui long kiem tra lai ma lo"
+            title="Không tìm thấy lô"
+            subTitle="Vui lòng kiểm tra lại mã lô"
           />
         </Card>
       )}
@@ -266,12 +285,12 @@ const QCQuickScanPage = () => {
         <Card style={{ marginBottom: 16 }}>
           <Result
             status={evaluation.result === 'passed' ? 'success' : evaluation.result === 'warning' ? 'warning' : 'error'}
-            title={evaluation.result === 'passed' ? 'Dat chuan' : evaluation.result === 'warning' ? 'Canh bao' : 'Khong dat'}
+            title={evaluation.result === 'passed' ? 'Đạt chuẩn' : evaluation.result === 'warning' ? 'Cảnh báo' : 'Không đạt'}
             subTitle={
               <Space direction="vertical" align="center">
                 <Text>{evaluation.message}</Text>
                 {drcValue && <GradeBadge grade={rubberGradeService.classifyByDRC(drcValue)} />}
-                <Text type="secondary">Tai kiem tiep: {evaluation.next_recheck_days} ngay</Text>
+                <Text type="secondary">Tái kiểm tiếp: {evaluation.next_recheck_days} ngày</Text>
               </Space>
             }
           />
@@ -283,7 +302,7 @@ const QCQuickScanPage = () => {
                 size="large"
                 onClick={() => navigate(`/wms/batch/${batch.id}/label`)}
               >
-                In nhan QR
+                In nhãn QR
               </Button>
             )}
             <Button
@@ -294,7 +313,7 @@ const QCQuickScanPage = () => {
               onClick={handleScanNext}
               style={{ background: BRAND_COLOR, borderColor: BRAND_COLOR }}
             >
-              Quet lo tiep
+              Quét lô tiếp
             </Button>
           </Space>
         </Card>
@@ -306,26 +325,26 @@ const QCQuickScanPage = () => {
           {/* Batch Info Card */}
           <Card size="small" style={{ marginBottom: 12, background: '#fafafa', borderRadius: 8 }}>
             <Descriptions size="small" column={2}>
-              <Descriptions.Item label="Ma lo">
+              <Descriptions.Item label="Mã lô">
                 <Text strong style={{ fontFamily: "'JetBrains Mono'", fontSize: 13 }}>
                   {batch.batch_no}
                 </Text>
               </Descriptions.Item>
               <Descriptions.Item label="NCC">
-                {batch.supplier_name || '---'}
+                {batch.supplier_name || '—'}
               </Descriptions.Item>
-              <Descriptions.Item label="Loai mu">
-                {batch.rubber_type || '---'}
+              <Descriptions.Item label="Loại mủ">
+                {batch.rubber_type ? (RUBBER_TYPE_LABELS[batch.rubber_type as keyof typeof RUBBER_TYPE_LABELS] || batch.rubber_type) : '—'}
               </Descriptions.Item>
-              <Descriptions.Item label="Khoi luong">
-                <Text strong>{(batch.current_weight || batch.initial_weight || 0).toLocaleString('vi-VN')} kg</Text>
+              <Descriptions.Item label="Khối lượng">
+                <Text strong>{fmtKg(batch.current_weight || batch.initial_weight || 0)} kg</Text>
               </Descriptions.Item>
-              <Descriptions.Item label="DRC hien tai">
+              <Descriptions.Item label="DRC hiện tại">
                 <Text strong style={{ color: BRAND_COLOR }}>
-                  {batch.latest_drc ? `${batch.latest_drc}%` : '---'}
+                  {batch.latest_drc ? `${batch.latest_drc}%` : '—'}
                 </Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Trang thai QC">
+              <Descriptions.Item label="Trạng thái QC">
                 <QCBadge result={batch.qc_status} size="sm" />
               </Descriptions.Item>
             </Descriptions>
@@ -336,7 +355,7 @@ const QCQuickScanPage = () => {
             <div style={{ marginBottom: 16 }}>
               <Text strong style={{ display: 'block', marginBottom: 8, fontSize: 16 }}>
                 <ExperimentOutlined style={{ marginRight: 4 }} />
-                Gia tri DRC (%)
+                Giá trị DRC (%)
               </Text>
               <InputNumber
                 value={drcValue}
@@ -344,32 +363,17 @@ const QCQuickScanPage = () => {
                 min={0}
                 max={100}
                 step={0.1}
-                placeholder="Nhap DRC..."
+                placeholder="Nhập DRC..."
                 style={{ width: '100%', fontSize: 24 }}
                 size="large"
                 autoFocus
               />
             </div>
 
-            <div style={{ marginBottom: 16 }}>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>Ket qua</Text>
-              <Radio.Group
-                value={qcResult}
-                onChange={(e) => setQcResult(e.target.value)}
-                size="large"
-                buttonStyle="solid"
-                style={{ width: '100%' }}
-              >
-                <Radio.Button value="passed" style={{ width: '33.33%', textAlign: 'center' }}>
-                  <CheckCircleOutlined /> Dat
-                </Radio.Button>
-                <Radio.Button value="warning" style={{ width: '33.33%', textAlign: 'center' }}>
-                  Canh bao
-                </Radio.Button>
-                <Radio.Button value="failed" style={{ width: '33.33%', textAlign: 'center' }}>
-                  Khong dat
-                </Radio.Button>
-              </Radio.Group>
+            {/* Kết quả KHÔNG chọn tay: qcService tự đánh giá theo Ngưỡng QC của vật liệu */}
+            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, color: '#6B7280', fontSize: 13 }}>
+              <InfoCircleOutlined />
+              <span>Kết quả (Đạt / Cảnh báo / Không đạt) hệ thống tự tính theo Ngưỡng QC sau khi lưu.</span>
             </div>
 
             {/* Optional parameters */}
@@ -377,11 +381,11 @@ const QCQuickScanPage = () => {
               ghost
               items={[{
                 key: 'advanced',
-                label: <Text type="secondary">Thong so them</Text>,
+                label: <Text type="secondary">Thông số thêm</Text>,
                 children: (
                   <Space direction="vertical" style={{ width: '100%' }}>
                     <div>
-                      <Text type="secondary" style={{ fontSize: 12 }}>Do am (%)</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Độ ẩm (%)</Text>
                       <InputNumber
                         value={moisture}
                         onChange={(v) => setMoisture(v)}
@@ -389,11 +393,11 @@ const QCQuickScanPage = () => {
                         max={100}
                         step={0.1}
                         style={{ width: '100%' }}
-                        placeholder="Do am..."
+                        placeholder="Độ ẩm..."
                       />
                     </div>
                     <div>
-                      <Text type="secondary" style={{ fontSize: 12 }}>Tap chat (%)</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Tạp chất (%)</Text>
                       <InputNumber
                         value={dirtContent}
                         onChange={(v) => setDirtContent(v)}
@@ -401,7 +405,7 @@ const QCQuickScanPage = () => {
                         max={100}
                         step={0.01}
                         style={{ width: '100%' }}
-                        placeholder="Tap chat..."
+                        placeholder="Tạp chất..."
                       />
                     </div>
                     <div>
@@ -439,7 +443,7 @@ const QCQuickScanPage = () => {
               marginBottom: 16,
             }}
           >
-            <CheckCircleOutlined /> Luu ket qua QC
+            <CheckCircleOutlined /> Lưu kết quả QC
           </Button>
         </>
       )}
@@ -448,7 +452,7 @@ const QCQuickScanPage = () => {
       {recentQCs.length > 0 && (
         <Card
           size="small"
-          title={<Text type="secondary" style={{ fontSize: 13 }}>Ket qua gan day</Text>}
+          title={<Text type="secondary" style={{ fontSize: 13 }}>Kết quả gần đây</Text>}
           style={{ marginTop: 16 }}
         >
           <List
@@ -465,7 +469,7 @@ const QCQuickScanPage = () => {
                       item.result === 'passed' ? 'success' :
                       item.result === 'warning' ? 'warning' : 'error'
                     }>
-                      {item.result === 'passed' ? 'Dat' : item.result === 'warning' ? 'C.bao' : 'K.dat'}
+                      {item.result === 'passed' ? 'Đạt' : item.result === 'warning' ? 'Cảnh báo' : 'Không đạt'}
                     </Tag>
                     <Text type="secondary" style={{ fontSize: 11 }}>{item.time}</Text>
                   </Space>

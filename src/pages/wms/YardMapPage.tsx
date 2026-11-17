@@ -49,6 +49,11 @@ import { supabase } from '../../lib/supabase'
 import { yardService, type YardCell, type YardConfig, type YardBatchInfo } from '../../services/wms/yardService'
 import { RUBBER_GRADE_COLORS, RUBBER_TYPE_LABELS, type RubberGrade } from '../../services/wms/wms.types'
 import GradeBadge from '../../components/wms/GradeBadge'
+import PageState from '../../components/common/PageState'
+import { LimitNotice } from '../../components/common/tableDefaults'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate, fmtKg, fmtNum } from '../../utils/format'
+import { BATCH_QC_STATUS_LABELS, BATCH_QC_STATUS_COLORS } from './qc/qcLabels'
 
 const { Title, Text } = Typography
 const MONO_FONT = "'JetBrains Mono', monospace"
@@ -91,29 +96,18 @@ const GRADE_CELL_COLORS: Record<string, { bg: string; border: string; text: stri
 const EMPTY_CELL = { bg: '#F9FAFB', border: '#E5E7EB', text: '#9CA3AF' }
 const PENDING_BORDER = '#F59E0B'
 
-const QC_STATUS_LABELS: Record<string, string> = {
-  pending: 'Chờ QC',
-  passed: 'Đạt',
-  warning: 'Cảnh báo',
-  failed: 'Không đạt',
-  needs_blend: 'Cần trộn',
-}
-
-const QC_STATUS_COLORS: Record<string, string> = {
-  pending: 'orange',
-  passed: 'green',
-  warning: 'gold',
-  failed: 'red',
-  needs_blend: 'purple',
-}
+// Một nguồn nhãn QC lô (qcLabels). Ô bãi giữ màu cam cho "Chờ QC" (khớp viền ô chờ QC trên lưới).
+const QC_STATUS_LABELS = BATCH_QC_STATUS_LABELS
+const QC_STATUS_COLORS: Record<string, string> = { ...BATCH_QC_STATUS_COLORS, pending: 'orange' }
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
+// Rút gọn cho ô lưới hẹp (cố ý: "1,5T" / "820kg") — số theo vi-VN
 function formatWeight(kg: number): string {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}T`
-  return `${Math.round(kg)}kg`
+  if (kg >= 1000) return `${fmtNum(kg / 1000, 1)}T`
+  return `${fmtNum(kg)}kg`
 }
 
 function getCellStyle(batch?: YardBatchInfo) {
@@ -323,10 +317,12 @@ const BatchDetailModal: React.FC<{
   onClose: () => void
   onNavigateQC: (batchId: string) => void
   onNavigateDetail: (batchId: string) => void
+  onNavigateLabel: (batchId: string, batchNo: string) => void
+  onNavigateStockOut: () => void
   onMove: (cell: YardCell) => void
   onClear: (batchId: string) => void
   onAssign: (cell: YardCell) => void
-}> = ({ cell, onClose, onNavigateQC, onNavigateDetail, onMove, onClear, onAssign }) => {
+}> = ({ cell, onClose, onNavigateQC, onNavigateDetail, onNavigateLabel, onNavigateStockOut, onMove, onClear, onAssign }) => {
   if (!cell) return null
 
   const batch = cell.batch
@@ -406,15 +402,16 @@ const BatchDetailModal: React.FC<{
           >
             QC
           </Button>
+          {/* Đợt 3: trước đây 2 nút chỉ bắn toast — nay mở đúng trang nhãn QR / tạo phiếu xuất */}
           <Button
             icon={<PrinterOutlined />}
-            onClick={() => { message.info('Tính năng in nhãn đang phát triển') }}
+            onClick={() => { onClose(); onNavigateLabel(batch.id, batch.batch_no) }}
           >
             In nhãn
           </Button>
           <Button
             icon={<ExportOutlined />}
-            onClick={() => { message.info('Chuyển đến tạo phiếu xuất kho') }}
+            onClick={() => { onClose(); onNavigateStockOut() }}
           >
             Xuất kho
           </Button>
@@ -453,7 +450,7 @@ const BatchDetailModal: React.FC<{
         </Descriptions.Item>
         <Descriptions.Item label="Khối lượng">
           <Text strong style={{ color: PRIMARY, fontFamily: MONO_FONT }}>
-            {batch.current_weight.toLocaleString('vi-VN')} kg
+            {fmtKg(batch.current_weight)} kg
           </Text>
         </Descriptions.Item>
         <Descriptions.Item label="Ngày lưu kho">
@@ -463,7 +460,7 @@ const BatchDetailModal: React.FC<{
           <Tag color="blue">{posLabel}</Tag>
         </Descriptions.Item>
         <Descriptions.Item label="Ngày tạo">
-          {new Date(batch.created_at).toLocaleDateString('vi-VN')}
+          {fmtDate(batch.created_at)}
         </Descriptions.Item>
       </Descriptions>
     </Modal>
@@ -509,7 +506,7 @@ const AssignBatchModal: React.FC<{
       if (error) throw error
       setBatches((data || []) as UnassignedBatch[])
     } catch (e: any) {
-      message.error('Lỗi tải danh sách lô: ' + e.message)
+      message.error(dichLoiHeThong(e, 'Lỗi tải danh sách lô'))
     } finally {
       setLoading(false)
     }
@@ -524,7 +521,7 @@ const AssignBatchModal: React.FC<{
       onAssigned()
       onClose()
     } catch (e: any) {
-      message.error(e.message || 'Lỗi gán vị trí')
+      message.error(dichLoiHeThong(e, 'Lỗi gán vị trí'))
     } finally {
       setAssigning(false)
     }
@@ -570,6 +567,8 @@ const AssignBatchModal: React.FC<{
           }))}
         />
       )}
+      {/* Query tải 100 lô mới nhất — chạm trần thì báo, đừng im lặng mất lô cũ */}
+      {!loading && <LimitNotice shown={batches.length} limit={100} what="lô" />}
 
       {selectedBatchId && (() => {
         const b = batches.find(x => x.id === selectedBatchId)
@@ -627,7 +626,7 @@ const MoveBatchModal: React.FC<{
       onMoved()
       onClose()
     } catch (e: any) {
-      message.error(e.message || 'Lỗi di chuyển')
+      message.error(dichLoiHeThong(e, 'Lỗi di chuyển'))
     } finally {
       setMoving(false)
     }
@@ -821,6 +820,8 @@ const YardMapPage: React.FC = () => {
   const [cells, setCells] = useState<YardCell[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  // Lỗi tải ≠ "Không có dữ liệu bãi phù hợp" — đừng để bãi trống giả
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([])
   const [selectedWarehouse, setSelectedWarehouse] = useState<string | undefined>(undefined)
   const [stats, setStats] = useState<{
@@ -858,6 +859,7 @@ const YardMapPage: React.FC = () => {
 
   const loadData = useCallback(async () => {
     try {
+      setLoadError(null)
       const [cellData, statsData] = await Promise.all([
         yardService.getYardMap(selectedWarehouse),
         yardService.getYardStats(selectedWarehouse),
@@ -866,7 +868,8 @@ const YardMapPage: React.FC = () => {
       setStats(statsData)
     } catch (e: any) {
       console.error('Lỗi tải bản đồ bãi:', e)
-      message.error('Lỗi tải dữ liệu bãi: ' + e.message)
+      setLoadError(e)
+      message.error(dichLoiHeThong(e, 'Lỗi tải dữ liệu bãi'))
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -959,7 +962,7 @@ const YardMapPage: React.FC = () => {
       setSelectedCell(null)
       loadData()
     } catch (e: any) {
-      message.error(e.message || 'Lỗi xóa vị trí')
+      message.error(dichLoiHeThong(e, 'Lỗi xóa vị trí'))
     }
   }
 
@@ -981,6 +984,22 @@ const YardMapPage: React.FC = () => {
       props: { batchId },
       path: `/wms/qc/batch/${batchId}`,
     })
+  }
+
+  // In nhãn QR — cùng đường mở tab với Tổng quan QC (BatchLabelPage có sẵn)
+  const handleNavigateLabel = (batchId: string, batchNo: string) => {
+    openTab({
+      key: `batch-label-${batchId}`,
+      title: `Nhãn ${batchNo || batchId.slice(0, 8)}`,
+      componentId: 'batch-label',
+      props: { batchId },
+      path: `/wms/batch/${batchId}/label`,
+    })
+  }
+
+  // Xuất kho — mở form tạo phiếu xuất thật (trước đây chỉ bắn toast, không đi đâu)
+  const handleNavigateStockOut = () => {
+    navigate('/wms/stock-out/new')
   }
 
   const handleConfigSave = () => {
@@ -1150,7 +1169,9 @@ const YardMapPage: React.FC = () => {
 
       {/* GRID CONTENT */}
       <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
-        {cellsByZone.size === 0 ? (
+        {loadError ? (
+          <PageState error={loadError} onRetry={handleRefresh} />
+        ) : cellsByZone.size === 0 ? (
           <div style={{ textAlign: 'center', padding: 64 }}>
             <Empty
               image={<EnvironmentOutlined style={{ fontSize: 40, color: '#ccc' }} />}
@@ -1186,6 +1207,8 @@ const YardMapPage: React.FC = () => {
         onClose={() => setSelectedCell(null)}
         onNavigateQC={handleNavigateQC}
         onNavigateDetail={handleNavigateDetail}
+        onNavigateLabel={handleNavigateLabel}
+        onNavigateStockOut={handleNavigateStockOut}
         onMove={handleMove}
         onClear={handleClear}
         onAssign={handleAssign}

@@ -12,20 +12,18 @@ import {
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, TruckOutlined, WarningOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
-  fleetService, VEHICLE_KIND_LABELS,
+  fleetService, VEHICLE_KIND_LABELS, VEHICLE_KIND_COLORS,
   type FleetVehicle, type VehicleKind, type FleetDriver, type ExpiryWarning,
 } from '../../../services/logistics/fleetService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { DASH, fmtDate } from '../../../utils/format'
+import PageState from '../../../components/common/PageState'
+import { stdPagination } from '../../../components/common/tableDefaults'
 
 const { Title } = Typography
 
-const KIND_COLOR: Record<VehicleKind, string> = { tractor: 'blue', trailer: 'gold', other: 'default' }
-
-function fmtDate(s?: string | null): string {
-  if (!s) return '–'
-  return dayjs(s).format('DD/MM/YYYY')
-}
 function expiryTag(s?: string | null) {
-  if (!s) return <span style={{ color: '#bbb' }}>–</span>
+  if (!s) return <span style={{ color: '#bbb' }}>{DASH}</span>
   const days = dayjs(s).startOf('day').diff(dayjs().startOf('day'), 'day')
   const color = days < 0 ? 'red' : days <= 30 ? 'orange' : undefined
   return <Tag color={color} style={{ margin: 0 }}>{fmtDate(s)}</Tag>
@@ -37,6 +35,7 @@ export default function FleetVehicleListPage() {
   const [drivers, setDrivers] = useState<FleetDriver[]>([])
   const [warnings, setWarnings] = useState<ExpiryWarning[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState<unknown>(null)
   const [kind, setKind] = useState<VehicleKind | 'all'>('all')
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
@@ -47,6 +46,7 @@ export default function FleetVehicleListPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadErr(null)
     try {
       const [v, d, w] = await Promise.all([
         fleetService.listVehicles({ kind: kind === 'all' ? undefined : kind, search: search || undefined }),
@@ -55,7 +55,7 @@ export default function FleetVehicleListPage() {
       ])
       setRows(v); setDrivers(d); setWarnings(w)
     } catch (e: any) {
-      message.error('Lỗi tải đội xe: ' + (e?.message || e))
+      setLoadErr(e)   // bảng không được hiện "trống" khi tải hỏng
     }
     setLoading(false)
   }, [kind, search])
@@ -99,7 +99,7 @@ export default function FleetVehicleListPage() {
       load()
     } catch (e: any) {
       if (e?.errorFields) return
-      message.error('Lỗi lưu: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi lưu xe'))
     }
     setSaving(false)
   }
@@ -110,19 +110,19 @@ export default function FleetVehicleListPage() {
       message.success('Đã xoá')
       load()
     } catch (e: any) {
-      message.error('Lỗi xoá: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi xoá xe'))
     }
   }
 
   const columns = useMemo(() => [
     { title: 'Biển số', dataIndex: 'plate', key: 'plate', fixed: 'left' as const, width: 130, render: (v: string) => <b>{v}</b> },
-    { title: 'Loại', dataIndex: 'kind', key: 'kind', width: 100, render: (k: VehicleKind) => <Tag color={KIND_COLOR[k]}>{VEHICLE_KIND_LABELS[k]}</Tag> },
-    { title: 'Mã / Nhãn hiệu', key: 'brand', minWidth: 160, render: (_: any, r: FleetVehicle) => <span>{[r.internal_code, r.brand].filter(Boolean).join(' · ') || '–'}</span> },
-    { title: 'Tài xế', key: 'driver', minWidth: 150, render: (_: any, r: FleetVehicle) => r.default_driver?.full_name || (r.kind === 'tractor' ? <span style={{ color: '#e8a33d' }}>Chưa gắn</span> : '–') },
-    { title: 'Trọng tải', key: 'cap', width: 110, render: (_: any, r: FleetVehicle) => r.capacity_kg ? `${r.capacity_kg.toLocaleString('vi-VN')} kg` : (r.capacity_note || '–') },
+    { title: 'Loại', dataIndex: 'kind', key: 'kind', width: 100, render: (k: VehicleKind) => <Tag color={VEHICLE_KIND_COLORS[k]}>{VEHICLE_KIND_LABELS[k]}</Tag> },
+    { title: 'Mã / Nhãn hiệu', key: 'brand', minWidth: 160, render: (_: any, r: FleetVehicle) => <span>{[r.internal_code, r.brand].filter(Boolean).join(' · ') || DASH}</span> },
+    { title: 'Tài xế', key: 'driver', minWidth: 150, render: (_: any, r: FleetVehicle) => r.default_driver?.full_name || (r.kind === 'tractor' ? <span style={{ color: '#e8a33d' }}>Chưa gắn</span> : DASH) },
+    { title: 'Trọng tải', key: 'cap', width: 110, render: (_: any, r: FleetVehicle) => r.capacity_kg ? `${r.capacity_kg.toLocaleString('vi-VN')} kg` : (r.capacity_note || DASH) },
     { title: 'Đăng kiểm', dataIndex: 'inspection_expiry', key: 'insp', width: 120, render: (v: string) => expiryTag(v) },
     { title: 'Phù hiệu', dataIndex: 'badge_expiry', key: 'badge', width: 120, render: (v: string) => expiryTag(v) },
-    { title: 'Cửa khẩu', dataIndex: 'border_gate', key: 'gate', width: 100, render: (v: string) => v || '–' },
+    { title: 'Cửa khẩu', dataIndex: 'border_gate', key: 'gate', width: 100, render: (v: string) => v || DASH },
     {
       title: '', key: 'act', fixed: 'right' as const, width: 100, render: (_: any, r: FleetVehicle) => (
         <Space>
@@ -133,7 +133,9 @@ export default function FleetVehicleListPage() {
         </Space>
       ),
     },
-  ], [])
+    // deps [load]: onDelete gọi load() — memo rỗng giữ load của lần render đầu (lọc "Tất cả"), xoá xe ở tab
+    // Đầu kéo xong bảng tải lại cả rơ-moóc/xe khác trong khi tab vẫn ghi "Đầu kéo" (cùng lỗi closure audit 17/11).
+  ], [load])
 
   return (
     <div style={{ padding: 20, fontSize: 15 }}>
@@ -150,7 +152,7 @@ export default function FleetVehicleListPage() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
               {warnings.slice(0, 12).map((w, i) => (
                 <Tag key={i} color={w.days_left < 0 ? 'red' : 'orange'}>
-                  {w.vehicle.plate} · {w.label} {w.days_left < 0 ? `quá ${-w.days_left}d` : `còn ${w.days_left}d`}
+                  {w.vehicle.plate} · {w.label} {w.days_left < 0 ? `quá ${-w.days_left} ngày` : `còn ${w.days_left} ngày`}
                 </Tag>
               ))}
             </div>
@@ -176,8 +178,10 @@ export default function FleetVehicleListPage() {
           { key: 'other', label: VEHICLE_KIND_LABELS.other },
         ]} />
 
-        <Table rowKey="id" size="middle" loading={loading} columns={columns as any} dataSource={rows}
-          scroll={{ x: 1180 }} pagination={{ pageSize: 20, showSizeChanger: false }} />
+        <PageState error={loadErr} onRetry={load}>
+          <Table rowKey="id" size="middle" loading={loading} columns={columns as any} dataSource={rows}
+            scroll={{ x: 1180 }} pagination={stdPagination(20)} />
+        </PageState>
       </Card>
 
       <Modal title={editing ? `Sửa xe ${editing.plate}` : 'Thêm phương tiện'} open={modalOpen} onOk={onSave}

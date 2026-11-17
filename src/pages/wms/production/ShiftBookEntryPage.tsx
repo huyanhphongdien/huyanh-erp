@@ -42,6 +42,9 @@ import { facilityService, type Facility } from '../../../services/wms/facilitySe
 import { xuatKhoDoiChieuService, type XuatTheoLoai } from '../../../services/wms/xuatKhoDoiChieuService'
 import { shiftService, type Shift } from '../../../services/shiftService'
 import { useAuthStore } from '../../../stores/authStore'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtNum, fmtKg, fmtDateTime } from '../../../utils/format'
 
 const { Title, Text } = Typography
 
@@ -76,8 +79,7 @@ interface OWork {
 
 const O_RONG: OWork = { nhapBanh: 0, xuatBanh: 0, nhapKgManual: null, xuatKgManual: null, note: null }
 
-const fmt = (n: number | null | undefined, d = 0): string =>
-  n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { minimumFractionDigits: d, maximumFractionDigits: d })
+// Định dạng số: fmtNum (bành) / fmtKg(…, 2) (kg) của utils/format — bỏ bản `fmt` chép riêng (Đợt 3 audit UI).
 
 export default function ShiftBookEntryPage() {
   const { id } = useParams<{ id: string }>()
@@ -86,6 +88,10 @@ export default function ShiftBookEntryPage() {
   const user = useAuthStore((s) => s.user)
 
   const [loading, setLoading] = useState(true)
+  // Lỗi nạp danh mục / phiếu → khoá màn bằng khối lỗi + Thử lại. Trước đây chỉ hiện toast rồi để
+  // form TRỐNG: mở phiếu cũ mà nạp lỗi trông y như phiếu mới, bấm Lưu là tạo phiếu trùng ca.
+  const [loiNap, setLoiNap] = useState<unknown>(null)
+  const [lanNap, setLanNap] = useState(0)
   const [saving, setSaving] = useState(false)
   const [materials, setMaterials] = useState<ShiftMaterial[]>([])
   const [facilities, setFacilities] = useState<Facility[]>([])
@@ -114,7 +120,7 @@ export default function ShiftBookEntryPage() {
   const [runIds, setRunIds] = useState<string[] | null>(null)   // null = chưa tải / chưa chạy SQL p10
   const [khaiBusy, setKhaiBusy] = useState(false)
   const [lenhs, setLenhs] = useState<LenhChay[]>([])   // lệnh đang chạy (SQL p13): lệnh nhiều mã → phiếu ca gắn lệnh, ô mã để trống
-  const taiSoChay = (fid: string) => { rawLotService.lenhDangChay(fid).then(setLenhs).catch(() => setLenhs([])); return rawLotService.dangChay(fid).then((ids) => { setRunIds(ids); return ids }).catch(() => { setRunIds(null); return [] as string[] }) }
+  const taiSoChay = (fid: string) => { rawLotService.lenhDangChay(fid).then(setLenhs).catch(() => setLenhs([])); return rawLotService.dangChay(fid).then((ids) => { setRunIds(ids); return ids }).catch((e) => { console.warn('[Sổ ca] Không đọc được sổ mã đang chạy — có thể DB chưa chạy SQL p10 (rawLotService.dangChay):', e); setRunIds(null); return [] as string[] }) }
   useEffect(() => {
     if (!facilityId) return
     taiSoChay(facilityId).then((ids) => { if (ids.length === 1 && !(id && id !== 'new')) setRawLotId((cur) => cur ?? ids[0]) })
@@ -125,7 +131,7 @@ export default function ShiftBookEntryPage() {
     if (!xn) return
     setKhaiBusy(true)
     try { const r = await rawLotService.batDauLenh([rawLotId], { thayThe: xn.thayThe, gopVao: xn.gopVao }); message.success(r.da_chay ? `${r.ma_gop} đã đang chạy` : r.gop ? `Đã gộp vào lệnh ${r.code}: ${r.ma_gop}` : r.da_thay.length ? `Đã thay ${r.da_thay.join(', ')} bằng ${r.ma_gop} — các ca sau tự theo lệnh này` : `Đã khai ${r.ma_gop} đang chạy — các ca sau tự theo lệnh này`); await taiSoChay(facilityId); rawLotService.list(facilityId, { includeClosed: true }).then(setRawLots).catch(() => { /* bỏ qua */ }) }
-    catch (e: any) { message.error(e?.message || 'Không khai được (cần chạy SQL p10)') }
+    catch (e: any) { console.warn('[Sổ ca] batDauLenh lỗi — nếu là lỗi hàm/bảng thiếu thì DB chưa chạy SQL p10:', e); message.error(dichLoiHeThong(e, 'Không khai được mã đang chạy — báo quản trị hệ thống')) }
     finally { setKhaiBusy(false) }
   }
   const [soNguoi, setSoNguoi] = useState<number | null>(null)
@@ -158,13 +164,13 @@ export default function ShiftBookEntryPage() {
         //   chọn nhà máy KHOÁ LẠI ngay sau khi lưu phiếu đầu tiên.
         setFacilityId((cur) => cur ?? fs.find((f) => f.code === 'PD')?.id ?? fs[0]?.id)
       } catch (e) {
-        message.error('Không đọc được danh mục: ' + (e as Error).message)
+        if (!huy) setLoiNap(e)
       } finally {
         if (!huy) setLoading(false)
       }
     })()
     return () => { huy = true }
-  }, [])
+  }, [lanNap])
 
   // ── Nạp phiếu đang sửa ────────────────────────────────────────────────────
   useEffect(() => {
@@ -196,13 +202,13 @@ export default function ShiftBookEntryPage() {
         setO(map)
         setDirty(false)
       } catch (e) {
-        message.error('Không mở được phiếu: ' + (e as Error).message)
+        if (!huy) setLoiNap(e)
       } finally {
         if (!huy) setLoading(false)
       }
     })()
     return () => { huy = true }
-  }, [id, materials.length])
+  }, [id, materials.length, lanNap])
 
   // ── Người đang đăng nhập được ký bước nào ─────────────────────────
   useEffect(() => {
@@ -365,7 +371,7 @@ export default function ShiftBookEntryPage() {
       if (!imLang) message.success('Đã lưu')
       return rid
     } catch (e) {
-      message.error('Lưu không được: ' + (e as Error).message)
+      message.error(dichLoiHeThong(e, 'Lưu không được'))
       return null
     } finally {
       setSaving(false)
@@ -402,7 +408,7 @@ export default function ShiftBookEntryPage() {
           }
           message.success(nhan + ' — xong')
         } catch (e) {
-          message.error((e as Error).message)
+          message.error(dichLoiHeThong(e, `${nhan} — không thực hiện được`))
         }
       },
     })
@@ -435,7 +441,7 @@ export default function ShiftBookEntryPage() {
       title: <Tooltip title="Tồn của các phiếu đã được thủ kho nhận, chưa tính phiếu này">Tồn đầu</Tooltip>,
       width: 90, align: 'right' as const,
       render: (_: unknown, r: ShiftLine) => (
-        <Text type="secondary">{fmt(tonDau(r))}</Text>
+        <Text type="secondary">{fmtNum(tonDau(r))}</Text>
       ),
     },
     {
@@ -472,7 +478,7 @@ export default function ShiftBookEntryPage() {
       width: 90, align: 'right' as const,
       render: (_: unknown, r: ShiftLine) => {
         const t = tonDau(r) + r.nhapBanh - r.xuatBanh
-        return <Text strong={r.nhapBanh > 0 || r.xuatBanh > 0}>{fmt(t)}</Text>
+        return <Text strong={r.nhapBanh > 0 || r.xuatBanh > 0}>{fmtNum(t)}</Text>
       },
     },
     {
@@ -501,7 +507,7 @@ export default function ShiftBookEntryPage() {
           )
         }
         return r.nhapBanh > 0
-          ? <Text style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(r.nhapKg, 2)}</Text>
+          ? <Text style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtKg(r.nhapKg, 2)}</Text>
           : <Text type="secondary">—</Text>
       },
     },
@@ -509,6 +515,23 @@ export default function ShiftBookEntryPage() {
 
   if (loading) {
     return <div style={{ padding: 48, textAlign: 'center' }}><Spin size="large" /></div>
+  }
+
+  if (loiNap) {
+    return (
+      <div style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}>
+        <Space style={{ marginBottom: 12 }}>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/production/shift-book')}>
+            Danh sách
+          </Button>
+          <Title level={4} style={{ margin: 0 }}>Ghi sổ ca ép bành</Title>
+        </Space>
+        <PageState
+          error={loiNap}
+          onRetry={() => { setLoiNap(null); setLoading(true); setLanNap((n) => n + 1) }}
+        />
+      </div>
+    )
   }
 
   const nhaMay = facilities.find((f) => f.id === facilityId)
@@ -581,7 +604,7 @@ export default function ShiftBookEntryPage() {
               options={rawLots.filter((l) => l.trang_thai !== 'huy').map((l) => ({ value: l.raw_lot_id, label: `${l.ma}${l.trang_thai === 'dang_chay' ? ' · đang chạy' : l.trang_thai === 'da_chay_xong' ? ' · đã chạy xong' : ''}${l.rubber_type_name ? ' · ' + l.rubber_type_name : ''}` }))}
             />
             <Text type="secondary" style={{ fontSize: 11 }}>
-              {runIds === null ? 'Sổ mã đang chạy chưa có (chạy SQL p10) — chọn tay.'
+              {runIds === null ? 'Chưa đọc được sổ mã đang chạy — chọn mã bằng tay.'
                 : !rawLotId && lenhs.some((g) => g.so_ma > 1) ? `Lệnh ${lenhs.filter((g) => g.so_ma > 1).map((g) => `${g.code} gộp ${g.ma_gop}`).join('; ')} đang chạy — phiếu ca gắn lệnh, ô mã để trống. `
                 : rawLotId && runIds.includes(rawLotId) ? `Đúng theo sổ mã đang chạy${(() => { const g = lenhs.find((x) => x.raw_lot_ids.includes(rawLotId)); return g && g.so_ma > 1 ? ` (lệnh ${g.code} gộp ${g.ma_gop})` : '' })()}.`
                 : runIds.length === 0 ? 'Chưa khai mã nào đang chạy. ' : 'Khác mã trong sổ đang chạy. '}
@@ -604,25 +627,25 @@ export default function ShiftBookEntryPage() {
         <Row gutter={16}>
           <Col xs={12} md={6}>
             <Text type="secondary" style={{ fontSize: 12 }}>TỔNG NHẬP</Text>
-            <div><Text strong style={{ fontSize: 22 }}>{fmt(tong.nhapBanh)}</Text> <Text type="secondary">bành</Text></div>
-            <Text type="secondary">{fmt(tong.nhapKg, 2)} kg</Text>
+            <div><Text strong style={{ fontSize: 22 }}>{fmtNum(tong.nhapBanh)}</Text> <Text type="secondary">bành</Text></div>
+            <Text type="secondary">{fmtKg(tong.nhapKg, 2)} kg</Text>
           </Col>
           <Col xs={12} md={6}>
             <Text type="secondary" style={{ fontSize: 12 }}>TRONG ĐÓ KHÔNG ĐẠT</Text>
             <div>
               <Text strong style={{ fontSize: 22, color: tong.loiBanh > 0 ? '#cf1322' : undefined }}>
-                {fmt(tong.loiBanh)}
+                {fmtNum(tong.loiBanh)}
               </Text> <Text type="secondary">bành</Text>
             </div>
             <Text type="secondary">
-              {fmt(tong.loiKg, 2)} kg
+              {fmtKg(tong.loiKg, 2)} kg
               {tong.nhapBanh > 0 && ` · ${Math.round((tong.loiBanh / tong.nhapBanh) * 100)}%`}
             </Text>
           </Col>
           <Col xs={12} md={6}>
             <Text type="secondary" style={{ fontSize: 12 }}>TỔNG XUẤT</Text>
-            <div><Text strong style={{ fontSize: 22 }}>{fmt(tong.xuatBanh)}</Text> <Text type="secondary">bành</Text></div>
-            <Text type="secondary">{fmt(tong.xuatKg, 2)} kg</Text>
+            <div><Text strong style={{ fontSize: 22 }}>{fmtNum(tong.xuatBanh)}</Text> <Text type="secondary">bành</Text></div>
+            <Text type="secondary">{fmtKg(tong.xuatKg, 2)} kg</Text>
           </Col>
           <Col xs={12} md={6}>
             <Text type="secondary" style={{ fontSize: 12 }}>SỐ DÒNG CÓ SỐ</Text>
@@ -657,7 +680,7 @@ export default function ShiftBookEntryPage() {
               {lenhXe.map((l) => (
                 <Space key={l.loaiHang} size={4}>
                   <Tag color="blue" style={{ marginInlineEnd: 0 }}>
-                    {l.loaiHang} · {fmt(l.soBanh)} bành · {l.soContainer} cont
+                    {l.loaiHang} · {fmtNum(l.soBanh)} bành · {l.soContainer} cont
                   </Tag>
                   <Select
                     size="small" style={{ minWidth: 190 }} placeholder="điền vào mã…"
@@ -665,7 +688,7 @@ export default function ShiftBookEntryPage() {
                     onChange={(mid: string) => {
                       const m = materials.find((x) => x.id === mid)
                       dat(mid, { xuatBanh: ((o[mid]?.xuatBanh) ?? 0) + l.soBanh })
-                      message.success(`Đã cộng ${fmt(l.soBanh)} bành vào cột xuất của ${m?.name ?? ''}`)
+                      message.success(`Đã cộng ${fmtNum(l.soBanh)} bành vào cột xuất của ${m?.name ?? ''}`)
                     }}
                     options={materials
                       .filter((m) => m.weightPerUnit !== null)
@@ -694,10 +717,10 @@ export default function ShiftBookEntryPage() {
               <Table.Summary.Row style={{ background: 'rgba(22,119,255,.06)', fontWeight: 600 }}>
                 <Table.Summary.Cell index={0} colSpan={2}>TỔNG CỘNG</Table.Summary.Cell>
                 <Table.Summary.Cell index={2} align="right">—</Table.Summary.Cell>
-                <Table.Summary.Cell index={3} align="right">{fmt(tong.nhapBanh)}</Table.Summary.Cell>
-                <Table.Summary.Cell index={4} align="right">{fmt(tong.xuatBanh)}</Table.Summary.Cell>
+                <Table.Summary.Cell index={3} align="right">{fmtNum(tong.nhapBanh)}</Table.Summary.Cell>
+                <Table.Summary.Cell index={4} align="right">{fmtNum(tong.xuatBanh)}</Table.Summary.Cell>
                 <Table.Summary.Cell index={5} align="right">—</Table.Summary.Cell>
-                <Table.Summary.Cell index={6} align="right">{fmt(tong.nhapKg, 2)}</Table.Summary.Cell>
+                <Table.Summary.Cell index={6} align="right">{fmtKg(tong.nhapKg, 2)}</Table.Summary.Cell>
               </Table.Summary.Row>
             </Table.Summary>
           )}
@@ -719,11 +742,11 @@ export default function ShiftBookEntryPage() {
           <Col>
             <Space size={4}>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {report?.submittedAt ? `Sản xuất giao ${dayjs(report.submittedAt).format('HH:mm DD/MM')}` : 'Chưa giao'}
+                {report?.submittedAt ? `Sản xuất giao ${fmtDateTime(report.submittedAt)}` : 'Chưa giao'}
                 {' → '}
-                {report?.qcConfirmedAt ? `QC xác nhận ${dayjs(report.qcConfirmedAt).format('HH:mm DD/MM')}` : 'chờ QC'}
+                {report?.qcConfirmedAt ? `QC xác nhận ${fmtDateTime(report.qcConfirmedAt)}` : 'chờ QC'}
                 {' → '}
-                {report?.receivedAt ? `Thủ kho nhận ${dayjs(report.receivedAt).format('HH:mm DD/MM')}` : 'chờ thủ kho'}
+                {report?.receivedAt ? `Thủ kho nhận ${fmtDateTime(report.receivedAt)}` : 'chờ thủ kho'}
               </Text>
             </Space>
           </Col>
@@ -776,7 +799,7 @@ export default function ShiftBookEntryPage() {
                         await shiftBookService.cancelReport(report.id, lyDo)
                         message.success('Đã huỷ phiếu')
                         navigate('/wms/production/shift-book')
-                      } catch (e) { message.error((e as Error).message) }
+                      } catch (e) { message.error(dichLoiHeThong(e, 'Không huỷ được phiếu')) }
                     },
                   })
                 }}>Huỷ</Button>

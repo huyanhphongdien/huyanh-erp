@@ -22,14 +22,14 @@ import type { ColumnsType } from 'antd/es/table'
 import type { SalesOrder } from '../../services/sales/salesTypes'
 import { useOrderLotAxes } from '../../hooks/useOrderLotAxes'
 import LotChipStrip, { mergeLotAxes, type LotChipData } from './LotChipStrip'
+import { fmtUsd } from '../../utils/format'
 
 const { Text } = Typography
 
 const OVER = '#c2410c'   // cùng màu "thu vượt" với LotChipStrip — hai nơi phải nói giống nhau
 
-const fmtUSD = (v: number | null | undefined): string =>
-  v == null ? '—'
-    : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v)
+// USD 0 số lẻ, null → '—' — fmtUsd chung (utils/format)
+const fmtUSD = (v: number | null | undefined): string => fmtUsd(v)
 
 const fmtTon = (kg: number | null | undefined): string =>
   !kg ? '—' : `${(kg / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} T`
@@ -149,7 +149,7 @@ export default function LotProgressTable({ order }: { order: SalesOrder }) {
         const tag = val <= 0 ? <Tag>chưa có mẫu số</Tag>
           : paid > val + 0.01 ? <Tag color="orange">thu vượt</Tag>
           : paid + 0.01 >= val ? <Tag color="green">đã thu đủ</Tag>
-          : paid > 0 ? <Tag color="gold">thu 1 phần</Tag>
+          : paid > 0 ? <Tag color="gold">thu một phần</Tag>
           : <Tag color="red">chưa thu</Tag>
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>

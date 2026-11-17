@@ -4,7 +4,7 @@
 // Module: Kho Thành Phẩm (WMS) - Huy Anh Rubber ERP
 // ============================================================================
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
@@ -16,7 +16,6 @@ import {
   Input,
   Select,
   Typography,
-  Alert,
   Row,
   Col,
   Statistic,
@@ -30,6 +29,10 @@ import {
 import blendingService from '../../../services/wms/blendingService'
 import { useDebounce } from '../../../hooks/useDebounce'
 import GradeBadge from '../../../components/wms/GradeBadge'
+import PageState from '../../../components/common/PageState'
+import { stdPagination } from '../../../components/common/tableDefaults'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { fmtDate, fmtKg } from '../../../utils/format'
 import type { BlendOrder, BlendStatus } from '../../../services/wms/wms.types'
 import {
   BLEND_STATUS_LABELS,
@@ -55,25 +58,33 @@ const BlendListPage = () => {
   const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
+  // Thẻ "Đang trộn"/"Hoàn thành" đếm trên SERVER (mọi lệnh khớp ô tìm), không đếm trang đang xem.
+  const [statusCounts, setStatusCounts] = useState<{ inProgress: number; completed: number } | null>(null)
+  // Chỉ nhận kết quả của lần tải MỚI NHẤT — lần cũ về sau không được đè lên.
+  const reqRef = useRef(0)
 
   // Load data
   const loadOrders = useCallback(async () => {
+    const my = ++reqRef.current
     setLoading(true)
     setError(null)
     try {
-      const result = await blendingService.getAll({
-        page,
-        pageSize,
-        status: filterStatus,
-        search: searchDebounced.trim() || undefined,
-      })
+      const search = searchDebounced.trim() || undefined
+      const [result, ip, done] = await Promise.all([
+        blendingService.getAll({ page, pageSize, status: filterStatus, search }),
+        blendingService.getAll({ page: 1, pageSize: 1, status: 'in_progress', search }),
+        blendingService.getAll({ page: 1, pageSize: 1, status: 'completed', search }),
+      ])
+      if (my !== reqRef.current) return
       setOrders(result.data)
       setTotalOrders(result.total)
+      setStatusCounts({ inProgress: ip.total, completed: done.total })
     } catch (err: any) {
+      if (my !== reqRef.current) return
       console.error('Load blend list error:', err)
-      setError(err.message || 'Không thể tải du lieu')
+      setError(dichLoiHeThong(err, 'Không tải được danh sách lệnh phối trộn'))
     } finally {
-      setLoading(false)
+      if (my === reqRef.current) setLoading(false)
     }
   }, [filterStatus, searchDebounced, page, pageSize])
 
@@ -81,9 +92,9 @@ const BlendListPage = () => {
     loadOrders()
   }, [loadOrders])
 
-  // Summary stats
-  const inProgress = orders.filter(o => o.status === 'in_progress').length
-  const completed = orders.filter(o => o.status === 'completed').length
+  // Summary stats (đếm server — xem statusCounts)
+  const inProgress = statusCounts?.inProgress ?? 0
+  const completed = statusCounts?.completed ?? 0
 
   // Table columns
   const columns = [
@@ -115,13 +126,13 @@ const BlendListPage = () => {
       ),
     },
     {
-      title: 'SL muc tieu (kg)',
+      title: 'SL mục tiêu (kg)',
       dataIndex: 'target_quantity_kg',
       key: 'target_quantity_kg',
       align: 'right' as const,
       render: (v: number) => (
         <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          {v ? v.toLocaleString('vi-VN') : '—'}
+          {fmtKg(v, 2)}
         </Text>
       ),
     },
@@ -147,11 +158,11 @@ const BlendListPage = () => {
       ),
     },
     {
-      title: 'Ngay',
+      title: 'Ngày',
       key: 'date',
       render: (_: any, r: BlendOrder) => (
         <Text type="secondary" style={{ fontSize: 12 }}>
-          {new Date(r.created_at).toLocaleDateString('vi-VN')}
+          {fmtDate(r.created_at)}
         </Text>
       ),
     },
@@ -169,13 +180,13 @@ const BlendListPage = () => {
         <Col>
           <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
             <ExperimentOutlined style={{ marginRight: 8 }} />
-            Lenh phoi tron
+            Lệnh phối trộn
           </Title>
         </Col>
         <Col>
           <Space>
             <Button icon={<BulbOutlined />} onClick={() => navigate('/wms/blending/suggest')}>
-              Goi y phoi tron
+              Gợi ý phối trộn
             </Button>
             <Button icon={<ReloadOutlined />} onClick={loadOrders} loading={loading}>
               Làm mới
@@ -184,18 +195,12 @@ const BlendListPage = () => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => navigate('/wms/blending/new')}
-              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
             >
               Tạo lệnh trộn
             </Button>
           </Space>
         </Col>
       </Row>
-
-      {/* Error */}
-      {error && (
-        <Alert type="error" message={error} closable onClose={() => setError(null)} style={{ marginBottom: 16, borderRadius: 8 }} showIcon />
-      )}
 
       {/* Summary */}
       <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -222,9 +227,9 @@ const BlendListPage = () => {
         title={
           <Space>
             <Input.Search
-              placeholder="Tìm mã lenh..."
+              placeholder="Tìm mã lệnh..."
               value={searchText}
-              onChange={e => setSearchText(e.target.value)}
+              onChange={e => { setSearchText(e.target.value); setPage(1) }}
               allowClear
               style={{ width: 250 }}
               size="small"
@@ -239,20 +244,22 @@ const BlendListPage = () => {
           </Space>
         }
       >
+        {/* Lỗi tải → khối lỗi + Thử lại, không để bảng hiện "trống" giả */}
+        {error ? (
+          <PageState error={error} onRetry={loadOrders} />
+        ) : (
         <Table
           dataSource={orders}
           columns={columns}
           rowKey="id"
           loading={loading}
           size="small"
-          pagination={{
+          pagination={stdPagination(20, {
             current: page,
             pageSize,
             total: totalOrders,
-            showSizeChanger: true,
-            showTotal: (t, r) => `${r[0]}-${r[1]} / ${t}`,
             onChange: (p, ps) => { setPage(p); setPageSize(ps) },
-          }}
+          })}
           onRow={(record) => ({
             onClick: () => openTab({
               key: `blend-${record.id}`,
@@ -264,6 +271,7 @@ const BlendListPage = () => {
             style: { cursor: 'pointer' },
           })}
         />
+        )}
       </Card>
     </div>
   )

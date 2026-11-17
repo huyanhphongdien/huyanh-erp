@@ -15,6 +15,7 @@ import {
 } from '../../../services/taskCommentService';
 import { supabase } from '../../../lib/supabase';
 import { notify } from '../../../services/notificationHelper';
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -260,7 +261,7 @@ export function CommentSection({ taskId, currentUserId, canComment = true }: Com
 
     // Fetch comments
     taskCommentService.getComments(taskId).then(({ data, error: err }) => {
-      if (err) setError(err.message);
+      if (err) setError(dichLoiHeThong(err, 'Không tải được bình luận'));
       else setComments(data);
       setLoading(false);
     });
@@ -307,7 +308,7 @@ export function CommentSection({ taskId, currentUserId, canComment = true }: Com
     });
 
     if (createError) {
-      setError(createError.message);
+      setError(dichLoiHeThong(createError, 'Không gửi được bình luận'));
     } else if (data) {
       if (replyTo) {
         setComments(prev => prev.map(c => c.id === replyTo ? { ...c, replies: [...(c.replies || []), data] } : c));
@@ -350,7 +351,7 @@ export function CommentSection({ taskId, currentUserId, canComment = true }: Com
     const { data, error: updateError } = await taskCommentService.updateComment(editingComment.id, { content: editContent.trim() });
 
     if (updateError) {
-      setError(updateError.message);
+      setError(dichLoiHeThong(updateError, 'Không sửa được bình luận'));
     } else if (data) {
       setComments(prev => prev.map(c => {
         if (c.id === data.id) return { ...c, ...data };
@@ -367,7 +368,7 @@ export function CommentSection({ taskId, currentUserId, canComment = true }: Com
     if (!deleteId) return;
     setSubmitting(true);
     const { success, error: deleteError } = await taskCommentService.deleteComment(deleteId);
-    if (deleteError) setError(deleteError.message);
+    if (deleteError) setError(dichLoiHeThong(deleteError, 'Không xóa được bình luận'));
     else if (success) {
       setComments(prev => prev.filter(c => c.id !== deleteId).map(c => ({ ...c, replies: c.replies?.filter(r => r.id !== deleteId) || [] })));
     }

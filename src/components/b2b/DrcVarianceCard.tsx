@@ -8,15 +8,11 @@ import { Row, Col, Card, Statistic, Alert } from 'antd'
 import { ArrowUpOutlined, ArrowDownOutlined, MinusOutlined } from '@ant-design/icons'
 import { Deal } from '../../services/b2b/dealService'
 import { drcVarianceService, DrcVariance } from '../../services/b2b/drcVarianceService'
+import { DASH, fmtVndNum } from '../../utils/format'
 
 // ============================================
 // HELPERS
 // ============================================
-
-const formatVnd = (value: number | null): string => {
-  if (value === null || value === undefined) return '-'
-  return value.toLocaleString('vi-VN')
-}
 
 const getDrcDiffIcon = (variance: DrcVariance) => {
   if (variance.drc_diff === null) return undefined
@@ -134,16 +130,16 @@ const DrcVarianceCard = ({ deal }: DrcVarianceCardProps) => {
         <Col xs={24} sm={8}>
           <Statistic
             title="Giá trị dự kiến"
-            value={variance.expected_value !== null ? formatVnd(variance.expected_value) : '-'}
-            suffix={variance.expected_value !== null ? 'VND' : ''}
+            value={fmtVndNum(variance.expected_value)}
+            suffix={variance.expected_value !== null ? '₫' : ''}
             valueStyle={{ color: '#666', fontSize: 18 }}
           />
         </Col>
         <Col xs={24} sm={8}>
           <Statistic
             title="Giá trị thực tế"
-            value={variance.actual_value !== null ? formatVnd(variance.actual_value) : '-'}
-            suffix={variance.actual_value !== null ? 'VND' : ''}
+            value={fmtVndNum(variance.actual_value)}
+            suffix={variance.actual_value !== null ? '₫' : ''}
             valueStyle={{
               color: variance.actual_value !== null ? '#1B4D3E' : '#999',
               fontSize: 18,
@@ -154,8 +150,8 @@ const DrcVarianceCard = ({ deal }: DrcVarianceCardProps) => {
         <Col xs={24} sm={8}>
           <Statistic
             title="Chênh lệch giá trị"
-            value={variance.value_diff !== null ? formatVnd(Math.abs(variance.value_diff)) : '-'}
-            suffix={variance.value_diff !== null ? 'VND' : ''}
+            value={variance.value_diff !== null ? fmtVndNum(Math.abs(variance.value_diff)) : DASH}
+            suffix={variance.value_diff !== null ? '₫' : ''}
             prefix={getValueDiffIcon(variance.value_diff)}
             valueStyle={{
               color: getValueDiffColor(variance.value_diff),

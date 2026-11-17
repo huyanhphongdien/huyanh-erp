@@ -151,6 +151,40 @@ export type QCStatus = 'pending' | 'passed' | 'warning' | 'failed' | 'needs_blen
 export type BatchType = 'production' | 'blend' | 'purchase'
 export type BatchStatus = 'active' | 'depleted' | 'expired' | 'quarantine'
 
+// Nhãn + màu TRẠNG THÁI QC của lô (stock_batches.qc_status, khoá = QCStatus) — MỘT bản cho mọi màn.
+// Đợt 3 audit UI (17/11/2026): pages/wms/qc/qcLabels.ts gom 5 bản chép tay về đúng bản này →
+// file đó chỉ cần re-export (giữ tên). Kiểu Record<string,…> để trang tra bằng chuỗi thô không lỗi type.
+export const BATCH_QC_STATUS_LABELS: Record<string, string> = {
+  passed: 'Đạt',
+  warning: 'Cảnh báo',
+  failed: 'Không đạt',
+  needs_blend: 'Cần phối trộn',
+  pending: 'Chờ QC',
+}
+
+export const BATCH_QC_STATUS_COLORS: Record<string, string> = {
+  passed: 'green',
+  warning: 'gold',
+  failed: 'red',
+  needs_blend: 'purple',
+  pending: 'default',
+}
+
+// Nhãn + màu TRẠNG THÁI LÔ (stock_batches.status, khoá = BatchStatus) — bản của RawBatchDetailPage.
+export const BATCH_STATUS_LABELS: Record<string, string> = {
+  active: 'Đang dùng',
+  depleted: 'Đã hết',
+  expired: 'Hết hạn',
+  quarantine: 'Tạm giữ (cách ly)',
+}
+
+export const BATCH_STATUS_COLORS: Record<string, string> = {
+  active: 'green',
+  depleted: 'default',
+  expired: 'red',
+  quarantine: 'orange',
+}
+
 export interface StockBatch {
   id: string
   batch_no: string
@@ -210,6 +244,42 @@ export interface StockBatch {
 
 export type StockInStatus = 'draft' | 'confirmed' | 'cancelled'
 export type StockInSourceType = 'production' | 'purchase' | 'blend' | 'transfer' | 'adjust' | 'return' | 'repack'
+
+// Nhãn + màu PHIẾU NHẬP KHO (khoá = StockInStatus / StockInSourceType) — MỘT bản cho mọi màn.
+// Đợt 3 audit UI (17/11/2026): đúng bản pages/wms/stock-in/stockInLabels.ts (file đó chỉ cần re-export,
+// giữ tên); stockInService cũng re-export. Record<string,…> để tra bằng chuỗi thô không lỗi type.
+export const STOCK_IN_STATUS_LABELS: Record<string, string> = {
+  draft: 'Nháp',
+  confirmed: 'Đã nhập kho',
+  cancelled: 'Đã hủy',
+}
+
+export const STOCK_IN_STATUS_COLORS: Record<string, string> = {
+  draft: 'default',
+  confirmed: 'green',
+  cancelled: 'red',
+}
+
+/** Nguồn nhập (stock_in_orders.source_type) */
+export const STOCK_IN_SOURCE_LABELS: Record<string, string> = {
+  production: 'Sản xuất',
+  purchase: 'Mua hàng',
+  blend: 'Phối trộn',
+  transfer: 'Chuyển kho',
+  adjust: 'Điều chỉnh',
+  return: 'Khách trả',
+  repack: 'Đóng gói lại',
+}
+
+export const STOCK_IN_SOURCE_COLORS: Record<string, string> = {
+  production: 'blue',
+  purchase: 'purple',
+  blend: 'cyan',
+  transfer: 'orange',
+  adjust: 'default',
+  return: 'magenta',
+  repack: 'geekblue',
+}
 
 export interface StockInOrder {
   id: string
@@ -285,6 +355,59 @@ export interface StockInDetailFormData {
 export type StockOutStatus = 'draft' | 'picking' | 'picked' | 'confirmed' | 'cancelled'
 export type StockOutReason = 'sale' | 'production' | 'transfer' | 'blend' | 'adjust' | 'return'
 export type PickingStatus = 'pending' | 'picking' | 'picked' | 'skipped'
+
+// Nhãn + màu PHIẾU XUẤT KHO (khoá = StockOutStatus / StockOutReason / PickingStatus) — MỘT bản cho mọi màn.
+// Đợt 3 audit UI (17/11/2026): đúng bản pages/wms/stock-out/stockOutLabels.ts (file đó chỉ cần re-export,
+// giữ tên); stockOutService cũng re-export. Record<string,…> để tra bằng chuỗi thô không lỗi type.
+export const STOCK_OUT_STATUS_LABELS: Record<string, string> = {
+  draft: 'Nháp',
+  picking: 'Đang lấy hàng',
+  picked: 'Đã lấy hàng',
+  confirmed: 'Đã xuất kho',
+  cancelled: 'Đã hủy',
+}
+
+export const STOCK_OUT_STATUS_COLORS: Record<string, string> = {
+  draft: 'default',
+  picking: 'blue',
+  picked: 'gold',
+  confirmed: 'green',
+  cancelled: 'red',
+}
+
+/** Lý do xuất (stock_out_orders.reason) */
+export const STOCK_OUT_REASON_LABELS: Record<string, string> = {
+  sale: 'Bán hàng',
+  production: 'Sản xuất',
+  transfer: 'Chuyển kho',
+  blend: 'Phối trộn',
+  adjust: 'Điều chỉnh',
+  return: 'Trả hàng',
+}
+
+export const STOCK_OUT_REASON_COLORS: Record<string, string> = {
+  sale: 'green',
+  production: 'blue',
+  transfer: 'purple',
+  blend: 'cyan',
+  adjust: 'default',
+  return: 'orange',
+}
+
+/** Trạng thái lấy hàng của TỪNG DÒNG (stock_out_details.picking_status) */
+export const PICKING_STATUS_LABELS: Record<string, string> = {
+  pending: 'Chờ lấy',
+  picking: 'Đang lấy',
+  picked: 'Đã lấy',
+  skipped: 'Bỏ qua',
+}
+
+export const PICKING_STATUS_COLORS: Record<string, string> = {
+  pending: 'default',
+  picking: 'blue',
+  picked: 'green',
+  skipped: 'orange',
+}
 
 export interface StockOutOrder {
   id: string
@@ -559,9 +682,20 @@ export const PRODUCTION_STATUS_LABELS: Record<ProductionStatus, string> = {
   completed: 'Hoàn thành', cancelled: 'Đã hủy',
 }
 
+// Màu tên antd theo quy ước EnumTag (Đợt 3 audit UI): nháp xám · chờ vàng · đang làm xanh dương ·
+// xong xanh lá · huỷ đỏ. Trước đó 'Đã lên lịch' (blue) và 'Đang sản xuất' (processing) cùng một màu xanh.
 export const PRODUCTION_STATUS_COLORS: Record<ProductionStatus, string> = {
-  draft: 'default', scheduled: 'blue', in_progress: 'processing',
-  completed: 'success', cancelled: 'error',
+  draft: 'default', scheduled: 'gold', in_progress: 'blue',
+  completed: 'green', cancelled: 'red',
+}
+
+/** Trạng thái MỘT công đoạn (production_stage_progress.status) — bản của ProductionDetailPage. */
+export const STAGE_STATUS_LABELS: Record<StageStatus, string> = {
+  pending: 'Chờ', in_progress: 'Đang chạy', completed: 'Hoàn thành', failed: 'Lỗi',
+}
+
+export const STAGE_STATUS_COLORS: Record<StageStatus, string> = {
+  pending: 'default', in_progress: 'blue', completed: 'green', failed: 'red',
 }
 
 export const STAGE_NAMES: Record<number, string> = {
@@ -681,6 +815,25 @@ export interface ProductionOutputBatch {
   qc_results?: ProductionQCResult[]
 }
 
+// Nhãn + màu TRẠNG THÁI LÔ THÀNH PHẨM SẢN XUẤT (production_output_batches.status) — MỘT bản.
+// Đợt 3 audit UI (17/11/2026): đúng bản pages/wms/production/productionLabels.ts (file đó chỉ cần
+// re-export, giữ tên). QC của LÔ NGUYÊN LIỆU dùng BATCH_QC_STATUS_* ở trên, không phải map này.
+export const OUTPUT_BATCH_STATUS_LABELS: Record<string, string> = {
+  created: 'Mới tạo',
+  qc_pending: 'Chờ QC',
+  qc_passed: 'Đạt QC',
+  qc_failed: 'Không đạt QC',
+  stored: 'Đã nhập kho',
+}
+
+export const OUTPUT_BATCH_STATUS_COLORS: Record<string, string> = {
+  created: 'default',
+  qc_pending: 'gold',
+  qc_passed: 'green',
+  qc_failed: 'red',
+  stored: 'blue',
+}
+
 export interface ProductionQCResult {
   id: string
   output_batch_id: string
@@ -754,9 +907,11 @@ export const BLEND_STATUS_LABELS: Record<BlendStatus, string> = {
   in_progress: 'Đang trộn', completed: 'Hoàn thành', cancelled: 'Đã hủy',
 }
 
+// Cùng quy ước màu như PRODUCTION_STATUS_COLORS: mô phỏng xong = chờ duyệt (vàng) · đã duyệt chờ trộn (cyan) ·
+// đang trộn xanh dương · xong xanh lá · huỷ đỏ.
 export const BLEND_STATUS_COLORS: Record<BlendStatus, string> = {
-  draft: 'default', simulated: 'blue', approved: 'cyan',
-  in_progress: 'processing', completed: 'success', cancelled: 'error',
+  draft: 'default', simulated: 'gold', approved: 'cyan',
+  in_progress: 'blue', completed: 'green', cancelled: 'red',
 }
 
 export interface BlendOrder {

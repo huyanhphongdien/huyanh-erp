@@ -5,6 +5,8 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
+import { dichLoiAuth } from '../utils/dichLoiAuth'
+import { dichLoiHeThong } from '../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -448,7 +450,7 @@ export const userSettingsService = {
       // 2. Verify current password by re-authenticating
       const { data: { user } } = await supabase.auth.getUser()
       if (!user?.email) {
-        return { success: false, error: 'Không tìm thấy thông tin user' }
+        return { success: false, error: 'Không tìm thấy thông tin tài khoản — đăng nhập lại rồi thử lại' }
       }
       
       // Try to sign in with current password to verify
@@ -468,7 +470,8 @@ export const userSettingsService = {
       
       if (updateError) {
         console.error('Password update error:', updateError)
-        return { success: false, error: 'Không thể cập nhật mật khẩu. Vui lòng thử lại.' }
+        // Nói rõ lý do (vd "mật khẩu mới phải khác mật khẩu cũ") thay vì câu chung chung
+        return { success: false, error: dichLoiAuth(updateError, 'Không thể cập nhật mật khẩu. Vui lòng thử lại.') }
       }
       
       // 4. Update last_password_change in security settings
@@ -495,9 +498,9 @@ export const userSettingsService = {
       }
     } catch (error) {
       console.error('❌ [userSettingsService] changePassword error:', error)
-      return { 
-        success: false, 
-        error: 'Có lỗi xảy ra. Vui lòng thử lại.' 
+      return {
+        success: false,
+        error: dichLoiHeThong(error, 'Có lỗi xảy ra. Vui lòng thử lại.')
       }
     }
   },

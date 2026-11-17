@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { todayVN, vnDayStartTs, vnDayEndTs } from '../../utils/dateVN'
 import { rubberGradeService } from './rubberGradeService'
 import { adjustLevelsAndLocation } from './inventorySync'
 import type {
@@ -151,8 +152,8 @@ export const blendingService = {
       .select(BLEND_ORDER_LIST_SELECT, { count: 'exact' })
 
     if (status) query = query.eq('status', status)
-    if (from_date) query = query.gte('created_at', `${from_date}T00:00:00`)
-    if (to_date) query = query.lte('created_at', `${to_date}T23:59:59`)
+    if (from_date) query = query.gte('created_at', vnDayStartTs(from_date))
+    if (to_date) query = query.lte('created_at', vnDayEndTs(to_date))
 
     if (search && search.trim()) {
       query = query.ilike('code', `%${search.trim()}%`)
@@ -479,7 +480,9 @@ export const blendingService = {
     // 4. Create output stock_batch
     // Use material_id from first source batch
     const firstMaterialId = items[0]?.source_batch?.material_id
-    const batchNo = `PT-BL-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`
+    // Ngày VN cho mã lô + ngày nhập — toISOString() (UTC) trước 7h sáng ra ngày HÔM QUA
+    const todayStr = todayVN()
+    const batchNo = `PT-BL-${todayStr.slice(2).replace(/-/g, '')}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`
 
     const { data: newBatch, error: batchErr } = await supabase
       .from('stock_batches')
@@ -496,7 +499,7 @@ export const blendingService = {
         qc_status: 'pending',
         batch_type: 'blend',
         blend_source_order_id: blendId,
-        received_date: now.split('T')[0],
+        received_date: todayStr,
         status: 'active',
         rubber_grade: resultGrade,
         dry_weight: rubberGradeService.calculateDryWeight(data.actual_quantity_kg, actualDrc),

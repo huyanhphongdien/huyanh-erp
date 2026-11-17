@@ -10,6 +10,7 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
+import { evalTableRating } from './taskScoring'
 import {
   TaskEvaluation,
   EvaluationWithRelations,
@@ -427,8 +428,9 @@ export async function createEvaluation(
       throw new Error('Đã có đánh giá cho công việc này');
     }
 
-    // Tính rating
-    const rating = calculateRating(input.score);
+    // Tính rating — bảng task_evaluations chỉ nhận excellent/good/fair/average/poor (CHECK),
+    // 'below_average' bị từ chối âm thầm → đi qua evalTableRating (taskScoring)
+    const rating = evalTableRating(input.score);
 
     const { data, error } = await supabase
       .from('task_evaluations')
@@ -466,7 +468,7 @@ export async function updateEvaluation(
 
     // Tính rating mới nếu có score
     if (input.score !== undefined) {
-      updateData.rating = calculateRating(input.score);
+      updateData.rating = evalTableRating(input.score);   // ghi task_evaluations → phải qua bộ giá trị CHECK nhận
     }
 
     const { data, error } = await supabase

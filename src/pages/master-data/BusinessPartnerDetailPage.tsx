@@ -13,9 +13,28 @@ import {
   businessPartnerService,
   type BpRole,
   type BpRoleType,
+  type BpStatus,
+  BP_ROLE_LABELS as ROLE_LABELS,
+  BP_ROLE_COLORS as ROLE_COLORS,
+  BP_STATUS_LABELS,
+  BP_ROLE_STATUS_LABELS,
 } from '../../services/businessPartnerService'
 import { Hac13CodeDisplay } from '../../components/master-data/Hac13CodeDisplay'
-import { ROLE_LABELS, ROLE_COLORS } from './BusinessPartnerListPage'
+import PageState from '../../components/common/PageState'
+import { fmtDate, fmtDateTime, fmtVnd } from '../../utils/format'
+
+// Tên tiếng Việt cho các khoá role_data hay gặp (trước đây in thẳng 'payment_terms_days', 'credit_limit_vnd'…)
+const ROLE_DATA_LABELS: Record<string, string> = {
+  supplier_type: 'Loại NCC',
+  supplier_group: 'Nhóm NCC',
+  payment_terms_days: 'Hạn thanh toán (ngày)',
+  credit_limit_vnd: 'Hạn mức công nợ',
+  contact_name: 'Người liên hệ',
+  contact_phone: 'SĐT liên hệ',
+  contact_email: 'Email liên hệ',
+  contact_position: 'Chức vụ liên hệ',
+  province_text: 'Tỉnh/Thành',
+}
 
 interface NameHistoryRow {
   id: string
@@ -40,7 +59,7 @@ export function BusinessPartnerDetailPage() {
   const navigate = useNavigate()
   const [tab, setTab] = useState<'overview' | 'roles' | 'history'>('overview')
 
-  const { data: bp, isLoading } = useQuery({
+  const { data: bp, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['business-partner', id],
     queryFn: () => businessPartnerService.getById(id!),
     enabled: Boolean(id),
@@ -48,6 +67,17 @@ export function BusinessPartnerDetailPage() {
 
   if (isLoading) {
     return <div className="p-6 text-slate-500">Đang tải đối tác…</div>
+  }
+  // Lỗi tải ≠ không tìm thấy — trước đây lỗi mạng/quyền cũng báo "Không tìm thấy đối tác"
+  if (isError) {
+    return (
+      <div className="p-6">
+        <button onClick={() => navigate(-1)} className="text-sm text-emerald-700 mb-2">
+          ← Quay lại
+        </button>
+        <PageState error={error} onRetry={() => refetch()} />
+      </div>
+    )
   }
   if (!bp) {
     return (
@@ -122,8 +152,11 @@ function StatusPill({ status }: { status: string }) {
       ? 'bg-emerald-100 text-emerald-700'
       : status === 'blocked'
         ? 'bg-rose-100 text-rose-700'
-        : 'bg-slate-100 text-slate-700'
-  return <span className={`px-2 py-1 rounded text-xs font-medium ${cls}`}>{status}</span>
+        : status === 'pending'
+          ? 'bg-amber-100 text-amber-700'
+          : 'bg-slate-100 text-slate-700'
+  // Nhãn tiếng Việt (trước đây in thẳng mã 'active'/'blocked')
+  return <span className={`px-2 py-1 rounded text-xs font-medium ${cls}`}>{BP_STATUS_LABELS[status as BpStatus] || status}</span>
 }
 
 function OverviewTab({ bp }: { bp: NonNullable<Awaited<ReturnType<typeof businessPartnerService.getById>>> }) {
@@ -211,20 +244,24 @@ function RoleCard({ role }: { role: BpRole }) {
             <span className="px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700">Chính</span>
           )}
           <span className="text-xs text-slate-500">
-            Kích hoạt {new Date(role.activated_at).toLocaleDateString('vi-VN')}
+            Kích hoạt {fmtDate(role.activated_at)}
           </span>
         </div>
         <span className={`text-xs ${role.status === 'active' ? 'text-emerald-700' : 'text-slate-500'}`}>
-          {role.status}
+          {BP_ROLE_STATUS_LABELS[role.status] || role.status}
         </span>
       </div>
-      {Object.keys(data).length > 0 && (
+      {Object.keys(data || {}).length > 0 && (
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm border-t pt-2">
-          {Object.entries(data).map(([k, v]) => (
+          {Object.entries(data || {}).map(([k, v]) => (
             <div key={k} className="flex justify-between gap-2">
-              <span className="text-slate-500">{k}</span>
+              <span className="text-slate-500">{ROLE_DATA_LABELS[k] || k}</span>
               <span className="text-slate-800 font-mono text-xs truncate">
-                {v == null ? '—' : Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                {v == null
+                  ? '—'
+                  : k === 'credit_limit_vnd' && typeof v === 'number'
+                    ? fmtVnd(v)
+                    : Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : String(v)}
               </span>
             </div>
           ))}
@@ -235,7 +272,7 @@ function RoleCard({ role }: { role: BpRole }) {
 }
 
 function HistoryTab({ bpId }: { bpId: string }) {
-  const { data: nameHistory } = useQuery({
+  const { data: nameHistory, error: nameErr, refetch: refetchName } = useQuery({
     queryKey: ['bp-name-history', bpId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -247,7 +284,7 @@ function HistoryTab({ bpId }: { bpId: string }) {
       return (data ?? []) as NameHistoryRow[]
     },
   })
-  const { data: addrHistory } = useQuery({
+  const { data: addrHistory, error: addrErr, refetch: refetchAddr } = useQuery({
     queryKey: ['bp-address-history', bpId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -273,6 +310,11 @@ function HistoryTab({ bpId }: { bpId: string }) {
     })),
   ].sort((a, b) => b.at.localeCompare(a.at))
 
+  // Lỗi tải xét TRƯỚC trống — không báo "Chưa có thay đổi" khi thực ra tải lỗi
+  if (nameErr || addrErr) {
+    return <PageState error={nameErr || addrErr} onRetry={() => { refetchName(); refetchAddr() }} />
+  }
+
   if (events.length === 0) {
     return (
       <div className="bg-white border rounded-md p-8 text-center text-slate-500">
@@ -289,7 +331,7 @@ function HistoryTab({ bpId }: { bpId: string }) {
           <div className="flex-1">
             <div className="text-slate-800">{e.detail}</div>
             <div className="text-xs text-slate-500">
-              {new Date(e.at).toLocaleString('vi-VN')}
+              {fmtDateTime(e.at)}
             </div>
           </div>
         </div>

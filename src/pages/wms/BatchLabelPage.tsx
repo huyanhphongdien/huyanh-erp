@@ -14,7 +14,8 @@ import {
   PrinterOutlined, ArrowLeftOutlined, ExpandOutlined,
 } from '@ant-design/icons'
 import batchService from '../../services/wms/batchService'
-import type { StockBatch } from '../../services/wms/wms.types'
+import type { StockBatch, RubberGrade } from '../../services/wms/wms.types'
+import { RUBBER_GRADE_LABELS } from '../../services/wms/wms.types'
 import BatchLabel from '../../components/wms/BatchLabel'
 
 const { Title, Text } = Typography
@@ -253,7 +254,7 @@ const BatchLabelPage = ({ batchId: propBatchId }: BatchLabelPageProps = {}) => {
             <Alert
               type="success"
               message="QC ĐẠT — Nhãn chính thức"
-              description={`DRC: ${batch.latest_drc?.toFixed(1)}% | Grade: ${batch.rubber_grade || '—'}`}
+              description={`DRC: ${batch.latest_drc?.toFixed(1)}% | Grade: ${batch.rubber_grade ? (RUBBER_GRADE_LABELS[batch.rubber_grade as RubberGrade] || batch.rubber_grade) : '—'}`}
               showIcon
               style={{ marginBottom: 16, borderRadius: 8 }}
             />

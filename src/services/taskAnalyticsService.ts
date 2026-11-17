@@ -10,6 +10,8 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
+import { vnDayStartTs, vnDayEndTs } from '../utils/dateVN';
+import { TASK_STATUS_LABELS } from '../types';
 
 // ============================================================================
 // SECTION 1: OVERVIEW STATS (merged from taskStatsService)
@@ -88,13 +90,8 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: '#ef4444',   // red - Đã hủy
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Nháp',
-  in_progress: 'Đang làm',
-  paused: 'Tạm dừng',     // ✅ thay vì on_hold
-  finished: 'Hoàn thành', // ✅ thay vì completed
-  cancelled: 'Đã hủy',
-};
+// Nhãn trạng thái: MỘT nguồn TASK_STATUS_LABELS (types/index.ts)
+const STATUS_LABELS: Record<string, string> = TASK_STATUS_LABELS;
 
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: '#ef4444',  // red
@@ -159,8 +156,8 @@ export async function getOverviewStats(filter: StatsFilter): Promise<{
         evaluation_status,
         department:departments(id, name)
       `)
-      .gte('created_at', filter.from_date)
-      .lte('created_at', filter.to_date + 'T23:59:59');
+      .gte('created_at', vnDayStartTs(filter.from_date))
+      .lte('created_at', vnDayEndTs(filter.to_date));
 
     // Filter by department if specified
     if (filter.department_id && filter.department_id !== 'all') {
@@ -403,8 +400,8 @@ export async function getTopEmployees(filter: StatsFilter, limit: number = 5): P
       `)
       .eq('status', 'finished')  // ✅ Fixed: 'finished' thay vì 'completed'
       // A-H4 fix: thêm 'id' vào select để taskIds có giá trị
-      .gte('created_at', filter.from_date)
-      .lte('created_at', filter.to_date + 'T23:59:59');
+      .gte('created_at', vnDayStartTs(filter.from_date))
+      .lte('created_at', vnDayEndTs(filter.to_date));
 
     if (filter.department_id && filter.department_id !== 'all') {
       query = query.eq('department_id', filter.department_id);
@@ -505,8 +502,8 @@ export async function getOverdueTasks(filter: StatsFilter, limit: number = 10): 
       `)
       .lt('due_date', today)
       .not('status', 'in', '("finished","cancelled")')  // ✅ Fixed: 'finished' thay vì 'completed'
-      .gte('created_at', filter.from_date)
-      .lte('created_at', filter.to_date + 'T23:59:59')
+      .gte('created_at', vnDayStartTs(filter.from_date))
+      .lte('created_at', vnDayEndTs(filter.to_date))
       .order('due_date', { ascending: true })
       .limit(limit);
 

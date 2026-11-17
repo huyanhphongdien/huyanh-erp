@@ -196,15 +196,17 @@ export const advanceStatusConfig: Record<AdvanceStatus, StatusConfig> = {
     icon: <ClockCircleOutlined />,
   },
   approved: {
+    // xanh DƯƠNG = đã duyệt CHỜ chi (luật màu dòng tiền CLAUDE.md — trước đây đảo: duyệt xanh lá, chi xanh dương)
     label: 'Đã duyệt',
-    color: '#52c41a',
-    bgColor: '#f6ffed',
+    color: '#1890ff',
+    bgColor: '#e6f7ff',
     icon: <CheckCircleOutlined />,
   },
   paid: {
+    // xanh LÁ = tiền đã ra
     label: 'Đã chi',
-    color: '#1890ff',
-    bgColor: '#e6f7ff',
+    color: '#52c41a',
+    bgColor: '#f6ffed',
     icon: <CheckCircleOutlined />,
   },
   rejected: {
@@ -362,10 +364,10 @@ export const StatusDot: React.FC<{
   };
   
   const labels = {
-    online: 'Online',
-    offline: 'Offline',
-    busy: 'Busy',
-    away: 'Away',
+    online: 'Trực tuyến',
+    offline: 'Ngoại tuyến',
+    busy: 'Đang bận',
+    away: 'Vắng mặt',
   };
   
   return (

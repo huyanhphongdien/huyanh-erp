@@ -18,10 +18,13 @@ import {
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import qcService from '../../../services/wms/qcService'
-import type { BatchQCResult, MaterialQCStandard } from '../../../services/wms/wms.types'
+import type { BatchQCResult, MaterialQCStandard, ContaminationStatus } from '../../../services/wms/wms.types'
+import { CONTAMINATION_LABELS } from '../../../services/wms/wms.types'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import { QCBadge } from '../../../components/wms/QCInputForm'
 import { rubberGradeService } from '../../../services/wms/rubberGradeService'
+import PageState from '../../../components/common/PageState'
+import { fmtDate, fmtDateTime, fmtDateShort, fmtKg } from '../../../utils/format'
 
 const { Title, Text } = Typography
 
@@ -54,13 +57,9 @@ interface BatchInfo {
 // HELPERS
 // ============================================================================
 
-function formatDateTime(d: string): string {
-  return new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function formatDate(d: string): string {
-  return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
+// Định dạng chung format.ts (ngày 'DD/MM/YYYY', ngày-giờ 'DD/MM HH:mm')
+const formatDateTime = (d: string): string => fmtDateTime(d)
+const formatDate = (d: string): string => fmtDate(d)
 
 const CHECK_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   initial: { label: 'Kiểm tra ban đầu', color: 'blue' },
@@ -93,14 +92,18 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
   const [qcHistory, setQcHistory] = useState<BatchQCResult[]>([])
   const [standard, setStandard] = useState<MaterialQCStandard | null>(null)
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Không tìm thấy lô hàng"
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!batchId) return
     const load = async () => {
       setLoading(true)
+      setLoadError(null)
       try {
         // Load batch info
-        const { data: batch } = await supabase
+        const { data: batch, error: batchErr } = await supabase
           .from('stock_batches')
           .select(`
             id, batch_no, initial_drc, latest_drc, qc_status,
@@ -113,6 +116,8 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
           `)
           .eq('id', batchId)
           .single()
+        // PGRST116 = không có dòng (lô không tồn tại) → để nhánh "Không tìm thấy"; lỗi khác thì báo lỗi
+        if (batchErr && batchErr.code !== 'PGRST116') throw batchErr
 
         if (batch) {
           const b = batch as any
@@ -145,13 +150,22 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
           setQcHistory(history)
           setStandard(std)
         }
-      } catch (err) { console.error('Load batch QC history error:', err) }
+      } catch (err) { console.error('Load batch QC history error:', err); setLoadError(err) }
       finally { setLoading(false) }
     }
     load()
-  }, [batchId])
+  }, [batchId, reloadKey])
 
   if (loading) return <div style={{ padding: 24, textAlign: 'center', paddingTop: 100 }}><Spin size="large" /></div>
+
+  if (loadError) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState error={loadError} onRetry={() => setReloadKey(k => k + 1)} />
+        <div style={{ textAlign: 'center', marginTop: 16 }}><Button onClick={() => navigate('/wms/qc')}>Quay lại</Button></div>
+      </div>
+    )
+  }
 
   if (!batchInfo) {
     return (
@@ -203,7 +217,7 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
       {/* Batch Info */}
       <Card style={{ marginBottom: 16, borderRadius: 12 }}>
         <Descriptions column={{ xs: 1, sm: 2, lg: 3 }} size="small" bordered>
-          <Descriptions.Item label="Lo">{batchInfo.batch_no}</Descriptions.Item>
+          <Descriptions.Item label="Mã lô">{batchInfo.batch_no}</Descriptions.Item>
           <Descriptions.Item label="Vật liệu">{batchInfo.material_name}</Descriptions.Item>
           <Descriptions.Item label="Grade">{batchInfo.rubber_grade ? <GradeBadge grade={batchInfo.rubber_grade} /> : '—'}</Descriptions.Item>
           <Descriptions.Item label="DRC hiện tại">
@@ -212,16 +226,16 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
           <Descriptions.Item label="DRC ban đầu">{batchInfo.initial_drc || '—'}%</Descriptions.Item>
           <Descriptions.Item label="QC"><QCBadge result={batchInfo.qc_status} /></Descriptions.Item>
           <Descriptions.Item label="Kho">{batchInfo.warehouse_name}{batchInfo.location_code ? ` · ${batchInfo.location_code}` : ''}</Descriptions.Item>
-          <Descriptions.Item label="SL còn">{batchInfo.quantity_remaining?.toLocaleString('vi-VN')} kg</Descriptions.Item>
-          <Descriptions.Item label="Dry weight">{batchInfo.dry_weight ? `${batchInfo.dry_weight.toLocaleString('vi-VN')} kg` : '—'}</Descriptions.Item>
+          <Descriptions.Item label="SL còn">{fmtKg(batchInfo.quantity_remaining)} kg</Descriptions.Item>
+          <Descriptions.Item label="KL khô">{batchInfo.dry_weight ? `${fmtKg(batchInfo.dry_weight)} kg` : '—'}</Descriptions.Item>
           <Descriptions.Item label="Ngày nhập">{formatDate(batchInfo.received_date)}</Descriptions.Item>
-          <Descriptions.Item label="Lưu kho">{batchInfo.storage_days || 0} ngay</Descriptions.Item>
-          <Descriptions.Item label="Tái kiểm tiep">
+          <Descriptions.Item label="Lưu kho">{batchInfo.storage_days || 0} ngày</Descriptions.Item>
+          <Descriptions.Item label="Tái kiểm tiếp">
             {batchInfo.next_recheck_date ? (
               <Space>
                 {formatDate(batchInfo.next_recheck_date)}
                 <Tag color={recheckDays !== null && recheckDays <= 0 ? 'red' : recheckDays !== null && recheckDays <= 3 ? 'orange' : 'default'}>
-                  {recheckDays !== null ? (recheckDays <= 0 ? `Quá hạn ${Math.abs(recheckDays)}d` : `${recheckDays}d`) : '—'}
+                  {recheckDays !== null ? (recheckDays <= 0 ? `Quá hạn ${Math.abs(recheckDays)} ngày` : `còn ${recheckDays} ngày`) : '—'}
                 </Tag>
               </Space>
             ) : '—'}
@@ -229,7 +243,9 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
           {batchInfo.supplier_name && <Descriptions.Item label="Đại lý">{batchInfo.supplier_name}</Descriptions.Item>}
           {batchInfo.supplier_region && <Descriptions.Item label="Vùng">{batchInfo.supplier_region}</Descriptions.Item>}
           {batchInfo.contamination_status && batchInfo.contamination_status !== 'clean' && (
-            <Descriptions.Item label="Tạp chất"><Tag color="red">{batchInfo.contamination_status}</Tag></Descriptions.Item>
+            <Descriptions.Item label="Tạp chất">
+              <Tag color="red">{CONTAMINATION_LABELS[batchInfo.contamination_status as ContaminationStatus] || batchInfo.contamination_status}</Tag>
+            </Descriptions.Item>
           )}
         </Descriptions>
       </Card>
@@ -241,14 +257,14 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
             <Col span={6}><Statistic title="DRC chuẩn" value={`${standard.drc_standard || '—'}%`} valueStyle={{ fontSize: 16, fontFamily: "'JetBrains Mono'" }} /></Col>
             <Col span={6}><Statistic title="Khoảng" value={`${standard.drc_min || '—'}–${standard.drc_max || '—'}%`} valueStyle={{ fontSize: 16, fontFamily: "'JetBrains Mono'" }} /></Col>
             <Col span={6}><Statistic title="PRI min" value={standard.pri_min || '—'} valueStyle={{ fontSize: 16, fontFamily: "'JetBrains Mono'" }} /></Col>
-            <Col span={6}><Statistic title="Chu kỳ TK" value={`${standard.recheck_interval_days}d`} valueStyle={{ fontSize: 16, fontFamily: "'JetBrains Mono'" }} /></Col>
+            <Col span={6}><Statistic title="Chu kỳ tái kiểm" value={`${standard.recheck_interval_days} ngày`} valueStyle={{ fontSize: 16, fontFamily: "'JetBrains Mono'" }} /></Col>
           </Row>
         </Card>
       )}
 
       {/* DRC Trend (simple inline) */}
       {qcHistory.length > 1 && (
-        <Card title="DRC Trend" size="small" style={{ marginBottom: 16, borderRadius: 12 }}>
+        <Card title="Diễn biến DRC" size="small" style={{ marginBottom: 16, borderRadius: 12 }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 80, padding: '0 8px' }}>
             {qcHistory.map((qc, i) => {
               const drc = qc.drc_value || 0
@@ -268,7 +284,7 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
                     width: '80%',
                   }} />
                   <Text style={{ fontSize: 9, fontFamily: "'JetBrains Mono'", display: 'block', marginTop: 2 }}>{drc}%</Text>
-                  <Text type="secondary" style={{ fontSize: 8 }}>{new Date(qc.tested_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</Text>
+                  <Text type="secondary" style={{ fontSize: 8 }}>{fmtDateShort(qc.tested_at)}</Text>
                 </div>
               )
             })}
@@ -279,7 +295,7 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
       {/* QC History Timeline */}
       <Card title={<Space><HistoryOutlined /> Lịch sử QC ({qcHistory.length})</Space>} style={{ marginBottom: 16, borderRadius: 12 }}>
         {qcHistory.length === 0 ? (
-          <Empty description="Chưa có ket qua QC" />
+          <Empty description="Chưa có kết quả QC" />
         ) : (
           <Timeline
             items={[...qcHistory].reverse().map(qc => {
@@ -303,17 +319,17 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
                     <Space size="middle" wrap style={{ fontSize: 11, color: '#888' }}>
                       {qc.pri_value && <span>PRI: {qc.pri_value}</span>}
                       {qc.mooney_value && <span>Mooney: {qc.mooney_value}</span>}
-                      {qc.ash_content && <span>Ash: {qc.ash_content}%</span>}
+                      {qc.ash_content && <span>Tro: {qc.ash_content}%</span>}
                       {qc.nitrogen_content && <span>N₂: {qc.nitrogen_content}%</span>}
-                      {qc.moisture_content && <span>Moisture: {qc.moisture_content}%</span>}
-                      {qc.volatile_matter && <span>Volatile: {qc.volatile_matter}%</span>}
-                      {qc.dirt_content && <span>Dirt: {qc.dirt_content}%</span>}
-                      {qc.metal_content && <span>Metal: {qc.metal_content} mg/kg</span>}
-                      {qc.color_lovibond && <span>Color: {qc.color_lovibond}</span>}
+                      {qc.moisture_content && <span>Độ ẩm: {qc.moisture_content}%</span>}
+                      {qc.volatile_matter && <span>Chất bay hơi: {qc.volatile_matter}%</span>}
+                      {qc.dirt_content && <span>Tạp chất: {qc.dirt_content}%</span>}
+                      {qc.metal_content && <span>Kim loại: {qc.metal_content} mg/kg</span>}
+                      {qc.color_lovibond && <span>Màu (Lovibond): {qc.color_lovibond}</span>}
                     </Space>
                     {qc.contamination_detected && (
                       <div style={{ marginTop: 4 }}>
-                        <Tag color="red">Tạp chất phat hien{qc.contamination_type ? `: ${qc.contamination_type}` : ''}</Tag>
+                        <Tag color="red">Phát hiện tạp chất{qc.contamination_type ? `: ${qc.contamination_type}` : ''}</Tag>
                       </div>
                     )}
                     {qc.notes && <div style={{ marginTop: 4 }}><Text type="secondary" style={{ fontSize: 11 }}>{qc.notes}</Text></div>}

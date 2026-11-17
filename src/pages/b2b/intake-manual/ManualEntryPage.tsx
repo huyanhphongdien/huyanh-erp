@@ -27,15 +27,17 @@ import {
 } from '../../../services/b2b/intakeManualEntryService'
 import { B2BPartnerSelector } from '../../../components/b2b/B2BPartnerSelector'
 import drcLookupService, { type DrcLookupRow } from '../../../services/wms/drcLookupService'
-import { facilityService, type Facility } from '../../../services/wms/facilityService'
 import { B2BSectionTabs, INTAKE_TABS } from '../../../components/b2b/B2BSectionTabs'
+import FacilityPicker from '../../../components/wms/FacilityPicker'
+import { fmtKg, fmtNum } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { Typography, message } from 'antd'
 
 const { Title, Text } = Typography
 
 const TABS = [
   { key: 'single', label: 'Nhập 1 phiếu', icon: <FileText className="w-4 h-4" /> },
-  { key: 'bulk',   label: 'Import CSV/XLSX', icon: <Upload className="w-4 h-4" /> },
+  { key: 'bulk',   label: 'Nhập từ file CSV/XLSX', icon: <Upload className="w-4 h-4" /> },
 ] as const
 
 export function ManualEntryPage() {
@@ -49,7 +51,7 @@ export function ManualEntryPage() {
       <div>
         <Title level={3} style={{ margin: 0 }}>Nhập tay phiếu cân</Title>
         <Text type="secondary">
-          Dùng khi data về sau cân (vd phiếu giấy cũ, phiếu Excel) — bonus sẽ tự recompute sau insert.
+          Dùng khi số liệu về sau khi cân (vd phiếu giấy cũ, phiếu Excel) — thưởng đại lý tự tính lại sau khi lưu.
         </Text>
       </div>
 
@@ -95,13 +97,18 @@ function SingleEntryForm() {
   // Sprint 1.4 (TL flow) — ĐỐT + LLM + facility + DRC lookup
   const [dotReading, setDotReading] = useState<number | undefined>(undefined)
   const [consolidationCode, setConsolidationCode] = useState('')
+  // Nhà máy GÁN cho phiếu (facility_id) — mặc định KHÔNG gán, như "— Không gán —" bản cũ.
+  // ⚠ KHÔNG dùng FacilityPicker persist ở đây: persist = bộ lọc XEM nhớ qua các sổ → đang lọc TL ở sổ khác
+  //   thì phiếu nhập tay mới tự mang facility TL, và chọn ở đây lại ghi đè bộ lọc xem của các sổ.
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined)
-  const [facilities, setFacilities] = useState<Facility[]>([])
   const [drcLookupRows, setDrcLookupRows] = useState<DrcLookupRow[]>([])
 
   useEffect(() => {
-    facilityService.getAllActive().then(setFacilities).catch(() => setFacilities([]))
-    drcLookupService.getAll().then(setDrcLookupRows).catch(() => setDrcLookupRows([]))
+    drcLookupService.getAll().then(setDrcLookupRows).catch((e) => {
+      setDrcLookupRows([])
+      // Không có bảng tra thì ĐỐT không tự điền DRC — báo để người nhập biết phải gõ DRC tay
+      message.warning(dichLoiHeThong(e, 'Không tải được bảng tra ĐỐT → DRC — nhập DRC tay'))
+    })
   }, [])
 
   // ĐỐT thay đổi → re-fill DRC từ bảng tra
@@ -137,7 +144,7 @@ function SingleEntryForm() {
       return intakeManualEntryService.createSingle(input, files)
     },
     onSuccess: (result) => {
-      const bonusGroup = result.rubber_type === 'tap' ? 'mủ tạp (bonus)' : result.rubber_type === 'nuoc' ? 'mủ nước (bonus)' : 'không tính bonus'
+      const bonusGroup = result.rubber_type === 'tap' ? 'mủ tạp (tính thưởng)' : result.rubber_type === 'nuoc' ? 'mủ nước (tính thưởng)' : 'không tính thưởng'
       message.success(`Tạo phiếu thành công — Net ${result.net_weight_kg.toLocaleString('vi-VN')}kg · ${RAW_RUBBER_TYPE_LABELS[result.raw_rubber_type]} · ${bonusGroup}`)
       // Reset form
       setPartnerId(null)
@@ -154,7 +161,8 @@ function SingleEntryForm() {
       qc.invalidateQueries({ queryKey: ['b2b-bonus-list'] })
       qc.invalidateQueries({ queryKey: ['b2b-bonus-dashboard'] })
     },
-    onError: (e: Error) => alert(`Lỗi: ${e.message}`),
+    // message.error + dịch lỗi hệ thống thay alert() thô của trình duyệt (audit 17/11/2026)
+    onError: (e: Error) => message.error(dichLoiHeThong(e, 'Lưu phiếu thất bại')),
   })
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,7 +188,7 @@ function SingleEntryForm() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs text-slate-600 mb-1 font-medium">
-            Loại mủ chi tiết * <span className="text-slate-400">(4 loại — DB tự nhóm cho bonus)</span>
+            Loại mủ chi tiết * <span className="text-slate-400">(4 loại — hệ thống tự nhóm để tính thưởng)</span>
           </label>
           <div className="grid grid-cols-4 gap-1">
             {(['mu_nuoc', 'mu_tap', 'mu_chen', 'mu_to'] as RawRubberType[]).map((t) => {
@@ -205,7 +213,7 @@ function SingleEntryForm() {
             })}
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            ⇒ Bonus: <strong className={mapRawToBonusType(rawRubberType) === 'nuoc' ? 'text-blue-700' : 'text-amber-700'}>
+            ⇒ Nhóm thưởng: <strong className={mapRawToBonusType(rawRubberType) === 'nuoc' ? 'text-blue-700' : 'text-amber-700'}>
               {mapRawToBonusType(rawRubberType) === 'nuoc' ? 'Mủ nước' : 'Mủ tạp'}
             </strong>
           </div>
@@ -223,8 +231,8 @@ function SingleEntryForm() {
 
       {/* Khối lượng */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <NumberInput label="Net weight (kg) *" value={netWeight} onChange={(v) => setNetWeight(Number(v) || 0)} required />
-        <NumberInput label="Gross weight (kg)" value={grossWeight ?? ''} onChange={(v) => setGrossWeight(v === '' ? undefined : Number(v))} />
+        <NumberInput label="KL net (kg) *" value={netWeight} onChange={(v) => setNetWeight(Number(v) || 0)} required />
+        <NumberInput label="KL tổng / gross (kg)" value={grossWeight ?? ''} onChange={(v) => setGrossWeight(v === '' ? undefined : Number(v))} />
         <NumberInput
           label={`ĐỐT (metrolac)${rawRubberType === 'mu_nuoc' ? ' — Quảng Trị' : ''}`}
           value={dotReading ?? ''}
@@ -241,22 +249,17 @@ function SingleEntryForm() {
       {/* KL khô preview + đơn giá + facility + LLM */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <NumberInput
-          label="Đơn giá (đ/kg)"
+          label="Đơn giá (₫/kg)"
           value={unitPrice ?? ''}
           onChange={(v) => setUnitPrice(v === '' ? undefined : Number(v))}
         />
         <div>
-          <label className="block text-xs text-slate-600 mb-1 font-medium">Nhà máy</label>
-          <select
-            value={facilityId || ''}
-            onChange={(e) => setFacilityId(e.target.value || undefined)}
-            className="w-full px-3 py-2 border rounded text-sm bg-white"
-          >
-            <option value="">— Không gán —</option>
-            {facilities.map((f) => (
-              <option key={f.id} value={f.id}>{f.code} — {f.name}</option>
-            ))}
-          </select>
+          <label className="block text-xs text-slate-600 mb-1 font-medium">
+            Nhà máy <span className="text-slate-400">— "Tất cả" = không gán</span>
+          </label>
+          {/* FacilityPicker dùng chung, điều khiển bằng state của phiếu (KHÔNG persist): mặc định "Tất cả"
+              = không gán; không đọc / không ghi bộ lọc nhà máy của các sổ */}
+          <FacilityPicker value={facilityId} onChange={setFacilityId} />
         </div>
         <div className="md:col-span-2">
           <label className="block text-xs text-slate-600 mb-1 font-medium">
@@ -277,10 +280,10 @@ function SingleEntryForm() {
         <div className="bg-teal-50 border border-teal-200 rounded px-3 py-2 text-sm">
           📊 KL khô ≈ {netWeight.toLocaleString('vi-VN')} kg × {drc}% ={' '}
           <strong className="text-teal-800">
-            {(netWeight * drc / 100).toFixed(1)} kg
+            {fmtKg(netWeight * drc / 100, 1)} kg
           </strong>{' '}
           <span className="text-xs text-teal-600">
-            ({((netWeight * drc / 100) / 1000).toFixed(2)} T)
+            ({fmtNum((netWeight * drc / 100) / 1000, 2)} T)
           </span>
         </div>
       )}
@@ -321,7 +324,7 @@ function SingleEntryForm() {
       {/* Upload ảnh phiếu cân */}
       <div>
         <label className="block text-xs text-slate-600 mb-1 font-medium">
-          Ảnh phiếu cân ({files.length} file{files.length !== 1 && 's'})
+          Ảnh phiếu cân ({files.length} tệp)
         </label>
         <div className="flex items-center gap-2">
           <input
@@ -340,7 +343,7 @@ function SingleEntryForm() {
             <ImageIcon className="w-4 h-4" />
             Thêm ảnh / PDF
           </label>
-          <span className="text-xs text-slate-500">Optional (10MB/file, jpg/png/webp/heic/pdf)</span>
+          <span className="text-xs text-slate-500">Không bắt buộc (10MB/tệp, jpg/png/webp/heic/pdf)</span>
         </div>
         {files.length > 0 && (
           <div className="mt-2 grid grid-cols-3 md:grid-cols-5 gap-2">
@@ -430,7 +433,7 @@ function BulkImportPanel() {
       await intakeManualEntryService.resolvePartnerCodes(parsed)
       setRows(parsed)
     } catch (err) {
-      message.error(`Đọc file thất bại: ${(err as Error).message}`)
+      message.error(dichLoiHeThong(err, 'Đọc file thất bại'))
     } finally {
       setParsing(false)
     }
@@ -450,7 +453,7 @@ function BulkImportPanel() {
         qc.invalidateQueries({ queryKey: ['b2b-bonus-dashboard'] })
       }
     },
-    onError: (e: Error) => message.error(`Lỗi import: ${e.message}`),
+    onError: (e: Error) => message.error(dichLoiHeThong(e, 'Nhập file thất bại')),
   })
 
   const okCount = rows.filter((r) => r.ok).length
@@ -459,11 +462,11 @@ function BulkImportPanel() {
   return (
     <div className="space-y-4">
       <div className="bg-blue-50 border border-blue-200 rounded p-3 space-y-2 text-sm">
-        <div className="font-medium text-blue-900">📋 Hướng dẫn import</div>
+        <div className="font-medium text-blue-900">📋 Hướng dẫn nhập từ file</div>
         <ul className="text-xs text-blue-900 list-disc list-inside space-y-0.5">
           <li>Cột bắt buộc: <code className="bg-white px-1 rounded">intake_date</code>, <code className="bg-white px-1 rounded">partner_code</code>, <code className="bg-white px-1 rounded">raw_rubber_type</code>, <code className="bg-white px-1 rounded">net_weight_kg</code></li>
-          <li><code className="bg-white px-1 rounded">raw_rubber_type</code> chấp nhận 5 giá trị: <strong>mu_nuoc, mu_tap, mu_dong, mu_chen, mu_to</strong> (DB tự nhóm sang 2 loại tap/nuoc cho bonus)</li>
-          <li>Shortcut được chấp nhận: <code>tap</code>=mu_tap, <code>nuoc</code>=mu_nuoc, <code>dong</code>=mu_dong, <code>chen</code>=mu_chen, <code>to</code>=mu_to</li>
+          <li><code className="bg-white px-1 rounded">raw_rubber_type</code> chấp nhận 5 giá trị: <strong>mu_nuoc, mu_tap, mu_dong, mu_chen, mu_to</strong> (hệ thống tự nhóm thành tạp/nước để tính thưởng)</li>
+          <li>Viết tắt được chấp nhận: <code>tap</code>=mu_tap, <code>nuoc</code>=mu_nuoc, <code>dong</code>=mu_dong, <code>chen</code>=mu_chen, <code>to</code>=mu_to</li>
           <li>Cột tuỳ chọn: gross_weight_kg, drc_percent, unit_price, vehicle_plate, invoice_no, notes</li>
           <li><code className="bg-white px-1 rounded">partner_code</code> chấp nhận: HAC-13 (13 chữ số), alias DEMO-XXX, hoặc legacy TEHG01...</li>
           <li><code className="bg-white px-1 rounded">intake_date</code>: YYYY-MM-DD hoặc DD/MM/YYYY hoặc Excel date</li>
@@ -484,13 +487,13 @@ function BulkImportPanel() {
           <span className="text-sm text-slate-700">Chọn file CSV / XLSX</span>
           <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFile} className="hidden" />
           <span className="text-xs px-2 py-1 bg-emerald-700 text-white rounded hover:bg-emerald-800">
-            Browse…
+            Chọn file…
           </span>
         </label>
         {fileName && (
           <div className="mt-2 text-xs text-slate-600 flex items-center gap-2">
             <FileText className="w-3 h-3" /> {fileName}
-            {parsing && <span className="text-blue-700">đang parse…</span>}
+            {parsing && <span className="text-blue-700">đang đọc file…</span>}
           </div>
         )}
       </div>
@@ -500,11 +503,11 @@ function BulkImportPanel() {
           {/* Summary */}
           <div className="flex gap-3 text-sm">
             <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded">
-              ✓ {okCount} row hợp lệ
+              ✓ {okCount} dòng hợp lệ
             </span>
             {errorCount > 0 && (
               <span className="px-3 py-1 bg-rose-100 text-rose-800 rounded">
-                ✗ {errorCount} row lỗi
+                ✗ {errorCount} dòng lỗi
               </span>
             )}
           </div>
@@ -561,7 +564,7 @@ function BulkImportPanel() {
           {/* Import button */}
           <div className="flex items-center justify-between border-t pt-3">
             <div className="text-xs text-slate-600">
-              Sẽ insert {okCount} phiếu với status=`confirmed`. Bonus tự recompute sau insert.
+              Sẽ nhập {okCount} phiếu ở trạng thái Đã xác nhận. Thưởng đại lý tự tính lại sau khi nhập.
             </div>
             <button
               onClick={() => importMutation.mutate()}
@@ -569,7 +572,7 @@ function BulkImportPanel() {
               className="px-4 py-2 bg-emerald-700 text-white rounded text-sm hover:bg-emerald-800 disabled:opacity-50 flex items-center gap-1"
             >
               <Save className="w-4 h-4" />
-              {importMutation.isPending ? 'Đang import…' : `Import ${okCount} phiếu`}
+              {importMutation.isPending ? 'Đang nhập…' : `Nhập ${okCount} phiếu`}
             </button>
           </div>
         </>
@@ -585,7 +588,7 @@ function BulkImportPanel() {
           }`}
         >
           <div className="font-medium">
-            ✓ Đã insert <strong>{importResult.inserted}</strong> phiếu
+            ✓ Đã nhập <strong>{importResult.inserted}</strong> phiếu
             {importResult.failed > 0 && <span> · ⚠ {importResult.failed} thất bại</span>}
           </div>
           {importResult.errors.length > 0 && (

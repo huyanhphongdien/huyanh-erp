@@ -17,6 +17,14 @@ import {
   CreateFromTemplateInput,
 } from '../../services/project/projectTemplateService'
 import { projectCategoryService, ProjectCategory } from '../../services/project/projectCategoryService'
+import { PROJECT_PRIORITY_LABELS } from '../../services/project/project.types'
+import { App } from 'antd'
+import PageState from '../../components/common/PageState'
+import { LimitNotice } from '../../components/common/tableDefaults'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+
+// Trần tải một lần của danh sách mẫu (getTemplates pageSize) — chạm trần thì báo
+const TEMPLATE_LOAD_LIMIT = 50
 
 // ============================================
 // ICON MAP
@@ -37,9 +45,11 @@ function CategoryIcon({ name, size = 18 }: { name?: string; size?: number }) {
 // ============================================
 
 export default function ProjectTemplateList() {
+  const { message } = App.useApp()
   const [templates, setTemplates] = useState<ProjectTemplate[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Lỗi TẢI danh sách (PageState + Thử lại). Lỗi thao tác (xem chi tiết, xoá) báo bằng message.
+  const [error, setError] = useState<unknown>(null)
   const [search, setSearch] = useState('')
 
   // Detail sheet
@@ -71,10 +81,11 @@ export default function ProjectTemplateList() {
     try {
       setLoading(true)
       setError(null)
-      const res = await projectTemplateService.getTemplates({ search, pageSize: 50 })
+      const res = await projectTemplateService.getTemplates({ search, pageSize: TEMPLATE_LOAD_LIMIT })
       setTemplates(res.data)
     } catch (err: any) {
-      setError(err.message || 'Lỗi tải templates')
+      console.error('[ProjectTemplateList] Load error:', err)
+      setError(err || 'Không tải được danh sách mẫu dự án')
     } finally {
       setLoading(false)
     }
@@ -99,7 +110,7 @@ export default function ProjectTemplateList() {
       const d = await projectTemplateService.getTemplateDetail(tmpl.id)
       setDetail(d)
     } catch (err: any) {
-      setError(err.message)
+      message.error(dichLoiHeThong(err, 'Không mở được chi tiết mẫu'))
     } finally {
       setLoadingDetail(false)
     }
@@ -143,9 +154,9 @@ export default function ProjectTemplateList() {
       // Success — navigate to project detail
       setCreateModal(null)
       // TODO: navigate to /projects/${result.project_id}
-      alert(`Tạo dự án thành công! Mã: ${result.code}`)
+      message.success(`Đã tạo dự án ${result.code}`)
     } catch (err: any) {
-      setCreateError(err.message || 'Lỗi tạo dự án')
+      setCreateError(dichLoiHeThong(err, 'Tạo dự án thất bại'))
     } finally {
       setCreating(false)
     }
@@ -163,7 +174,7 @@ export default function ProjectTemplateList() {
       setDeleteTarget(null)
       loadTemplates()
     } catch (err: any) {
-      setError(err.message)
+      message.error(dichLoiHeThong(err, 'Xoá mẫu thất bại'))
     } finally {
       setDeleting(false)
     }
@@ -174,11 +185,12 @@ export default function ProjectTemplateList() {
   // ============================================
 
   const PriorityBadge = ({ priority }: { priority: string }) => {
+    // Chữ đọc từ PROJECT_PRIORITY_LABELS (project.types — một nguồn)
     const config: Record<string, { label: string; className: string }> = {
-      critical: { label: 'Khẩn cấp', className: 'bg-red-100 text-red-700' },
-      high: { label: 'Cao', className: 'bg-orange-100 text-orange-700' },
-      medium: { label: 'Trung bình', className: 'bg-blue-100 text-blue-700' },
-      low: { label: 'Thấp', className: 'bg-gray-100 text-gray-600' },
+      critical: { label: PROJECT_PRIORITY_LABELS.critical, className: 'bg-red-100 text-red-700' },
+      high: { label: PROJECT_PRIORITY_LABELS.high, className: 'bg-orange-100 text-orange-700' },
+      medium: { label: PROJECT_PRIORITY_LABELS.medium, className: 'bg-blue-100 text-blue-700' },
+      low: { label: PROJECT_PRIORITY_LABELS.low, className: 'bg-gray-100 text-gray-600' },
     }
     const c = config[priority] || config.medium
     return (
@@ -206,7 +218,7 @@ export default function ProjectTemplateList() {
                 <ChevronLeft size={22} />
               </button>
               <div>
-                <h1 className="text-lg font-bold text-gray-900">Templates dự án</h1>
+                <h1 className="text-lg font-bold text-gray-900">Mẫu dự án</h1>
                 <p className="text-sm text-gray-500">{templates.length} mẫu</p>
               </div>
             </div>
@@ -220,7 +232,7 @@ export default function ProjectTemplateList() {
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Tìm template..."
+            placeholder="Tìm mẫu dự án..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-8 py-2.5 border border-gray-300 rounded-lg text-[15px]
@@ -235,29 +247,18 @@ export default function ProjectTemplateList() {
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="max-w-5xl mx-auto px-4 pb-2">
-          <div className="flex items-center gap-2 px-4 py-3 bg-red-50 text-red-700 rounded-lg text-sm">
-            <AlertCircle size={18} />
-            {error}
-            <button onClick={() => setError(null)} className="ml-auto"><X size={16} /></button>
-          </div>
-        </div>
-      )}
-
       {/* Content */}
       <div className="max-w-5xl mx-auto px-4 pb-24">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 size={32} className="animate-spin text-[#1B4D3E]" />
-          </div>
+        <LimitNotice shown={templates.length} limit={TEMPLATE_LOAD_LIMIT} what="mẫu" />
+        {(loading || !!error) ? (
+          // Lỗi xét TRƯỚC trống: trước đây lỗi tải hiện băng đỏ NHƯNG vẫn vẽ "Chưa có template nào" bên dưới
+          <PageState loading={loading} error={error} onRetry={loadTemplates} minHeight={240} />
         ) : templates.length === 0 ? (
           <div className="text-center py-20">
             <Layers size={48} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500 mb-2">Chưa có template nào</p>
+            <p className="text-gray-500 mb-2">Chưa có mẫu dự án nào</p>
             <p className="text-sm text-gray-400">
-              Tạo dự án → Hoàn thành → Đánh dấu làm template
+              Tạo dự án → Hoàn thành → Đánh dấu làm mẫu
             </p>
           </div>
         ) : (
@@ -363,7 +364,7 @@ export default function ProjectTemplateList() {
           <div className="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl
                           max-h-[85vh] overflow-y-auto z-10">
             <div className="sticky top-0 bg-white border-b px-5 py-4 flex items-center justify-between rounded-t-2xl">
-              <h2 className="text-lg font-bold text-gray-900">Chi tiết template</h2>
+              <h2 className="text-lg font-bold text-gray-900">Chi tiết mẫu dự án</h2>
               <button onClick={() => setDetail(null)} className="p-2 -mr-2 text-gray-400">
                 <X size={20} />
               </button>
@@ -465,7 +466,7 @@ export default function ProjectTemplateList() {
             <div className="sticky top-0 bg-white border-b px-5 py-4 flex items-center justify-between rounded-t-2xl">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Tạo dự án mới</h2>
-                <p className="text-sm text-gray-500">Từ template: {createModal.name}</p>
+                <p className="text-sm text-gray-500">Từ mẫu: {createModal.name}</p>
               </div>
               <button onClick={() => !creating && setCreateModal(null)} className="p-2 -mr-2 text-gray-400">
                 <X size={20} />
@@ -488,7 +489,7 @@ export default function ProjectTemplateList() {
                   type="text"
                   value={createForm.name}
                   onChange={(e) => setCreateForm(p => ({ ...p, name: e.target.value }))}
-                  placeholder="VD: Triển khai ERP Phase 2"
+                  placeholder="VD: Triển khai ERP giai đoạn 2"
                   className="w-full px-3.5 py-3 border border-gray-300 rounded-lg text-[15px]
                              focus:outline-none focus:ring-2 focus:ring-[#2D8B6E]"
                   autoFocus
@@ -619,12 +620,12 @@ export default function ProjectTemplateList() {
                 <Trash2 size={24} className="text-red-600" />
               </div>
               <div>
-                <h3 className="font-bold text-gray-900">Xóa template?</h3>
+                <h3 className="font-bold text-gray-900">Xoá mẫu dự án?</h3>
                 <p className="text-sm text-gray-500">{deleteTarget.name}</p>
               </div>
             </div>
             <p className="text-sm text-gray-500 mb-5">
-              Template và các phases/milestones mẫu sẽ bị xóa vĩnh viễn.
+              Mẫu và các giai đoạn/mốc của mẫu sẽ bị xoá vĩnh viễn.
             </p>
             <div className="flex gap-3">
               <button

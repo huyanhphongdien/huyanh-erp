@@ -21,6 +21,7 @@ import {
   formatDwell,
 } from '../../../services/sales/salesStages'
 import StagePill from '../../../components/common/StagePill'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 interface StageOwnershipCardProps {
   orderId: string
@@ -70,11 +71,13 @@ export default function StageOwnershipCard({
   const openOwnerEdit = async () => {
     setOwnerEditOpen(true)
     if (ownerOptions.length === 0) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('employees')
         .select('id, full_name, email')
         .eq('status', 'active')
         .order('full_name')
+      // Lỗi tải ≠ "không có nhân viên nào" — báo để người dùng thử mở lại
+      if (error) { message.error(dichLoiHeThong(error, 'Không tải được danh sách nhân viên')); return }
       setOwnerOptions((data as EmployeeOpt[]) || [])
     }
   }
@@ -91,7 +94,7 @@ export default function StageOwnershipCard({
       .eq('id', orderId)
     setOwnerSaving(false)
     if (error) {
-      message.error('Lỗi cập nhật owner: ' + error.message)
+      message.error(dichLoiHeThong(error, 'Lỗi cập nhật người phụ trách'))
       return
     }
     message.success('Đã cập nhật người phụ trách')
@@ -140,7 +143,7 @@ export default function StageOwnershipCard({
       setNotes('')
       onChanged?.()
     } else {
-      message.error(res.error || 'Lỗi chuyển stage')
+      message.error(dichLoiHeThong(res.error, 'Lỗi chuyển bộ phận'))
     }
   }
 
@@ -167,7 +170,7 @@ export default function StageOwnershipCard({
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>Owner</span>
+            <span>Người phụ trách</span>
             <Button
               type="text"
               size="small"
@@ -195,9 +198,9 @@ export default function StageOwnershipCard({
             <span style={{ fontSize: 11, color: '#6b7280' }}>SLA</span>
             <Tag color={slaStatus === 'overdue' ? 'red' : slaStatus === 'at_risk' ? 'orange' : 'blue'} style={{ fontSize: 10, margin: 0 }}>
               {slaStatus === 'overdue' && `Quá ${formatDwell((elapsedHours || 0) - stageSlaHours)}`}
-              {slaStatus === 'at_risk' && `Cận ${formatDwell(stageSlaHours - (elapsedHours || 0))}`}
+              {slaStatus === 'at_risk' && `Sắp quá hạn — còn ${formatDwell(stageSlaHours - (elapsedHours || 0))}`}
               {slaStatus === 'on_track' && `Còn ${formatDwell(stageSlaHours - (elapsedHours || 0))}`}
-              {slaStatus === 'pending' && `${stageSlaHours}h`}
+              {slaStatus === 'pending' && `${stageSlaHours} giờ`}
             </Tag>
           </div>
           {slaProgress !== null && (
@@ -231,7 +234,7 @@ export default function StageOwnershipCard({
           </div>
           {SALES_STAGE_DEFAULT_OWNER_NAME[nextStage] && (
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span>→ Auto giao cho:</span>
+              <span>→ Tự giao cho:</span>
               <span style={{ fontWeight: 500, color: '#111111' }}>
                 {SALES_STAGE_DEFAULT_OWNER_NAME[nextStage]}
               </span>
@@ -248,7 +251,7 @@ export default function StageOwnershipCard({
             onClick={() => setModalOpen(true)}
             style={{ background: '#111111', borderColor: '#111111' }}
           >
-            ✓ Mark done & Chuyển {SALES_STAGE_LABELS[nextStage!]}
+            ✓ Xong — chuyển sang {SALES_STAGE_LABELS[nextStage!]}
           </Button>
         )}
         {isTerminal && (
@@ -268,12 +271,12 @@ export default function StageOwnershipCard({
         okButtonProps={{ style: { background: '#111111', borderColor: '#111111' } }}
       >
         <p style={{ margin: 0, marginBottom: 8, fontSize: 13, color: '#374151' }}>
-          Hệ thống sẽ ghi log handoff với:
+          Hệ thống sẽ ghi lịch sử bàn giao:
         </p>
         <ul style={{ margin: 0, marginBottom: 12, paddingLeft: 20, fontSize: 13, color: '#374151' }}>
           <li>Người chuyển: <strong>{user?.full_name || user?.email}</strong></li>
-          <li>Dwell time: <strong>{formatDwell(elapsedHours)}</strong></li>
-          <li>From: {SALES_STAGE_LABELS[currentStage]} → {nextStage && SALES_STAGE_LABELS[nextStage]}</li>
+          <li>Thời gian giữ: <strong>{formatDwell(elapsedHours)}</strong></li>
+          <li>Từ: {SALES_STAGE_LABELS[currentStage]} → {nextStage && SALES_STAGE_LABELS[nextStage]}</li>
         </ul>
         <div>
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Ghi chú (tùy chọn)</div>
@@ -299,7 +302,7 @@ export default function StageOwnershipCard({
       >
         <p style={{ margin: 0, marginBottom: 8, fontSize: 13, color: '#374151' }}>
           Đang ở: <strong>{SALES_STAGE_LABELS[currentStage]}</strong>
-          {currentOwnerName && <> — owner hiện tại: <strong>{currentOwnerName}</strong></>}
+          {currentOwnerName && <> — người phụ trách hiện tại: <strong>{currentOwnerName}</strong></>}
         </p>
         <div style={{ marginTop: 12 }}>
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Người phụ trách mới</div>
@@ -316,7 +319,7 @@ export default function StageOwnershipCard({
             }))}
           />
           <div style={{ fontSize: 11, color: '#a1a1aa', marginTop: 6 }}>
-            BGĐ có thể đổi owner bất kỳ lúc nào để giao việc rõ ràng. Lịch sử handoff vẫn được giữ nguyên.
+            BGĐ có thể đổi người phụ trách bất kỳ lúc nào để giao việc rõ ràng. Lịch sử bàn giao vẫn được giữ nguyên.
           </div>
         </div>
       </Modal>

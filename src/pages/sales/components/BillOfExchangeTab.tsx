@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react'
 import { Spin, Button, Space, Typography, Result, message } from 'antd'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { PrinterOutlined, FileWordOutlined, FileDoneOutlined } from '@ant-design/icons'
 import { documentService, type InvoiceData } from '../../../services/sales/documentService'
 import { lcNegotiationService, type LcNegotiation } from '../../../services/sales/lcNegotiationService'
@@ -45,7 +46,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
         setInv(i)
         setNeg(n)
       } catch (e: any) {
-        if (!cancelled) { setError(true); message.error(e?.message || 'Lỗi tải Hối phiếu') }
+        if (!cancelled) { setError(true); message.error(dichLoiHeThong(e, 'Lỗi tải Hối phiếu')) }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -53,7 +54,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
     return () => { cancelled = true }
   }, [orderId, reloadKey, lotNo])   // reloadKey bump khi ĐNCK lưu → BOE nạp lại số L/C/tenor/NH mới
 
-  if (loading) return <Spin tip="Loading..." />
+  if (loading) return <Spin tip="Đang tải..." />
   if (error || !inv) {
     return <Result icon={<FileDoneOutlined />} title="Bill of Exchange" subTitle="Chưa tải được dữ liệu" />
   }

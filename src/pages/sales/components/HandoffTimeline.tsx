@@ -14,6 +14,8 @@ import {
   formatDwell,
 } from '../../../services/sales/salesStages'
 import { salesStageService, type HandoffRow } from '../../../services/sales/salesStageService'
+import { fmtDateTime } from '../../../utils/format'
+import PageState from '../../../components/common/PageState'
 
 interface HandoffTimelineProps {
   orderId: string
@@ -22,14 +24,9 @@ interface HandoffTimelineProps {
   stageStartedAt: string | null
 }
 
+/** Ngày-giờ chuẩn toàn hệ 'DD/MM HH:mm' (+/YYYY khác năm) — toLocaleString('vi-VN') in giờ trước ngày. */
 function formatDate(iso: string | null): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  return d.toLocaleString('vi-VN', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-    timeZone: 'Asia/Ho_Chi_Minh',
-  })
+  return fmtDateTime(iso)
 }
 
 export default function HandoffTimeline({
@@ -40,18 +37,30 @@ export default function HandoffTimeline({
 }: HandoffTimelineProps) {
   const [handoffs, setHandoffs] = useState<HandoffRow[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải: trước đây không bắt → vòng quay mãi / hiện "Chưa có lịch sử" giả
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   const fetch = async () => {
     setLoading(true)
-    const rows = await salesStageService.getHandoffHistory(orderId)
-    setHandoffs(rows)
-    setLoading(false)
+    setLoadError(null)
+    try {
+      const rows = await salesStageService.getHandoffHistory(orderId)
+      setHandoffs(rows)
+    } catch (e) {
+      setLoadError(e || true)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { fetch() }, [orderId])
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+  }
+
+  if (loadError) {
+    return <PageState error={loadError} onRetry={fetch} minHeight={120} />
   }
 
   // Compute current dwell at the active stage

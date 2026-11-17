@@ -15,6 +15,10 @@ import { executeWalkinIntake } from '../../../services/b2b/intakeWalkinService'
 import { findHouseholdByCCCD, validateVietnameseCCCD } from '../../../services/b2b/partnerQuickCreateService'
 import { getCurrentPrice } from '../../../services/b2b/dailyPriceListService'
 import { useAuthStore } from '../../../stores/authStore'
+import { fmtVnd, vndInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { TIER_LABELS } from '../../../services/b2b/partnerService'
+import { enumLabel } from '../../../components/common/EnumTag'
 
 const { Title, Text } = Typography
 
@@ -98,12 +102,13 @@ export default function WalkinWizardPage() {
       if (res.success) {
         setResult(res)
         setStep(3)
-        message.success(`Đã tạo deal ${res.deal_number} + chi ${res.total_amount_vnd.toLocaleString('vi-VN')} VNĐ`)
+        message.success(`Đã tạo deal ${res.deal_number} + chi ${fmtVnd(res.total_amount_vnd)}`)
       } else {
-        message.error(res.error || 'Lỗi không xác định')
+        message.error(dichLoiHeThong(res.error, 'Lỗi không xác định'))
       }
     } catch (e: any) {
-      message.error(e.message || 'Validate failed')
+      if (e?.errorFields) { message.warning('Còn ô bắt buộc chưa điền — kiểm tra lại'); return }
+      message.error(dichLoiHeThong(e, 'Không chi tiền được'))
     } finally {
       setSubmitting(false)
     }
@@ -142,7 +147,7 @@ export default function WalkinWizardPage() {
               {existingPartner && (
                 <Alert type="success" showIcon style={{ marginBottom: 16 }}
                   message={`Đã có trong hệ thống: ${existingPartner.name} (${existingPartner.code})`}
-                  description={`Tier: ${existingPartner.tier} · Reuse partner_id`} />
+                  description={`Hạng: ${enumLabel(TIER_LABELS, existingPartner.tier)} · dùng lại hồ sơ đại lý đã có`} />
               )}
 
               {!existingPartner && cccdValid && (
@@ -207,11 +212,10 @@ export default function WalkinWizardPage() {
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item name="unit_price_override" label={`Giá (VNĐ/kg) — daily: ${dailyPrice?.toLocaleString('vi-VN') || 'chưa có'}`}
+                  <Form.Item name="unit_price_override" label={`Giá (₫/kg) — giá ngày: ${dailyPrice?.toLocaleString('vi-VN') || 'chưa có'}`}
                     rules={[{ required: true }]}>
                     <InputNumber<number> min={0} step={1000}
-                      formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                      parser={v => Number(String(v).replace(/\D/g, '')) || 0}
+                      {...vndInputProps}
                       style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
@@ -266,12 +270,12 @@ export default function WalkinWizardPage() {
                 <Row gutter={16}>
                   <Col span={6}>NET: <strong>{netKg?.toLocaleString('vi-VN')} kg</strong></Col>
                   <Col span={6}>DRC: <strong>{drc}%</strong></Col>
-                  <Col span={6}>Giá: <strong>{priceUse?.toLocaleString('vi-VN')} VNĐ/kg</strong></Col>
-                  <Col span={6}><Tag color="green">Công thức: qty×DRC×giá</Tag></Col>
+                  <Col span={6}>Giá: <strong>{priceUse?.toLocaleString('vi-VN')} ₫/kg</strong></Col>
+                  <Col span={6}><Tag color="green">Công thức: KL × DRC × giá</Tag></Col>
                 </Row>
                 <Divider />
                 <Text strong style={{ fontSize: 22, color: '#1B4D3E' }}>
-                  Tổng chi: {totalAmount.toLocaleString('vi-VN')} VNĐ
+                  Tổng chi: {fmtVnd(totalAmount)}
                 </Text>
               </Card>
 
@@ -293,7 +297,7 @@ export default function WalkinWizardPage() {
               subTitle={
                 <Space direction="vertical">
                   <Text>Hộ: <strong>{result.partner_code}</strong> {result.partner_is_new && <Tag color="blue">Mới tạo</Tag>}</Text>
-                  <Text>Đã chi: <strong>{result.total_amount_vnd.toLocaleString('vi-VN')} VNĐ</strong></Text>
+                  <Text>Đã chi: <strong>{fmtVnd(result.total_amount_vnd)}</strong></Text>
                 </Space>
               }
               extra={[

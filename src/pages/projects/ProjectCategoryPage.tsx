@@ -18,6 +18,9 @@ import {
   PROJECT_CATEGORY_ICONS,
   PROJECT_CATEGORY_COLORS,
 } from '../../services/project/projectCategoryService'
+import { App } from 'antd'
+import PageState from '../../components/common/PageState'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 // ============================================
 // ICON MAP — render Lucide icon từ string name
@@ -39,10 +42,13 @@ function CategoryIcon({ name, size = 20, className = '' }: { name?: string; size
 // ============================================
 
 export default function ProjectCategoryPage() {
+  const { message } = App.useApp()
   // State
   const [categories, setCategories] = useState<ProjectCategory[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Lỗi TẢI danh sách → PageState + Thử lại (trước đây băng đỏ e.message thô VÀ vẫn vẽ "Chưa có loại dự án nào").
+  // Lỗi thao tác (bật/tắt, xoá) báo bằng message.
+  const [error, setError] = useState<unknown>(null)
   const [search, setSearch] = useState('')
   const [filterActive, setFilterActive] = useState<boolean | 'all'>('all')
   
@@ -85,7 +91,8 @@ export default function ProjectCategoryPage() {
       
       setCategories(filtered)
     } catch (err: any) {
-      setError(err.message || 'Lỗi tải danh mục')
+      console.error('[ProjectCategoryPage] Load error:', err)
+      setError(err || 'Không tải được danh mục loại dự án')
     } finally {
       setLoading(false)
     }
@@ -144,7 +151,7 @@ export default function ProjectCategoryPage() {
       setShowForm(false)
       loadCategories()
     } catch (err: any) {
-      setFormError(err.message || 'Lỗi lưu danh mục')
+      setFormError(dichLoiHeThong(err, 'Lưu loại dự án thất bại'))
     } finally {
       setSaving(false)
     }
@@ -155,7 +162,7 @@ export default function ProjectCategoryPage() {
       await projectCategoryService.toggleActive(cat.id)
       loadCategories()
     } catch (err: any) {
-      setError(err.message)
+      message.error(dichLoiHeThong(err, 'Không đổi được trạng thái loại dự án'))
     }
   }
 
@@ -167,7 +174,7 @@ export default function ProjectCategoryPage() {
       setDeleteTarget(null)
       loadCategories()
     } catch (err: any) {
-      setError(err.message)
+      message.error(dichLoiHeThong(err, 'Xoá loại dự án thất bại'))
     } finally {
       setDeleting(false)
     }
@@ -257,25 +264,11 @@ export default function ProjectCategoryPage() {
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="max-w-5xl mx-auto px-4 pb-2">
-          <div className="flex items-center gap-2 px-4 py-3 bg-red-50 text-red-700 rounded-lg text-sm">
-            <AlertCircle size={18} />
-            {error}
-            <button onClick={() => setError(null)} className="ml-auto p-1">
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Content */}
       <div className="max-w-5xl mx-auto px-4 pb-24">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 size={32} className="animate-spin text-[#1B4D3E]" />
-          </div>
+        {(loading || !!error) ? (
+          // Lỗi xét TRƯỚC trống
+          <PageState loading={loading} error={error} onRetry={loadCategories} minHeight={240} />
         ) : categories.length === 0 ? (
           <div className="text-center py-20">
             <FolderOpen size={48} className="mx-auto text-gray-300 mb-3" />

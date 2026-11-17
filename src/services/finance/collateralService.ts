@@ -36,6 +36,8 @@ export const ASSET_TYPE_LABEL: Record<string, string> = {
 export const COLLATERAL_STATUS_LABEL: Record<CollateralStatus, string> = {
   active: 'Đang thế chấp', released: 'Đã giải chấp',
 }
+// tím = màu "tài sản đảm bảo" của module (🏛); đã giải chấp = xám
+export const COLLATERAL_STATUS_COLOR: Record<CollateralStatus, string> = { active: 'purple', released: 'default' }
 
 export const collateralService = {
   async list(): Promise<FinCollateral[]> {

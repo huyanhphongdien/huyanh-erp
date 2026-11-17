@@ -29,6 +29,8 @@ import { attendanceService, validateGPS } from '../../services/attendanceService
 import { getActiveShifts } from '../../services/opsService'
 import { getDeviceType, getDeviceInfo } from '../../utils/deviceDetect'
 import { todayVN } from '../../utils/dateVN'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { TEAM_BADGE, TEAM_BADGE_DEFAULT } from './labels'
 import type {
   ShiftInfo,
   AttendanceRecord,
@@ -149,12 +151,6 @@ function isShiftInWindow(
   const windowEnd = new Date(shiftEndDT.getTime() + 60 * 60 * 1000)
 
   return now >= windowStart && now <= windowEnd
-}
-
-// Team badge colors
-const TEAM_COLORS: Record<string, string> = {
-  A: 'bg-blue-100 text-blue-700 border-blue-200',
-  B: 'bg-rose-100 text-rose-700 border-rose-200',
 }
 
 // ============================================================
@@ -412,19 +408,19 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
       const shiftName = data.shift?.name || displayShift?.name
       setToast({
         type: 'success',
-        message: `✅ Check-in thành công${shiftName ? ` — ${shiftName}` : ''}`,
+        message: `✅ Vào ca thành công${shiftName ? ` — ${shiftName}` : ''}`,
       })
       invalidateAll()
     },
     onError: (err: Error) => {
-      setToast({ type: 'error', message: err.message || 'Lỗi check-in' })
+      setToast({ type: 'error', message: dichLoiHeThong(err, 'Không vào ca được') })
     },
   })
 
   // ── Check-out mutation (via service V4) ──
   const checkOutMutation = useMutation({
     mutationFn: async () => {
-      if (!employeeId) throw new Error('Chưa check-in')
+      if (!employeeId) throw new Error('Không tìm thấy thông tin nhân viên')
 
       return attendanceService.checkOut(employeeId, {
         gps: gpsPosition,
@@ -439,12 +435,12 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
         : ''
       setToast({
         type: 'success',
-        message: `✅ Check-out thành công${shiftName ? ` (${shiftName})` : ''}${workStr}`,
+        message: `✅ Ra ca thành công${shiftName ? ` (${shiftName})` : ''}${workStr}`,
       })
       invalidateAll()
     },
     onError: (err: Error) => {
-      setToast({ type: 'error', message: err.message || 'Lỗi check-out' })
+      setToast({ type: 'error', message: dichLoiHeThong(err, 'Không ra ca được') })
     },
   })
 
@@ -557,7 +553,7 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
           openAttendance.date !== todayVN() && (
             <div className="mt-1.5 flex items-center gap-1.5 text-yellow-200 text-xs">
               <AlertCircle size={10} />
-              <span>Ca đêm từ hôm qua — cần check-out</span>
+              <span>Ca đêm từ hôm qua — cần bấm Ra ca</span>
             </div>
           )}
 
@@ -723,7 +719,7 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
                   ? 'Đang xử lý...'
                   : (() => {
                       const name = (selectedShiftId ? activeShifts.find((s) => s.id === selectedShiftId)?.name : null) || currentShift?.name
-                      return name ? `Check-in — ${name}` : 'Check-in'
+                      return name ? `Vào ca — ${name}` : 'Vào ca'
                     })()}
               </button>
             )}
@@ -744,8 +740,8 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
                 {isActionLoading
                   ? 'Đang xử lý...'
                   : openAttendance?.shift
-                    ? `Check-out — ${openAttendance.shift.name}`
-                    : 'Check-out'}
+                    ? `Ra ca — ${openAttendance.shift.name}`
+                    : 'Ra ca'}
               </button>
             )}
 
@@ -754,7 +750,7 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
               <div className="w-full flex flex-col items-center gap-1 py-3 bg-gray-100 rounded-xl min-h-[48px]">
                 <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
                   <LogOut size={16} />
-                  Check-out khóa
+                  Chưa được Ra ca
                 </div>
                 <span className="text-[11px] text-gray-400">
                   Cần làm ≥ 50% ca — còn {checkoutLockedMinutes > 60 ? `${Math.floor(checkoutLockedMinutes / 60)}h${checkoutLockedMinutes % 60}p` : `${checkoutLockedMinutes} phút`}
@@ -770,7 +766,7 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
                   min-h-[48px] bg-gray-200 text-gray-400 cursor-not-allowed"
               >
                 <LogIn size={18} />
-                Check-in
+                Vào ca
               </button>
             )}
 
@@ -850,10 +846,7 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
                           {sa.team_code && (
                             <span
                               className={`px-1 py-px rounded text-[9px] font-bold border
-                              ${
-                                TEAM_COLORS[sa.team_code] ||
-                                'bg-gray-100 text-gray-600 border-gray-200'
-                              }`}
+                              ${TEAM_BADGE[sa.team_code] || TEAM_BADGE_DEFAULT}`}
                             >
                               {sa.team_code}
                             </span>

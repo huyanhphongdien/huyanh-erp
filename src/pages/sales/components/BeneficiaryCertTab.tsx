@@ -5,6 +5,7 @@
 
 import { useState, useEffect, type ReactNode } from 'react'
 import { Spin, Button, Space, Typography, Result, message } from 'antd'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { PrinterOutlined, FileWordOutlined, FileProtectOutlined } from '@ant-design/icons'
 import { documentService, type BeneficiaryCertData } from '../../../services/sales/documentService'
 import { beneficiaryCertDoc, saveDocx } from '../../../services/sales/docxExport'
@@ -32,7 +33,7 @@ export default function BeneficiaryCertTab({ orderId, lotNo = 0 }: { orderId: st
         const r = await documentService.getBeneficiaryCertData(orderId, lotNo)
         if (!cancelled) setD(r)
       } catch (e: any) {
-        if (!cancelled) { setError(true); message.error(e?.message || 'Lỗi tải Beneficiary Certificate') }
+        if (!cancelled) { setError(true); message.error(dichLoiHeThong(e, 'Lỗi tải Beneficiary Certificate')) }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -40,7 +41,7 @@ export default function BeneficiaryCertTab({ orderId, lotNo = 0 }: { orderId: st
     return () => { cancelled = true }
   }, [orderId, lotNo])
 
-  if (loading) return <Spin tip="Loading..." />
+  if (loading) return <Spin tip="Đang tải..." />
   if (error || !d) return <Result icon={<FileProtectOutlined />} title="Beneficiary's Certificate" subTitle="Chưa tải được dữ liệu" />
 
   const row = (k: string, v: ReactNode) => (

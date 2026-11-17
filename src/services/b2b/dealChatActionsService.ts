@@ -13,6 +13,9 @@ import { supabase } from '../../lib/supabase'
 import type { AddAdvanceFormData } from '../../components/b2b/AddAdvanceModal'
 import type { RecordDeliveryFormData } from '../../components/b2b/RecordDeliveryModal'
 import type { DealCardMetadata } from '../../types/b2b.types'
+// Hằng thuần (không kéo thư viện) — file này nằm trong chuỗi import của app cân (qua dealWmsService),
+// nên CỐ Ý không import utils/format (dayjs). formatCurrency bên dưới giữ cục bộ vì lý do đó.
+import { DEAL_STATUS_LABELS, type DealStatus } from '../../types/b2b.constants'
 
 // ============================================
 // TYPES
@@ -134,7 +137,7 @@ export const dealChatActionsService = {
     // (actual_drc + BGĐ approve) rồi mới được ứng.
     if (deal.status !== 'accepted') {
       throw new Error(
-        `Chỉ được tạm ứng khi deal đã DUYỆT. Hiện: "${deal.status}". ` +
+        `Chỉ được tạm ứng khi deal đã DUYỆT. Hiện: "${DEAL_STATUS_LABELS[deal.status as DealStatus] || deal.status}". ` +
         `Hãy duyệt deal trước khi ứng tiền.`
       )
     }
@@ -232,7 +235,7 @@ export const dealChatActionsService = {
           sender_type: context.actionByType,
           sender_id: context.actionBy,
           message_type: 'system',
-          content: `💰 Ứng thêm ${formatCurrency(formData.amount)} VNĐ cho Deal ${context.dealNumber} (${advanceNumber})`,
+          content: `💰 Ứng thêm ${formatCurrency(formData.amount)} ₫ cho Deal ${context.dealNumber} (${advanceNumber})`,
           metadata: {
             advance_id: advance.id,
             advance_number: advanceNumber,

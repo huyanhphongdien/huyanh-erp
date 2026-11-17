@@ -7,13 +7,17 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Input, Select, message, Spin, Button, Modal, Empty } from 'antd'
-import { Search, RefreshCw } from 'lucide-react'
+import { Search, RefreshCw, Plus, List } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { salesStageService } from '../../services/sales/salesStageService'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
 import QuickPayModal, { type QuickPayTarget } from './components/QuickPayModal'
 import { salesOrderPaymentService, type OrderLotMoney } from '../../services/sales/salesOrderPaymentService'
+import { fmtMoney } from '../../services/sales/salesMoney'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
+import { useOpenTab } from '../../hooks/useOpenTab'
 import {
   SALES_STAGES,
   SALES_STAGE_LABELS,
@@ -24,12 +28,8 @@ import {
   type SalesStage,
 } from '../../services/sales/salesStages'
 
-// Format tiền USD gọn cho KPI cột (vd $5.9M, $307K)
-const fmtUsdCompact = (v: number): string => {
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1000)}K`
-  return `$${Math.round(v)}`
-}
+// Tiền USD gọn cho KPI cột (vd $5.90M, $307K) — fmtMoney compact (salesMoney), không tự chép formatter
+const fmtUsdCompact = (v: number): string => fmtMoney(v, 'USD', { compact: true })
 
 // Stage rank cho forward-only validation
 const STAGE_RANK: Record<SalesStage, number> = {
@@ -45,6 +45,9 @@ import KanbanCard, { type KanbanOrder } from './components/KanbanCard'
 import { dispatchService, type LotProgress } from '../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../services/sales/salesTypes'
 
+/** Thẻ Kanban + id người phụ trách — lọc "Của tôi" so theo ID, không so chuỗi tên. */
+type KanbanRow = KanbanOrder & { current_owner_id: string | null }
+
 // ============================================================================
 // MAIN PAGE
 // ============================================================================
@@ -52,11 +55,14 @@ import { soDisplayCode } from '../../services/sales/salesTypes'
 export default function SalesKanbanPage() {
   const user = useAuthStore(s => s.user)
   const navigate = useNavigate()
+  const openTab = useOpenTab()
   const canCollect = ['accounting', 'admin'].includes(getSalesRole(user) || '')
-  const [orders, setOrders] = useState<KanbanOrder[]>([])
+  const [orders, setOrders] = useState<KanbanRow[]>([])
   const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})
   const [lotPay, setLotPay] = useState<Record<string, OrderLotMoney>>({})
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "cột nào cũng rảnh" — hiện khối lỗi + Thử lại thay cho bảng trống
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [search, setSearch] = useState('')
   const [filterEtd, setFilterEtd] = useState<'all' | '7d' | '14d' | '30d'>('all')
   const [showOnlyMine, setShowOnlyMine] = useState(false)
@@ -76,10 +82,12 @@ export default function SalesKanbanPage() {
   // ── Fetch ──
   const fetchOrders = async () => {
     setLoading(true)
+    setLoadError(null)
     const { data, error } = await supabase
       .from('sales_orders')
       .select(`
         id, code, contract_no, grade, quantity_tons, status, total_value_usd,
+        currency, total_value_vnd,
         payment_status, actual_payment_amount,
         delivery_date, etd, current_stage, current_owner_id,
         stage_started_at, stage_sla_hours,
@@ -99,13 +107,14 @@ export default function SalesKanbanPage() {
       message.error(
         isJwt
           ? 'Phiên đăng nhập có vấn đề — bấm Làm mới, nếu vẫn lỗi thì đăng xuất rồi đăng nhập lại.'
-          : 'Lỗi tải đơn: ' + error.message,
+          : dichLoiHeThong(error, 'Lỗi tải đơn'),
         6,
       )
+      setLoadError(error)
       return
     }
 
-    const mapped: KanbanOrder[] = (data || []).map((o: any) => {
+    const mapped: KanbanRow[] = (data || []).map((o: any) => {
       const customer = Array.isArray(o.customer) ? o.customer[0] : o.customer
       const owner = Array.isArray(o.owner) ? o.owner[0] : o.owner
       return {
@@ -117,6 +126,9 @@ export default function SalesKanbanPage() {
         quantity_tons: o.quantity_tons,
         status: o.status,
         total_value_usd: o.total_value_usd,
+        // Đồng tiền của đơn — thẻ (KanbanCard) vẽ tiền theo đúng ký hiệu $/₫ (đơn VNĐ không hiện "$")
+        currency: o.currency ?? null,
+        total_value_vnd: o.total_value_vnd ?? null,
         payment_status: o.payment_status || null,
         actual_payment_amount: o.actual_payment_amount ?? null,
         delivery_date: o.delivery_date,
@@ -125,6 +137,7 @@ export default function SalesKanbanPage() {
         stage_started_at: o.stage_started_at,
         stage_sla_hours: o.stage_sla_hours,
         current_owner_name: owner?.full_name || null,
+        current_owner_id: o.current_owner_id ?? null,   // đã có trong select — trước đây bị bỏ khi map
       }
     })
     setOrders(mapped)
@@ -161,10 +174,8 @@ export default function SalesKanbanPage() {
         if (days > cutoff) return false
       }
       if (showOnlyMine && user?.employee_id) {
-        // owner_id check — simplified: if owner_name truthy match user name
-        // Better: check current_owner_id === user.employee_id (need add to KanbanOrder)
-        if (!o.current_owner_name || !user.full_name) return false
-        if (o.current_owner_name !== user.full_name) return false
+        // So theo ID người phụ trách (trước đây so chuỗi tên: trùng tên / gõ khác một dấu là lọc câm)
+        if (o.current_owner_id !== user.employee_id) return false
       }
       if (showOnlyOverdue) {
         if (!o.stage_started_at || !o.stage_sla_hours) return false
@@ -178,7 +189,7 @@ export default function SalesKanbanPage() {
 
   // ── Group by stage ──
   const byStage = useMemo(() => {
-    const m: Record<SalesStage, KanbanOrder[]> = {
+    const m: Record<SalesStage, KanbanRow[]> = {
       sales: [], raw_material: [], production: [], qc: [],
       packing: [], logistics: [], delivered: [],
     }
@@ -272,7 +283,7 @@ export default function SalesKanbanPage() {
       confirmTransition.orderId,
       confirmTransition.toStage,
       user.employee_id,
-      `Drag từ ${SALES_STAGE_LABELS[confirmTransition.fromStage]} → ${SALES_STAGE_LABELS[confirmTransition.toStage]}`,
+      `Kéo thẻ từ ${SALES_STAGE_LABELS[confirmTransition.fromStage]} → ${SALES_STAGE_LABELS[confirmTransition.toStage]}`,
     )
     setSubmitting(false)
     if (res.success) {
@@ -280,21 +291,37 @@ export default function SalesKanbanPage() {
       setConfirmTransition(null)
       fetchOrders()
     } else {
-      message.error(res.error || 'Lỗi')
+      message.error(dichLoiHeThong(res.error, 'Không chuyển được bộ phận'))
     }
   }
+
+  const openCreateTab = () => openTab({
+    key: 'sales-order-create',
+    title: 'Tạo đơn hàng',
+    componentId: 'sales-order-create',
+    props: {},
+    path: '/sales/orders/new',
+  })
 
   return (
     <div style={{ padding: 16, maxWidth: '100%', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, color: '#111' }}>📋 Sales Kanban — Tiến độ tất cả đơn</h2>
+          <h2 style={{ margin: 0, fontSize: 22, color: '#111' }}>📋 Kanban tiến độ — tất cả đơn</h2>
           <p style={{ color: '#6b7280', margin: '4px 0 0 0', fontSize: 13 }}>
-            {filtered.length}/{orders.length} đơn · Drag card sang cột khác để chuyển bộ phận
+            {filtered.length}/{orders.length} đơn · Kéo thẻ sang cột khác để chuyển bộ phận
           </p>
         </div>
-        <Button icon={<RefreshCw size={14} />} onClick={fetchOrders}>Làm mới</Button>
+        {/* Đường quay về Sổ đơn + tạo đơn — trước đây Kanban là ngõ cụt (chỉ có Làm mới) */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Button icon={<List size={14} />} onClick={() => navigate('/sales/orders')}>Sổ đơn hàng</Button>
+          <Button icon={<RefreshCw size={14} />} onClick={fetchOrders}>Làm mới</Button>
+          <Button type="primary" icon={<Plus size={14} />} onClick={openCreateTab}
+            style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}>
+            Tạo đơn hàng
+          </Button>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -342,6 +369,8 @@ export default function SalesKanbanPage() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
+      ) : loadError ? (
+        <PageState error={loadError} onRetry={fetchOrders} />
       ) : (
         // Swimlane container — co giãn vừa màn hình, 7 cột chia đều
         // Desktop: 7 cột fit toàn bộ width
@@ -532,8 +561,8 @@ export default function SalesKanbanPage() {
         </div>
       )}
 
-      {filtered.length === 0 && !loading && (
-        <Empty description="Không có đơn nào khớp filter" style={{ marginTop: 40 }} />
+      {filtered.length === 0 && !loading && !loadError && (
+        <Empty description="Không có đơn nào khớp bộ lọc" style={{ marginTop: 40 }} />
       )}
 
       {/* Modal ghi nhận đã thu (kéo card vào cột "Đã tất toán") — dùng chung với Công nợ khách */}

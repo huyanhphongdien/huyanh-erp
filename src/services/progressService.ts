@@ -11,6 +11,7 @@
 
 import { supabase } from '../lib/supabase'
 import { insertAutoApproval, type AutoApproveSource } from './approvalService'
+import { computeAutoScore } from './taskScoring'
 
 // ============================================================================
 // TYPES
@@ -202,21 +203,21 @@ export async function updateTaskProgress(input: UpdateProgressInput) {
       // Recurring: auto-approve 80đ, không cần duyệt
       updateData.status = 'finished'
       updateData.self_score = 100
-      updateData.final_score = 80
+      updateData.final_score = computeAutoScore('recurring')
       updateData.evaluation_status = 'approved'
       autoApproveSource = 'recurring'
     } else if (source === 'self') {
       // Self: auto-approve 85đ
       updateData.status = 'finished'
       updateData.self_score = 100
-      updateData.final_score = 85
+      updateData.final_score = computeAutoScore('self')
       updateData.evaluation_status = 'approved'
       autoApproveSource = 'self'
     } else if (source === 'project') {
       // Project: auto-approve 90đ
       updateData.status = 'finished'
       updateData.self_score = 100
-      updateData.final_score = 90
+      updateData.final_score = computeAutoScore('project')
       updateData.evaluation_status = 'approved'
       autoApproveSource = 'project'
     } else {
@@ -371,15 +372,15 @@ export async function updateTaskProgressDirect(
     const source = taskMeta?.task_source || 'assigned'
     if (source === 'recurring') {
       updateData.self_score = 100
-      updateData.final_score = 80
+      updateData.final_score = computeAutoScore('recurring')
       updateData.evaluation_status = 'approved'
     } else if (source === 'self') {
       updateData.self_score = 100
-      updateData.final_score = 85
+      updateData.final_score = computeAutoScore('self')
       updateData.evaluation_status = 'approved'
     } else if (source === 'project') {
       updateData.self_score = 100
-      updateData.final_score = 90
+      updateData.final_score = computeAutoScore('project')
       updateData.evaluation_status = 'approved'
     } else if (taskMeta?.status !== 'finished' && taskMeta?.status !== 'pending_review') {
       updateData.status = 'pending_review'

@@ -14,6 +14,8 @@ import {
   Navigation, Calendar, AlertTriangle,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { fmtNum, fmtVndCompact, fmtDateShort, fmtDateTime as fmtDateTimeStd } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -42,29 +44,17 @@ interface LaoShipment {
 // HELPERS
 // ============================================================================
 
-function fmt(n?: number | null): string {
-  if (n == null || n === 0) return '–'
-  return n.toLocaleString('vi-VN')
-}
+// Số theo vi-VN qua format.ts (toFixed cũ ra DẤU CHẤM thập phân). Tiền KIP/BATH giữ đơn vị riêng;
+// cước VND dùng chung fmtVndCompact ("1,5 tr" / "500.000 ₫"). Thẻ hẹp nên tấn rút gọn "T".
+const fmt = (n?: number | null): string => fmtNum(n, 2)
 function fmtWeight(kg?: number | null): string {
-  if (!kg) return '–'
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}T`
-  return `${fmt(Math.round(kg))} kg`
+  if (!kg) return '—'
+  if (kg >= 1000) return `${fmtNum(kg / 1000, 1)}T`
+  return `${fmtNum(kg)} kg`
 }
-function fmtMoney(a?: number | null): string {
-  if (!a) return '–'
-  if (a >= 1e6) return `${(a / 1e6).toFixed(1)} tr`
-  if (a >= 1e3) return `${(a / 1e3).toFixed(0)}k`
-  return fmt(a)
-}
-function fmtDate(s?: string): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-}
-function fmtDateTime(s?: string): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
+const fmtMoney = (a?: number | null): string => fmtVndCompact(a)
+const fmtDate = (s?: string): string => fmtDateShort(s)
+const fmtDateTime = (s?: string): string => fmtDateTimeStd(s)
 function getMonthLabel(y: number, m: number) { return `Tháng ${m}/${y}` }
 
 const STATUS_CFG: Record<string, { label: string; icon: React.ReactNode; className: string; border: string }> = {
@@ -208,7 +198,7 @@ const ShipmentCard: React.FC<{ shipment: LaoShipment }> = ({ shipment }) => {
                 <span className="text-blue-600 font-mono">{fmt(shipment.loading_cost_bath)} ฿</span>
               )}
               {(shipment.transport_cost_vnd || 0) > 0 && (
-                <span className="text-[#E8A838] font-mono">{fmtMoney(shipment.transport_cost_vnd)} ₫</span>
+                <span className="text-[#E8A838] font-mono">{fmtMoney(shipment.transport_cost_vnd)}</span>
               )}
             </div>
           )}
@@ -257,7 +247,7 @@ const LaoShipmentPage: React.FC = () => {
       setShipments((data || []) as LaoShipment[])
     } catch (err: unknown) {
       console.error('Lỗi tải xuất kho Lào:', err)
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu'))
     } finally {
       setLoading(false)
     }

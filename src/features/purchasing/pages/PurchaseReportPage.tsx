@@ -54,6 +54,14 @@ import purchaseReportService, {
 } from '../../../services/purchaseReportService'
 
 import { exportPurchaseReport } from '../../../utils/purchaseExportExcel'
+import { App as AntdApp } from 'antd'
+import { PO_STATUS_LABELS, PO_STATUS_COLORS } from '../../../services/purchaseOrderService'
+import { EnumTag } from '../../../components/common/EnumTag'
+// formatVND = fmtVndCompact (rút gọn cho thẻ/trục: "9,33 tỷ"/"350,5 tr" — bản cũ toFixed ra "1.5 tỷ" chấm thập phân)
+// formatFullVND = fmtVnd · formatDate = fmtDate — bản tự viết cũ đã xoá
+import { fmtVnd as formatFullVND, fmtVndCompact as formatVND, fmtDate as formatDate, fmtNum, fmtPct } from '../../../utils/format'
+import { toDateStrVN } from '../../../utils/dateVN'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ============================================================================
 // CONSTANTS
@@ -64,34 +72,15 @@ const PIE_COLORS = [
   '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#84CC16',
 ]
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  draft: { label: 'Nháp', color: '#9CA3AF' },
-  confirmed: { label: 'Đã duyệt', color: '#3B82F6' },
-  delivering: { label: 'Đang giao', color: '#F59E0B' },
-  partial: { label: 'Giao 1 phần', color: '#8B5CF6' },
-  completed: { label: 'Hoàn thành', color: '#10B981' },
-  cancelled: { label: 'Hủy', color: '#EF4444' },
-}
+// Nhãn + màu trạng thái đơn: đọc PO_STATUS_LABELS/COLORS của service (bản chép cũ ở đây ghi 'Đã duyệt',
+// 'Giao 1 phần' tím và cả trạng thái 'delivering' không tồn tại — đã xoá)
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-function formatVND(n: number): string {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)} tỷ`
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} tr`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`
-  return n.toLocaleString('vi-VN')
-}
-
-function formatFullVND(n: number): string {
-  return n.toLocaleString('vi-VN') + ' ₫'
-}
-
-function formatDate(d: string): string {
-  if (!d) return '–'
-  return new Date(d).toLocaleDateString('vi-VN')
-}
+/** Tên mục để báo khi một phần báo cáo không tải được */
+const SECTION_NAMES = ['Tổng quan', 'Chi phí theo tháng', 'Top nhà cung cấp', 'Chi phí theo nhóm vật tư', 'Hóa đơn quá hạn', 'Đơn hàng gần đây']
 
 // ============================================================================
 // CUSTOM TOOLTIP
@@ -117,8 +106,11 @@ function ChartTooltip({ active, payload, label }: any) {
 // ============================================================================
 
 export default function PurchaseReportPage() {
+  const { message } = AntdApp.useApp()
   // State
   const [loading, setLoading] = useState(true)
+  // Mục nào tải lỗi (allSettled) — phải báo, không được hiện "Chưa có dữ liệu" giả
+  const [failedSections, setFailedSections] = useState<{ name: string; reason: unknown }[]>([])
   const [summary, setSummary] = useState<PurchaseSummary | null>(null)
   const [monthlyData, setMonthlyData] = useState<MonthlySpending[]>([])
   const [topSuppliers, setTopSuppliers] = useState<TopSupplier[]>([])
@@ -141,15 +133,16 @@ export default function PurchaseReportPage() {
     let from_date: string | undefined
     let to_date: string | undefined
 
+    // Date dựng theo giờ máy → toDateStrVN (toISOString lùi về ngày cuối tháng trước ở UTC+7)
     switch (dateRange) {
       case '3m':
-        from_date = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString().split('T')[0]
+        from_date = toDateStrVN(new Date(now.getFullYear(), now.getMonth() - 3, 1))
         break
       case '6m':
-        from_date = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString().split('T')[0]
+        from_date = toDateStrVN(new Date(now.getFullYear(), now.getMonth() - 6, 1))
         break
       case '12m':
-        from_date = new Date(now.getFullYear(), now.getMonth() - 12, 1).toISOString().split('T')[0]
+        from_date = toDateStrVN(new Date(now.getFullYear(), now.getMonth() - 12, 1))
         break
       case 'custom':
         from_date = fromDate || undefined
@@ -184,8 +177,16 @@ export default function PurchaseReportPage() {
       if (categoryRes.status === 'fulfilled') setCategorySpending(categoryRes.value)
       if (overdueRes.status === 'fulfilled') setOverdueInvoices(overdueRes.value)
       if (recentRes.status === 'fulfilled') setRecentOrders(recentRes.value)
+
+      const results = [summaryRes, monthlyRes, suppliersRes, categoryRes, overdueRes, recentRes]
+      setFailedSections(
+        results
+          .map((r, i) => (r.status === 'rejected' ? { name: SECTION_NAMES[i], reason: r.reason } : null))
+          .filter((x): x is { name: string; reason: unknown } => x !== null)
+      )
     } catch (err) {
       console.error('Error fetching report data:', err)
+      setFailedSections([{ name: 'Báo cáo', reason: err }])
     } finally {
       setLoading(false)
     }
@@ -194,6 +195,10 @@ export default function PurchaseReportPage() {
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
+
+  /** Mục rỗng vì TẢI LỖI thì nói lỗi, không nói "Chưa có dữ liệu" */
+  const emptyOrFailed = (section: string, emptyText: string) =>
+    failedSections.some((f) => f.name === section) ? 'Không tải được mục này — bấm "Thử lại" phía trên' : emptyText
 
   // ============================================
   // EXPORT EXCEL
@@ -206,7 +211,7 @@ export default function PurchaseReportPage() {
       const data = await purchaseReportService.getExportData(type, filters)
 
       if (!data || data.length === 0) {
-        alert('Không có dữ liệu để xuất')
+        message.info('Không có dữ liệu trong khoảng thời gian đang chọn để xuất')
         return
       }
 
@@ -222,7 +227,7 @@ export default function PurchaseReportPage() {
       await exportPurchaseReport(type, data, rangeLabels[dateRange] || '')
     } catch (err) {
       console.error('Export error:', err)
-      alert('Lỗi khi xuất dữ liệu')
+      message.error(dichLoiHeThong(err, 'Lỗi khi xuất dữ liệu'))
     } finally {
       setExporting(false)
     }
@@ -251,7 +256,7 @@ export default function PurchaseReportPage() {
         format: 'vnd' as const,
         icon: DollarSign,
         color: 'emerald',
-        sub: `TB/đơn: ${formatVND(summary.avg_order_value)}`,
+        sub: `Trung bình/đơn: ${formatVND(summary.avg_order_value)}`,
       },
       {
         title: 'Đã thanh toán',
@@ -303,7 +308,7 @@ export default function PurchaseReportPage() {
                   <p className="text-2xl font-bold text-gray-900 mt-1">
                     {card.format === 'vnd'
                       ? formatVND(card.value)
-                      : card.value.toLocaleString('vi-VN')}
+                      : fmtNum(card.value)}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">{card.sub}</p>
                 </div>
@@ -318,12 +323,12 @@ export default function PurchaseReportPage() {
                   {card.trend > 0 ? (
                     <>
                       <ArrowUpRight className="w-3.5 h-3.5 text-green-500" />
-                      <span className="text-green-600">+{card.trend.toFixed(1)}%</span>
+                      <span className="text-green-600">+{fmtPct(card.trend)}</span>
                     </>
                   ) : card.trend < 0 ? (
                     <>
                       <ArrowDownRight className="w-3.5 h-3.5 text-red-500" />
-                      <span className="text-red-600">{card.trend.toFixed(1)}%</span>
+                      <span className="text-red-600">{fmtPct(card.trend)}</span>
                     </>
                   ) : (
                     <>
@@ -404,7 +409,7 @@ export default function PurchaseReportPage() {
         </h3>
 
         {topSuppliers.length === 0 ? (
-          <p className="text-sm text-gray-400 py-8 text-center">Chưa có dữ liệu</p>
+          <p className="text-sm text-gray-400 py-8 text-center">{emptyOrFailed('Top nhà cung cấp', 'Chưa có dữ liệu')}</p>
         ) : (
           <div className="space-y-3">
             {topSuppliers.slice(0, 7).map((s, i) => (
@@ -436,7 +441,7 @@ export default function PurchaseReportPage() {
                       {s.total_orders} hóa đơn
                     </span>
                     <span className="text-[11px] text-gray-400">
-                      {s.pct_of_total.toFixed(1)}%
+                      {fmtPct(s.pct_of_total)}
                     </span>
                   </div>
                 </div>
@@ -454,7 +459,7 @@ export default function PurchaseReportPage() {
         </h3>
 
         {categorySpending.length === 0 ? (
-          <p className="text-sm text-gray-400 py-8 text-center">Chưa có dữ liệu</p>
+          <p className="text-sm text-gray-400 py-8 text-center">{emptyOrFailed('Chi phí theo nhóm vật tư', 'Chưa có dữ liệu')}</p>
         ) : (
           <div className="h-60">
             <ResponsiveContainer width="100%" height="100%">
@@ -511,11 +516,11 @@ export default function PurchaseReportPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-                <th className="pb-2 pr-3 font-medium">Mã HĐ</th>
+                <th className="pb-2 pr-3 font-medium">Mã hóa đơn</th>
                 <th className="pb-2 pr-3 font-medium">Nhà cung cấp</th>
                 <th className="pb-2 pr-3 font-medium text-right">Tổng tiền</th>
                 <th className="pb-2 pr-3 font-medium text-right">Còn nợ</th>
-                <th className="pb-2 pr-3 font-medium">Hạn TT</th>
+                <th className="pb-2 pr-3 font-medium">Hạn thanh toán</th>
                 <th className="pb-2 font-medium text-center">Quá hạn</th>
               </tr>
             </thead>
@@ -569,13 +574,13 @@ export default function PurchaseReportPage() {
       </h3>
 
       {recentOrders.length === 0 ? (
-        <p className="text-sm text-gray-400 py-8 text-center">Chưa có đơn hàng</p>
+        <p className="text-sm text-gray-400 py-8 text-center">{emptyOrFailed('Đơn hàng gần đây', 'Chưa có đơn hàng')}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-                <th className="pb-2 pr-3 font-medium">Mã ĐH</th>
+                <th className="pb-2 pr-3 font-medium">Mã đơn</th>
                 <th className="pb-2 pr-3 font-medium">Ngày</th>
                 <th className="pb-2 pr-3 font-medium">Nhà cung cấp</th>
                 <th className="pb-2 pr-3 font-medium text-right">Giá trị</th>
@@ -585,10 +590,6 @@ export default function PurchaseReportPage() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {recentOrders.map((order) => {
-                const statusInfo = STATUS_LABELS[order.status] || {
-                  label: order.status,
-                  color: '#9CA3AF',
-                }
                 return (
                   <tr key={order.id} className="hover:bg-gray-50/50">
                     <td className="py-2 pr-3">
@@ -602,15 +603,7 @@ export default function PurchaseReportPage() {
                       {formatVND(order.total_amount)}
                     </td>
                     <td className="py-2 pr-3 text-center">
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                        style={{
-                          backgroundColor: statusInfo.color + '15',
-                          color: statusInfo.color,
-                        }}
-                      >
-                        {statusInfo.label}
-                      </span>
+                      <EnumTag value={order.status} labels={PO_STATUS_LABELS} colors={PO_STATUS_COLORS} />
                     </td>
                     <td className="py-2">
                       <div className="flex items-center gap-2">
@@ -753,6 +746,25 @@ export default function PurchaseReportPage() {
           </button>
         </div>
       </div>
+
+      {/* Mục tải lỗi — báo rõ + Thử lại (trước đây allSettled nuốt lỗi, mục hiện "Chưa có dữ liệu" giả) */}
+      {!loading && failedSections.length > 0 && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 text-sm text-red-700">
+            <p className="font-semibold">
+              Không tải được: {failedSections.map((f) => f.name).join(', ')}
+            </p>
+            <p className="mt-0.5 text-red-600">{dichLoiHeThong(failedSections[0].reason, 'Có lỗi khi tải báo cáo')}</p>
+          </div>
+          <button
+            onClick={fetchAll}
+            className="px-3 py-1.5 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-100"
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
 
       {/* Loading */}
       {loading ? (

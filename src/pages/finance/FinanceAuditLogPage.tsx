@@ -34,6 +34,7 @@ export default function FinanceAuditLogPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<unknown>(null)
   const [stats, setStats] = useState({ today: 0, last_7d: 0, last_30d: 0, by_action: { INSERT: 0, UPDATE: 0, DELETE: 0 } })
+  const [statsError, setStatsError] = useState(false)   // lỗi đếm → thẻ hiện '—', không hiện 0 giả
 
   const [tableName, setTableName] = useState<string>('all')
   const [action, setAction] = useState<'INSERT' | 'UPDATE' | 'DELETE' | 'all'>('all')
@@ -73,7 +74,13 @@ export default function FinanceAuditLogPage() {
   }, [page, tableName, action, recordCodeDebounced, changedByEmailDebounced, dateRange])
 
   useEffect(() => { if (isAuthorized) fetchData() }, [fetchData, isAuthorized])
-  useEffect(() => { if (isAuthorized) financeAuditService.getStats().then(setStats).catch(console.error) }, [isAuthorized])
+  useEffect(() => {
+    if (!isAuthorized) return
+    financeAuditService.getStats()
+      .then((s) => { setStats(s); setStatsError(false) })
+      .catch((e) => { console.error(e); setStatsError(true) })
+  }, [isAuthorized])
+  const sv = (n: number) => (statsError ? '—' : n)
 
   if (!isAuthorized) {
     return (
@@ -103,12 +110,12 @@ export default function FinanceAuditLogPage() {
         styles={{ body: { padding: 14 } }}
       >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
-          <StatCard label="Sự kiện hôm nay" value={stats.today} color="#1B4D3E" />
-          <StatCard label="7 ngày" value={stats.last_7d} color="#0a72ef" />
-          <StatCard label="30 ngày" value={stats.last_30d} color="#6366f1" />
-          <StatCard label="🟢 Tạo mới (30d)" value={stats.by_action.INSERT} color="#10b981" />
-          <StatCard label="🔵 Cập nhật (30d)" value={stats.by_action.UPDATE} color="#0a72ef" />
-          <StatCard label="🔴 Xóa (30d)" value={stats.by_action.DELETE} color="#cf1322" />
+          <StatCard label="Sự kiện hôm nay" value={sv(stats.today)} color="#1B4D3E" />
+          <StatCard label="7 ngày" value={sv(stats.last_7d)} color="#0a72ef" />
+          <StatCard label="30 ngày" value={sv(stats.last_30d)} color="#6366f1" />
+          <StatCard label="🟢 Tạo mới (30 ngày)" value={sv(stats.by_action.INSERT)} color="#10b981" />
+          <StatCard label="🔵 Cập nhật (30 ngày)" value={sv(stats.by_action.UPDATE)} color="#0a72ef" />
+          <StatCard label="🔴 Xóa (30 ngày)" value={sv(stats.by_action.DELETE)} color="#cf1322" />
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, padding: 12, background: '#f8f9fa', borderRadius: 8, marginBottom: 14, alignItems: 'center' }}>
@@ -208,7 +215,7 @@ interface TdProps { children: React.ReactNode; align?: 'left' | 'right' | 'cente
 function Td({ children, align = 'left' }: TdProps) {
   return <td style={{ padding: '10px', textAlign: align, verticalAlign: 'middle' }}>{children}</td>
 }
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatCard({ label, value, color }: { label: string; value: number | string; color: string }) {
   return (
     <div style={{ padding: '10px 14px', background: '#fff', border: '1px solid #e4e4e7', borderLeft: `3px solid ${color}`, borderRadius: 8 }}>
       <div style={{ fontSize: 11, color: '#6b7280' }}>{label}</div>

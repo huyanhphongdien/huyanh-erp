@@ -10,6 +10,7 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
+import { approveTasksScored, computeAutoScore, ratingFromScore, type AutoSource } from './taskScoring';
 import {
   getPermissionGroup,
   canUserApproveTask,
@@ -168,27 +169,18 @@ export interface ApprovalPermissionContext {
 // HELPER FUNCTIONS
 // ============================================================================
 
-function calculateRating(score: number): string {
-  if (score >= 90) return 'excellent';
-  if (score >= 70) return 'good';
-  if (score >= 50) return 'average';
-  return 'below_average';
-}
+// Xếp loại + hệ số tự duyệt: MỘT nguồn ở taskScoring.ts (Đợt 3 audit UI) — đừng chép lại ở đây.
+const calculateRating = ratingFromScore;
 
-const AUTO_APPROVE_SCORE = {
-  recurring: 80,
-  self: 85,
-  project: 90,
-  deptmanager: 100,
-} as const;
-
-export type AutoApproveSource = keyof typeof AUTO_APPROVE_SCORE;
+export type AutoApproveSource = AutoSource;
 
 export interface AutoApproveInput {
   task_id: string;
   approver_id: string;
   source: AutoApproveSource;
   self_score?: number;
+  /** điểm cuối đã tính (vd QuickEvalModal); bỏ trống = computeAutoScore(source, self_score) */
+  final_score?: number;
   comments?: string;
 }
 
@@ -203,7 +195,9 @@ export interface AutoApproveInput {
  * user thấy error thay vì silent miss shared_score.
  */
 export async function insertAutoApproval(input: AutoApproveInput): Promise<void> {
-  const finalScore = AUTO_APPROVE_SCORE[input.source];
+  // approved_score PHẢI bằng final_score trên việc — trước đây ghi cứng 80/85/90/100 bất kể tự chấm,
+  // nên người cùng làm (trigger lan approved_score) nhận điểm khác người chính (130 việc lệch, 17/11/2026).
+  const finalScore = input.final_score ?? computeAutoScore(input.source, input.self_score);
   const rating = calculateRating(finalScore);
 
   const { error } = await supabase.from('task_approvals').insert({
@@ -291,38 +285,17 @@ export async function getApprovalHistory(params: { approver_id: string }): Promi
 }
 
 export async function approveTask(input: ApproveTaskInput): Promise<{ success: boolean; error: Error | null }> {
-  console.log('📋 [approveTask]:', input);
-  
+  // Đi qua cửa duyệt CHUNG (taskScoring): input.score = điểm QL 0–100, điểm cuối tính theo công thức
+  // chung (trộn tự chấm, hệ số khó, trừ trễ) và GHI final_score — bản cũ chỉ chèn task_approvals,
+  // tasks.final_score không bao giờ được ghi ở đường này.
   try {
-    const rating = input.rating || calculateRating(input.score);
-
-    const { error: approvalError } = await supabase
-      .from('task_approvals')
-      .insert({
-        task_id: input.task_id,
-        approver_id: input.approver_id,
-        action: 'approved',
-        approved_score: input.score,
-        original_score: input.score,
-        rating: rating,
-        comments: input.comments || null,
-      });
-
-    if (approvalError) throw approvalError;
-
-    if (input.self_evaluation_id) {
-      await supabase
-        .from('task_self_evaluations')
-        .update({ status: 'approved', updated_at: new Date().toISOString() })
-        .eq('id', input.self_evaluation_id);
-    }
-
-    await supabase
-      .from('tasks')
-      .update({ evaluation_status: 'approved' })
-      .eq('id', input.task_id);
-
-    console.log('✅ [approveTask] Approved successfully');
+    const res = await approveTasksScored([{
+      taskId: input.task_id,
+      managerPoints: input.score,
+      note: input.comments || null,
+      selfEvaluationId: input.self_evaluation_id || null,
+    }], input.approver_id, 'Phê duyệt');
+    if (res.failed.length) throw new Error(res.failed[0].error);
     return { success: true, error: null };
   } catch (error) {
     console.error('❌ [approveTask] error:', error);
@@ -711,65 +684,18 @@ export const approvalService = {
   },
 
   async quickApprove(input: QuickApproveInput): Promise<{ success: boolean; error: Error | null }> {
-    console.log('📋 [approvalService] quickApprove:', input);
-
+    // Phê duyệt nhanh việc CHƯA tự đánh giá → cửa duyệt chung với ignoreSelf (điểm = trọn điểm QL,
+    // vẫn nhân hệ số khó / trừ trễ). Bản cũ chèn một bản "tự đánh giá" giả mang ĐIỂM CỦA QL vào
+    // task_self_evaluations → báo cáo hiệu suất đếm điểm QL như điểm tự chấm của NV. Đã bỏ.
+    // Việc còn mở (overdue/in_progress…) được approveTasksScored đưa lên progress 100 + finished.
     try {
-      const rating = calculateRating(input.score);
-
-      // BƯỚC 1: Đảm bảo task có progress=100 và status=finished
-      // Trigger validate_task_status_progress yêu cầu finished phải có progress=100
-      // Task overdue thường có progress < 100 → phải update trước khi insert self_eval
-      const { error: taskUpdateError } = await supabase
-        .from('tasks')
-        .update({
-          progress: 100,
-          status: 'finished',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', input.task_id)
-        .in('status', ['overdue', 'in_progress', 'draft', 'assigned', 'paused']);
-        // Chỉ update nếu chưa finished, tránh đụng task đã finished thật
-
-      if (taskUpdateError) throw taskUpdateError;
-
-      // BƯỚC 2: Insert self_evaluation
-      const { error: selfEvalError } = await supabase
-        .from('task_self_evaluations')
-        .insert({
-          task_id: input.task_id,
-          employee_id: input.employee_id,
-          completion_percentage: 100,
-          self_score: input.score,
-          quality_assessment: rating,
-          status: 'approved',
-          revision_count: 0,
-          submitted_at: new Date().toISOString(),
-        });
-
-      if (selfEvalError) throw selfEvalError;
-
-      // BƯỚC 3: Insert approval record
-      const { error: approvalError } = await supabase
-        .from('task_approvals')
-        .insert({
-          task_id: input.task_id,
-          approver_id: input.approver_id,
-          action: 'approved',
-          approved_score: input.score,
-          original_score: input.score,
-          rating: rating,
-          comments: input.comments || 'Phê duyệt nhanh bởi Manager',
-        });
-
-      if (approvalError) throw approvalError;
-
-      // BƯỚC 4: Cập nhật evaluation_status
-      await supabase
-        .from('tasks')
-        .update({ evaluation_status: 'approved' })
-        .eq('id', input.task_id);
-
-      console.log('✅ [approvalService] Quick approved successfully');
+      const res = await approveTasksScored([{
+        taskId: input.task_id,
+        managerPoints: input.score,
+        note: input.comments || null,
+        ignoreSelf: true,
+      }], input.approver_id, 'Phê duyệt nhanh bởi Manager');
+      if (res.failed.length) throw new Error(res.failed[0].error);
       return { success: true, error: null };
     } catch (error) {
       console.error('❌ [approvalService] quickApprove error:', error);

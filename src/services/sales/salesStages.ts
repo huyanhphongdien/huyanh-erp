@@ -146,10 +146,11 @@ export function getSLAStatus(
 export function formatDwell(hours: number | null): string {
   if (!hours || hours <= 0) return '—'
   if (hours < 1) return `${Math.round(hours * 60)} phút`
-  if (hours < 24) return `${hours.toFixed(1)}h`
-  const days = Math.floor(hours / 24)
-  const rh = Math.round(hours % 24)
-  return rh > 0 ? `${days}d ${rh}h` : `${days}d`
+  if (hours < 24) return `${hours.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} giờ`
+  const totalH = Math.round(hours)   // làm tròn trước để không ra "1 ngày 24 giờ"
+  const days = Math.floor(totalH / 24)
+  const rh = totalH % 24
+  return rh > 0 ? `${days} ngày ${rh} giờ` : `${days} ngày`
 }
 
 // Status pill colors (Vercel-inspired) — dùng ở StagePill component

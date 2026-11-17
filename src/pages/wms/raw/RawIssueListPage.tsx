@@ -7,17 +7,20 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, Col, Row, Select, Space, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { ArrowLeftOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, PlusOutlined, ReloadOutlined, MobileOutlined } from '@ant-design/icons'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { rawIssueService, RAW_ISSUE_PURPOSE_LABELS, RAW_ISSUE_STATUS_COLORS, RAW_ISSUE_STATUS_LABELS, type RawIssueOrder, type RawIssueStatus } from '../../../services/wms/rawIssueService'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { useIsPhone } from '../../../hooks/useIsPhone'
+import { fmtKg, fmtDateTime as fmtTime } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { stdPagination } from '../../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
-const fmtKg = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }))
-const fmtTime = (iso: string | null) => (iso ? new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '—')
 
 export default function RawIssueListPage() {
   const navigate = useNavigate()
+  const isPhone = useIsPhone()
   const { data: facilities } = useActiveFacilities()
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined)
   const [facilityInit, setFacilityInit] = useState(false)
@@ -36,7 +39,7 @@ export default function RawIssueListPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try { setRows(await rawIssueService.list({ facilityId, status: status === 'all' ? null : status })) }
-    catch (e: any) { setError(e?.message || 'Không tải được danh sách lệnh xuất') }
+    catch (e: any) { setError(dichLoiHeThong(e, 'Không tải được danh sách lệnh xuất')) }
     finally { setLoading(false) }
   }, [facilityId, status])
 
@@ -77,9 +80,15 @@ export default function RawIssueListPage() {
             </Space>
           </Col>
         </Row>
-        {error && <Alert type="error" showIcon message={error} description="Kiểm tra đã chạy migration wms_nvl_p2_lenh_xuat_can_lai.sql chưa." />}
+        {isPhone && (
+          <Alert type="info" showIcon message="Đang mở trên điện thoại — bản điện thoại cân và ký lệnh xuất dễ hơn"
+            action={<Button size="small" type="primary" icon={<MobileOutlined />} onClick={() => navigate('/m/kho/xuat')}>Mở bản điện thoại</Button>} />
+        )}
+        {error && <Alert type="error" showIcon message={error} description="Nếu vẫn lỗi sau khi thử lại, chụp màn hình gửi quản trị."
+          action={<Button size="small" onClick={load}>Thử lại</Button>} />}
         <Card size="small" bodyStyle={{ padding: 0 }}>
-          <Table<RawIssueOrder> rowKey="id" columns={columns} dataSource={rows} size="small" loading={loading} pagination={{ pageSize: 20, showSizeChanger: false }} />
+          <Table<RawIssueOrder> rowKey="id" columns={columns} dataSource={rows} size="small" loading={loading} pagination={stdPagination(20)}
+            locale={error ? { emptyText: 'Không tải được — xem lỗi phía trên' } : undefined} />
         </Card>
       </Space>
     </div>

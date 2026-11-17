@@ -29,6 +29,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { rubberGradeService } from '../../services/wms/rubberGradeService'
 import GradeBadge from './GradeBadge'
+import { fmtPct } from '../../utils/format'
 
 const { Text } = Typography
 
@@ -214,7 +215,7 @@ export const DRCGauge: React.FC<{
               fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
               fontFamily: "'JetBrains Mono', monospace",
             }}>
-              {value.toFixed(1)}%
+              {fmtPct(value, 1)}
             </div>
           )}
         </div>

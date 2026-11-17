@@ -3,33 +3,39 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Alert, Card, Descriptions, Tag, Button, Space, Typography, Row, Col, Table, Divider, Spin, Empty, Modal, Form, Input, Select, Statistic, message, Breadcrumb, Popconfirm, InputNumber } from 'antd'
 import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, DollarOutlined, PrinterOutlined, EditOutlined, SendOutlined, PlusOutlined } from '@ant-design/icons'
 import { settlementService, Settlement, SettlementStatus, SETTLEMENT_STATUS_LABELS, SETTLEMENT_STATUS_COLORS, SETTLEMENT_TYPE_LABELS } from '../../../services/b2b/settlementService'
-import { paymentService } from '../../../services/b2b/paymentService'
+import { paymentService, PAYMENT_METHOD_LABELS } from '../../../services/b2b/paymentService'
 import PaymentForm from '../../../components/b2b/PaymentForm'
 import ApprovalTimeline from '../../../components/b2b/ApprovalTimeline'
 import { SettlementStatusTag } from '../../../components/ui/StatusTag'
 import { useAuthStore } from '../../../stores/authStore'
 import { supabase } from '../../../lib/supabase'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import { TIER_LABELS, TIER_COLORS } from '../../../services/b2b/partnerService'
+import { DASH, fmtDate, fmtNum, fmtVnd, vndInputProps } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
+import EnumTag, { enumLabel } from '../../../components/common/EnumTag'
 
 const { Title, Text } = Typography
 
-const TIER_COLORS: Record<string, string> = { diamond: 'purple', gold: 'gold', silver: 'default', bronze: 'orange', new: 'cyan' }
-
-const formatCurrency = (value: number | null): string => {
-  if (!value) return '-'
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value)
+// Loại hạng mục: gộp mã của modal "Thêm hạng mục" (dưới) + mã của SettlementItemsTable lúc tạo phiếu
+// — cột "Loại" từng in thẳng mã tiếng Anh 'transport_fee'… (audit 17/11/2026).
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  transport_fee: 'Phí vận chuyển',
+  processing_fee: 'Phí gia công',
+  quality_bonus: 'Thưởng chất lượng',
+  quality_penalty: 'Phạt chất lượng',
+  late_penalty: 'Phạt chậm giao',
+  loyalty_bonus: 'Thưởng khách hàng thân thiết',
+  adjustment: 'Điều chỉnh khác',
+  rubber: 'Mủ cao su',
+  transport: 'Vận chuyển',
+  processing: 'Gia công',
+  deduction: 'Khấu trừ',
+  bonus: 'Thưởng',
+  penalty: 'Phạt',
+  other: 'Khác',
 }
-
-const formatDate = (dateStr: string | null): string => {
-  if (!dateStr) return '-'
-  return format(new Date(dateStr), 'dd/MM/yyyy', { locale: vi })
-}
-
-const formatNumber = (value: number | null): string => {
-  if (!value) return '-'
-  return value.toLocaleString('vi-VN')
-}
+const ADD_ITEM_TYPES = ['transport_fee', 'processing_fee', 'quality_bonus', 'quality_penalty', 'late_penalty', 'loyalty_bonus', 'adjustment', 'other']
 
 const SettlementDetailPage = () => {
   const { id } = useParams<{ id: string }>()
@@ -47,6 +53,8 @@ const SettlementDetailPage = () => {
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
   const [addItemForm] = Form.useForm()
   const { user } = useAuthStore()
+  // Lỗi tải phiếu ≠ "không tìm thấy phiếu" — trước đây mất mạng cũng hiện "Không tìm thấy" (audit 17/11/2026)
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   // Lookup employee_id of current auth user (FK target cho approved_by / rejected_by / paid_by).
   // Cache lại local để không phải query mỗi lần click.
@@ -66,10 +74,12 @@ const SettlementDetailPage = () => {
     if (!id) return
     try {
       setLoading(true)
+      setLoadError(null)
       const data = await settlementService.getSettlementById(id)
       setSettlement(data)
     } catch (err) {
-      message.error('Không thể tải thông tin phiếu quyết toán')
+      setLoadError(err)
+      message.error(dichLoiHeThong(err, 'Không thể tải thông tin phiếu quyết toán'))
     } finally {
       setLoading(false)
     }
@@ -86,7 +96,7 @@ const SettlementDetailPage = () => {
       message.success('Đã gửi duyệt thành công')
       fetchSettlement()
     } catch (err) {
-      message.error('Gửi duyệt thất bại')
+      message.error(dichLoiHeThong(err, 'Gửi duyệt thất bại'))
     }
   }
 
@@ -101,7 +111,7 @@ const SettlementDetailPage = () => {
       approvalForm.resetFields()
       fetchSettlement()
     } catch (err) {
-      message.error('Duyệt phiếu thất bại')
+      message.error(dichLoiHeThong(err, 'Duyệt phiếu thất bại'))
     }
   }
 
@@ -116,8 +126,9 @@ const SettlementDetailPage = () => {
       setRejectModalOpen(false)
       rejectForm.resetFields()
       fetchSettlement()
-    } catch (err) {
-      message.error('Từ chối phiếu thất bại')
+    } catch (err: any) {
+      if (err?.errorFields) return
+      message.error(dichLoiHeThong(err, 'Từ chối phiếu thất bại'))
     } finally {
       setActionLoading(false)
     }
@@ -147,7 +158,8 @@ const SettlementDetailPage = () => {
       markPaidForm.resetFields()
       fetchSettlement()
     } catch (err: any) {
-      message.error(err?.message || 'Cập nhật trạng thái thất bại')
+      if (err?.errorFields) return
+      message.error(dichLoiHeThong(err, 'Cập nhật trạng thái thất bại'))
     } finally {
       setActionLoading(false)
     }
@@ -160,7 +172,7 @@ const SettlementDetailPage = () => {
       message.success('Đã hủy phiếu quyết toán')
       fetchSettlement()
     } catch (err) {
-      message.error('Hủy phiếu thất bại')
+      message.error(dichLoiHeThong(err, 'Hủy phiếu thất bại'))
     }
   }
 
@@ -171,7 +183,7 @@ const SettlementDetailPage = () => {
       message.success('Đã xóa phiếu quyết toán')
       navigate('/b2b/settlements')
     } catch (err) {
-      message.error('Xóa phiếu thất bại')
+      message.error(dichLoiHeThong(err, 'Xóa phiếu thất bại'))
     }
   }
 
@@ -206,7 +218,7 @@ const SettlementDetailPage = () => {
       fetchSettlement()
     } catch (err: any) {
       if (err?.errorFields) return
-      message.error(err?.message || 'Không thể thêm hạng mục')
+      message.error(dichLoiHeThong(err, 'Không thể thêm hạng mục'))
     } finally {
       setActionLoading(false)
     }
@@ -220,6 +232,14 @@ const SettlementDetailPage = () => {
     )
   }
 
+  if (loadError) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState error={loadError} onRetry={fetchSettlement} />
+      </div>
+    )
+  }
+
   if (!settlement) {
     return (
       <Empty description="Không tìm thấy phiếu quyết toán" />
@@ -227,33 +247,32 @@ const SettlementDetailPage = () => {
   }
 
   const itemColumns = [
-    { title: 'Loại', dataIndex: 'item_type', key: 'item_type' },
+    { title: 'Loại', dataIndex: 'item_type', key: 'item_type', render: (v: string) => enumLabel(ITEM_TYPE_LABELS, v) },
     { title: 'Mô tả', dataIndex: 'description', key: 'description' },
-    { title: 'SL', dataIndex: 'quantity', key: 'quantity', render: (v: number) => formatNumber(v) },
-    { title: 'Đơn giá', dataIndex: 'unit_price', key: 'unit_price', render: (v: number) => formatCurrency(v) },
-    { title: 'Thành tiền', dataIndex: 'amount', key: 'amount', render: (v: number) => formatCurrency(v) },
+    { title: 'SL', dataIndex: 'quantity', key: 'quantity', render: (v: number) => (v ? fmtNum(v, 3) : DASH) },
+    { title: 'Đơn giá', dataIndex: 'unit_price', key: 'unit_price', render: (v: number) => (v ? fmtVnd(v) : DASH) },
+    { title: 'Thành tiền', dataIndex: 'amount', key: 'amount', render: (v: number) => fmtVnd(v) },
     { title: 'Nợ/Có', dataIndex: 'is_credit', key: 'is_credit', render: (v: boolean) => v ? 'Có' : 'Nợ' },
   ]
 
   const advanceColumns = [
-    { title: 'Ngày', dataIndex: 'advance_date', key: 'advance_date', render: (v: string) => formatDate(v) },
-    { title: 'Số tiền', dataIndex: 'amount', key: 'amount', render: (v: number) => formatCurrency(v) },
+    { title: 'Ngày', dataIndex: 'advance_date', key: 'advance_date', render: (v: string) => fmtDate(v) },
+    { title: 'Số tiền', dataIndex: 'amount', key: 'amount', render: (v: number) => fmtVnd(v) },
     { title: 'Ghi chú', dataIndex: 'notes', key: 'notes' },
   ]
 
+  // dataIndex theo đúng cột b2b_settlement_payments (SettlementPayment) — trước đây trỏ 'date'/'method'/
+  // 'recipient'/'bank'/'note' không tồn tại nên 5/6 cột Lịch sử thanh toán luôn trống (audit 17/11/2026).
   const paymentColumns = [
-    { title: 'Ngày', dataIndex: 'date', key: 'date', render: (v: string) => formatDate(v) },
-    { title: 'Số tiền', dataIndex: 'amount', key: 'amount', render: (v: number) => formatCurrency(v) },
+    { title: 'Ngày', dataIndex: 'payment_date', key: 'payment_date', render: (v: string) => fmtDate(v) },
+    { title: 'Số tiền', dataIndex: 'amount', key: 'amount', render: (v: number) => fmtVnd(v) },
     {
-      title: 'Phương thức', dataIndex: 'method', key: 'method',
-      render: (v: string) => {
-        const labels: Record<string, string> = { bank_transfer: 'Chuyển khoản', cash: 'Tiền mặt', check: 'Séc' }
-        return labels[v] || v
-      },
+      title: 'Phương thức', dataIndex: 'payment_method', key: 'payment_method',
+      render: (v: string) => enumLabel(PAYMENT_METHOD_LABELS, v),
     },
-    { title: 'Người nhận', dataIndex: 'recipient', key: 'recipient' },
-    { title: 'Ngân hàng', dataIndex: 'bank', key: 'bank' },
-    { title: 'Ghi chú', dataIndex: 'note', key: 'note' },
+    { title: 'Người nhận', dataIndex: 'recipient_name', key: 'recipient_name' },
+    { title: 'Ngân hàng', dataIndex: 'bank_name', key: 'bank_name' },
+    { title: 'Ghi chú', dataIndex: 'notes', key: 'notes' },
   ]
 
   const renderActionButtons = () => {
@@ -278,7 +297,7 @@ const SettlementDetailPage = () => {
 
     if (settlement.status === 'draft') {
       buttons.push(
-        <Popconfirm key="delete" title="Bạn có chắc muốn xóa phiếu này?" onConfirm={handleDelete} okText="Xóa" cancelText="Hủy">
+        <Popconfirm key="delete" title="Bạn có chắc muốn xóa phiếu này?" description="Phiếu nháp bị xoá hẳn, không khôi phục được." onConfirm={handleDelete} okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
           <Button danger>Xóa</Button>
         </Popconfirm>
       )
@@ -324,7 +343,7 @@ const SettlementDetailPage = () => {
 
     if (settlement.status !== 'cancelled' && settlement.status !== 'paid' && settlement.status !== 'rejected') {
       buttons.push(
-        <Popconfirm key="cancel" title="Bạn có chắc muốn hủy phiếu này?" onConfirm={handleCancel} okText="Hủy phiếu" cancelText="Đóng">
+        <Popconfirm key="cancel" title="Bạn có chắc muốn hủy phiếu này?" onConfirm={handleCancel} okText="Hủy phiếu" cancelText="Đóng" okButtonProps={{ danger: true }}>
           <Button danger icon={<CloseCircleOutlined />}>Hủy</Button>
         </Popconfirm>
       )
@@ -364,22 +383,22 @@ const SettlementDetailPage = () => {
                   <Alert type="info" message={settlement.notes} style={{ marginTop: 8 }} />
                 )}
               </Descriptions.Item>
-              <Descriptions.Item label="Sản phẩm">{settlement.product_type || '-'}</Descriptions.Item>
-              <Descriptions.Item label="KL cân">{settlement.weighed_kg ? `${formatNumber(settlement.weighed_kg)} kg` : '-'}</Descriptions.Item>
-              <Descriptions.Item label="KL thành phẩm">{settlement.finished_kg ? `${formatNumber(settlement.finished_kg)} kg` : '-'}</Descriptions.Item>
-              <Descriptions.Item label="DRC">{settlement.drc_percent ? `${settlement.drc_percent}%` : '-'}</Descriptions.Item>
-              <Descriptions.Item label="Đơn giá duyệt">{formatCurrency(settlement.approved_price)}</Descriptions.Item>
-              <Descriptions.Item label="Biển số xe">{settlement.vehicle_plates?.join(', ') || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Sản phẩm">{settlement.product_type || DASH}</Descriptions.Item>
+              <Descriptions.Item label="KL cân">{settlement.weighed_kg ? `${fmtNum(settlement.weighed_kg, 3)} kg` : DASH}</Descriptions.Item>
+              <Descriptions.Item label="KL thành phẩm">{settlement.finished_kg ? `${fmtNum(settlement.finished_kg, 3)} kg` : DASH}</Descriptions.Item>
+              <Descriptions.Item label="DRC">{settlement.drc_percent ? `${settlement.drc_percent}%` : DASH}</Descriptions.Item>
+              <Descriptions.Item label="Đơn giá duyệt">{settlement.approved_price ? fmtVnd(settlement.approved_price) : DASH}</Descriptions.Item>
+              <Descriptions.Item label="Biển số xe">{settlement.vehicle_plates?.join(', ') || DASH}</Descriptions.Item>
               <Descriptions.Item label="Tài xế">
-                {settlement.driver_name ? `${settlement.driver_name}${settlement.driver_phone ? ` - ${settlement.driver_phone}` : ''}` : '-'}
+                {settlement.driver_name ? `${settlement.driver_name}${settlement.driver_phone ? ` - ${settlement.driver_phone}` : ''}` : DASH}
               </Descriptions.Item>
               <Descriptions.Item label="Ngày cân">
                 {settlement.weigh_date_start || settlement.weigh_date_end
-                  ? `${formatDate(settlement.weigh_date_start || '')} - ${formatDate(settlement.weigh_date_end || '')}`
-                  : '-'}
+                  ? `${fmtDate(settlement.weigh_date_start)} - ${fmtDate(settlement.weigh_date_end)}`
+                  : DASH}
               </Descriptions.Item>
-              <Descriptions.Item label="Ngày nhập kho">{formatDate(settlement.stock_in_date)}</Descriptions.Item>
-              <Descriptions.Item label="Ghi chú" span={2}>{settlement.notes || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Ngày nhập kho">{fmtDate(settlement.stock_in_date)}</Descriptions.Item>
+              <Descriptions.Item label="Ghi chú" span={2}>{settlement.notes || DASH}</Descriptions.Item>
             </Descriptions>
           </Card>
 
@@ -434,16 +453,12 @@ const SettlementDetailPage = () => {
         <Col span={8}>
           <Card title="Đối tác" style={{ borderRadius: 8, marginBottom: 16 }}>
             <Descriptions column={1} size="small">
-              <Descriptions.Item label="Tên">{settlement.partner?.name || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Mã">{settlement.partner?.code || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Tên">{settlement.partner?.name || DASH}</Descriptions.Item>
+              <Descriptions.Item label="Mã">{settlement.partner?.code || DASH}</Descriptions.Item>
               <Descriptions.Item label="Hạng">
-                {settlement.partner?.tier ? (
-                  <Tag color={TIER_COLORS[settlement.partner.tier] || 'default'}>
-                    {settlement.partner.tier.toUpperCase()}
-                  </Tag>
-                ) : '-'}
+                <EnumTag value={settlement.partner?.tier} labels={TIER_LABELS} colors={TIER_COLORS} />
               </Descriptions.Item>
-              <Descriptions.Item label="SĐT">{settlement.partner?.phone || '-'}</Descriptions.Item>
+              <Descriptions.Item label="SĐT">{settlement.partner?.phone || DASH}</Descriptions.Item>
             </Descriptions>
           </Card>
 
@@ -453,7 +468,7 @@ const SettlementDetailPage = () => {
                 <Statistic
                   title="Tổng tiền hàng"
                   value={settlement.gross_amount || 0}
-                  formatter={(val) => formatCurrency(val as number)}
+                  formatter={(val) => fmtVnd(val as number)}
                   valueStyle={{ color: '#1B4D3E' }}
                 />
               </Col>
@@ -461,7 +476,7 @@ const SettlementDetailPage = () => {
                 <Statistic
                   title="Tạm ứng"
                   value={settlement.total_advance || 0}
-                  formatter={(val) => formatCurrency(val as number)}
+                  formatter={(val) => fmtVnd(val as number)}
                   valueStyle={{ color: 'orange' }}
                 />
               </Col>
@@ -469,7 +484,7 @@ const SettlementDetailPage = () => {
                 <Statistic
                   title="Đã thanh toán"
                   value={settlement.total_paid_post || 0}
-                  formatter={(val) => formatCurrency(val as number)}
+                  formatter={(val) => fmtVnd(val as number)}
                   valueStyle={{ color: 'blue' }}
                 />
               </Col>
@@ -477,7 +492,7 @@ const SettlementDetailPage = () => {
                 <Statistic
                   title="Còn phải trả"
                   value={settlement.remaining_amount || 0}
-                  formatter={(val) => formatCurrency(val as number)}
+                  formatter={(val) => fmtVnd(val as number)}
                   valueStyle={{ color: 'red', fontWeight: 'bold' }}
                 />
               </Col>
@@ -621,16 +636,7 @@ const SettlementDetailPage = () => {
           >
             <Select
               placeholder="Chọn loại hạng mục"
-              options={[
-                { value: 'transport_fee', label: 'Phí vận chuyển' },
-                { value: 'processing_fee', label: 'Phí gia công' },
-                { value: 'quality_bonus', label: 'Thưởng chất lượng' },
-                { value: 'quality_penalty', label: 'Phạt chất lượng' },
-                { value: 'late_penalty', label: 'Phạt chậm giao' },
-                { value: 'loyalty_bonus', label: 'Thưởng khách hàng thân thiết' },
-                { value: 'adjustment', label: 'Điều chỉnh khác' },
-                { value: 'other', label: 'Khác' },
-              ]}
+              options={ADD_ITEM_TYPES.map((v) => ({ value: v, label: ITEM_TYPE_LABELS[v] }))}
             />
           </Form.Item>
           <Form.Item name="description" label="Mô tả" rules={[{ required: true, message: 'Nhập mô tả' }]}>
@@ -648,8 +654,7 @@ const SettlementDetailPage = () => {
                   style={{ width: '100%' }}
                   min={0}
                   placeholder="(nếu có)"
-                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(v) => Number(v!.replace(/,/g, '')) || 0}
+                  {...vndInputProps}
                 />
               </Form.Item>
             </Col>
@@ -663,8 +668,7 @@ const SettlementDetailPage = () => {
                 <InputNumber<number>
                   style={{ width: '100%' }}
                   min={0}
-                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(v) => Number(v!.replace(/,/g, '')) || 0}
+                  {...vndInputProps}
                 />
               </Form.Item>
             </Col>

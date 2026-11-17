@@ -15,19 +15,28 @@
 // - ★ Thêm badge số tin chưa đọc cho B2B Chat
 // - ★ 17/11/2026 (audit UI): thêm group NHÂN SỰ — 12 route HR trước đó mồ côi
 //   (menu cũ chỉ nằm trong navigation.ts ĐÃ CHẾT, không được import ở đâu)
+// - ★ 17/11/2026 (Đợt 3): nhãn Việt hoá (Tổng quan / Quân số ca trực / Mẫu dự án / Nhật ký hệ thống…),
+//   nối 2 trang mồ côi (/sales/shipments, /executive), nhớ đóng/mở nhóm (localStorage 'erp_sidebar_groups'),
+//   ô tìm mục menu, chuông thông báo trên thanh điện thoại; menuLabelForPath() đặt tiêu đề tab trình duyệt.
 // ============================================================
 
 import { useState, useEffect, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useOpenTab } from '../../hooks/useOpenTab';
+import { useTabStore } from '../../stores/tabStore';
 import { useRawRole } from '../../hooks/useRawRole';
+import { useUnreadNotificationCount } from '../../hooks/useUnreadNotificationCount';
+import { NotificationBadge } from '../NotificationBadge';
+import { palette } from '../../theme/palette';
 import { getSalesRole, hasSalesAccess } from '../../services/sales/salesPermissionService';
 import { supabase } from '../../lib/supabase';
 import { isFinanceUser } from '../../lib/financeAccess';
+import { isAdminUser } from '../../lib/adminAccess';
 import { purchaseAccessService } from '../../services/purchaseAccessService';
 import { overtimeRequestService } from '../../services/overtimeRequestService';
 import { leaveRequestService } from '../../services/leaveRequestService';
+import { getPendingApprovalCount } from '../../services/taskExceptionService';
 import logoImg from '../../assets/logo.png';
 import {
   Menu, X, ChevronDown, ChevronRight, ChevronLeft,
@@ -98,10 +107,11 @@ import {
 // DESIGN TOKENS
 // ============================================================
 
+// Một nguồn màu: src/theme/palette.js (cùng nguồn với antdTheme + Tailwind) — đừng gõ lại hex
 const BRAND = {
-  primary: '#1B4D3E',
-  secondary: '#2D8B6E',
-  accent: '#E8A838',
+  primary: palette.brand,
+  secondary: palette.brandHover,
+  accent: palette.accent,
 } as const;
 
 // ============================================================
@@ -172,8 +182,10 @@ const getMenuGroups = (
     collapsible: true,
     icon: <LayoutDashboard size={18} />,
     items: [
-      { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      { path: '/', label: 'Tổng quan', icon: <LayoutDashboard size={18} /> },
       { path: '/notifications', label: 'Thông báo', icon: <Bell size={18} />, badge: unreadNotifications > 0 ? unreadNotifications : undefined },
+      // Trang điều hành BGĐ (ExecutiveDashboardPage) — trước chỉ vào được qua 1 thẻ nhỏ trong ManagerDashboard
+      { path: '/executive', label: 'Điều hành (BGĐ)', icon: <PieChart size={18} />, executiveOnly: true },
     ],
   },
   {
@@ -185,7 +197,7 @@ const getMenuGroups = (
       { path: '/attendance', label: 'Bảng chấm công', icon: <Clock size={18} /> },
       { path: '/attendance/monthly', label: 'Chấm công tháng', icon: <Calendar size={18} />, managerOnly: true },
       { path: '/attendance/gps-monitor', label: 'Giám sát GPS', icon: <MapPin size={18} />, managerOnly: true },
-      { path: '/operations/coverage', label: 'Coverage live', icon: <Activity size={18} />, managerOnly: true },
+      { path: '/operations/coverage', label: 'Quân số ca trực', icon: <Activity size={18} />, managerOnly: true },
       { path: '/shifts', label: 'Quản lý ca', icon: <Timer size={18} />, executiveOnly: true },
       { path: '/shift-assignments', label: 'Phân ca', icon: <CalendarDays size={18} />, managerOnly: true },
       {
@@ -268,7 +280,7 @@ const getMenuGroups = (
       { path: '/projects/gantt', label: 'Gantt tổng hợp', icon: <GanttChart size={18} /> },
       { path: '/projects/resources', label: 'Nguồn lực', icon: <UserCog size={18} /> },
       { path: '/projects/categories', label: 'Loại dự án', icon: <Layers size={18} /> },
-      { path: '/projects/templates', label: 'Templates', icon: <Copy size={18} /> },
+      { path: '/projects/templates', label: 'Mẫu dự án', icon: <Copy size={18} /> },
     ],
   },
 
@@ -312,7 +324,7 @@ const getMenuGroups = (
     items: [
       {
         path: '/b2b',
-        label: 'Dashboard',
+        label: 'Tổng quan B2B',
         icon: <LayoutDashboard size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-dashboard', componentId: 'b2b-dashboard' },
@@ -427,6 +439,9 @@ const getMenuGroups = (
       // Sổ lô: dạng xem duy nhất lấy LÔ làm dòng — trả lời "lô nào đã thu, thuộc HĐ nào"
       { path: '/sales/lots', label: 'Sổ lô', icon: <Package size={18} />,
         requireSalesRoles: ['sale', 'logistics', 'accounting', 'admin'] },
+      // Theo dõi lô hàng xuất (thay file Excel SHIPMENT FOLLOWING) — route có sẵn nhưng trước đó mồ côi
+      { path: '/sales/shipments', label: 'Theo dõi lô hàng xuất', icon: <Ship size={18} />,
+        requireSalesRoles: ['sale', 'logistics', 'accounting', 'admin'] },
       { path: '/sales/cash-flow', label: 'Dòng tiền bán', icon: <BarChart3 size={18} />,
         requireSalesRoles: ['accounting', 'admin'] },
     ],
@@ -443,9 +458,9 @@ const getMenuGroups = (
     allowedEmails: ['minhld@huyanhrubber.com'],
     items: [
       { path: '/wms/production', label: 'Lệnh sản xuất', icon: <ClipboardList size={18} /> },
-      { path: '/wms/production/dashboard', label: 'Dashboard SX', icon: <TrendingUp size={18} /> },
+      { path: '/wms/production/dashboard', label: 'Tổng quan SX', icon: <TrendingUp size={18} /> },
       { path: '/wms/production/facilities', label: 'Dây chuyền', icon: <Settings size={18} /> },
-      { path: '/wms/production/specs', label: 'Công thức BOM', icon: <FileText size={18} /> },
+      { path: '/wms/production/specs', label: 'Định mức sản xuất', icon: <FileText size={18} /> },
       { path: '/wms/blending', label: 'Phối trộn', icon: <Droplets size={18} /> },
       { path: '/wms/blending/suggest', label: 'Gợi ý trộn', icon: <FlaskConical size={18} /> },
     ],
@@ -534,11 +549,58 @@ const getMenuGroups = (
     collapsible: true,
     items: [
       { path: '/settings', label: 'Cài đặt tài khoản', icon: <User size={18} /> },
-      // Audit Log: chỉ hiện cho admin/BGĐ (executiveOnly = level <= 3)
-      { path: '/admin/audit-log', label: 'Audit Log (BGĐ)', icon: <Shield size={18} />, executiveOnly: true },
+      // Nhật ký hệ thống (bảng audit_log): chỉ hiện cho admin/BGĐ (executiveOnly = level <= 3).
+      // Khác 'Nhật ký kiểm toán' bên TÀI CHÍNH (chỉ sổ tài chính).
+      { path: '/admin/audit-log', label: 'Nhật ký hệ thống (BGĐ)', icon: <Shield size={18} />, executiveOnly: true },
     ],
   },
 ];
+
+/**
+ * Nhãn menu của một đường dẫn — TabbedWorkspace dùng để đặt tiêu đề tab trình duyệt '<Tên màn> · Huy Anh ERP'
+ * cho trang không mở thành tab.
+ *  1) khớp ĐÚNG path của một mục → nhãn mục đó;
+ *  2) không thì đoạn khớp DÀI NHẤT, xét cả path của mục (tiền tố) LẪN extraActivePaths (khớp đúng hoặc tiền tố —
+ *     cùng luật làm mục SÁNG trong menu). Trước chỉ xét path → '/b2b/bonuses' rơi về tiền tố '/b2b' = 'Tổng quan B2B'
+ *     trong khi menu đang sáng 'Đại lý'; '/wms/weighbridge/<id>' không ra tên nào. Bằng độ dài thì path của chính mục thắng.
+ */
+export function menuLabelForPath(pathname: string): string | null {
+  const items = getMenuGroups().flatMap((g) => g.items);
+  const exact = items.find((it) => it.path === pathname);
+  if (exact) return exact.label;
+  const khop = (p: string) => p !== '/' && (pathname === p || pathname.startsWith(p + '/'));
+  let best: { score: number; label: string } | null = null;
+  for (const item of items) {
+    const cands: [string, number][] = [[item.path, 1], ...(item.extraActivePaths ?? []).map((p): [string, number] => [p, 0])];
+    for (const [p, own] of cands) {
+      const score = p.length * 2 + own;   // dài hơn thắng; bằng độ dài thì path của mục > extraActivePaths
+      if (khop(p) && (!best || score > best.score)) best = { score, label: item.label };
+    }
+  }
+  return best?.label ?? null;
+}
+
+// Trạng thái đóng/mở nhóm menu — nhớ theo máy (localStorage); nhóm mới chưa có trong máy theo mặc định dưới đây.
+const GROUPS_STORAGE_KEY = 'erp_sidebar_groups';
+const DEFAULT_COLLAPSED_GROUPS: Record<string, boolean> = {
+  // Mặc định MỞ: module đang dùng nhiều
+  'CHẤM CÔNG': false,
+  'ĐƠN HÀNG BÁN': false,
+  'KHO NGUYÊN LIỆU': false,
+  'VẬN TẢI': false,
+  // Mặc định ĐÓNG: module ít dùng hàng ngày
+  'NHÂN SỰ': true,
+  'QUẢN LÝ SẢN XUẤT': true,
+  'QUẢN LÝ CÔNG VIỆC': true,
+  'QUẢN LÝ DỰ ÁN': true,
+  'MUA HÀNG': true,
+  'B2B THU MUA': true,
+  'CÀI ĐẶT': true,
+};
+
+/** So khớp ô tìm menu không phân biệt dấu ('cham cong' khớp 'Chấm công') */
+const boDau = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/đ/g, 'd');
 
 // ============================================================
 // MAIN COMPONENT
@@ -550,21 +612,17 @@ export function Sidebar() {
   const openTab = useOpenTab();
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
-    // Mặc định MỞ: module đang dùng nhiều
-    'CHẤM CÔNG': false,
-    'ĐƠN HÀNG BÁN': false,
-    'KHO NGUYÊN LIỆU': false,
-    'VẬN TẢI': false,
-    // Mặc định ĐÓNG: module ít dùng hàng ngày
-    'NHÂN SỰ': true,
-    'QUẢN LÝ SẢN XUẤT': true,
-    'QUẢN LÝ CÔNG VIỆC': true,
-    'QUẢN LÝ DỰ ÁN': true,
-    'MUA HÀNG': true,
-    'B2B THU MUA': true,
-    'CÀI ĐẶT': true,
+  // Đóng/mở nhóm: mặc định ở DEFAULT_COLLAPSED_GROUPS, ghi đè bằng lựa chọn đã lưu trên máy (nếu có)
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(GROUPS_STORAGE_KEY) || '{}');
+      return { ...DEFAULT_COLLAPSED_GROUPS, ...(saved && typeof saved === 'object' ? saved : {}) };
+    } catch {
+      return { ...DEFAULT_COLLAPSED_GROUPS };
+    }
   });
+  // Ô tìm mục menu (lọc theo nhãn, không phân biệt dấu)
+  const [menuQuery, setMenuQuery] = useState('');
 
   // Sidebar thu gọn icon-only (desktop) — nhớ lựa chọn; hover bung tạm thời
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -592,11 +650,11 @@ export function Sidebar() {
   
   const [pendingOTCount, setPendingOTCount] = useState(0);
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
+  const [pendingTaskApprovals, setPendingTaskApprovals] = useState(0);
   const [unreadB2BCount, setUnreadB2BCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  const ADMIN_EMAILS = ['minhld@huyanhrubber.com'];
-  const isAdmin = user?.role === 'admin' || ADMIN_EMAILS.includes(user?.email?.toLowerCase() || '');
+  const isAdmin = isAdminUser(user);   // MỘT nguồn danh sách admin: src/lib/adminAccess.ts (AuditLogPage + Tài chính dùng chung)
   const isFinance = isFinanceUser(user);   // Admin / BGĐ / Phòng kế toán — Module Tài chính
   const userLevel = user?.position_level || (isAdmin ? 1 : 7);
   const isExecutive = isAdmin || userLevel <= 3;
@@ -685,6 +743,22 @@ export function Sidebar() {
     }
   }, [user?.employee_id, canApproveOT, isExecutive, isAdmin]);
 
+  // ── Load pending TASK approvals (badge "Phê duyệt" — trước đây truyền cứng 0) ──
+  useEffect(() => {
+    if (!user?.employee_id || (!canApproveOT && !isExecutive && !isAdmin)) return;
+    const load = async () => {
+      try {
+        // QL thường: chỉ phòng mình — đúng phạm vi trang Duyệt hàng loạt
+        setPendingTaskApprovals(await getPendingApprovalCount(isAdmin || isExecutive ? null : user.department_id));
+      } catch (error) {
+        console.error('Failed to load pending task approvals:', error);
+      }
+    };
+    load();
+    const interval = setInterval(load, 120000);
+    return () => clearInterval(interval);
+  }, [user?.employee_id, user?.department_id, canApproveOT, isExecutive, isAdmin]);
+
   // ── Load pending leave count (unchanged) ──
   useEffect(() => {
     const loadPendingLeaveCount = async () => {
@@ -765,24 +839,16 @@ export function Sidebar() {
     }
   }, [location.pathname]);
 
-  // ★ Notification count
-  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
-  useEffect(() => {
-    if (!user?.employee_id) return;
-    const load = async () => {
-      try {
-        const { countUnread } = await import('../../services/notificationHelper');
-        const count = await countUnread(user.employee_id!);
-        setUnreadNotifCount(count);
-      } catch { /* ignore */ }
-    };
-    load();
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
-  }, [user?.employee_id]);
+  // ★ Notification count — TanStack (key ['notification-count', id], làm mới 30s): trang Thông báo bấm
+  //   "Đọc hết"/"Xoá" invalidate đúng key này nên badge menu + chuông điện thoại cập nhật ngay
+  const unreadNotifCount = useUnreadNotificationCount();
 
   const toggleGroup = (title: string) => {
-    setCollapsedGroups(prev => ({ ...prev, [title]: !prev[title] }));
+    setCollapsedGroups(prev => {
+      const next = { ...prev, [title]: !prev[title] };
+      try { localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+      return next;
+    });
   };
 
   // ── Permission checks — ★ CẬP NHẬT: thêm check requireB2BPurchaser ──
@@ -823,7 +889,7 @@ export function Sidebar() {
   };
 
   // ── Build filtered menu (must be AFTER isGroupVisible/isItemVisible) ──
-  const allMenuGroups = getMenuGroups(0, pendingOTCount, pendingLeaveCount, unreadB2BCount, unreadNotifCount);
+  const allMenuGroups = getMenuGroups(pendingTaskApprovals, pendingOTCount, pendingLeaveCount, unreadB2BCount, unreadNotifCount);
   const menuGroups = allMenuGroups.filter(g =>
     isGroupVisible(g) && g.items.some(item => isItemVisible(item))
   );
@@ -837,6 +903,7 @@ export function Sidebar() {
 
     const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
       setIsMobileOpen(false);
+      setMenuQuery('');
       // Nếu item có tab config → mở thành tab thay vì navigate thường
       if (item.tab) {
         e.preventDefault();
@@ -847,6 +914,10 @@ export function Sidebar() {
           props: {},
           path: item.path,
         });
+        // Tab đã lưu trên máy từ trước giữ nhãn cũ (vd 'Dashboard') — đồng bộ theo nhãn menu hiện tại
+        const tabStore = useTabStore.getState();
+        const savedTab = tabStore.tabs.find(t => t.key === item.tab!.key);
+        if (savedTab && savedTab.title !== item.label) tabStore.setTitle(savedTab.key, item.label);
       }
     };
 
@@ -918,7 +989,14 @@ export function Sidebar() {
   // SIDEBAR CONTENT — NEW DESIGN
   // ══════════════════════════════════════════════════════════
 
-  const renderSidebarContent = (expanded: boolean) => (
+  const renderSidebarContent = (expanded: boolean) => {
+    // Lọc theo ô tìm chỉ khi menu đang mở rộng (thu gọn icon-only không có ô tìm)
+    const q = expanded ? boDau(menuQuery.trim()) : '';
+    const matchesQuery = (item: MenuItem) => !q || boDau(item.label).includes(q);
+    const noMatch = !!q && !menuGroups.some(g =>
+      isGroupVisible(g) && g.items.some(it => isItemVisible(it) && matchesQuery(it))
+    );
+    return (
     <>
       {/* ─── LOGO / COMPANY ─── */}
       <div className="p-4 pb-3 border-b border-black/[0.06]">
@@ -993,15 +1071,34 @@ export function Sidebar() {
         </NavLink>
       </div>
 
+      {/* ─── TÌM MỤC MENU ─── (14 nhóm ~80 mục: gõ vài chữ thay vì nhớ mục nằm nhóm nào) */}
+      {expanded && (
+        <div className="px-3 pt-3">
+          <input
+            type="search"
+            value={menuQuery}
+            onChange={(e) => setMenuQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') setMenuQuery(''); }}
+            placeholder="Tìm mục menu…"
+            aria-label="Tìm mục menu"
+            className="w-full px-3 py-2 text-[13px] rounded-xl bg-black/[0.03] border border-black/[0.06] text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white transition-colors"
+          />
+        </div>
+      )}
+
       {/* ─── NAVIGATION ─── */}
       <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${expanded ? 'px-2.5' : 'px-2'}`}>
+        {noMatch && (
+          <p className="px-3 py-2 text-[12px] text-gray-500">Không có mục nào khớp “{menuQuery.trim()}”</p>
+        )}
         {menuGroups.map((group) => {
           if (!isGroupVisible(group)) return null;
 
-          const filteredItems = group.items.filter(isItemVisible);
+          const filteredItems = group.items.filter(it => isItemVisible(it) && matchesQuery(it));
           if (filteredItems.length === 0) return null;
 
-          const isCollapsed = group.collapsible && collapsedGroups[group.title];
+          // Đang tìm thì bung mọi nhóm có mục khớp (không đổi lựa chọn đóng/mở đã lưu)
+          const isCollapsed = group.collapsible && collapsedGroups[group.title] && !q;
 
           return (
             <div key={group.title} className="mb-1.5">
@@ -1052,7 +1149,8 @@ export function Sidebar() {
         </button>
       </div>
     </>
-  );
+    );
+  };
 
   // ══════════════════════════════════════════════════════════
   // RENDER — NEW DESIGN (light sidebar)
@@ -1065,6 +1163,7 @@ export function Sidebar() {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-b border-black/[0.06] px-4 flex items-center justify-between" style={{ height: 'calc(3.5rem + var(--safe-top))', paddingTop: 'var(--safe-top)' }}>
         <button
           onClick={() => setIsMobileOpen(true)}
+          aria-label="Mở menu"
           className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#5A6B63] hover:text-[#1B4D3E] hover:bg-black/[0.04] rounded-xl transition-colors"
         >
           <Menu size={22} />
@@ -1072,7 +1171,15 @@ export function Sidebar() {
         <div className="flex items-center gap-2">
           <img src={logoImg} alt="Huy Anh" className="h-7 w-auto object-contain" />
         </div>
-        <div className="w-10" />
+        {/* Chuông thông báo (thay khoảng trống cũ) — điện thoại không cần mở menu mới thấy có thông báo */}
+        <NavLink
+          to="/notifications"
+          aria-label={unreadNotifCount > 0 ? `Thông báo (${unreadNotifCount} chưa đọc)` : 'Thông báo'}
+          className="relative p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#5A6B63] hover:text-[#1B4D3E] hover:bg-black/[0.04] rounded-xl transition-colors"
+        >
+          <Bell size={22} />
+          <NotificationBadge count={unreadNotifCount} className="absolute top-0.5 right-0.5" />
+        </NavLink>
       </div>
 
       {/* ─── MOBILE OVERLAY ─── */}

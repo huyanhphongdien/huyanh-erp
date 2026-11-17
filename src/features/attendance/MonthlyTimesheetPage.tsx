@@ -5,6 +5,7 @@
 
 import { useState, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { App } from 'antd'
 import {
   Calendar,
   ChevronLeft,
@@ -20,6 +21,7 @@ import { supabase } from '../../lib/supabase'
 import { monthlyTimesheetService } from '../../services/monthlyTimesheetService'
 import type { DayDetail, EmployeeMonthlySummary } from '../../services/monthlyTimesheetService'
 import { exportMonthlyTimesheetExcel, exportEmployeeMonthlyExcel } from '../../services/monthlyTimesheetExcel'
+import { AUTO_CHECKOUT_LABEL } from '../../services/attendanceService'
 import EditAttendanceModal from './EditAttendanceModal'
 import PageState from '../../components/common/PageState'
 
@@ -84,6 +86,7 @@ function formatTimeVN(iso: string | null): string {
 
 export default function MonthlyTimesheetPage() {
   const { user } = useAuthStore()
+  const { message } = App.useApp()
   const tableRef = useRef<HTMLDivElement>(null)
 
   const now = new Date()
@@ -148,7 +151,7 @@ export default function MonthlyTimesheetPage() {
 
   const handleExportExcel = () => {
     if (!displayedTimesheet || displayedTimesheet.employees.length === 0) {
-      alert('Không có dữ liệu để xuất')
+      message.info('Không có dữ liệu để xuất')
       return
     }
     exportMonthlyTimesheetExcel(displayedTimesheet)
@@ -174,7 +177,8 @@ export default function MonthlyTimesheetPage() {
       <div className="bg-white border-b sticky top-0 z-20">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-[16px] font-bold text-[#1B4D3E]">Bảng chấm công</h1>
+            {/* "tháng" để phân biệt với Bảng chấm công theo ngày (AttendanceListPage) — khớp mục menu "Chấm công tháng" */}
+            <h1 className="text-[16px] font-bold text-[#1B4D3E]">Bảng chấm công tháng</h1>
             <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium bg-[#1B4D3E] text-white active:bg-[#163d32]">
               <Download size={14} /><span className="hidden sm:inline">Xuất Excel</span>
             </button>
@@ -465,7 +469,7 @@ export default function MonthlyTimesheetPage() {
           {tooltipData.day.overtimeMinutes > 0 && <div className="text-red-600">Tăng ca: {Math.round(tooltipData.day.overtimeMinutes / 60 * 10) / 10}h</div>}
           {tooltipData.day.isBusinessTrip && <div className="text-sky-600 font-medium">Công tác</div>}
           {tooltipData.day.isLeave && <div className="text-orange-600">Nghỉ phép</div>}
-          {tooltipData.day.autoCheckout && <div className="text-gray-400 text-[10px]">Auto checkout</div>}
+          {tooltipData.day.autoCheckout && <div className="text-gray-400 text-[10px]">{AUTO_CHECKOUT_LABEL}</div>}
         </div>
       )}
     </div>

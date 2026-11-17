@@ -13,102 +13,22 @@ import {
   ChevronDown, ChevronUp, X, AlertTriangle, CheckCircle,
   Trash2, User, FileText,
 } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
-import { leaveRequestService, type BusinessTripCreateInput } from '../../services/leaveRequestService'
+import { leaveRequestService, type BusinessTripCreateInput, type BusinessTripRow } from '../../services/leaveRequestService'
 import { todayVN } from '../../utils/dateVN'
 import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-interface BusinessTrip {
-  id: string
-  employee_id: string
-  request_number: string
-  start_date: string
-  end_date: string
-  total_days: number
-  trip_destination: string
-  trip_purpose: string
-  trip_with: string
-  reason: string
-  status: string
-  created_by: string
-  created_at: string
-  employee?: { id: string; code: string; full_name: string }
-  creator?: { id: string; full_name: string }
-}
-
-interface Employee {
-  id: string
-  code: string
-  full_name: string
-  department_id: string
-}
+import { fmtDate, fmtDateShort } from '../../utils/format'
+import PageState from '../../components/common/PageState'
 
 // ============================================================================
 // SERVICE
 // ============================================================================
 
-const BUSINESS_TRIP_SELECT = `
-  *,
-  employee:employees!leave_requests_employee_id_fkey(id, code, full_name),
-  creator:employees!leave_requests_approved_by_fkey(id, full_name)
-`
-
-async function getBusinessTripTypeId(): Promise<string | null> {
-  const { data } = await supabase
-    .from('leave_types')
-    .select('id')
-    .eq('code', 'BUSINESS_TRIP')
-    .maybeSingle()
-  return data?.id || null
-}
-
-async function fetchBusinessTrips(
-  employeeId: string,
-  isManager: boolean,
-  departmentId: string | null
-): Promise<BusinessTrip[]> {
-  const typeId = await getBusinessTripTypeId()
-  if (!typeId) return []
-
-  let query = supabase
-    .from('leave_requests')
-    .select(BUSINESS_TRIP_SELECT)
-    .eq('leave_type_id', typeId)
-    .in('status', ['approved', 'pending'])
-    .order('created_at', { ascending: false })
-
-  if (!isManager) {
-    // NV chỉ xem của mình
-    query = query.eq('employee_id', employeeId)
-  } else if (departmentId) {
-    // Manager: xem NV trong phòng
-    const { data: deptEmps } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('department_id', departmentId)
-      .eq('status', 'active')
-    if (deptEmps && deptEmps.length > 0) {
-      query = query.in('employee_id', deptEmps.map(e => e.id))
-    }
-  }
-
-  const { data, error } = await query
-  if (error) {
-    console.error('[BusinessTrip] fetch error:', error)
-    return []
-  }
-  return (data || []) as any
-}
-
-// Tạo / sửa / xoá đơn công tác: gọi leaveRequestService.createBusinessTrips /
-// updateBusinessTrip / deleteBusinessTrip — MỘT nguồn attendance công tác chung
-// với luồng duyệt nghỉ phép. Bản inline cũ tính ngày bằng toISOString (UTC) nên
-// attendance lùi 1 ngày, xoá đơn để sót dòng mồ côi (audit 17/11/2026).
+// Đọc / tạo / sửa / xoá đơn công tác: TẤT CẢ qua leaveRequestService (getBusinessTrips,
+// getBusinessTripEmployees, createBusinessTrips, updateBusinessTrip, deleteBusinessTrip) —
+// MỘT nguồn attendance công tác chung với luồng duyệt nghỉ phép; trang không gọi supabase.
+// Bản inline cũ tính ngày bằng toISOString (UTC) nên attendance lùi 1 ngày, xoá đơn để sót
+// dòng mồ côi, lỗi đọc bị nuốt thành "Chưa có đơn công tác" (audit 17/11/2026).
 
 // ============================================================================
 // COMPONENT
@@ -144,26 +64,16 @@ export default function BusinessTripPage() {
   const [formReason, setFormReason] = useState('')
 
   // Queries
-  const { data: trips = [], isLoading } = useQuery({
+  const { data: trips = [], isLoading, error: tripsError, refetch: refetchTrips } = useQuery<BusinessTripRow[]>({
     queryKey: ['business-trips', employeeId, isManager, departmentId],
-    queryFn: () => fetchBusinessTrips(employeeId, isManager, departmentId),
+    queryFn: () => leaveRequestService.getBusinessTrips(employeeId, isManager, departmentId),
+    // NV chưa gắn hồ sơ nhân viên → không có gì để xem (tránh lọc employee_id = '' thành lỗi)
+    enabled: isManager || !!employeeId,
   })
 
-  const { data: employees = [] } = useQuery({
+  const { data: employees = [], error: employeesError } = useQuery({
     queryKey: ['dept-employees-for-trip', departmentId],
-    queryFn: async () => {
-      if (!isManager) return []
-      let query = supabase
-        .from('employees')
-        .select('id, code, full_name, department_id')
-        .eq('status', 'active')
-        .order('full_name')
-      if (departmentId && userLevel > 3) {
-        query = query.eq('department_id', departmentId)
-      }
-      const { data } = await query
-      return (data || []) as Employee[]
-    },
+    queryFn: () => leaveRequestService.getBusinessTripEmployees(departmentId, userLevel),
     enabled: isManager,
   })
 
@@ -314,7 +224,13 @@ export default function BusinessTripPage() {
                     </label>
                   ))}
                   {employees.length === 0 && (
-                    <p className="px-3 py-3 text-[13px] text-gray-400 text-center">Không có nhân viên</p>
+                    employeesError ? (
+                      <p className="px-3 py-3 text-[13px] text-red-600 text-center">
+                        Không tải được danh sách nhân viên — {dichLoiHeThong(employeesError, 'thử lại sau')}
+                      </p>
+                    ) : (
+                      <p className="px-3 py-3 text-[13px] text-gray-400 text-center">Không có nhân viên</p>
+                    )
                   )}
                 </div>
                 {employees.length > 3 && (
@@ -463,6 +379,8 @@ export default function BusinessTripPage() {
             <Loader2 className="w-8 h-8 animate-spin text-sky-500" />
             <span className="mt-2 text-sm text-gray-500">Đang tải...</span>
           </div>
+        ) : tripsError ? (
+          <PageState error={tripsError} onRetry={() => refetchTrips()} />
         ) : trips.length === 0 ? (
           <div className="text-center py-12">
             <Briefcase className="w-12 h-12 mx-auto text-gray-300 mb-3" />
@@ -474,8 +392,8 @@ export default function BusinessTripPage() {
               const emp = Array.isArray(trip.employee) ? trip.employee[0] : trip.employee
               const creator = Array.isArray(trip.creator) ? trip.creator[0] : trip.creator
               const isExpanded = expandedId === trip.id
-              const startVN = new Date(trip.start_date + 'T00:00:00+07:00').toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-              const endVN = new Date(trip.end_date + 'T00:00:00+07:00').toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+              const startVN = fmtDateShort(trip.start_date)
+              const endVN = fmtDate(trip.end_date)
 
               return (
                 <div key={trip.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -496,7 +414,7 @@ export default function BusinessTripPage() {
                         <span className="truncate">{trip.trip_destination}</span>
                         <span className="text-gray-300">|</span>
                         <span>{startVN} → {endVN}</span>
-                        <span className="text-sky-600 font-medium">({trip.total_days}d)</span>
+                        <span className="text-sky-600 font-medium">({trip.total_days} ngày)</span>
                       </div>
                     </div>
                     {isExpanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}

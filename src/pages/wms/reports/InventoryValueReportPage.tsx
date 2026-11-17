@@ -5,14 +5,14 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Card, Table, Button, Space, Typography, Row, Col,
   Select, Tag,
 } from 'antd'
 import {
-  ArrowLeftOutlined, ReloadOutlined, DatabaseOutlined, DownloadOutlined,
+  ReloadOutlined, DatabaseOutlined, DownloadOutlined,
 } from '@ant-design/icons'
+import { fmtVnd, fmtVndNum } from '../../../utils/format'
 import wmsReportService from '../../../services/wms/wmsReportService'
 import type { InventoryValueReport } from '../../../services/wms/wms.types'
 import { RUBBER_GRADE_LABELS } from '../../../services/wms/wms.types'
@@ -27,7 +27,6 @@ import { xuatExcelBaoCao } from './wmsReportExcel'
 const { Title, Text } = Typography
 
 const InventoryValueReportPage = () => {
-  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<InventoryValueReport[]>([])
@@ -104,10 +103,10 @@ const InventoryValueReportPage = () => {
         { title: 'Grade' },
         { title: 'SL (kg)', summary: 'sum' },
         { title: 'DRC TB (%)' },
-        { title: 'Dry Weight (kg)', summary: 'sum' },
+        { title: 'KL khô (kg)', summary: 'sum' },
         { title: 'Số lô', summary: 'sum' },
-        { title: 'Giá vốn TB (đ/kg)' },
-        { title: 'Giá trị tồn (đ)', summary: 'sum', numFmt: '#,##0' },
+        { title: 'Giá vốn TB (₫/kg)' },
+        { title: 'Giá trị tồn (₫)', summary: 'sum', numFmt: '#,##0' },
         { title: 'Kho', align: 'left' },
       ],
       rows: data.map(r => {
@@ -157,7 +156,7 @@ const InventoryValueReportPage = () => {
       render: (v: number) => <Text style={{ ...numStyle, color: '#1B4D3E' }}>{v}%</Text>,
     },
     {
-      title: 'Dry Weight (kg)', dataIndex: 'total_dry_weight_kg', key: 'dry', align: 'right' as const, width: 130,
+      title: 'KL khô (kg)', dataIndex: 'total_dry_weight_kg', key: 'dry', align: 'right' as const, width: 130,
       render: (v: number) => <Text style={{ ...numStyle, color: '#E8A838' }}>{v.toLocaleString('vi-VN')}</Text>,
     },
     {
@@ -165,24 +164,24 @@ const InventoryValueReportPage = () => {
       render: (v: number) => <Text style={numStyle}>{v}</Text>,
     },
     {
-      title: 'Giá vốn TB (đ/kg)', key: 'cost_per_kg', align: 'right' as const, width: 140,
+      title: 'Giá vốn TB (₫/kg)', key: 'cost_per_kg', align: 'right' as const, width: 140,
       render: (_: unknown, r: InventoryValueReport) => {
         const costInfo = gradeCostMap[r.rubber_grade]
         const avgCost = costInfo?.avg_cost || 0
         return avgCost > 0
-          ? <Text style={{ ...numStyle, color: '#7C3AED' }}>{avgCost.toLocaleString('vi-VN')}</Text>
+          ? <Text style={{ ...numStyle, color: '#7C3AED' }}>{fmtVndNum(avgCost)}</Text>
           : <Text type="secondary" style={{ fontSize: 11 }}>Chưa có</Text>
       },
     },
     {
-      title: 'Giá trị tồn (đ)', key: 'total_cost', align: 'right' as const, width: 150,
+      title: 'Giá trị tồn (₫)', key: 'total_cost', align: 'right' as const, width: 150,
       render: (_: unknown, r: InventoryValueReport) => {
         // Giá trị mức VẬT LIỆU của dòng (giá vốn TB grade × SL dòng) — trước đây
         // lặp tổng cả grade trên từng dòng, cộng dọc cột là đếm trùng.
         const costInfo = gradeCostMap[r.rubber_grade]
         const value = Math.round((costInfo?.avg_cost || 0) * r.total_quantity_kg)
         return value > 0
-          ? <Text style={{ ...numStyle, color: '#DC2626', fontWeight: 600 }}>{value.toLocaleString('vi-VN')}</Text>
+          ? <Text style={{ ...numStyle, color: '#DC2626', fontWeight: 600 }}>{fmtVndNum(value)}</Text>
           : <Text type="secondary" style={{ fontSize: 11 }}>—</Text>
       },
     },
@@ -202,15 +201,11 @@ const InventoryValueReportPage = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      {/* Header */}
-      <Space style={{ marginBottom: 16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/reports')}>Quay lại</Button>
-      </Space>
-
+      {/* Header — trang sống trong tab của /wms/reports nên không có nút Quay lại */}
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
           <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
-            <DatabaseOutlined style={{ marginRight: 8 }} />Tồn kho theo vat lieu
+            <DatabaseOutlined style={{ marginRight: 8 }} />Tồn kho theo vật liệu
           </Title>
         </Col>
         <Col>
@@ -257,13 +252,13 @@ const InventoryValueReportPage = () => {
         </Col>
         <Col xs={12} sm={6} md={4}>
           <Card styles={{ body: { padding: 12, textAlign: 'center' } }}>
-            <Text type="secondary" style={{ fontSize: 11 }}>Dry Weight</Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>KL khô</Text>
             <div style={{ ...numStyle, fontSize: 18, color: '#E8A838', fontWeight: 600 }}>{totalDry.toLocaleString('vi-VN')} kg</div>
           </Card>
         </Col>
         <Col xs={12} sm={6} md={4}>
           <Card styles={{ body: { padding: 12, textAlign: 'center' } }}>
-            <Text type="secondary" style={{ fontSize: 11 }}>DRC TB (weighted)</Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>DRC TB (gia quyền theo SL)</Text>
             <div style={{ ...numStyle, fontSize: 18, color: '#1B4D3E', fontWeight: 600 }}>{weightedDrc}%</div>
           </Card>
         </Col>
@@ -277,7 +272,7 @@ const InventoryValueReportPage = () => {
           <Card styles={{ body: { padding: 12, textAlign: 'center' } }}>
             <Text type="secondary" style={{ fontSize: 11 }}>Giá trị tồn kho</Text>
             <div style={{ ...numStyle, fontSize: 18, color: '#DC2626', fontWeight: 600 }}>
-              {totalValue > 0 ? `${totalValue.toLocaleString('vi-VN')} đ` : 'Chưa có dữ liệu'}
+              {totalValue > 0 ? fmtVnd(totalValue) : 'Chưa có dữ liệu'}
             </div>
           </Card>
         </Col>

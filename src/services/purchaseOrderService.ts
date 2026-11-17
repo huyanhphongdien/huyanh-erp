@@ -15,6 +15,7 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
+import { fmtVnd } from '../utils/format'
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -28,7 +29,8 @@ export type POStatus =
   | 'completed'   // Hoàn thành
   | 'cancelled'   // Đã hủy
 
-/** Label tiếng Việt cho status */
+/** Label tiếng Việt cho status — NGUỒN DUY NHẤT (Đợt 3 audit UI 17/11/2026):
+ *  sổ đơn, chi tiết đơn, badge, báo cáo đều đọc map này; đừng chép lại ở trang. */
 export const PO_STATUS_LABELS: Record<POStatus, string> = {
   draft: 'Nháp',
   confirmed: 'Đã xác nhận',
@@ -37,13 +39,13 @@ export const PO_STATUS_LABELS: Record<POStatus, string> = {
   cancelled: 'Đã hủy',
 }
 
-/** Màu sắc cho status badge */
+/** Màu antd cho status (quy ước chung: default nháp · blue đang làm · orange một phần · green xong · red huỷ) */
 export const PO_STATUS_COLORS: Record<POStatus, string> = {
-  draft: 'gray',
+  draft: 'default',
   confirmed: 'blue',
   partial: 'orange',
   completed: 'green',
-  cancelled: 'gray',
+  cancelled: 'red',
 }
 
 /** Transitions hợp lệ */
@@ -456,14 +458,10 @@ export function groupItemsBySupplier(items: PurchaseOrderItem[]): POSupplierSumm
 }
 
 /**
- * Format số tiền VNĐ
+ * Format số tiền VNĐ — giữ tên cũ cho các file đang import, ruột đi qua utils/format (fmtVnd: "1.234.567 ₫", null → "—")
  */
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(amount)
+export function formatCurrency(amount: number | null | undefined): string {
+  return fmtVnd(amount)
 }
 
 /**

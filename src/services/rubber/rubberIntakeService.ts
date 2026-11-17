@@ -57,6 +57,9 @@ export interface RubberIntake {
   fund_transfer_id?: string
   arrival_date?: string
 
+  // Loại mủ chi tiết (mu_nuoc/mu_tap/…) — cột raw_rubber_type, đọc cho cột "Loại mủ" ở sổ Lý lịch mủ
+  raw_rubber_type?: string | null
+
   // Trạng thái
   notes?: string
   status: 'draft' | 'confirmed' | 'settled' | 'cancelled'
@@ -106,6 +109,25 @@ export interface PaginatedResponse<T> {
 }
 
 // ============================================================================
+// NHÃN + MÀU TRẠNG THÁI — MỘT nguồn cho sổ Lý lịch mủ (list) và chi tiết phiếu
+// (audit UI 17/11/2026: list từng dùng map pending/qc_done KHÔNG có trong DB → phiếu
+// nháp/đã xác nhận hiện mã tiếng Anh thô, lọc "Chờ QC"/"Đã QC" ra 0 dòng). Màu tên antd.
+// ============================================================================
+
+export const RUBBER_INTAKE_STATUS_LABELS: Record<RubberIntake['status'], string> = {
+  draft: 'Nháp', confirmed: 'Đã xác nhận', settled: 'Đã quyết toán', cancelled: 'Đã hủy',
+}
+export const RUBBER_INTAKE_STATUS_COLORS: Record<RubberIntake['status'], string> = {
+  draft: 'default', confirmed: 'blue', settled: 'green', cancelled: 'red',
+}
+export const RUBBER_INTAKE_PAYMENT_LABELS: Record<RubberIntake['payment_status'], string> = {
+  unpaid: 'Chưa thanh toán', partial: 'Thanh toán 1 phần', paid: 'Đã thanh toán',
+}
+export const RUBBER_INTAKE_PAYMENT_COLORS: Record<RubberIntake['payment_status'], string> = {
+  unpaid: 'orange', partial: 'gold', paid: 'green',
+}
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
@@ -126,7 +148,7 @@ const INTAKE_LIST_SELECT = `
   location_name, buyer_name,
   exchange_rate, total_amount_vnd,
   status, payment_status, paid_amount,
-  deal_id, b2b_partner_id, lot_code, facility_id,
+  deal_id, b2b_partner_id, lot_code, facility_id, raw_rubber_type,
   rubber_region, rubber_region_lat, rubber_region_lng,
   eudr_statement_ref, deforestation_risk_assessment,
   notes, created_by, created_at, updated_at,

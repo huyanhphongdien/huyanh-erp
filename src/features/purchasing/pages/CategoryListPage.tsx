@@ -22,12 +22,16 @@ import {
   MaterialCategory
 } from '../../../services/materialCategoryService'
 import CategoryForm from './components/materials/CategoryForm'
+import { useDebounce } from '../../../hooks/useDebounce'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 export default function CategoryListPage() {
   // State
   const [categories, setCategories] = useState<MaterialCategory[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null) // lỗi THAO TÁC (tự ẩn sau 5s)
+  // Lỗi TẢI danh sách — không tự ẩn, bảng hiện lỗi + Thử lại thay vì "Chưa có nhóm vật tư nào"
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   
   // Pagination
@@ -38,6 +42,7 @@ export default function CategoryListPage() {
   
   // Filters
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 400) // gõ xong 400ms mới bắn query
   const [statusFilter, setStatusFilter] = useState<boolean | 'all'>('all')
   
   // Modal
@@ -55,12 +60,12 @@ export default function CategoryListPage() {
   const fetchCategories = useCallback(async () => {
     try {
       setLoading(true)
-      setError(null)
-      
+      setLoadError(null)
+
       const response = await materialCategoryService.getAll({
         page,
         pageSize,
-        search: search.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
         is_active: statusFilter
       })
       
@@ -81,11 +86,11 @@ export default function CategoryListPage() {
       
     } catch (err) {
       console.error('Error fetching categories:', err)
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
+      setLoadError(dichLoiHeThong(err, 'Không thể tải dữ liệu'))
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, search, statusFilter])
+  }, [page, pageSize, debouncedSearch, statusFilter])
 
   useEffect(() => {
     fetchCategories()
@@ -94,7 +99,7 @@ export default function CategoryListPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1)
-  }, [search, statusFilter])
+  }, [debouncedSearch, statusFilter])
 
   // Auto hide messages
   useEffect(() => {
@@ -132,7 +137,7 @@ export default function CategoryListPage() {
       setDeleteConfirm(null)
       fetchCategories()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể xóa nhóm')
+      setError(dichLoiHeThong(err, 'Không thể xóa nhóm'))
     }
   }
 
@@ -142,7 +147,7 @@ export default function CategoryListPage() {
       setSuccess(`Đã ${category.is_active ? 'vô hiệu hóa' : 'kích hoạt'} nhóm "${category.name}"`)
       fetchCategories()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái')
+      setError(dichLoiHeThong(err, 'Không thể cập nhật trạng thái'))
     }
   }
 
@@ -294,6 +299,20 @@ export default function CategoryListPage() {
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
                     Đang tải...
+                  </td>
+                </tr>
+              ) : loadError ? (
+                // Lỗi tải xét TRƯỚC trống (không hiện "Chưa có nhóm vật tư nào" giả)
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center bg-red-50">
+                    <p className="font-semibold text-red-700">Không tải được dữ liệu</p>
+                    <p className="text-sm text-red-600">{loadError}</p>
+                    <button
+                      onClick={fetchCategories}
+                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-100"
+                    >
+                      <RefreshCw className="w-4 h-4" /> Thử lại
+                    </button>
                   </td>
                 </tr>
               ) : categories.length === 0 ? (

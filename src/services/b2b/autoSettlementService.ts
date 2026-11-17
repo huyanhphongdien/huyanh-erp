@@ -6,6 +6,7 @@
 
 import { supabase } from '../../lib/supabase'
 import type { Settlement, SettlementCreateData } from './settlementService'
+import { fmtNum, fmtVnd } from '../../utils/format'
 
 // ============================================
 // TYPES
@@ -111,7 +112,7 @@ export const autoSettlementService = {
       const outputValue = pricePerKg > 0 ? Math.round(estimatedOutputKg * pricePerKg) : 0
       // Đại lý nhận = giá trị TP - phí gia công
       finalValue = outputValue > 0 ? outputValue - Math.round(processingFee) : Math.round(-processingFee)
-      settlementNotes = `Gia công: NVL ${(actualWeightKg/1000).toFixed(1)}T → TP ~${(estimatedOutputKg/1000).toFixed(1)}T (${expectedOutputRate}%). Phí GC: ${processingFee.toLocaleString('vi-VN')} VNĐ`
+      settlementNotes = `Gia công: NVL ${fmtNum(actualWeightKg / 1000, 1)}T → TP ~${fmtNum(estimatedOutputKg / 1000, 1)}T (${expectedOutputRate}%). Phí GC: ${fmtVnd(processingFee)}`
     } else {
       // Mua đứt / Bán: Tính từ khối lượng NVL
       if (pricePerKg <= 0) {
@@ -147,8 +148,8 @@ export const autoSettlementService = {
     // nhưng log để audit. Trong trường hợp purchase thường không nên vượt.
     if (totalAdvanced > finalValue && finalValue > 0 && dealType !== 'processing') {
       throw new Error(
-        `Tổng tạm ứng (${totalAdvanced.toLocaleString('vi-VN')} đ) lớn hơn giá trị deal thực tế ` +
-        `(${finalValue.toLocaleString('vi-VN')} đ). Vui lòng kiểm tra lại advances hoặc điều chỉnh ` +
+        `Tổng tạm ứng (${fmtVnd(totalAdvanced)}) lớn hơn giá trị deal thực tế ` +
+        `(${fmtVnd(finalValue)}). Vui lòng kiểm tra lại các phiếu tạm ứng hoặc điều chỉnh ` +
         `trước khi quyết toán.`,
       )
     }

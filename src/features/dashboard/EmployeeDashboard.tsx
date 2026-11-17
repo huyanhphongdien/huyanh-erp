@@ -13,6 +13,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { toDateStrVN, todayVN } from '../../utils/dateVN'
+import { fmtDate, fmtDateShort } from '../../utils/format'
+import { palette } from '../../theme/palette'
+import { taskStatusLabel, taskStatusTone, taskPriorityLabel, taskPriorityTone } from '../tasks/taskUi'
+import { dayOf } from '../../services/taskScoring'
+import { myTasksService } from '../../services/myTasksService'
 import {
   ClipboardList,
   Clock,
@@ -36,10 +42,11 @@ import {
 // DESIGN TOKENS
 // ============================================================================
 
+// Màu thương hiệu đọc từ src/theme/palette.js (một nguồn với antd + Tailwind) — đừng gõ lại hex
 const BRAND = {
-  primary: '#1B4D3E',
-  secondary: '#2D8B6E',
-  accent: '#E8A838',
+  primary: palette.brand,
+  secondary: palette.brandHover,
+  accent: palette.accent,
   bg: '#F0EDE8',
 } as const
 
@@ -177,39 +184,21 @@ function StatCard({ title, value, subtitle, icon, accentColor, iconBg, link, onC
 }
 
 // ============================================================================
-// TASK STATUS BADGE
+// TASK STATUS / PRIORITY BADGE — nhãn + màu từ MỘT nguồn (types/index.ts qua features/tasks/taskUi)
+// (Bản chép cục bộ cũ thiếu 'finished' → việc đã xong hiện mã thô "finished"; ưu tiên rút "TB"/"Khẩn".)
 // ============================================================================
 
 function TaskStatusBadge({ status }: { status: string }) {
-  const configs: Record<string, { label: string; cls: string }> = {
-    new: { label: 'Mới', cls: 'bg-gray-100 text-gray-600' },
-    in_progress: { label: 'Đang làm', cls: 'bg-blue-50 text-blue-600' },
-    pending_review: { label: 'Chờ duyệt', cls: 'bg-amber-50 text-amber-600' },
-    completed: { label: 'Hoàn thành', cls: 'bg-emerald-50 text-emerald-600' },
-    accepted: { label: 'Đã duyệt', cls: 'bg-green-50 text-green-600' },
-    rejected: { label: 'Từ chối', cls: 'bg-red-50 text-red-600' },
-  }
-  const cfg = configs[status] || { label: status, cls: 'bg-gray-100 text-gray-600' }
+  const tone = taskStatusTone(status)
   return (
-    <span className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold whitespace-nowrap ${cfg.cls}`}>
-      {cfg.label}
+    <span className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold whitespace-nowrap ${tone.bg} ${tone.text}`}>
+      {taskStatusLabel(status)}
     </span>
   )
 }
 
-// ============================================================================
-// PRIORITY BADGE
-// ============================================================================
-
 function PriorityBadge({ priority }: { priority: string }) {
-  const cfg: Record<string, { label: string; cls: string }> = {
-    low: { label: 'Thấp', cls: 'text-gray-400' },
-    medium: { label: 'TB', cls: 'text-blue-500' },
-    high: { label: 'Cao', cls: 'text-orange-500' },
-    urgent: { label: 'Khẩn', cls: 'text-red-500' },
-  }
-  const item = cfg[priority] || cfg.medium
-  return <span className={`text-[10px] sm:text-xs font-semibold ${item.cls}`}>{item.label}</span>
+  return <span className={`text-[10px] sm:text-xs font-semibold ${taskPriorityTone(priority).text}`}>{taskPriorityLabel(priority)}</span>
 }
 
 // ============================================================================
@@ -245,13 +234,18 @@ export function EmployeeDashboard() {
         .from('task_assignments').select(`id, task:tasks!inner(status)`)
         .eq('employee_id', employeeId).in('tasks.status', ['new', 'in_progress'])
       if (eInProgress) throw eInProgress
-      const { data: pendingEvalTasks, error: ePendingEval } = await supabase
-        .from('task_assignments').select(`id, self_rating, task:tasks!inner(status)`)
-        .eq('employee_id', employeeId).eq('tasks.status', 'pending_review').is('self_rating', null)
-      if (ePendingEval) throw ePendingEval
+      // "Chờ đánh giá" = ĐÚNG số trên tab 'awaiting_eval' của Công việc của tôi (MyTasksPage): CÙNG nguồn
+      // myTasksService.getMyTasks (việc mình phụ trách tạo trong tháng + việc mình tham gia chưa bị gỡ) và CÙNG luật lọc
+      // (status 'finished' + evaluation_status rỗng/none/pending_self_eval). Bản trước chỉ đếm task_assignments (sót việc
+      // mình phụ trách chính — đo 17/11/2026: 649/650 việc người phụ trách không có dòng task_assignments), còn lọc self_rating + bỏ evaluation_status
+      // rỗng → thẻ lệch số trong tab. Đổi luật tab (MyTasksPage stats.awaitingEval) thì đổi cả dòng lọc dưới.
+      const { data: myTasks } = await myTasksService.getMyTasks(employeeId)   // service tự throw khi lỗi
+      const pendingEvaluation = (myTasks || []).filter(t => t.status === 'finished'
+        && (!t.evaluation_status || t.evaluation_status === 'none' || t.evaluation_status === 'pending_self_eval')).length
+      // 'finished' là trạng thái xong thật của tasks ('accepted' không có trong CHECK, xem taskService) — thiếu nó là thẻ luôn 0
       const { data: completedData, error: eCompleted } = await supabase
         .from('task_assignments').select(`id, task:tasks!inner(status)`)
-        .eq('employee_id', employeeId).in('tasks.status', ['completed', 'accepted'])
+        .eq('employee_id', employeeId).in('tasks.status', ['finished', 'completed', 'accepted'])
       if (eCompleted) throw eCompleted
       const { count: pendingLeave, error: ePendingLeave } = await supabase
         .from('leave_requests').select('*', { count: 'exact', head: true })
@@ -350,7 +344,8 @@ export function EmployeeDashboard() {
           // Count absent: weekdays from monthStart to today that have NO attendance record and are NOT weekend
           let absent = 0
           for (let d = new Date(monthStart + 'T00:00:00+07:00'); d <= new Date(todayStr + 'T00:00:00+07:00'); d.setDate(d.getDate() + 1)) {
-            const ds = d.toISOString().split('T')[0]
+            // toDateStrVN (giờ máy): toISOString() của nửa đêm VN là 17h UTC hôm TRƯỚC → mỗi ngày bị so với ngày hôm trước
+            const ds = toDateStrVN(d)
             if (d.getDay() === 0) continue // skip Sunday
             if (!byDate.has(ds)) absent++
           }
@@ -359,14 +354,14 @@ export function EmployeeDashboard() {
       } catch { monthlySummary = null }
 
       setStats({
-        totalTasks: totalTasks || 0, pendingEvaluation: pendingEvalTasks?.length || 0,
+        totalTasks: totalTasks || 0, pendingEvaluation,
         completedTasks: completedData?.length || 0, inProgressTasks: inProgressData?.length || 0,
         remainingLeaveDays: remainingDays, pendingLeaveRequests: pendingLeave || 0, recentTasks, myProjectCount,
         attendanceToday, monthlySummary,
       })
     } catch (err) {
       console.error('Error fetching dashboard data:', err)
-      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu dashboard'))
+      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu trang tổng quan'))
     } finally { setLoading(false); setRefreshing(false) }
   }
 
@@ -381,7 +376,7 @@ export function EmployeeDashboard() {
             style={{ background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.secondary})` }}>
             <Loader2 className="w-6 h-6 text-white animate-spin" />
           </div>
-          <p className="text-sm text-gray-500 font-medium">Đang tải Dashboard...</p>
+          <p className="text-sm text-gray-500 font-medium">Đang tải trang tổng quan...</p>
         </div>
       </div>
     )
@@ -404,8 +399,12 @@ export function EmployeeDashboard() {
     )
   }
 
-  const formatDate = (dateStr: string | null) => dateStr ? new Date(dateStr).toLocaleDateString('vi-VN') : ''
-  const isOverdue = (dateStr: string | null) => dateStr ? new Date(dateStr) < new Date() : false
+  // due_date là timestamptz nửa đêm UTC (= 7h sáng VN) → so theo NGÀY lịch VN (dayOf), không so mốc giờ:
+  // việc hạn hôm nay không bị tô đỏ "quá hạn" từ 7h sáng.
+  const isOverdue = (dateStr: string | null) => {
+    const d = dayOf(dateStr)
+    return d ? d < todayVN() : false
+  }
 
   return (
     <div className="min-h-screen" style={{ background: BRAND.bg }}>
@@ -465,7 +464,7 @@ export function EmployeeDashboard() {
                 ) : (
                   <>
                     <p className="text-[14px] font-bold text-amber-700">Chưa chấm công hôm nay</p>
-                    <p className="text-[12px] text-gray-500">Chọn cách check-in bên dưới</p>
+                    <p className="text-[12px] text-gray-500">Chọn cách chấm công bên dưới</p>
                   </>
                 )}
               </div>
@@ -479,7 +478,7 @@ export function EmployeeDashboard() {
               <Link to="/attendance"
                 className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold border-2 transition-all active:scale-[0.97]"
                 style={{ borderColor: BRAND.primary, color: BRAND.primary }}>
-                <MapPin className="w-4 h-4" /> GPS Check-in
+                <MapPin className="w-4 h-4" /> Chấm công GPS
               </Link>
             </div>
           </div>
@@ -540,7 +539,7 @@ export function EmployeeDashboard() {
             icon={<Clock />}
             accentColor={BRAND.accent}
             iconBg="bg-amber-50 text-amber-600"
-            link="/my-tasks?status=pending_review"
+            link="/my-tasks?tab=awaiting_eval"
           />
           <StatCard
             title="Đã hoàn thành"
@@ -549,7 +548,7 @@ export function EmployeeDashboard() {
             icon={<CheckCircle2 />}
             accentColor="#10B981"
             iconBg="bg-emerald-50 text-emerald-600"
-            link="/my-tasks?status=completed"
+            link="/my-tasks"
           />
           <StatCard
             title="Ngày phép còn"
@@ -616,7 +615,8 @@ export function EmployeeDashboard() {
             ) : (
               stats.recentTasks.map((task) => (
                 <div key={task.id}
-                  onClick={() => navigate(`/my-tasks/${task.id}`)}
+                  // MỘT trang chi tiết cho mọi cửa vào (Công việc của tôi, danh sách, thông báo…): /tasks/:id
+                  onClick={() => navigate(`/tasks/${task.id}`)}
                   className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between gap-2 hover:bg-black/[0.015] cursor-pointer transition-colors active:bg-black/[0.03]">
                   <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                     <TaskStatusBadge status={task.status} />
@@ -633,8 +633,8 @@ export function EmployeeDashboard() {
                     <div className={`flex items-center gap-1 text-xs whitespace-nowrap ml-2 flex-shrink-0 font-medium
                       ${isOverdue(task.due_date) ? 'text-red-500' : 'text-gray-400'}`}>
                       {isOverdue(task.due_date) ? <Timer className="w-3 h-3" /> : <Calendar className="w-3 h-3" />}
-                      <span className="hidden sm:inline">{formatDate(task.due_date)}</span>
-                      <span className="sm:hidden">{new Date(task.due_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</span>
+                      <span className="hidden sm:inline">{fmtDate(task.due_date)}</span>
+                      <span className="sm:hidden">{fmtDateShort(task.due_date)}</span>
                     </div>
                   )}
                 </div>

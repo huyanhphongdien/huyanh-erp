@@ -12,6 +12,8 @@ import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { mixService, MIX_BUOC_LABELS, MIX_BUOC_MO_TA, type MixBuoc, type MixSigner, type NhanVienLite } from '../../../services/wms/mixService'
 import { useMixRole } from '../../../hooks/useMixRole'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { fmtDate } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 const BUOC: MixBuoc[] = ['khai_bao', 'duyet_qc', 'nhan_kho']
@@ -30,7 +32,7 @@ export default function MixSignersPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try { setRows(await mixService.listSigners()) }
-    catch (e: any) { setError(e?.message || 'Không tải được phân công') }
+    catch (e: any) { setError(dichLoiHeThong(e, 'Không tải được phân công')) }
     finally { setLoading(false) }
   }, [])
   useEffect(() => { load() }, [load])
@@ -48,20 +50,20 @@ export default function MixSignersPage() {
       await mixService.grantSigner(emp, buoc, facPick[buoc] ?? null, 'Phân công trên màn Phân công')
       message.success(`Đã thêm vào bước ${MIX_BUOC_LABELS[buoc]}`)
       setPick((p) => ({ ...p, [buoc]: undefined })); await load(); role.refresh()
-    } catch (e: any) { message.error(e?.message || 'Không thêm được (chỉ BGĐ thêm được)') }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Không thêm được (chỉ BGĐ thêm được)')) }
     finally { setBusy(null) }
   }
   const thu = async (r: MixSigner) => {
     setBusy(r.id)
     try { await mixService.revokeSigner(r.id); message.success(`Đã thu quyền ${r.full_name}`); await load(); role.refresh() }
-    catch (e: any) { message.error(e?.message || 'Không thu được') }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Không thu được')) }
     finally { setBusy(null) }
   }
 
   const columns: ColumnsType<MixSigner> = [
     { title: 'Người', dataIndex: 'full_name', key: 'full_name', render: (v, r) => <span><Text strong>{v}</Text>{r.email ? <Text type="secondary"> · {r.email}</Text> : null}</span> },
     { title: 'Nhà máy', dataIndex: 'facility_code', key: 'facility_code', render: (v) => v || <Text type="secondary">mọi nhà máy</Text> },
-    { title: 'Từ', dataIndex: 'granted_at', key: 'granted_at', render: (v) => new Date(v).toLocaleDateString('vi-VN') },
+    { title: 'Từ', dataIndex: 'granted_at', key: 'granted_at', render: (v) => fmtDate(v) },
     { title: '', key: 'x', render: (_, r) => role.laBgd ? <Popconfirm title={`Thu quyền ${r.full_name}?`} okText="Thu" cancelText="Thôi" onConfirm={() => thu(r)}><Button size="small" danger loading={busy === r.id}>Thu</Button></Popconfirm> : null },
   ]
 
@@ -75,7 +77,7 @@ export default function MixSignersPage() {
           </Col>
           <Col><Button icon={<ReloadOutlined />} onClick={load} loading={loading}>Làm mới</Button></Col>
         </Row>
-        {error && <Alert type="error" showIcon message={error} />}
+        {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={load}>Thử lại</Button>} />}
         {!role.laBgd && !role.loading && <Alert type="warning" showIcon message="Chỉ Ban giám đốc mới thêm / thu người. Bạn đang xem." />}
 
         <Row gutter={[12, 12]}>

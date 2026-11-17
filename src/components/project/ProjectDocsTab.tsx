@@ -13,6 +13,10 @@ import {
   UploadCloud, Grid3X3, List, Edit3, Check, AlertCircle, Loader2, FileUp,
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { App } from 'antd'
+import PageState from '../common/PageState'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate, fmtNum } from '../../utils/format'
 import projectDocumentService from '../../services/project/projectDocumentService'
 import type { ProjectDocument, DocCategory } from '../../services/project/projectDocumentService'
 
@@ -64,8 +68,9 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024
 
 function fmtSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1048576).toFixed(1)} MB`
+  // số lẻ dấu phẩy vi-VN (bản cũ toFixed → "1.5 MB" kiểu Anh)
+  if (bytes < 1048576) return `${fmtNum(bytes / 1024, 1)} KB`
+  return `${fmtNum(bytes / 1048576, 1)} MB`
 }
 
 function ago(s: string): string {
@@ -77,7 +82,7 @@ function ago(s: string): string {
   if (h < 24) return `${h} giờ trước`
   const d = Math.floor(h / 24)
   if (d < 30) return `${d} ngày trước`
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return fmtDate(s)
 }
 
 function getIcon(fileName: string | null) {
@@ -96,12 +101,15 @@ function getCat(c: string | null) {
 
 const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) => {
   const { user } = useAuthStore()
+  const { message } = App.useApp()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const versionInputRef = useRef<HTMLInputElement>(null)
 
   // Data
   const [docs, setDocs] = useState<ProjectDocument[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải: trước đây chỉ console.error rồi hiện "Chưa có tài liệu" như thật
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   // Filters
   const [activeCat, setActiveCat] = useState<DocCategory | 'all'>('all')
@@ -147,10 +155,12 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
 
   const loadDocs = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       setDocs(await projectDocumentService.getByProject(projectId))
     } catch (err) {
       console.error('[DocsTab] Load failed:', err)
+      setLoadError(err || 'Không tải được danh sách tài liệu')
     } finally { setLoading(false) }
   }, [projectId])
 
@@ -211,7 +221,7 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
       await loadDocs()
       setShowUpload(false); setUploadFiles([]); setUploadCat('other'); setUploadPhase(''); setUploadDesc('')
     } catch (err: any) {
-      setUploadError(err.message || 'Lỗi upload')
+      setUploadError(dichLoiHeThong(err, 'Tải file lên thất bại'))
     } finally { setUploading(false) }
   }
 
@@ -228,7 +238,10 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
     try {
       await projectDocumentService.delete(d.id)
       setDocs(prev => prev.filter(x => x.id !== d.id))
-    } catch (err) { console.error('Delete failed:', err) }
+    } catch (err) {
+      console.error('Delete failed:', err)
+      message.error(dichLoiHeThong(err, 'Xoá tài liệu thất bại'))
+    }
     setDelDoc(null); setMenuId(null)
   }
 
@@ -254,7 +267,10 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
             uploaded_by: user?.employee_id || null,
           })
           await loadDocs()
-        } catch (err) { console.error('Version upload failed:', err) }
+        } catch (err) {
+          console.error('Version upload failed:', err)
+          message.error(dichLoiHeThong(err, 'Tải phiên bản mới thất bại'))
+        }
       }
     }
     setVersionDocId(null)
@@ -272,7 +288,10 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
     try {
       await projectDocumentService.update(editDoc.id, { description: editDesc || null, category: editCat })
       await loadDocs()
-    } catch (err) { console.error('Edit failed:', err) }
+    } catch (err) {
+      console.error('Edit failed:', err)
+      message.error(dichLoiHeThong(err, 'Lưu thông tin tài liệu thất bại'))
+    }
     setEditDoc(null)
   }
 
@@ -297,7 +316,7 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
       <div className="flex items-center gap-2 mb-3">
         <button onClick={() => fileInputRef.current?.click()}
           className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-[#1B4D3E] text-white rounded-xl text-[13px] font-semibold active:bg-[#15402F]">
-          <Plus className="w-4 h-4" /> Upload
+          <Plus className="w-4 h-4" /> Tải lên
         </button>
         <span className="text-[12px] text-gray-400 inline-flex items-center gap-1"><FolderOpen className="w-3.5 h-3.5" /> {docs.length} file</span>
         <span className="text-[12px] text-gray-400 inline-flex items-center gap-1"><HardDrive className="w-3.5 h-3.5" /> {fmtSize(totalSize)}</span>
@@ -311,7 +330,7 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
         </button>
         <select value={phaseFilter} onChange={e => setPhaseFilter(e.target.value)}
           className="text-[12px] bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 focus:outline-none focus:border-[#2D8B6E]">
-          <option value="">Phases</option>
+          <option value="">Mọi giai đoạn</option>
           {phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </div>
@@ -343,19 +362,19 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
       </div>
 
       {/* LOADING */}
-      {loading && <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>}
+      {(loading || !!loadError) && <PageState loading={loading} error={loadError} onRetry={loadDocs} minHeight={200} />}
 
       {/* EMPTY */}
-      {!loading && filtered.length === 0 && (
+      {!loading && !loadError && filtered.length === 0 && (
         <div className="py-12 text-center">
           <FolderOpen className="w-14 h-14 text-gray-200 mx-auto mb-3" />
           <p className="text-[14px] text-gray-500 font-medium">{search ? 'Không tìm thấy tài liệu' : 'Chưa có tài liệu'}</p>
-          <p className="text-[12px] text-gray-400 mt-1">Kéo thả file hoặc nhấn Upload để thêm</p>
+          <p className="text-[12px] text-gray-400 mt-1">Kéo thả file hoặc nhấn Tải lên để thêm</p>
         </div>
       )}
 
       {/* LIST VIEW */}
-      {!loading && viewMode === 'list' && filtered.length > 0 && (
+      {!loading && !loadError && viewMode === 'list' && filtered.length > 0 && (
         <div className="space-y-2">
           {filtered.map(doc => {
             const fi = getIcon(doc.name)
@@ -375,7 +394,7 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
                           <div className="absolute right-0 top-7 z-40 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px]">
                             <MenuBtn icon={<Download className="w-4 h-4" />} label="Tải xuống" onClick={() => doDownload(doc)} />
                             <MenuBtn icon={<Edit3 className="w-4 h-4" />} label="Sửa thông tin" onClick={() => openEdit(doc)} />
-                            <MenuBtn icon={<FileUp className="w-4 h-4" />} label="Version mới" onClick={() => doVersionUpload(doc.id)} />
+                            <MenuBtn icon={<FileUp className="w-4 h-4" />} label="Phiên bản mới" onClick={() => doVersionUpload(doc.id)} />
                             <div className="border-t border-gray-100 my-0.5" />
                             <MenuBtn icon={<Trash2 className="w-4 h-4" />} label="Xóa" onClick={() => { setDelDoc(doc); setMenuId(null) }} danger />
                           </div>
@@ -401,7 +420,7 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
       )}
 
       {/* GRID VIEW */}
-      {!loading && viewMode === 'grid' && filtered.length > 0 && (
+      {!loading && !loadError && viewMode === 'grid' && filtered.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {filtered.map(doc => {
             const fi = getIcon(doc.name)
@@ -426,7 +445,7 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
                     <div className="absolute right-0 top-7 z-40 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[150px]">
                       <MenuBtn icon={<Download className="w-3.5 h-3.5" />} label="Tải" onClick={() => doDownload(doc)} small />
                       <MenuBtn icon={<Edit3 className="w-3.5 h-3.5" />} label="Sửa" onClick={() => openEdit(doc)} small />
-                      <MenuBtn icon={<FileUp className="w-3.5 h-3.5" />} label="Version" onClick={() => doVersionUpload(doc.id)} small />
+                      <MenuBtn icon={<FileUp className="w-3.5 h-3.5" />} label="Phiên bản" onClick={() => doVersionUpload(doc.id)} small />
                       <div className="border-t border-gray-100 my-0.5" />
                       <MenuBtn icon={<Trash2 className="w-3.5 h-3.5" />} label="Xóa" onClick={() => { setDelDoc(doc); setMenuId(null) }} danger small />
                     </div>
@@ -447,7 +466,7 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
       {showUpload && (
         <Modal onClose={() => !uploading && setShowUpload(false)}>
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-[16px] font-bold text-gray-900">Upload tài liệu</h2>
+            <h2 className="text-[16px] font-bold text-gray-900">Tải tài liệu lên</h2>
             <button onClick={() => !uploading && setShowUpload(false)} className="p-1.5 rounded-lg active:bg-gray-100"><X className="w-5 h-5 text-gray-400" /></button>
           </div>
           <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
@@ -507,7 +526,7 @@ const ProjectDocsTab: React.FC<ProjectDocsTabProps> = ({ projectId, phases }) =>
               className="flex-1 py-3 rounded-xl border border-gray-200 text-[14px] font-semibold text-gray-600 disabled:opacity-50">Hủy</button>
             <button onClick={doUpload} disabled={uploading || !uploadFiles.length}
               className="flex-1 py-3 rounded-xl bg-[#1B4D3E] text-white text-[14px] font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
-              {uploading ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang upload...</> : <><Upload className="w-4 h-4" /> Upload</>}
+              {uploading ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang tải lên...</> : <><Upload className="w-4 h-4" /> Tải lên</>}
             </button>
           </div>
         </Modal>

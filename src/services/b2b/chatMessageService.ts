@@ -6,6 +6,7 @@
 
 import { supabase } from '../../lib/supabase'
 import { dealService, type Deal } from './dealService'
+import { fmtVndNum } from '../../utils/format'
 
 // ============================================
 // INTERFACES
@@ -585,12 +586,12 @@ export const chatMessageService = {
     const basePrice = booking.counter_price || booking.price_per_kg
     if (counterPrice > basePrice * 2) {
       throw new Error(
-        `Giá đề xuất quá cao (>${(basePrice * 2).toLocaleString('vi-VN')} đ/kg = 2× giá hiện tại)`,
+        `Giá đề xuất quá cao (>${fmtVndNum(basePrice * 2)} ₫/kg = 2× giá hiện tại)`,
       )
     }
     if (counterPrice < basePrice * 0.5) {
       throw new Error(
-        `Giá đề xuất quá thấp (<${(basePrice * 0.5).toLocaleString('vi-VN')} đ/kg = 50% giá hiện tại)`,
+        `Giá đề xuất quá thấp (<${fmtVndNum(basePrice * 0.5)} ₫/kg = 50% giá hiện tại)`,
       )
     }
 
@@ -623,7 +624,7 @@ export const chatMessageService = {
         room_id: original.room_id,
         sender_id: actorInfo?.id || null,
         sender_type: 'factory',
-        content: `💬 Vòng ${roundNo} — Nhà máy đề xuất thương lượng phiếu #${booking.code || ''}\nGiá: ${counterPrice.toLocaleString('vi-VN')} VNĐ/${priceUnitLabel}\nLý do: ${notes.trim()}`,
+        content: `💬 Vòng ${roundNo} — Nhà máy đề xuất thương lượng phiếu #${booking.code || ''}\nGiá: ${fmtVndNum(counterPrice)} ₫/${priceUnitLabel}\nLý do: ${notes.trim()}`,
         message_type: 'system',
         reply_to_id: messageId,
         metadata: {
@@ -798,7 +799,10 @@ export const chatMessageService = {
   // ============================================
 
   /**
-   * Tìm kiếm tin nhắn trong room
+   * Tìm kiếm tin nhắn trong room — PHÍA SERVER (ilike trên content, 50 kết quả mới nhất).
+   * Dùng khi tin cần tìm nằm ngoài các tin đã nạp vào màn chat (getMessages chỉ nạp
+   * `limit` tin gần nhất; tin cũ hơn lấy bằng getMessages({ room_id, before: <id tin cũ nhất> })
+   * và đọc cờ hasMore).
    */
   async searchMessages(roomId: string, searchText: string): Promise<ChatMessage[]> {
     const { data, error } = await supabase

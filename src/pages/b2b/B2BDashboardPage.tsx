@@ -26,6 +26,7 @@ import {
   Empty,
   Tooltip,
   Badge,
+  Alert,
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -73,6 +74,9 @@ import {
   ProductionStats,
 } from '../../services/b2b/b2bDashboardService'
 import { chatMessageService } from '../../services/b2b/chatMessageService'
+import { TIER_LABELS, TIER_COLORS } from '../../services/b2b/partnerService'
+import EnumTag from '../../components/common/EnumTag'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
 
@@ -82,13 +86,7 @@ const { Title, Text } = Typography
 // CONSTANTS
 // ============================================
 
-const TIER_COLORS: Record<string, string> = {
-  diamond: '#9333EA',
-  gold: '#F59E0B',
-  silver: '#6B7280',
-  bronze: '#EA580C',
-  new: '#06B6D4',
-}
+// Hạng đại lý: nhãn tiếng Việt + màu dùng chung TIER_LABELS/TIER_COLORS (partnerService) — trước in 'DIAMOND'
 
 const CHART_COLORS = ['#1B4D3E', '#2D8B6E', '#E8A838', '#D4763D', '#8B5CF6', '#94A3B8']
 
@@ -191,6 +189,8 @@ const B2BDashboardPage = () => {
   const [activities, setActivities] = useState<ActivityItem[]>([])
   const [productionStats, setProductionStats] = useState<ProductionStats | null>(null)
   const [chartType, setChartType] = useState<'production' | 'revenue'>('production')
+  // Lỗi tải: thẻ KPI không được hiện 0 như thể thật (audit 17/11/2026)
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   // ============================================
   // DATA FETCHING
@@ -229,9 +229,12 @@ const B2BDashboardPage = () => {
       setRecentMessages(recentMessagesRes)
       setActivities(activitiesRes)
       setProductionStats(productionStatsRes)
+      setLoadError(null)
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
-      message.error('Không thể tải dữ liệu dashboard')
+      setLoadError(error)
+      // Lượt tự làm mới 30s lỗi thì chỉ hiện băng lỗi, không bắn toast lặp lại
+      if (showLoading) message.error(dichLoiHeThong(error, 'Không thể tải dữ liệu tổng quan'))
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -262,7 +265,7 @@ const B2BDashboardPage = () => {
       message.success(`Đã xác nhận phiếu chốt mủ & tạo Deal ${deal.deal_number}`)
       fetchData(false)
     } catch (error) {
-      message.error('Không thể xác nhận')
+      message.error(dichLoiHeThong(error, 'Không thể xác nhận'))
     }
   }
 
@@ -297,9 +300,7 @@ const B2BDashboardPage = () => {
       render: (_, record) => (
         <Space>
           <Text strong>{record.name}</Text>
-          <Tag color={TIER_COLORS[record.tier]} style={{ fontSize: 10 }}>
-            {record.tier.toUpperCase()}
-          </Tag>
+          <EnumTag value={record.tier} labels={TIER_LABELS} colors={TIER_COLORS} style={{ fontSize: 10 }} />
         </Space>
       ),
     },
@@ -311,7 +312,7 @@ const B2BDashboardPage = () => {
       render: (val) => <Text strong>{val} tấn</Text>,
     },
     {
-      title: 'Deals',
+      title: 'Số deal',
       dataIndex: 'dealCount',
       key: 'dealCount',
       align: 'center',
@@ -339,8 +340,8 @@ const B2BDashboardPage = () => {
       {/* Header */}
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <Title level={3} style={{ margin: 0 }}>B2B Dashboard</Title>
-          <Text type="secondary">Tổng quan hoạt động B2B</Text>
+          <Title level={3} style={{ margin: 0 }}>Tổng quan B2B</Title>
+          <Text type="secondary">Tổng quan hoạt động thu mua B2B</Text>
         </div>
         <Button
           icon={<ReloadOutlined spin={refreshing} />}
@@ -351,11 +352,23 @@ const B2BDashboardPage = () => {
         </Button>
       </div>
 
+      {/* Lỗi tải → nói rõ, số 0 trên thẻ KPI bên dưới KHÔNG phải số thật */}
+      {!!loadError && !loading && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Không tải được dữ liệu tổng quan"
+          description={`${dichLoiHeThong(loadError, 'Có lỗi khi tải')}. Các số bên dưới có thể chưa đúng.`}
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={() => fetchData()}>Thử lại</Button>}
+        />
+      )}
+
       {/* KPI Cards (E3.1) */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={4}>
           <KPICard
-            title="Đại lý Active"
+            title="Đại lý đang hoạt động"
             value={kpis?.totalActivePartners || 0}
             prefix={<TeamOutlined />}
             loading={loading}
@@ -365,7 +378,7 @@ const B2BDashboardPage = () => {
         </Col>
         <Col xs={24} sm={12} lg={4}>
           <KPICard
-            title="Deals đang xử lý"
+            title="Deal đang xử lý"
             value={kpis?.dealsProcessing || 0}
             prefix={<ShoppingOutlined />}
             loading={loading}
@@ -626,7 +639,7 @@ const B2BDashboardPage = () => {
                         }
                         description={
                           <Text type="secondary" style={{ fontSize: 12 }}>
-                            {item.booking.price_per_kg.toLocaleString('vi-VN')} đ/kg • {formatTime(item.sentAt)}
+                            {item.booking.price_per_kg.toLocaleString('vi-VN')} ₫/kg • {formatTime(item.sentAt)}
                           </Text>
                         }
                       />

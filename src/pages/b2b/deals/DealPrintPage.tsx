@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Printer, AlertCircle } from 'lucide-react'
 import { dealService, type Deal } from '../../../services/b2b/dealService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ============================================
 // FACILITY MAP (sync với portal + dealConfirmService)
@@ -65,7 +66,7 @@ const DealPrintPage = ({ id: propId }: DealPrintPageProps = {}) => {
         if (!d) setError('Không tìm thấy Deal')
         else setDeal(d)
       })
-      .catch(e => setError(e?.message || 'Lỗi tải dữ liệu'))
+      .catch(e => setError(dichLoiHeThong(e, 'Lỗi tải dữ liệu')))
       .finally(() => setLoading(false))
   }, [id])
 

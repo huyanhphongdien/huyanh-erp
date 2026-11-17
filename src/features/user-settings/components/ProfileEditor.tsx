@@ -21,11 +21,13 @@ import {
   Camera,
   Trash2
 } from 'lucide-react'
-import { 
-  userSettingsService, 
-  type UserProfile, 
-  type UpdateProfileInput 
+import { App } from 'antd'
+import {
+  userSettingsService,
+  type UserProfile,
+  type UpdateProfileInput
 } from '../../../services/userSettingsService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -41,6 +43,7 @@ interface ProfileEditorProps {
 // ============================================================================
 
 export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) {
+  const { modal } = App.useApp()
   // Form state
   const [formData, setFormData] = useState<UpdateProfileInput>({
     phone: '',
@@ -104,7 +107,7 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
         // Auto hide success after 3s
         setTimeout(() => setSuccess(false), 3000)
       } else {
-        setError(result.error?.message || 'Lưu thất bại')
+        setError(dichLoiHeThong(result.error, 'Lưu thất bại'))
       }
     } catch (err) {
       setError('Có lỗi xảy ra. Vui lòng thử lại.')
@@ -143,29 +146,43 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
       if (result.success) {
         onProfileUpdate?.()
       } else {
-        setError(result.error || 'Upload ảnh thất bại')
+        setError(dichLoiHeThong(result.error, 'Tải ảnh lên thất bại'))
       }
     } catch (err) {
-      setError('Có lỗi xảy ra khi upload ảnh')
+      setError(dichLoiHeThong(err, 'Có lỗi khi tải ảnh lên'))
     } finally {
       setIsUploadingAvatar(false)
     }
   }
-  
-  const handleRemoveAvatar = async () => {
+
+  const doRemoveAvatar = async () => {
     if (!profile?.employee_id) return
-    if (!confirm('Bạn có chắc muốn xóa ảnh đại diện?')) return
-    
     setIsUploadingAvatar(true)
-    
+    setError(null)
     try {
       const result = await userSettingsService.removeAvatar(profile.employee_id)
       if (result.success) {
         onProfileUpdate?.()
+      } else {
+        // trước đây lỗi xoá ảnh không báo gì — người dùng tưởng đã xoá
+        setError(dichLoiHeThong(result.error, 'Xoá ảnh đại diện thất bại'))
       }
     } finally {
       setIsUploadingAvatar(false)
     }
+  }
+
+  // Xác nhận bằng Modal antd (thay window.confirm — hộp hệ thống tiêu đề tiếng Anh, chặn luồng, thô trên điện thoại)
+  const handleRemoveAvatar = () => {
+    if (!profile?.employee_id) return
+    modal.confirm({
+      title: 'Xoá ảnh đại diện?',
+      content: 'Ảnh hiện tại sẽ bị gỡ khỏi hồ sơ nhân viên. Muốn có ảnh lại thì tải ảnh mới lên.',
+      okText: 'Xoá ảnh',
+      okButtonProps: { danger: true },
+      cancelText: 'Thôi',
+      onOk: doRemoveAvatar,
+    })
   }
   
   // ========================================================================
@@ -202,7 +219,7 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
       {/* Profile Card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {/* Header with Avatar */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-8">
+        <div className="bg-gradient-to-r from-primary to-secondary px-6 py-8">
           <div className="flex items-center gap-6">
             {/* Avatar */}
             <div className="relative">
@@ -214,8 +231,8 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-blue-100 flex items-center justify-center">
-                    <span className="text-3xl font-bold text-blue-600">
+                  <div className="w-full h-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-3xl font-bold text-primary">
                       {profile.full_name.charAt(0).toUpperCase()}
                     </span>
                   </div>
@@ -255,8 +272,8 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
             {/* Basic Info (Read-only) */}
             <div className="text-white">
               <h2 className="text-2xl font-bold">{profile.full_name}</h2>
-              <p className="text-blue-100 mt-1">Mã NV: {profile.employee_code}</p>
-              <div className="flex items-center gap-4 mt-2 text-blue-100">
+              <p className="text-white/80 mt-1">Mã NV: {profile.employee_code}</p>
+              <div className="flex items-center gap-4 mt-2 text-white/80">
                 {profile.department_name && (
                   <span className="flex items-center gap-1.5">
                     <Building2 className="w-4 h-4" />
@@ -282,7 +299,7 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
             {!isEditing ? (
               <button
                 onClick={() => setIsEditing(true)}
-                className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-lg transition-colors"
               >
                 Chỉnh sửa
               </button>
@@ -298,7 +315,7 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"
+                  className="px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-secondary rounded-lg transition-colors flex items-center gap-2"
                 >
                   {isSaving ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -337,7 +354,7 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="Nhập số điện thoại"
                 />
               ) : (
@@ -358,7 +375,7 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
                   value={formData.address}
                   onChange={(e) => handleChange('address', e.target.value)}
                   rows={2}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
                   placeholder="Nhập địa chỉ"
                 />
               ) : (
@@ -399,7 +416,7 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
                   type="text"
                   value={formData.emergency_contact_name}
                   onChange={(e) => handleChange('emergency_contact_name', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="Họ tên người liên hệ"
                 />
               ) : (
@@ -419,7 +436,7 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
                   type="tel"
                   value={formData.emergency_contact_phone}
                   onChange={(e) => handleChange('emergency_contact_phone', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="Số điện thoại"
                 />
               ) : (
@@ -438,7 +455,7 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
                 <select
                   value={formData.emergency_contact_relation}
                   onChange={(e) => handleChange('emergency_contact_relation', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="">-- Chọn --</option>
                   <option value="Bố">Bố</option>
@@ -488,7 +505,7 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
                   type="text"
                   value={formData.bank_name}
                   onChange={(e) => handleChange('bank_name', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="Ví dụ: Vietcombank, BIDV..."
                 />
               ) : (
@@ -508,7 +525,7 @@ export function ProfileEditor({ profile, onProfileUpdate }: ProfileEditorProps) 
                   type="text"
                   value={formData.bank_account_number}
                   onChange={(e) => handleChange('bank_account_number', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="Nhập số tài khoản"
                 />
               ) : (

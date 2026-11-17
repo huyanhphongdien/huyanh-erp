@@ -11,24 +11,25 @@ import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, BankOutline
 import dayjs from 'dayjs'
 import FinanceLendingTabs from './FinanceLendingTabs'
 import {
-  creditLineService, LINE_TYPE_LABEL, type FinCreditLineComputed,
+  creditLineService, LINE_TYPE_LABEL, CREDIT_LINE_STATUS_LABELS, CREDIT_LINE_STATUS_COLORS, type FinCreditLineComputed,
 } from '../../services/finance/creditLineService'
 import { BANKS } from '../../services/finance/loanService'
 import FacilityDrawer from './FacilityDrawer'
 import { useAuthStore } from '../../stores/authStore'
+import { fmtVndNum, fmtTy, vndInputProps } from '../../utils/format'
+import { FIN_LIGHT } from '../../services/finance/finLight'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
+import { EnumTag } from '../../components/common/EnumTag'
 
 const { Title, Text } = Typography
-const fmtVnd = (n?: number | null) => (n || 0).toLocaleString('vi-VN')
-const fmtTy = (n: number) => `${((n || 0) / 1_000_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} tỷ`
-const fDate = (s?: string | null) => (s ? dayjs(s).format('DD/MM/YYYY') : '—')
-const numFmt = (v?: number | string) => `${v ?? ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-const numParse = (v?: string) => (v || '').replace(/\./g, '')
 
 export default function FinanceCreditLinePage() {
   const user = useAuthStore((s) => s.user)
   const actorId = user?.employee_id || user?.id || null
   const [rows, setRows] = useState<FinCreditLineComputed[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<FinCreditLineComputed | null>(null)
   const [saving, setSaving] = useState(false)
@@ -36,8 +37,8 @@ export default function FinanceCreditLinePage() {
   const [drawerLine, setDrawerLine] = useState<FinCreditLineComputed | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    try { setRows(await creditLineService.listComputed()) } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
+    setLoading(true); setLoadError(null)
+    try { setRows(await creditLineService.listComputed()) } catch (e) { setLoadError(e) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
@@ -69,25 +70,26 @@ export default function FinanceCreditLinePage() {
       if (editing) await creditLineService.update(editing.id, payload)
       else await creditLineService.create({ ...payload, created_by: actorId })
       message.success('Đã lưu hạn mức'); setOpen(false); load()
-    } catch (e: any) { if (e?.errorFields) return; message.error('Lỗi lưu: ' + (e?.message || e)) }
+    } catch (e: any) { if (e?.errorFields) return; message.error(dichLoiHeThong(e, 'Lưu hạn mức thất bại')) }
     finally { setSaving(false) }
   }
   const handleDelete = async (r: FinCreditLineComputed) => {
     try { await creditLineService.remove(r.id); message.success('Đã xoá'); load() }
-    catch (e: any) { message.error('Lỗi xoá: ' + (e?.message || e)) }
+    catch (e) { message.error(dichLoiHeThong(e, 'Xoá hạn mức thất bại')) }
   }
 
   const columns = [
     { title: 'Ngân hàng', dataIndex: 'bank', width: 150, render: (v: string, r: FinCreditLineComputed) => (
-      <span><b>{v}</b>{r.contract_no ? <div style={{ fontSize: 11, color: '#9ca3af' }}>{r.contract_no}</div> : null}</span>) },
+      <span><b>{v}</b>{r.status && r.status !== 'active' ? <EnumTag value={r.status} labels={CREDIT_LINE_STATUS_LABELS} colors={CREDIT_LINE_STATUS_COLORS} style={{ marginLeft: 6 }} /> : null}
+        {r.contract_no ? <div style={{ fontSize: 11, color: '#9ca3af' }}>{r.contract_no}</div> : null}</span>) },
     { title: 'Loại', dataIndex: 'line_type', width: 110, render: (v: string) => <Tag>{LINE_TYPE_LABEL[v] || v || '—'}</Tag> },
-    { title: 'Hạn mức', dataIndex: 'limit_amount', width: 140, align: 'right' as const, render: (v: number) => <b>{fmtVnd(v)}</b> },
-    { title: 'Đang vay', dataIndex: 'used', width: 140, align: 'right' as const, render: (v: number) => <span style={{ color: '#92400E' }}>{fmtVnd(v)}</span> },
+    { title: 'Hạn mức', dataIndex: 'limit_amount', width: 140, align: 'right' as const, render: (v: number | null) => <b>{fmtVndNum(v)}</b> },
+    { title: 'Đang vay', dataIndex: 'used', width: 140, align: 'right' as const, render: (v: number) => <span style={{ color: '#92400E' }}>{fmtVndNum(v)}</span> },
     { title: 'Room còn lại', dataIndex: 'room', width: 150, align: 'right' as const, render: (v: number, r: FinCreditLineComputed) => {
       const limit = Number(r.limit_amount) || 0
       const pct = limit > 0 ? Math.round((r.used / limit) * 100) : 0
-      return <div><b style={{ color: v < 0 ? '#dc2626' : '#16a34a' }}>{fmtVnd(v)}</b>
-        <Progress percent={Math.min(pct, 100)} size="small" showInfo={false} strokeColor={pct >= 90 ? '#dc2626' : '#1677ff'} /></div>
+      return <div><b style={{ color: v < 0 ? '#dc2626' : '#16a34a' }}>{fmtVndNum(v)}</b>
+        <Progress percent={Math.min(pct, 100)} size="small" showInfo={false} strokeColor={pct >= 100 ? FIN_LIGHT.overdue : pct >= 90 ? FIN_LIGHT.due : '#1677ff'} /></div>
     } },
     { title: 'Đảm bảo (gửi + tài sản)', key: 'secured', width: 170, align: 'right' as const, render: (_: any, r: FinCreditLineComputed) => (
       <div style={{ fontSize: 12 }}>
@@ -99,7 +101,8 @@ export default function FinanceCreditLinePage() {
     { title: '', key: 'act', width: 90, fixed: 'right' as const, render: (_: any, r: FinCreditLineComputed) => (
       <Space size={2} onClick={(e) => e.stopPropagation()}>
         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
-        <Popconfirm title="Xoá hạn mức này?" okText="Xoá" cancelText="Huỷ" onConfirm={() => handleDelete(r)}>
+        <Popconfirm title="Xoá hạn mức này?" description="Khoản vay / HĐTG / tài sản đang nối với hạn mức sẽ thành 'chưa nối' (dữ liệu của chúng giữ nguyên)."
+          okText="Xoá" cancelText="Huỷ" okButtonProps={{ danger: true }} onConfirm={() => handleDelete(r)}>
           <Button type="text" size="small" danger icon={<DeleteOutlined />} />
         </Popconfirm>
       </Space>) },
@@ -124,10 +127,12 @@ export default function FinanceCreditLinePage() {
       </Row>
 
       <Card size="small" styles={{ body: { padding: 0 } }}>
+        <PageState error={loadError} onRetry={load}>
         <Table rowKey="id" size="small" loading={loading} columns={columns as any} dataSource={rows}
           pagination={false} scroll={{ x: 1100 }}
           onRow={(r) => ({ onClick: () => setDrawerLine(r), style: { cursor: 'pointer' } })}
           locale={{ emptyText: 'Chưa có hạn mức. Bấm "Thêm hạn mức" để khai báo (vd Agribank 99 tỷ).' }} />
+        </PageState>
       </Card>
 
       <Modal title={editing ? 'Sửa hạn mức' : 'Thêm hạn mức tín dụng'} open={open} onCancel={() => setOpen(false)}
@@ -139,12 +144,12 @@ export default function FinanceCreditLinePage() {
               <AutoComplete options={BANKS.map((b) => ({ value: b }))} placeholder="Agribank…" filterOption={(i, o) => (o?.value || '').toLowerCase().includes(i.toLowerCase())} />
             </Form.Item>
             <Form.Item name="contract_no" label="Số HĐTD"><Input placeholder="vd: 4000-LCL-..." /></Form.Item>
-            <Form.Item name="limit_amount" label="Hạn mức (VNĐ)" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} /></Form.Item>
+            <Form.Item name="limit_amount" label="Hạn mức (VNĐ)" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} {...vndInputProps} /></Form.Item>
             <Form.Item name="line_type" label="Loại hạn mức">
               <Select options={Object.entries(LINE_TYPE_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
             </Form.Item>
             <Form.Item name="interest_rate" label="Lãi suất (%/năm)"><InputNumber min={0} step={0.1} style={{ width: '100%' }} /></Form.Item>
-            <Form.Item name="status" label="Trạng thái"><Select options={[{ value: 'active', label: 'Hiệu lực' }, { value: 'expired', label: 'Hết hạn' }, { value: 'closed', label: 'Đã đóng' }]} /></Form.Item>
+            <Form.Item name="status" label="Trạng thái"><Select options={Object.entries(CREDIT_LINE_STATUS_LABELS).map(([value, label]) => ({ value, label }))} /></Form.Item>
             <Form.Item name="from_date" label="Từ ngày"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="to_date" label="Đến ngày"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="currency" hidden initialValue="VND"><Input /></Form.Item>

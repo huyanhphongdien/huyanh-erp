@@ -39,7 +39,7 @@ interface SafetySign {
 export default function SafetySignsPage() {
   const navigate = useNavigate()
 
-  const { data: signs = [], isLoading, refetch } = useQuery({
+  const { data: signs = [], isLoading, error, refetch } = useQuery({
     queryKey: ['safety-signs'],
     queryFn: async () => {
       const { data, error } = await supabase.from('safety_signs').select('*').order('area, code')
@@ -102,6 +102,7 @@ export default function SafetySignsPage() {
         dataSource={signs}
         rowKey="id"
         loading={isLoading}
+        error={error}
         title="Biển hiệu an toàn"
         onRefresh={() => refetch()}
         expandedRowRender={renderInlineDetail}

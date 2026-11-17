@@ -31,6 +31,9 @@ import {
   type TaskParticipant,
   type AvailableEmployee,
 } from '../../../services/taskParticipantService'
+import { Modal, message } from 'antd'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -183,7 +186,7 @@ const AddParticipantModal: React.FC<{
       )
 
       if (loadError) {
-        setError(loadError.message)
+        setError(dichLoiHeThong(loadError, 'Không tải được danh sách nhân viên'))
       } else {
         setEmployees(data)
 
@@ -436,6 +439,8 @@ const TaskParticipantsSection: React.FC<TaskParticipantsSectionProps> = ({
   const { user } = useAuthStore()
   const [participants, setParticipants] = useState<TaskParticipant[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải — service trả { data: [], error } (không ném); trước đây bỏ qua → "Chưa có người tham gia" giả
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [expanded, setExpanded] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
@@ -450,8 +455,9 @@ const TaskParticipantsSection: React.FC<TaskParticipantsSectionProps> = ({
   // Load participants
   const loadParticipants = useCallback(async () => {
     setLoading(true)
-    const { data } = await taskParticipantService.getParticipants(taskId)
+    const { data, error } = await taskParticipantService.getParticipants(taskId)
     setParticipants(data)
+    setLoadError(error)
     setLoading(false)
   }, [taskId])
 
@@ -460,20 +466,29 @@ const TaskParticipantsSection: React.FC<TaskParticipantsSectionProps> = ({
   }, [loadParticipants])
 
   // Handle remove participant - FIX: removeParticipant chỉ nhận 1 tham số
-  const handleRemove = async (assignmentId: string) => {
-    if (!confirm('Bạn có chắc muốn xóa người này khỏi công việc?')) return
+  // Modal antd thay confirm()/alert() hệ thống — nêu hệ quả, nút đỏ tiếng Việt
+  const handleRemove = (assignmentId: string) => {
+    const name = participants.find((p) => p.id === assignmentId)?.employee_name
+    Modal.confirm({
+      title: 'Gỡ người tham gia?',
+      content: `${name ? `"${name}"` : 'Người này'} sẽ không còn tham gia công việc này nữa.`,
+      okText: 'Gỡ khỏi công việc',
+      cancelText: 'Không',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setRemovingId(assignmentId)
+        const result = await taskParticipantService.removeParticipant(assignmentId)
 
-    setRemovingId(assignmentId)
-    const result = await taskParticipantService.removeParticipant(assignmentId)
+        if (result.success) {
+          await loadParticipants()
+          onParticipantChange?.()
+        } else {
+          message.error(dichLoiHeThong(result.error, 'Không thể xóa người tham gia'))
+        }
 
-    if (result.success) {
-      await loadParticipants()
-      onParticipantChange?.()
-    } else {
-      alert(result.error || 'Không thể xóa người tham gia')
-    }
-
-    setRemovingId(null)
+        setRemovingId(null)
+      },
+    })
   }
 
   // Count by status
@@ -529,6 +544,8 @@ const TaskParticipantsSection: React.FC<TaskParticipantsSectionProps> = ({
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
             </div>
+          ) : loadError ? (
+            <PageState error={loadError} onRetry={loadParticipants} />
           ) : participants.length === 0 ? (
             <div className="text-center py-8 bg-gray-50 rounded-lg">
               <Users className="w-10 h-10 mx-auto mb-2 text-gray-300" />

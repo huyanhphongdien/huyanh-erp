@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { App } from 'antd'
 import {
   X, Clock, Save, History, AlertTriangle, Loader2, Plus, Trash2,
 } from 'lucide-react'
@@ -14,6 +15,9 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { attendanceEditService } from '../../services/attendanceEditService'
 import type { DayDetail } from '../../services/monthlyTimesheetService'
+import { addDaysStr } from '../../utils/dateVN'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtDate, fmtDateTime } from '../../utils/format'
 
 // ============================================================================
 // TYPES
@@ -48,6 +52,7 @@ interface AttRecord {
 export default function EditAttendanceModal({ open, onClose, day, employeeId, employeeName, onSaved }: Props) {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
+  const { modal } = App.useApp()
   const editorId = user?.employee_id || ''
 
   const [tab, setTab] = useState<Tab>('symbol')
@@ -136,9 +141,9 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
       let checkOutISO: string | null = null
       if (coutTime) {
         if ((shift as any).crosses_midnight && coutTime < cinTime) {
-          const nextDay = new Date(day.date + 'T00:00:00+07:00')
-          nextDay.setDate(nextDay.getDate() + 1)
-          const nextDateStr = nextDay.toISOString().split('T')[0]
+          // Ngày hôm sau theo LỊCH. Bản cũ: nửa đêm VN + 1 ngày rồi toISOString (UTC) → ra lại
+          // CHÍNH ngày đó → giờ ra ca đêm sớm hơn giờ vào
+          const nextDateStr = addDaysStr(day.date, 1)
           checkOutISO = `${nextDateStr}T${coutTime}:00+07:00`
         } else {
           checkOutISO = `${day.date}T${coutTime}:00+07:00`
@@ -160,7 +165,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
       // Giữ modal mở để user có thể tiếp tục thao tác (xem, thêm, sửa)
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => setError(dichLoiHeThong(err, 'Thêm ca thất bại')),
   })
 
   // ── Xóa 1 record ──
@@ -176,9 +181,9 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
         .delete()
         .eq('id', recordId)
         .select('id')
-      if (delErr) throw new Error(delErr.message)
+      if (delErr) throw delErr
       if (!data || data.length === 0) {
-        throw new Error('Không xóa được. Có thể do RLS policy chặn — liên hệ admin.')
+        throw new Error('Không xóa được — tài khoản không có quyền xoá dòng chấm công này, liên hệ admin.')
       }
     },
     onSuccess: () => {
@@ -186,7 +191,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
       // Giữ modal mở sau khi xóa 1 ca để user xem ca còn lại / tiếp tục thao tác
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => setError(dichLoiHeThong(err, 'Xoá ca thất bại')),
   })
 
   // ── Xóa tất cả (đánh vắng) ──
@@ -202,9 +207,9 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
         .eq('employee_id', employeeId)
         .eq('date', day.date)
         .select('id')
-      if (delErr) throw new Error(delErr.message)
+      if (delErr) throw delErr
       if (dayRecords.length > 0 && (!data || data.length === 0)) {
-        throw new Error('Không xóa được. Có thể do RLS policy chặn — liên hệ admin.')
+        throw new Error('Không xóa được — tài khoản không có quyền xoá chấm công ngày này, liên hệ admin.')
       }
     },
     onSuccess: () => {
@@ -213,7 +218,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
       onSaved()
       onClose()
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => setError(dichLoiHeThong(err, 'Đánh vắng thất bại')),
   })
 
   // ── Sửa nhanh ký hiệu (1 click) ──
@@ -236,7 +241,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
       onSaved()
       onClose()
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => setError(dichLoiHeThong(err, 'Sửa ký hiệu thất bại')),
   })
 
   // ── Sửa nhanh 1 record (đổi ca) ──
@@ -254,8 +259,31 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
       // Giữ modal mở sau khi đổi ca để user xem kết quả ngay
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => setError(dichLoiHeThong(err, 'Đổi ca thất bại')),
   })
+
+  // Xác nhận bằng antd (bản cũ dùng confirm() của trình duyệt — Enter là qua, WebView hiện domain lạ)
+  const confirmDeleteRecord = (rec: AttRecord) => {
+    modal.confirm({
+      title: 'Xoá ca chấm công này?',
+      content: `${rec.shift?.name || 'Ca'} — ${formatTime(rec.check_in_time)} → ${formatTime(rec.check_out_time)} ngày ${fmtDate(day.date)}. Công của ca này sẽ bị trừ khỏi bảng công.`,
+      okText: 'Xoá ca',
+      cancelText: 'Không xoá',
+      okButtonProps: { danger: true },
+      onOk: () => deleteMutation.mutateAsync(rec.id).catch(() => undefined),
+    })
+  }
+
+  const confirmDeleteAll = () => {
+    modal.confirm({
+      title: `Đánh vắng ngày ${fmtDate(day.date)}?`,
+      content: `Xoá cả ${dayRecords.length} ca chấm công của ${employeeName} trong ngày này. Ngày sẽ hiện "X" (vắng) và 0 công trên bảng công.`,
+      okText: `Xoá ${dayRecords.length} ca`,
+      cancelText: 'Không xoá',
+      okButtonProps: { danger: true },
+      onOk: () => deleteAllMutation.mutateAsync().catch(() => undefined),
+    })
+  }
 
   if (!open) return null
 
@@ -420,8 +448,9 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
                                   Đổi ca
                                 </button>
                                 <button
-                                  onClick={() => { if (confirm('Xóa bản ghi này?')) deleteMutation.mutate(rec.id) }}
+                                  onClick={() => confirmDeleteRecord(rec)}
                                   disabled={isLoading}
+                                  title="Xoá ca này"
                                   className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
                                 >
                                   <Trash2 size={13} />
@@ -538,11 +567,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
                   {/* ★ ĐÁNH VẮNG — Xóa tất cả attendance */}
                   {dayRecords.length > 0 && (
                     <button
-                      onClick={() => {
-                        if (confirm(`Xóa tất cả chấm công ngày ${day.date}?\nNgày này sẽ hiện "X" (vắng).`)) {
-                          deleteAllMutation.mutate()
-                        }
-                      }}
+                      onClick={confirmDeleteAll}
                       disabled={isLoading}
                       className="w-full flex items-center justify-center gap-1.5 py-2 border border-red-300 rounded-xl text-[12px] font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
                     >
@@ -566,7 +591,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium text-gray-700">{log.editor?.full_name || 'N/A'}</span>
                             <span className="text-gray-400">
-                              {new Date(log.edited_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}
+                              {fmtDateTime(log.edited_at)}
                             </span>
                           </div>
                           <div className="text-gray-500">

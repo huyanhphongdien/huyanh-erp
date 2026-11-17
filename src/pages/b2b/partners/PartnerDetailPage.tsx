@@ -70,8 +70,10 @@ import {
   DEAL_STATUS_LABELS,
   DEAL_STATUS_COLORS,
 } from '../../../services/b2b/dealService'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import LedgerBalanceCard from '../../../components/b2b/LedgerBalanceCard'
+import PageState from '../../../components/common/PageState'
+import { fmtDate, fmtNum, fmtVnd, fmtVndCompact } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text, Paragraph } = Typography
 const { TabPane } = Tabs
@@ -80,21 +82,9 @@ const { TabPane } = Tabs
 // HELPER FUNCTIONS
 // ============================================
 
-const formatCurrency = (value: number | null): string => {
-  if (!value) return '-'
-  if (value >= 1000000000) {
-    return `${(value / 1000000000).toFixed(2)} tỷ`
-  }
-  if (value >= 1000000) {
-    return `${(value / 1000000).toFixed(1)} tr`
-  }
-  return value.toLocaleString('vi-VN')
-}
-
-const formatDate = (dateStr: string | null): string => {
-  if (!dateStr) return '-'
-  return format(new Date(dateStr), 'dd/MM/yyyy', { locale: vi })
-}
+// Định dạng dùng chung src/utils/format.ts — bản cũ viết tắt "1.23 tỷ" (chấm thập phân kiểu Mỹ).
+// Thẻ KPI rút gọn tỷ/tr (fmtVndCompact); bảng in số đầy đủ (fmtVnd).
+const formatDate = (dateStr: string | null): string => fmtDate(dateStr)
 
 // ============================================
 // TAB: INFO
@@ -219,9 +209,8 @@ const InfoTab = ({ partner, stats, proxyName }: InfoTabProps) => {
               <Statistic
                 title="Tổng giá trị giao dịch"
                 value={stats?.totalValue || 0}
-                suffix="VNĐ"
                 valueStyle={{ color: '#1B4D3E', fontSize: 20 }}
-                formatter={(value) => formatCurrency(Number(value))}
+                formatter={(value) => fmtVndCompact(Number(value))}
               />
             </Col>
           </Row>
@@ -283,11 +272,14 @@ const DealsTab = ({ partnerId }: DealsTabProps) => {
   const openDealCreateTab = useOpenDealCreateTab()
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Chưa có giao dịch nào" (audit 17/11/2026)
+  const [loadFailed, setLoadFailed] = useState(false)
 
   useEffect(() => {
     const fetchDeals = async () => {
       try {
         setLoading(true)
+        setLoadFailed(false)
         const response = await dealService.getDeals({
           partner_id: partnerId,
           pageSize: 50,
@@ -295,6 +287,8 @@ const DealsTab = ({ partnerId }: DealsTabProps) => {
         setDeals(response.data)
       } catch (error) {
         console.error('Error fetching deals:', error)
+        setLoadFailed(true)
+        message.error(dichLoiHeThong(error, 'Không tải được danh sách giao dịch của đại lý'))
       } finally {
         setLoading(false)
       }
@@ -322,14 +316,14 @@ const DealsTab = ({ partnerId }: DealsTabProps) => {
       title: 'Số lượng',
       key: 'quantity',
       align: 'right',
-      render: (_, record) => `${record.quantity_tons?.toFixed(1) || '-'} tấn`,
+      render: (_, record) => `${record.quantity_tons ? fmtNum(record.quantity_tons, 1) : '—'} tấn`,
     },
     {
       title: 'Giá trị',
       dataIndex: 'total_value_vnd',
       key: 'total_value_vnd',
       align: 'right',
-      render: (val) => formatCurrency(val),
+      render: (val) => (val ? fmtVnd(val) : '—'),
     },
     {
       title: 'Trạng thái',
@@ -383,7 +377,7 @@ const DealsTab = ({ partnerId }: DealsTabProps) => {
         rowKey="id"
         loading={loading}
         pagination={{ pageSize: 10 }}
-        locale={{ emptyText: <Empty description="Chưa có giao dịch nào" /> }}
+        locale={{ emptyText: <Empty description={loadFailed ? 'Không tải được danh sách — tải lại trang để thử lại' : 'Chưa có giao dịch nào'} /> }}
       />
     </Card>
   )
@@ -398,66 +392,23 @@ interface DebtTabProps {
 }
 
 const DebtTab = ({ partner }: DebtTabProps) => {
-  // Placeholder data - sẽ được implement trong Phase E5
-  const debtData = {
-    totalAdvance: 0,
-    totalPaid: 0,
-    remaining: 0,
-    transactions: [],
-  }
-
+  const navigate = useNavigate()
+  // Trước đây tab này hiện số GIẢ (tạm ứng / đã thanh toán / còn lại = 0 gõ cứng, "sẽ hoàn thiện Phase E5")
+  // trong khi sổ công nợ thật đã chạy ở /b2b/ledger — nay đọc số dư thật + nút mở sổ cái (audit 17/11/2026)
   return (
-    <Row gutter={24}>
-      <Col xs={24} lg={16}>
-        <Card title="Tổng quan công nợ" style={{ marginBottom: 24 }}>
-          <Descriptions bordered column={{ xs: 1, sm: 3 }}>
-            <Descriptions.Item label="Tổng tạm ứng">
-              <Text strong style={{ color: '#1677ff', fontSize: 18 }}>
-                {formatCurrency(debtData.totalAdvance)}
-              </Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="Đã thanh toán">
-              <Text strong style={{ color: '#52c41a', fontSize: 18 }}>
-                {formatCurrency(debtData.totalPaid)}
-              </Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="Còn lại">
-              <Text strong style={{ color: '#ff4d4f', fontSize: 18 }}>
-                {formatCurrency(debtData.remaining)}
-              </Text>
-            </Descriptions.Item>
-          </Descriptions>
-        </Card>
-
-        <Card title="Lịch sử giao dịch">
-          {debtData.transactions.length > 0 ? (
-            <Timeline items={[]} />
-          ) : (
-            <Empty description="Chưa có giao dịch công nợ" />
-          )}
-        </Card>
-      </Col>
-
-      <Col xs={24} lg={8}>
-        <Card title="Thao tác nhanh">
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Button block icon={<PlusOutlined />} disabled>
-              Ghi nhận tạm ứng
-            </Button>
-            <Button block icon={<DollarOutlined />} disabled>
-              Ghi nhận thanh toán
-            </Button>
-            <Button block icon={<CalendarOutlined />} disabled>
-              Quyết toán kỳ
-            </Button>
-            <Divider />
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              * Chức năng công nợ sẽ được hoàn thiện trong Phase E5
-            </Text>
-          </Space>
-        </Card>
-      </Col>
-    </Row>
+    <Card
+      title="Tổng quan công nợ"
+      extra={
+        <Button type="primary" icon={<DollarOutlined />} onClick={() => navigate(`/b2b/ledger/${partner.id}`)}>
+          Mở sổ cái đối tác
+        </Button>
+      }
+    >
+      <LedgerBalanceCard partnerId={partner.id} />
+      <Text type="secondary" style={{ display: 'block', marginTop: 12, fontSize: 12 }}>
+        Bút toán chi tiết (quyết toán, tạm ứng, thanh toán, điều chỉnh) xem ở Sổ cái đối tác.
+      </Text>
+    </Card>
   )
 }
 
@@ -476,6 +427,8 @@ const PartnerDetailPage = () => {
   const [partner, setPartner] = useState<Partner | null>(null)
   const [stats, setStats] = useState<PartnerStats | null>(null)
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Không tìm thấy đại lý" (audit 17/11/2026)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [activeTab, setActiveTab] = useState('info')
 
   // Sprint 1.1 (TL) — proxy + alias edit
@@ -496,6 +449,7 @@ const PartnerDetailPage = () => {
 
     try {
       setLoading(true)
+      setLoadError(null)
       const [partnerData, statsData] = await Promise.all([
         partnerService.getPartnerById(partnerId),
         partnerService.getPartnerStats(partnerId),
@@ -511,7 +465,8 @@ const PartnerDetailPage = () => {
       }
     } catch (error) {
       console.error('Error fetching partner:', error)
-      message.error('Không thể tải thông tin đại lý')
+      setLoadError(error)
+      message.error(dichLoiHeThong(error, 'Không thể tải thông tin đại lý'))
     } finally {
       setLoading(false)
     }
@@ -554,7 +509,7 @@ const PartnerDetailPage = () => {
       setEditOpen(false)
       await fetchPartner()
     } catch (e: any) {
-      message.error('Lỗi cập nhật: ' + (e?.message || e))
+      message.error(dichLoiHeThong(e, 'Lỗi cập nhật'))
     } finally {
       setEditSaving(false)
     }
@@ -579,7 +534,7 @@ const PartnerDetailPage = () => {
       openChatTab({ id: room.id, partner_name: partner.name })
     } catch (error: any) {
       console.error('handleOpenChat error:', error)
-      message.error('Không thể mở chat: ' + (error?.message || ''))
+      message.error(dichLoiHeThong(error, 'Không thể mở chat'))
     }
   }
 
@@ -596,6 +551,14 @@ const PartnerDetailPage = () => {
     return (
       <div style={{ padding: 24, textAlign: 'center' }}>
         <Spin size="large" />
+      </div>
+    )
+  }
+
+  if (loadError && !partner) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState error={loadError} onRetry={fetchPartner} />
       </div>
     )
   }

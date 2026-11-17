@@ -18,6 +18,9 @@ import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { attendanceService } from '../../services/attendanceService'
 import type { GPSConfig, GPSLocation } from '../../services/attendanceService'
+import PageState from '../../components/common/PageState'
+import { LimitNotice } from '../../components/common/tableDefaults'
+import { fmtDateTime } from '../../utils/format'
 
 // ============================================================================
 // TYPES
@@ -80,11 +83,9 @@ function fmtDist(m: number | null | undefined): string {
   return m >= 1000 ? `${(m / 1000).toFixed(1).replace('.', ',')} km` : `${Math.round(m)} m`
 }
 
+// Ngày-giờ chuẩn toàn hệ 'DD/MM HH:mm' (utils/format) — giữ tên cũ cho các chỗ đang gọi
 function fmtTime(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-  })
+  return fmtDateTime(iso)
 }
 
 /** "<loại>|<userAgent>" → loại. Dòng trước 16/09/2026 không có device → unknown. */
@@ -241,6 +242,10 @@ function reasonLabel(r: string): string {
 
 const EMP_SELECT = 'employee:employees!attendance_employee_id_fkey(code, full_name, department:departments!employees_department_id_fkey(name))'
 
+// Trần tải một cục — chạm trần thì báo (LimitNotice), không im lặng mất lượt cũ
+const CHECKIN_LIMIT = 4000
+const REJECTION_LIMIT = 1000
+
 async function fetchCheckIns(fromDate: string): Promise<CheckInRow[]> {
   const { data, error } = await supabase
     .from('attendance')
@@ -248,7 +253,7 @@ async function fetchCheckIns(fromDate: string): Promise<CheckInRow[]> {
     .gte('date', fromDate)
     .not('check_in_time', 'is', null)
     .order('check_in_time', { ascending: false })
-    .limit(4000)
+    .limit(CHECKIN_LIMIT)
   if (error) throw error
   return (data || []) as unknown as CheckInRow[]
 }
@@ -259,7 +264,7 @@ async function fetchRejections(fromIso: string): Promise<RejectionRow[]> {
     .select('id, attempted_at, lat, lng, accuracy_m, distance_m, nearest_name, radius_m, device, ip, reason, employee:employees!attendance_gps_rejections_employee_id_fkey(code, full_name, department:departments!employees_department_id_fkey(name))')
     .gte('attempted_at', fromIso)
     .order('attempted_at', { ascending: false })
-    .limit(1000)
+    .limit(REJECTION_LIMIT)
   if (error) throw error
   return (data || []) as unknown as RejectionRow[]
 }
@@ -437,6 +442,11 @@ export default function GpsMonitorPage() {
           <h2 className="font-semibold text-gray-800">Lượt điểm danh thành công theo điểm — {range} ngày</h2>
           <span className="text-xs text-gray-500">{classified.length} lượt · từ {fromDate}</span>
         </div>
+        <div className="px-4"><LimitNotice shown={rowsQ.data?.length || 0} limit={CHECKIN_LIMIT} what="lượt" /></div>
+        {/* Lỗi tải ≠ "0 lượt": không vẽ bảng số 0 khi đọc lỗi */}
+        {rowsQ.isError ? (
+          <PageState error={rowsQ.error} onRetry={() => rowsQ.refetch()} minHeight={120} />
+        ) : (<>
         {/* Điện thoại: thẻ theo điểm */}
         <div className="sm:hidden divide-y divide-gray-100">
           {summary.map(s => {
@@ -511,6 +521,7 @@ export default function GpsMonitorPage() {
             </tbody>
           </table>
         </div>
+        </>)}
         <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-100">
           Bấm vào một dòng để lọc hai bảng dưới. "Bản cũ" = lượt chấm bằng bản app trước 16/09 (chưa ghi loại thiết bị).
           "Ngoài mọi điểm" chỉ còn có thể là máy tính — điện thoại đã bị chặn từ 16/09.
@@ -527,8 +538,12 @@ export default function GpsMonitorPage() {
           <span className="hidden sm:inline text-xs text-gray-500">Ai cố điểm danh bằng điện thoại ngoài phạm vi / không bật định vị</span>
           <SortSelect value={rejSort} options={REJ_SORT_OPTIONS} onChange={setRejSort} />
         </div>
+        <div className="px-4"><LimitNotice shown={rejQ.data?.length || 0} limit={REJECTION_LIMIT} what="lượt bị chặn" /></div>
         {rejQ.isLoading ? (
           <div className="p-6 text-center text-gray-400"><Loader2 className="animate-spin inline mr-2" size={16} />Đang tải…</div>
+        ) : rejQ.isError ? (
+          // Lỗi tải ≠ "không có lượt bị chặn"
+          <PageState error={rejQ.error} onRetry={() => rejQ.refetch()} minHeight={120} />
         ) : rejections.length === 0 ? (
           <div className="p-6 text-center text-gray-400 text-sm">Không có lượt bị chặn trong khoảng này.</div>
         ) : (<>
@@ -610,6 +625,9 @@ export default function GpsMonitorPage() {
         </div>
         {rowsQ.isLoading ? (
           <div className="p-6 text-center text-gray-400"><Loader2 className="animate-spin inline mr-2" size={16} />Đang tải…</div>
+        ) : rowsQ.isError ? (
+          // Lỗi tải ≠ "mọi lượt đã xác minh" — không trấn an giả trên màn giám sát
+          <PageState error={rowsQ.error} onRetry={() => rowsQ.refetch()} minHeight={120} />
         ) : filtered.length === 0 ? (
           <div className="p-6 text-center text-gray-400 text-sm">Mọi lượt trong khoảng này đều đã xác minh vị trí.</div>
         ) : (<>

@@ -597,7 +597,7 @@ export default function ProjectDocsPage() {
               onChange={e => setSelectedPhase(e.target.value)}
               className="ml-auto text-[12px] bg-transparent border border-gray-200 rounded-lg px-2 py-1 text-gray-600 focus:outline-none focus:border-[#2D8B6E]"
             >
-              <option value="">Tất cả phases</option>
+              <option value="">Tất cả giai đoạn</option>
               {phases.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}

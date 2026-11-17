@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { fmtDateTime } from '../../utils/format'
 
 // ============================================================================
 // TYPES
@@ -53,7 +54,8 @@ export function formatRelativeTime(dateString: string): string {
   if (diffHours < 24) return `${diffHours} giờ trước`
   if (diffDays === 1) return 'Hôm qua'
   if (diffDays < 7) return `${diffDays} ngày trước`
-  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  // Quá 1 tuần → ngày-giờ chuẩn 'DD/MM HH:mm' (+/YYYY khác năm) của src/utils/format.ts
+  return fmtDateTime(date)
 }
 
 /** Parse @mentions from content text, return array of employee IDs */
@@ -135,7 +137,8 @@ export async function getComments(projectId: string): Promise<ProjectComment[]> 
     return roots.map(c => ({ ...c, replies: repliesMap[c.id] || [] }))
   } catch (e) {
     console.error('[projectCommentService] getComments error:', e)
-    return []
+    // Ném tiếp (Đợt 3 audit UI): trả [] làm màn hiện "Chưa có bình luận nào" khi thật ra tải lỗi
+    throw e
   }
 }
 

@@ -14,9 +14,15 @@
 // - ✅ getRecentActivities: Hoạt động trong tháng
 // - ✅ getExpiringContracts: HĐ hết hạn trong tháng
 // - ✅ getTaskStatusDistribution: Phân bổ trạng thái CV trong tháng
+// - 17/11/2026 (Đợt 3 audit UI): (1) đầu/cuối tháng-tuần tính bằng toDateStrVN — toISOString() của nửa đêm
+//   giờ VN là 17h UTC hôm TRƯỚC → tháng 11 bị đếm từ 31/10 tới 29/11; (2) mốc lọc cột timestamptz dùng
+//   vnDayStartTs/vnDayEndTs (+07:00) — DB chạy UTC, chuỗi '…T00:00:00' trần là 7h sáng VN; (3) getStats /
+//   getDepartmentPerformance / getOverdueTasks đọc `error` của từng query (supabase-js không throw) →
+//   lỗi mạng/RLS báo lỗi thay vì KPI 0 giả.
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
+import { toDateStrVN, vnDayStartTs, vnDayEndTs } from '../utils/dateVN';
 
 // ============================================================================
 // TYPES
@@ -146,8 +152,8 @@ function getCurrentMonthRange(): { startOfMonth: string; endOfMonth: string; mon
   const endOfMonth = new Date(year, month + 1, 0); // last day of month
 
   return {
-    startOfMonth: startOfMonth.toISOString().split('T')[0], // "2026-03-01"
-    endOfMonth: endOfMonth.toISOString().split('T')[0],     // "2026-03-31"
+    startOfMonth: toDateStrVN(startOfMonth), // "2026-03-01"
+    endOfMonth: toDateStrVN(endOfMonth),     // "2026-03-31"
     monthLabel: `Tháng ${month + 1}/${year}`,
   };
 }
@@ -168,8 +174,8 @@ function getCurrentWeekRange(): { startOfWeek: string; endOfWeek: string } {
   endOfWeek.setDate(startOfWeek.getDate() + 6);
 
   return {
-    startOfWeek: startOfWeek.toISOString().split('T')[0],
-    endOfWeek: endOfWeek.toISOString().split('T')[0],
+    startOfWeek: toDateStrVN(startOfWeek),
+    endOfWeek: toDateStrVN(endOfWeek),
   };
 }
 
@@ -211,18 +217,18 @@ export const dashboardService = {
 
         supabase.from('employees').select('id', { count: 'exact', head: true })
           .eq('status', 'active')
-          .gte('created_at', `${startOfMonth}T00:00:00`)
-          .lte('created_at', `${endOfMonth}T23:59:59`),
+          .gte('created_at', vnDayStartTs(startOfMonth))
+          .lte('created_at', vnDayEndTs(endOfMonth)),
 
         // ★ Chỉ task tháng hiện tại, bỏ draft
         supabase.from('tasks').select('id', { count: 'exact', head: true })
           .neq('status', 'draft')
-          .gte('created_at', `${startOfMonth}T00:00:00`)
-          .lte('created_at', `${endOfMonth}T23:59:59`),
+          .gte('created_at', vnDayStartTs(startOfMonth))
+          .lte('created_at', vnDayEndTs(endOfMonth)),
 
         supabase.from('tasks').select('id', { count: 'exact', head: true })
           .neq('status', 'draft')
-          .gte('created_at', `${startOfWeek}T00:00:00`),
+          .gte('created_at', vnDayStartTs(startOfWeek)),
 
         // ★ CV hoàn thành: dùng completed_date (task dự án có thể tạo tháng trước, hoàn thành tháng này)
         supabase.from('tasks').select('id', { count: 'exact', head: true })
@@ -249,6 +255,13 @@ export const dashboardService = {
           .lte('due_date', endOfMonth)
           .not('status', 'in', '("finished","completed","cancelled")'),
       ]);
+
+      // supabase-js KHÔNG throw — 1 query lỗi mà không đọc `error` là KPI thành 0 giả (BGĐ đọc nhầm)
+      const firstError = [
+        employeesResult, newEmployeesResult, tasksInMonthResult, tasksThisWeekResult, completedInMonthResult,
+        overdueInMonthResult, pendingApprovalsResult, leavesResult, upcomingInMonthResult,
+      ].find(r => r.error)?.error;
+      if (firstError) throw firstError;
 
       const totalEmployees = employeesResult.count || 0;
       const newEmployeesThisMonth = newEmployeesResult.count || 0;
@@ -294,8 +307,8 @@ export const dashboardService = {
       const { data, error } = await supabase
         .from('tasks')
         .select('status')
-        .gte('created_at', `${startOfMonth}T00:00:00`)
-        .lte('created_at', `${endOfMonth}T23:59:59`);
+        .gte('created_at', vnDayStartTs(startOfMonth))
+        .lte('created_at', vnDayEndTs(endOfMonth));
 
       if (error) throw error;
 
@@ -324,51 +337,52 @@ export const dashboardService = {
   async getTaskTrend(weeks?: number): Promise<{ data: TaskTrend[]; error: Error | null }> {
     try {
       const { startOfMonth, endOfMonth } = getCurrentMonthRange();
-      const trends: TaskTrend[] = [];
 
       // Chia tháng thành từng tuần
       const monthStart = new Date(`${startOfMonth}T00:00:00`);
       const monthEnd = new Date(`${endOfMonth}T23:59:59`);
 
+      const weekRanges: { start: Date; end: Date }[] = [];
       let weekStart = new Date(monthStart);
-
       while (weekStart <= monthEnd) {
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
         // Cap at month end
-        const effectiveEnd = weekEnd > monthEnd ? monthEnd : weekEnd;
+        weekRanges.push({ start: new Date(weekStart), end: weekEnd > monthEnd ? monthEnd : weekEnd });
+        // Next week
+        weekStart = new Date(weekStart);
+        weekStart.setDate(weekStart.getDate() + 7);
+      }
 
-        const weekStartStr = weekStart.toISOString().split('T')[0];
-        const weekEndStr = effectiveEnd.toISOString().split('T')[0];
+      // Các tuần chạy SONG SONG (trước: await tuần tự 4–5 vòng → dashboard quản lý đợi cả chuỗi round-trip)
+      const trends: TaskTrend[] = await Promise.all(weekRanges.map(async ({ start, end: effectiveEnd }) => {
+        const weekStartStr = toDateStrVN(start);
+        const weekEndStr = toDateStrVN(effectiveEnd);
 
         const [createdResult, completedResult] = await Promise.all([
           supabase
             .from('tasks')
             .select('id', { count: 'exact', head: true })
-            .gte('created_at', `${weekStartStr}T00:00:00`)
-            .lte('created_at', `${weekEndStr}T23:59:59`),
+            .gte('created_at', vnDayStartTs(weekStartStr))
+            .lte('created_at', vnDayEndTs(weekEndStr)),
           supabase
             .from('tasks')
             .select('id', { count: 'exact', head: true })
             .eq('status', 'finished')
-            .gte('updated_at', `${weekStartStr}T00:00:00`)
-            .lte('updated_at', `${weekEndStr}T23:59:59`),
+            .gte('updated_at', vnDayStartTs(weekStartStr))
+            .lte('updated_at', vnDayEndTs(weekEndStr)),
         ]);
 
-        const weekLabel = `${weekStart.getDate()}/${weekStart.getMonth() + 1}` +
+        const weekLabel = `${start.getDate()}/${start.getMonth() + 1}` +
           `–${effectiveEnd.getDate()}/${effectiveEnd.getMonth() + 1}`;
 
-        trends.push({
+        return {
           date: weekStartStr,
           label: weekLabel,
           created: createdResult.count || 0,
           completed: completedResult.count || 0,
-        });
-
-        // Next week
-        weekStart = new Date(weekStart);
-        weekStart.setDate(weekStart.getDate() + 7);
-      }
+        };
+      }));
 
       return { data: trends, error: null };
     } catch (error) {
@@ -394,8 +408,8 @@ export const dashboardService = {
       const { data: allTasks, error: tasksError } = await supabase
         .from('tasks')
         .select('id, status, assignee_id')
-        .gte('created_at', `${startOfMonth}T00:00:00`)
-        .lte('created_at', `${endOfMonth}T23:59:59`);
+        .gte('created_at', vnDayStartTs(startOfMonth))
+        .lte('created_at', vnDayEndTs(endOfMonth));
 
       if (tasksError) throw tasksError;
 
@@ -403,10 +417,12 @@ export const dashboardService = {
 
       let employeeMap = new Map<string, string>();
       if (assigneeIds.length > 0) {
-        const { data: employees } = await supabase
+        const { data: employees, error: empError } = await supabase
           .from('employees')
           .select('id, department_id')
           .in('id', assigneeIds);
+        // lỗi ở đây mà nuốt là mọi phòng ban hiện 0 việc
+        if (empError) throw empError;
 
         (employees || []).forEach(emp => {
           if (emp.department_id) employeeMap.set(emp.id, emp.department_id);
@@ -417,12 +433,13 @@ export const dashboardService = {
       const taskIds = (allTasks || []).map(t => t.id);
       let allApprovals: any[] = [];
       if (taskIds.length > 0) {
-        const { data: approvals } = await supabase
+        const { data: approvals, error: apprError } = await supabase
           .from('task_approvals')
           .select('approved_score, task_id')
           .eq('action', 'approved')
           .not('approved_score', 'is', null)
           .in('task_id', taskIds);
+        if (apprError) throw apprError;
         allApprovals = approvals || [];
       }
 
@@ -489,8 +506,8 @@ export const dashboardService = {
         .from('tasks')
         .select('id, assignee_id')
         .eq('status', 'finished')
-        .gte('updated_at', `${startOfMonth}T00:00:00`)
-        .lte('updated_at', `${endOfMonth}T23:59:59`);
+        .gte('updated_at', vnDayStartTs(startOfMonth))
+        .lte('updated_at', vnDayEndTs(endOfMonth));
 
       if (tasksError) throw tasksError;
       if (!finishedTasks || finishedTasks.length === 0) return { data: [], error: null };
@@ -630,10 +647,12 @@ export const dashboardService = {
 
       let employeeMap = new Map<string, any>();
       if (assigneeIds.length > 0) {
-        const { data: employees } = await supabase
+        const { data: employees, error: empError } = await supabase
           .from('employees')
           .select('id, full_name, department_id')
           .in('id', assigneeIds);
+        // nuốt lỗi ở đây là việc quá hạn hiện "Chưa giao" — sai nghĩa
+        if (empError) throw empError;
         (employees || []).forEach(emp => employeeMap.set(emp.id, emp));
       }
 
@@ -643,10 +662,11 @@ export const dashboardService = {
 
       let deptMap = new Map<string, string>();
       if (deptIds.length > 0) {
-        const { data: departments } = await supabase
+        const { data: departments, error: deptError } = await supabase
           .from('departments')
           .select('id, name')
           .in('id', deptIds);
+        if (deptError) throw deptError;
         (departments || []).forEach(d => deptMap.set(d.id, d.name));
       }
 
@@ -738,7 +758,7 @@ export const dashboardService = {
       const { data, error } = await supabase
         .from('task_activities')
         .select('id, action, description, created_at, actor_id, task_id')
-        .gte('created_at', `${startOfMonth}T00:00:00`)
+        .gte('created_at', vnDayStartTs(startOfMonth))
         .order('created_at', { ascending: false })
         .limit(limit);
 

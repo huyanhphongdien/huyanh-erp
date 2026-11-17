@@ -58,6 +58,9 @@ import { lcNegotiationService, type LcNegotiation } from '../../services/sales/l
 import { salesBookingService, type SalesBooking } from '../../services/sales/salesBookingService'
 import { useOrderLotAxes } from '../../hooks/useOrderLotAxes'
 import LotChipStrip, { mergeLotAxes } from '../../components/sales/LotChipStrip'
+import { fmtUsd } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -110,163 +113,8 @@ function buildInvoiceDescNodes(d: DescLike): React.ReactNode[] {
   return out
 }
 
-// ============================================================================
-// COA TAB
-// ============================================================================
-
-interface COATabProps {
-  data: COAData | null
-  loading: boolean
-  onGenerate: () => void
-}
-
-const COATab = ({ data, loading, onGenerate }: COATabProps) => {
-  if (loading) return <Spin tip="Loading..." />
-  if (!data) {
-    return (
-      <Result
-        icon={<SafetyCertificateOutlined />}
-        title="Certificate of Analysis"
-        subTitle="Click button below to generate COA data"
-        extra={<Button type="primary" onClick={onGenerate}>Generate COA</Button>}
-      />
-    )
-  }
-
-  // Compute average across batches
-  const avg = (field: keyof COAData['batch_results'][0]) => {
-    const vals = data.batch_results.map((b) => b[field]).filter((v): v is number => v !== null && v !== undefined)
-    if (vals.length === 0) return null
-    return vals.reduce((a, b) => a + b, 0) / vals.length
-  }
-
-  const avgDrc = avg('drc')
-  const avgMoisture = avg('moisture')
-  const avgVolatile = avg('volatile')
-  const avgAsh = avg('ash')
-  const avgNitrogen = avg('nitrogen')
-  const avgDirt = avg('dirt')
-  const avgPri = avg('pri')
-  const avgMooney = avg('mooney')
-  const avgColor = avg('color')
-
-  const std = data.grade_standard
-
-  const parameters = [
-    { name: 'Dry Rubber Content (DRC)', result: avgDrc, standard: `>= ${std.drc_min}%`, pass: avgDrc !== null && avgDrc >= std.drc_min, unit: '%' },
-    { name: 'Moisture Content', result: avgMoisture, standard: `<= ${std.moisture_max}%`, pass: avgMoisture !== null && avgMoisture <= std.moisture_max, unit: '%' },
-    { name: 'Volatile Matter', result: avgVolatile, standard: `<= ${std.volatile_max}%`, pass: avgVolatile !== null && avgVolatile <= std.volatile_max, unit: '%' },
-    { name: 'Ash Content', result: avgAsh, standard: `<= ${std.ash_max}%`, pass: avgAsh !== null && avgAsh <= std.ash_max, unit: '%' },
-    { name: 'Nitrogen Content', result: avgNitrogen, standard: `<= ${std.nitrogen_max}%`, pass: avgNitrogen !== null && avgNitrogen <= std.nitrogen_max, unit: '%' },
-    { name: 'Dirt Content', result: avgDirt, standard: `<= ${std.dirt_max}%`, pass: avgDirt !== null && avgDirt <= std.dirt_max, unit: '%' },
-    { name: 'Plasticity Retention Index (PRI)', result: avgPri, standard: std.pri_min ? `>= ${std.pri_min}` : 'N/A', pass: std.pri_min === null || (avgPri !== null && avgPri >= std.pri_min), unit: '' },
-    { name: 'Mooney Viscosity', result: avgMooney, standard: std.mooney_max ? `<= ${std.mooney_max}` : 'N/A', pass: std.mooney_max === null || (avgMooney !== null && avgMooney <= std.mooney_max), unit: '' },
-    { name: 'Color (Lovibond)', result: avgColor, standard: std.color_lovibond_max ? `<= ${std.color_lovibond_max}` : 'N/A', pass: std.color_lovibond_max === null || (avgColor !== null && avgColor <= std.color_lovibond_max), unit: '' },
-  ]
-
-  const columns: ColumnsType<typeof parameters[0]> = [
-    { title: 'Parameter', dataIndex: 'name', key: 'name', width: 250 },
-    {
-      title: 'Result', key: 'result', width: 120, align: 'center',
-      render: (_, r) => r.result !== null ? `${r.result.toFixed(2)}${r.unit}` : '-',
-    },
-    { title: 'Standard', dataIndex: 'standard', key: 'standard', width: 150, align: 'center' },
-    {
-      title: 'Status', key: 'status', width: 100, align: 'center',
-      render: (_, r) => {
-        if (r.standard === 'N/A') return <Tag>N/A</Tag>
-        return r.pass
-          ? <Tag color="success" icon={<CheckCircleOutlined />}>PASS</Tag>
-          : <Tag color="error">FAIL</Tag>
-      },
-    },
-  ]
-
-  return (
-    <div className="doc-print-area" id="coa-print">
-      <CompanyHeader />
-
-      <Title level={3} style={{ textAlign: 'center', marginBottom: 24 }}>
-        CERTIFICATE OF ANALYSIS
-      </Title>
-
-      <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-        <Descriptions.Item label="Sales Order">{data.order_code}</Descriptions.Item>
-        <Descriptions.Item label="Customer">{data.customer_name}</Descriptions.Item>
-        <Descriptions.Item label="Grade">{data.grade?.replace(/_/g, ' ')}</Descriptions.Item>
-        <Descriptions.Item label="Quantity">{data.quantity_tons} MT</Descriptions.Item>
-        <Descriptions.Item label="Test Date">{data.test_date}</Descriptions.Item>
-        <Descriptions.Item label="No. of Batches">{data.batch_results.length}</Descriptions.Item>
-      </Descriptions>
-
-      <Title level={5} style={{ marginTop: 16, marginBottom: 8 }}>
-        Quality Test Results (Average of {data.batch_results.length} batch{data.batch_results.length > 1 ? 'es' : ''})
-      </Title>
-
-      <Table
-        dataSource={parameters}
-        columns={columns}
-        rowKey="name"
-        pagination={false}
-        size="small"
-        bordered
-      />
-
-      <Divider />
-
-      <Row justify="space-between" align="middle">
-        <Col>
-          <Title level={5} style={{ margin: 0 }}>
-            Overall Result:{' '}
-            <Tag color={data.result === 'PASS' ? 'success' : 'error'} style={{ fontSize: 16, padding: '4px 16px' }}>
-              {data.result}
-            </Tag>
-          </Title>
-        </Col>
-      </Row>
-
-      {data.batch_results.length > 1 && (
-        <>
-          <Title level={5} style={{ marginTop: 24, marginBottom: 8 }}>Batch Detail</Title>
-          <Table
-            dataSource={data.batch_results}
-            rowKey="batch_no"
-            pagination={false}
-            size="small"
-            bordered
-            columns={[
-              { title: 'Batch No.', dataIndex: 'batch_no', key: 'batch_no' },
-              { title: 'DRC %', dataIndex: 'drc', key: 'drc', render: (v: number) => v?.toFixed(2) },
-              { title: 'Moisture %', dataIndex: 'moisture', key: 'moisture', render: (v: number) => v?.toFixed(2) },
-              { title: 'Volatile %', dataIndex: 'volatile', key: 'volatile', render: (v: number) => v?.toFixed(2) },
-              { title: 'Ash %', dataIndex: 'ash', key: 'ash', render: (v: number) => v?.toFixed(3) },
-              { title: 'Nitrogen %', dataIndex: 'nitrogen', key: 'nitrogen', render: (v: number) => v?.toFixed(3) },
-              { title: 'Dirt %', dataIndex: 'dirt', key: 'dirt', render: (v: number) => v?.toFixed(3) },
-              { title: 'PRI', dataIndex: 'pri', key: 'pri', render: (v: number | null) => v?.toFixed(0) ?? '-' },
-            ]}
-          />
-        </>
-      )}
-
-      <div style={{ marginTop: 48, display: 'flex', justifyContent: 'space-between' }}>
-        <div style={{ textAlign: 'center', width: 250 }}>
-          <Divider style={{ borderColor: '#000', marginBottom: 4 }} />
-          <Text strong>Quality Control Manager</Text>
-        </div>
-        <div style={{ textAlign: 'center', width: 250 }}>
-          <Divider style={{ borderColor: '#000', marginBottom: 4 }} />
-          <Text strong>General Director</Text>
-        </div>
-      </div>
-
-      <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>
-        <Button type="primary" icon={<PrinterOutlined />} size="large" onClick={() => window.print()}>
-          Print COA
-        </Button>
-      </div>
-    </div>
-  )
-}
+// COA: ĐÍNH KÈM từ phòng LAB (không sinh ở trang này). Component COATab + generateCOA cũ đã xoá
+// 17/11/2026 — không còn được render/gọi (grep: chỉ có định nghĩa).
 
 // ============================================================================
 // PACKING LIST TAB
@@ -279,14 +127,14 @@ interface PackingListTabProps {
 }
 
 const PackingListTab = ({ data, loading, onGenerate }: PackingListTabProps) => {
-  if (loading) return <Spin tip="Loading..." />
+  if (loading) return <Spin tip="Đang sinh…" />
   if (!data) {
     return (
       <Result
         icon={<ContainerOutlined />}
         title="Packing List"
-        subTitle="Click button below to generate Packing List data"
-        extra={<Button type="primary" onClick={onGenerate}>Generate Packing List</Button>}
+        subTitle="Bấm nút bên dưới để sinh dữ liệu Packing List"
+        extra={<Button type="primary" onClick={onGenerate}>Sinh Packing List</Button>}
       />
     )
   }
@@ -416,14 +264,14 @@ interface WeightListTabProps {
 }
 
 const WeightListTab = ({ data, loading, onGenerate }: WeightListTabProps) => {
-  if (loading) return <Spin tip="Loading..." />
+  if (loading) return <Spin tip="Đang sinh…" />
   if (!data) {
     return (
       <Result
         icon={<FileDoneOutlined />}
         title="Weight List"
-        subTitle="Click button below to generate Weight List data"
-        extra={<Button type="primary" onClick={onGenerate}>Generate Weight List</Button>}
+        subTitle="Bấm nút bên dưới để sinh dữ liệu Weight List"
+        extra={<Button type="primary" onClick={onGenerate}>Sinh Weight List</Button>}
       />
     )
   }
@@ -534,14 +382,14 @@ interface InvoiceTabProps {
 }
 
 const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
-  if (loading) return <Spin tip="Loading..." />
+  if (loading) return <Spin tip="Đang sinh…" />
   if (!data) {
     return (
       <Result
         icon={<DollarOutlined />}
         title="Commercial Invoice"
-        subTitle="Click button below to generate Invoice data"
-        extra={<Button type="primary" onClick={onGenerate}>Generate Invoice</Button>}
+        subTitle="Bấm nút bên dưới để sinh dữ liệu Invoice"
+        extra={<Button type="primary" onClick={onGenerate}>Sinh Invoice</Button>}
       />
     )
   }
@@ -680,11 +528,10 @@ const ExportDocumentsPage = () => {
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [activeTab, setActiveTab] = useState('coa')
 
-  // Document data
-  const [coaData, setCOAData] = useState<COAData | null>(null)
-  const [coaLoading, setCOALoading] = useState(false)
+  // Document data (COA là đính kèm — không có dữ liệu sinh ở đây)
   const [packingData, setPackingData] = useState<PackingListData | null>(null)
   const [packingLoading, setPackingLoading] = useState(false)
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
@@ -702,16 +549,18 @@ const ExportDocumentsPage = () => {
   const [readyVersion, setReadyVersion] = useState(0)       // bump sau khi nhập nhanh → nạp lại ctx
   const [quickGroup, setQuickGroup] = useState<ReadyGroup | null>(null)  // group đang mở drawer nhập nhanh
 
-  // Load order
-  useEffect(() => {
+  // Load order — lỗi tải ≠ "không tìm thấy đơn"
+  const loadOrder = useCallback(() => {
     if (!orderId) return
     setLoading(true)
+    setLoadError(null)
     salesOrderService
       .getById(orderId)
       .then((data) => setOrder(data))
-      .catch(() => message.error('Không thể tải đơn hàng'))
+      .catch((e) => setLoadError(e))
       .finally(() => setLoading(false))
   }, [orderId])
+  useEffect(() => { loadOrder() }, [loadOrder])
 
   // Danh sách LÔ suy thẳng từ container (tự refresh sau khi "Chia lô" trong drawer)
   const lots = useMemo(() => {
@@ -756,26 +605,9 @@ const ExportDocumentsPage = () => {
 
   // Đổi lô → xoá dữ liệu đã sinh (sinh lại theo lô mới) + báo BOE/ĐNCK nạp lại
   useEffect(() => {
-    setCOAData(null); setPackingData(null); setWeightData(null); setInvoiceData(null)
+    setPackingData(null); setWeightData(null); setInvoiceData(null)
     setNegVersion((v) => v + 1)
   }, [lotNo])
-
-  // Generate COA
-  const generateCOA = useCallback(async () => {
-    if (!orderId) return
-    setCOALoading(true)
-    try {
-      const data = await documentService.getCOAData(orderId, lotNo)
-      setCOAData(data)
-      await documentService.markGenerated(orderId, 'coa')
-      setOrder((prev) => prev ? { ...prev, coa_generated: true } : prev)
-      message.success('COA generated successfully')
-    } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : 'Failed to generate COA')
-    } finally {
-      setCOALoading(false)
-    }
-  }, [orderId, lotNo])
 
   // Generate Packing List
   const generatePacking = useCallback(async () => {
@@ -786,9 +618,9 @@ const ExportDocumentsPage = () => {
       setPackingData(data)
       await documentService.markGenerated(orderId, 'packing_list')
       setOrder((prev) => prev ? { ...prev, packing_list_generated: true } : prev)
-      message.success('Packing List generated successfully')
+      message.success('Đã sinh Packing List')
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : 'Failed to generate Packing List')
+      message.error(dichLoiHeThong(err, 'Không sinh được Packing List'))
     } finally {
       setPackingLoading(false)
     }
@@ -801,9 +633,9 @@ const ExportDocumentsPage = () => {
     try {
       const data = await documentService.getWeightListData(orderId, lotNo)
       setWeightData(data)
-      message.success('Weight List generated successfully')
+      message.success('Đã sinh Weight List')
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : 'Failed to generate Weight List')
+      message.error(dichLoiHeThong(err, 'Không sinh được Weight List'))
     } finally {
       setWeightLoading(false)
     }
@@ -818,9 +650,9 @@ const ExportDocumentsPage = () => {
       setInvoiceData(data)
       await documentService.markGenerated(orderId, 'invoice')
       setOrder((prev) => prev ? { ...prev, invoice_generated: true } : prev)
-      message.success('Invoice generated successfully')
+      message.success('Đã sinh Commercial Invoice')
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : 'Failed to generate Invoice')
+      message.error(dichLoiHeThong(err, 'Không sinh được Invoice'))
     } finally {
       setInvoiceLoading(false)
     }
@@ -845,18 +677,32 @@ const ExportDocumentsPage = () => {
       window.print()
       document.body.classList.remove('print-all')
     }, 500)
-  }, [orderId, coaData, packingData, weightData, invoiceData, generateCOA, generatePacking, generateWeight, generateInvoice])
+  }, [orderId, packingData, weightData, invoiceData, generatePacking, generateWeight, generateInvoice])
 
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: 80 }}>
-        <Spin size="large" tip="Loading order..." />
+        <Spin size="large" tip="Đang tải đơn hàng…" />
+      </div>
+    )
+  }
+
+  if (loadError && !order) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState error={loadError} onRetry={loadOrder} />
       </div>
     )
   }
 
   if (!order) {
-    return <Result status="404" title="Order not found" />
+    return (
+      <Result
+        status="404"
+        title="Không tìm thấy đơn hàng"
+        extra={<Button onClick={() => navigate('/sales/orders')}>Về danh sách đơn hàng</Button>}
+      />
+    )
   }
 
   // Ctx kiểm tra sẵn sàng + đèn trạng thái (🟢 đủ / 🟡 thiếu / ⚪ đính kèm)
@@ -950,22 +796,22 @@ const ExportDocumentsPage = () => {
         <Breadcrumb
           style={{ marginBottom: 16 }}
           items={[
-            { title: 'Sales' },
-            { title: <a onClick={() => navigate('/sales/orders')}>Orders</a> },
+            { title: 'Bán hàng' },
+            { title: <a onClick={() => navigate('/sales/orders')}>Đơn hàng</a> },
             { title: <a onClick={() => navigate(`/sales/orders/${orderId}`)}>{soDisplayCode(order)}</a> },
-            { title: 'Export Documents' },
+            { title: 'Bộ chứng từ' },
           ]}
         />
 
-        {/* Header */}
+        {/* Header — KHUNG trang tiếng Việt; nội dung chứng từ in cho khách (.doc-print-area) giữ tiếng Anh */}
         <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
           <Col>
             <Space>
               <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/sales/orders/${orderId}`)}>
-                Back
+                Quay lại
               </Button>
               <Title level={4} style={{ margin: 0 }}>
-                Export Documents - {soDisplayCode(order)}
+                Bộ chứng từ xuất khẩu — {soDisplayCode(order)}
               </Title>
               <Tag color={ORDER_STATUS_COLORS[order.status]}>
                 {ORDER_STATUS_LABELS[order.status]}
@@ -1056,7 +902,7 @@ const ExportDocumentsPage = () => {
         <Text style={{ fontSize: 13 }}>
           {lotNo ? `Lô ${lotNo}: ` : 'Toàn đơn: '}
           <b>{nCont}</b> cont · <b>{scopeQtyTons.toLocaleString('en-US', { maximumFractionDigits: 3 })}</b> tấn ·
-          CIF <b>${scopeCif.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+          CIF <b>{fmtUsd(scopeCif, 2)}</b>
         </Text>
         {contIncomplete && (
           <Tag color="warning">{nCont === 0 ? 'Chưa có container' : `${nCont - nReal}/${nCont} cont còn TBD`}</Tag>
@@ -1103,8 +949,13 @@ const ExportDocumentsPage = () => {
                     subTitle={
                       <span>
                         Certificate of Analysis do phòng thí nghiệm (VILAS 1522) cấp — <b>không tự sinh</b> từ hệ thống.
-                        <br />Vui lòng đính kèm file COA ở tab <b>"Chứng từ"</b> → mục Checklist (dòng "Certificate of Analysis (COA)").
+                        <br />Đính kèm file COA ở checklist chứng từ của đơn (dòng "Certificate of Analysis (COA)").
                       </span>
+                    }
+                    extra={
+                      <Button type="primary" onClick={() => navigate(`/sales/orders/${orderId}?tab=documents`)}>
+                        Mở checklist đính kèm của đơn
+                      </Button>
                     }
                   />
                 </div>

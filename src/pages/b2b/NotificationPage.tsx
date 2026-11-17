@@ -10,8 +10,10 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Modal } from 'antd'
+import { Modal, message } from 'antd'
 import { useAuthStore } from '../../stores/authStore'
+import PageState from '../../components/common/PageState'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import {
   Bell, Check, CheckCheck, Trash2, Filter, Search, X,
   RefreshCw, Inbox
@@ -66,7 +68,7 @@ export default function NotificationPage() {
   })
 
   // Query: Lấy thông báo
-  const { data: allNotifications = [], isLoading, refetch } = useQuery({
+  const { data: allNotifications = [], isLoading, error: loadError, refetch } = useQuery({
     queryKey: ['notifications-page', employeeId, activeModule, showUnreadOnly],
     queryFn: async () => {
       const { getNotifications: getNotifs } = await import('../../services/notificationHelper')
@@ -144,13 +146,15 @@ export default function NotificationPage() {
     return groups
   }, [filteredNotifications])
 
-  // ★ Mutations dùng notificationHelper
+  // ★ Mutations dùng notificationHelper — helper nay NÉM lỗi thật (RLS/mạng) → phải báo, đừng để
+  // bấm xong UI đứng im như thể đã làm
   const markReadMutation = useMutation({
     mutationFn: async (id: string) => {
       const { markRead } = await import('../../services/notificationHelper')
       await markRead(id)
     },
     onSuccess: () => invalidateAll(),
+    onError: (e) => message.error(dichLoiHeThong(e, 'Không đánh dấu đã đọc được')),
   })
 
   const markAllReadMutation = useMutation({
@@ -159,6 +163,7 @@ export default function NotificationPage() {
       await markAllRead(employeeId)
     },
     onSuccess: () => invalidateAll(),
+    onError: (e) => message.error(dichLoiHeThong(e, 'Không đánh dấu đọc hết được')),
   })
 
   const deleteMutation = useMutation({
@@ -167,14 +172,17 @@ export default function NotificationPage() {
       await deleteNotification(id)
     },
     onSuccess: () => invalidateAll(),
+    onError: (e) => message.error(dichLoiHeThong(e, 'Xóa thông báo thất bại')),
   })
 
   const deleteAllReadMutation = useMutation({
     mutationFn: async () => {
       const { supabase } = await import('../../lib/supabase')
-      await supabase.from('notifications').delete().eq('employee_id', employeeId).eq('is_read', true)
+      const { error } = await supabase.from('notifications').delete().eq('employee_id', employeeId).eq('is_read', true)
+      if (error) throw error
     },
     onSuccess: () => invalidateAll(),
+    onError: (e) => message.error(dichLoiHeThong(e, 'Dọn thông báo đã đọc thất bại')),
   })
 
   function invalidateAll() {
@@ -204,7 +212,7 @@ export default function NotificationPage() {
         {/* Title bar */}
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <Bell className="w-5 h-5 text-blue-600" />
+            <Bell className="w-5 h-5 text-primary" />
             <h1 className="text-lg font-bold text-gray-900">Thông báo</h1>
             {unreadCount > 0 && (
               <span className="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">
@@ -217,7 +225,7 @@ export default function NotificationPage() {
             {/* Search toggle */}
             <button
               onClick={() => setShowSearch(!showSearch)}
-              className={`p-2.5 rounded-lg transition-colors ${showSearch ? 'bg-blue-50 text-blue-600' : 'text-gray-500 active:bg-gray-100'}`}
+              className={`p-2.5 rounded-lg transition-colors ${showSearch ? 'bg-primary/10 text-primary' : 'text-gray-500 active:bg-gray-100'}`}
               style={{ minWidth: 44, minHeight: 44 }}
             >
               <Search className="w-5 h-5" />
@@ -226,7 +234,7 @@ export default function NotificationPage() {
             {/* Unread filter */}
             <button
               onClick={() => setShowUnreadOnly(!showUnreadOnly)}
-              className={`p-2.5 rounded-lg transition-colors ${showUnreadOnly ? 'bg-blue-50 text-blue-600' : 'text-gray-500 active:bg-gray-100'}`}
+              className={`p-2.5 rounded-lg transition-colors ${showUnreadOnly ? 'bg-primary/10 text-primary' : 'text-gray-500 active:bg-gray-100'}`}
               style={{ minWidth: 44, minHeight: 44 }}
               title={showUnreadOnly ? 'Hiện tất cả' : 'Chỉ chưa đọc'}
             >
@@ -254,7 +262,7 @@ export default function NotificationPage() {
                 value={searchText}
                 onChange={e => setSearchText(e.target.value)}
                 placeholder="Tìm kiếm thông báo..."
-                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 autoFocus
               />
               {searchText && (
@@ -284,7 +292,7 @@ export default function NotificationPage() {
                 className={`
                   flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-all
                   ${isActive
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                    ? 'bg-primary text-white shadow-md shadow-primary/20'
                     : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
                   }
                 `}
@@ -318,7 +326,7 @@ export default function NotificationPage() {
               <button
                 onClick={() => markAllReadMutation.mutate()}
                 disabled={markAllReadMutation.isPending}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg active:bg-blue-100 disabled:opacity-50"
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-lg active:bg-primary/20 disabled:opacity-50"
               >
                 <CheckCheck className="w-3.5 h-3.5" />
                 Đọc hết
@@ -349,8 +357,13 @@ export default function NotificationPage() {
       <div className="pb-safe">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             <p className="text-sm text-gray-400 mt-3">Đang tải...</p>
+          </div>
+        ) : loadError ? (
+          // Lỗi tải ≠ "Chưa có thông báo" — báo lỗi + Thử lại (audit 17/11/2026)
+          <div className="px-4 py-6">
+            <PageState error={loadError} onRetry={() => refetch()} />
           </div>
         ) : filteredNotifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
@@ -416,7 +429,7 @@ function NotificationRow({ notification, onClick, onMarkRead, onDelete }: Notifi
     <div
       className={`
         flex items-start gap-3 px-4 py-3.5 transition-colors cursor-pointer
-        ${notification.is_read ? 'bg-white' : 'bg-blue-50/40 border-l-3 border-l-blue-500'}
+        ${notification.is_read ? 'bg-white' : 'bg-primary/5 border-l-3 border-l-primary'}
         active:bg-gray-50 lg:hover:bg-gray-50
       `}
       onClick={onClick}
@@ -485,7 +498,7 @@ function NotificationRow({ notification, onClick, onMarkRead, onDelete }: Notifi
         {!notification.is_read && (
           <button
             onClick={(e) => { e.stopPropagation(); onMarkRead() }}
-            className="p-1.5 text-blue-400 active:text-blue-600 rounded"
+            className="p-1.5 text-primary/60 active:text-primary rounded"
             title="Đánh dấu đã đọc"
           >
             <Check className="w-4 h-4" />

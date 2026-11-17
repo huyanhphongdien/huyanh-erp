@@ -54,11 +54,15 @@ import {
   SmileOutlined,
   EnvironmentOutlined,
 } from '@ant-design/icons'
-import { 
-  chatRoomService, 
+import {
+  chatRoomService,
   ChatRoom,
   TIER_LABELS,
+  TIER_COLORS,
 } from '../../services/b2b/chatRoomService'
+import { fmtDateTime, fmtVnd, vndInputProps } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import EnumTag from '../../components/common/EnumTag'
 import {
   chatMessageService,
   ChatMessage,
@@ -107,10 +111,6 @@ const formatDateDivider = (dateStr: string): string => {
   if (isToday(date)) return 'Hôm nay'
   if (isYesterday(date)) return 'Hôm qua'
   return format(date, 'EEEE, dd/MM/yyyy', { locale: vi })
-}
-
-const formatCurrency = (amount: number): string => {
-  return amount.toLocaleString('vi-VN') + ' VNĐ'
 }
 
 const formatDuration = (seconds: number): string => {
@@ -278,12 +278,12 @@ const BookingCard = ({
             <br />
             <Text strong style={{ color: '#fff', fontSize: 13 }}>
               {/* Live update: hiện counter_price khi đang negotiating */}
-              {((isNegotiating && booking.counter_price) ? booking.counter_price : booking.price_per_kg)?.toLocaleString('vi-VN') || '—'} đ/kg
+              {((isNegotiating && booking.counter_price) ? booking.counter_price : booking.price_per_kg)?.toLocaleString('vi-VN') || '—'} ₫/kg
             </Text>
           </Col>
         </Row>
 
-        {/* Dia diem chot hang */}
+        {/* Địa điểm chốt hàng */}
         {booking.pickup_location && (
           <div style={{
             marginTop: 8,
@@ -297,7 +297,7 @@ const BookingCard = ({
             <EnvironmentOutlined style={{ color: '#60a5fa', fontSize: 14 }} />
             <div>
               <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
-                Dia diem chot
+                Địa điểm chốt
               </span>
               <br />
               <span style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>
@@ -319,9 +319,9 @@ const BookingCard = ({
                 const isDry = booking.price_unit === 'dry'
                 const drcMul = isDry ? ((booking.drc_percent || 0) / 100) : 1
                 const recomputed = Math.round(booking.quantity_tons * 1000 * drcMul * booking.counter_price)
-                return formatCurrency(recomputed)
+                return fmtVnd(recomputed)
               }
-              return formatCurrency(booking.estimated_value)
+              return fmtVnd(booking.estimated_value)
             })()}
           </Text>
         </div>
@@ -363,11 +363,11 @@ const BookingCard = ({
                         {h.actor_name || (h.actor_id ? h.actor_id.substring(0, 8) : '?')}
                       </strong>
                       <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
-                        {new Date(h.ts).toLocaleString('vi-VN')}
+                        {fmtDateTime(h.ts)}
                       </span>
                     </div>
                     <div style={{ marginLeft: 4, color: '#ffd700' }}>
-                      💰 <strong>{h.counter_price.toLocaleString('vi-VN')} đ/kg</strong>
+                      💰 <strong>{h.counter_price.toLocaleString('vi-VN')} ₫/kg</strong>
                     </div>
                     {h.notes && (
                       <div style={{
@@ -805,7 +805,13 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
   // Panel ⋮: Tìm kiếm / Tin đã ghim / File đã gửi
   const [infoPanel, setInfoPanel] = useState<null | 'search' | 'pinned' | 'files'>(null)
   const [panelSearch, setPanelSearch] = useState('')
-  
+  // Lịch sử chat: lần đầu nạp 50 tin cuối, "Tải tin cũ hơn" lật tiếp theo con trỏ `before`
+  // (service đã có sẵn) — trước đây tin thứ 51 trở về trước không cách nào xem lại (audit 17/11/2026).
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  // Giữ nguyên chỗ đang đọc sau khi chèn tin cũ lên đầu (không bị kéo xuống đáy)
+  const restoreScrollRef = useRef<{ height: number; top: number } | null>(null)
+
   // Upload & Voice states
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [isRecordingVoice, setIsRecordingVoice] = useState(false)
@@ -853,7 +859,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
       setRoom(data)
     } catch (error) {
       console.error('Error fetching room:', error)
-      message.error('Không thể tải thông tin phòng chat')
+      message.error(dichLoiHeThong(error, 'Không thể tải thông tin phòng chat'))
     }
   }, [roomId])
 
@@ -871,6 +877,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
         return msg
       })
       setMessages(enriched)
+      setHasMore(response.hasMore)
 
       // Kiểm tra booking đã confirmed nhưng chưa có Deal → tự tạo
       // Đảm bảo Deal luôn được tạo dù user bỏ lỡ realtime event
@@ -911,6 +918,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
                 // Reload messages to show the new DealCard
                 const updated = await chatMessageService.getMessages({ room_id: roomId, limit: 50 })
                 setMessages(updated.data)
+                setHasMore(updated.hasMore)
                 message.success(`Deal tạo tự động cho phiếu ${booking.code}`)
               } catch (err: any) {
                 if (!err?.message?.includes('đã tồn tại') && !err?.message?.includes('đã được xác nhận')) {
@@ -924,11 +932,40 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
       }
     } catch (error) {
       console.error('Error fetching messages:', error)
-      message.error('Không thể tải tin nhắn')
+      message.error(dichLoiHeThong(error, 'Không thể tải tin nhắn'))
     } finally {
       setLoading(false)
     }
   }, [roomId, room?.partner_id, user?.employee_id])
+
+  // Nạp thêm 50 tin CŨ hơn tin đầu tiên đang hiện, chèn lên đầu, giữ chỗ đang đọc.
+  const loadOlderMessages = useCallback(async () => {
+    if (!roomId || loadingOlder || messages.length === 0) return
+    const container = messagesContainerRef.current
+    try {
+      setLoadingOlder(true)
+      const res = await chatMessageService.getMessages({ room_id: roomId, limit: 50, before: messages[0].id })
+      if (container) restoreScrollRef.current = { height: container.scrollHeight, top: container.scrollTop }
+      setMessages((prev) => {
+        const known = new Set(prev.map((m) => m.id))
+        const all = [...res.data.filter((m) => !known.has(m.id)), ...prev]
+        // Gắn lại reply_to cho tin trả lời một tin vừa nạp
+        return all.map((msg) => {
+          if (msg.reply_to_id && !msg.reply_to) {
+            const replyMsg = all.find((m) => m.id === msg.reply_to_id)
+            if (replyMsg) return { ...msg, reply_to: replyMsg }
+          }
+          return msg
+        })
+      })
+      setHasMore(res.hasMore)
+    } catch (error) {
+      restoreScrollRef.current = null
+      message.error(dichLoiHeThong(error, 'Không tải được tin nhắn cũ hơn'))
+    } finally {
+      setLoadingOlder(false)
+    }
+  }, [roomId, loadingOlder, messages])
 
   const markAsRead = useCallback(async () => {
     if (!roomId) return
@@ -1046,6 +1083,14 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
     const curr = messages.length
     prevMsgCountRef.current = curr
     if (curr === 0) return
+
+    // Vừa chèn tin cũ lên đầu ("Tải tin cũ hơn") → giữ nguyên chỗ đang đọc, KHÔNG kéo xuống đáy
+    const restore = restoreScrollRef.current
+    if (restore) {
+      restoreScrollRef.current = null
+      container.scrollTop = container.scrollHeight - restore.height + restore.top
+      return
+    }
 
     // Initial/re-open load → instant scroll. New message (n → n+1) → smooth.
     const smooth = prev > 0 && curr > prev
@@ -1315,7 +1360,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
       // Refresh messages để thấy DealCard + booking updated
       fetchMessages()
     } catch (error: any) {
-      message.error(error?.message || 'Không thể tạo Deal')
+      message.error(dichLoiHeThong(error, 'Không thể tạo Deal'))
     } finally {
       setConfirmDealLoading(false)
     }
@@ -1359,7 +1404,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
         message.success('Đã duyệt Deal thành công')
         fetchMessages()
       } catch (err: any) {
-        message.error(err?.message || 'Không thể duyệt Deal')
+        message.error(dichLoiHeThong(err, 'Không thể duyệt Deal'))
       }
       return
     }
@@ -1398,12 +1443,12 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
       })
 
       message.success(
-        `Đã ứng thêm ${result.amount.toLocaleString('vi-VN')} VNĐ (${result.advance_number})`
+        `Đã ứng thêm ${fmtVnd(result.amount)} (${result.advance_number})`
       )
       setAddAdvanceModal({ visible: false, deal: null })
       fetchMessages()
     } catch (error: any) {
-      message.error(error?.message || 'Không thể ứng thêm')
+      message.error(dichLoiHeThong(error, 'Không thể ứng thêm'))
     } finally {
       setAddAdvanceLoading(false)
     }
@@ -1428,7 +1473,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
       setDeliveryModal({ visible: false, deal: null })
       fetchMessages()
     } catch (error: any) {
-      message.error(error?.message || 'Không thể ghi nhận giao hàng')
+      message.error(dichLoiHeThong(error, 'Không thể ghi nhận giao hàng'))
     } finally {
       setDeliveryLoading(false)
     }
@@ -1453,8 +1498,10 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
       setNegotiateModal({ visible: false, messageId: null })
       negotiateForm.resetFields()
     } catch (error: any) {
-      // negotiateBooking throw error rõ ràng (giá out of range, race condition…)
-      message.error(error?.message || 'Không thể gửi đề xuất')
+      // Lỗi kiểm tra form → antd đã tô đỏ ô, không bắn thêm toast
+      if (error?.errorFields) return
+      // negotiateBooking throw error rõ ràng (giá out of range, race condition…) — câu tiếng Việt giữ nguyên
+      message.error(dichLoiHeThong(error, 'Không thể gửi đề xuất'))
     }
   }
 
@@ -1536,7 +1583,15 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
 
     let lastDate: string | null = null
 
-    return messages.map((msg, idx) => {
+    const olderButton = hasMore ? (
+      <div key="__older" style={{ textAlign: 'center', marginBottom: 8 }}>
+        <Button size="small" loading={loadingOlder} onClick={loadOlderMessages}>
+          Tải tin cũ hơn
+        </Button>
+      </div>
+    ) : null
+
+    return [olderButton, ...messages.map((msg, idx) => {
       const currentDate = format(new Date(msg.sent_at), 'yyyy-MM-dd')
       const showDateDivider = currentDate !== lastDate
       lastDate = currentDate
@@ -1563,7 +1618,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
           />
         </div>
       )
-    })
+    })]
   }
 
   return (
@@ -1581,14 +1636,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
               <Space size={4}>
                 {room?.partner?.code && <Text type="secondary" style={{ fontSize: 12 }}>{room?.partner?.code}</Text>}
                 {room?.partner?.tier && (
-                  <Tag color={
-                    room?.partner?.tier === 'diamond' ? 'purple' :
-                    room?.partner?.tier === 'gold' ? 'gold' :
-                    room?.partner?.tier === 'silver' ? 'default' :
-                    room?.partner?.tier === 'bronze' ? 'orange' : 'cyan'
-                  } style={{ fontSize: 10 }}>
-                    {TIER_LABELS[room?.partner?.tier]}
-                  </Tag>
+                  <EnumTag value={room.partner.tier} labels={TIER_LABELS} colors={TIER_COLORS} style={{ fontSize: 10 }} />
                 )}
               </Space>
             </div>
@@ -1791,7 +1839,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
             <Form form={negotiateForm} layout="vertical">
               <Form.Item
                 name="counterPrice"
-                label="Giá đề xuất (đ/kg)"
+                label="Giá đề xuất (₫/kg)"
                 rules={[
                   { required: true, message: 'Vui lòng nhập giá đề xuất' },
                   {
@@ -1816,9 +1864,8 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
                   style={{ width: '100%' }}
                   min={0}
                   step={500}
-                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(value) => Number(value!.replace(/,/g, '')) || 0}
-                  addonAfter="đ/kg"
+                  {...vndInputProps}
+                  addonAfter="₫/kg"
                   placeholder="Nhập giá đề xuất"
                 />
               </Form.Item>
@@ -1840,9 +1887,9 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
               </Form.Item>
               {basePrice > 0 && (
                 <div style={{ color: '#8c8c8c', fontSize: 12 }}>
-                  Giá hiện tại: <strong>{basePrice.toLocaleString('vi-VN')} đ/kg</strong>
+                  Giá hiện tại: <strong>{basePrice.toLocaleString('vi-VN')} ₫/kg</strong>
                   <br />
-                  Cho phép: {(basePrice * 0.5).toLocaleString('vi-VN')} → {(basePrice * 2).toLocaleString('vi-VN')} đ/kg
+                  Cho phép: {(basePrice * 0.5).toLocaleString('vi-VN')} → {(basePrice * 2).toLocaleString('vi-VN')} ₫/kg
                 </div>
               )}
             </Form>
@@ -1881,12 +1928,22 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
             )
           }
 
+          // Panel chỉ lọc các tin ĐÃ NẠP — còn tin cũ hơn thì nói rõ + cho nạp tiếp ngay tại đây
+          const olderHint = hasMore ? (
+            <div style={{ marginTop: 8, textAlign: 'center' }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>Chỉ tìm trong {messages.length} tin đã tải.</Text>{' '}
+              <Button type="link" size="small" style={{ padding: 0 }} loading={loadingOlder} onClick={loadOlderMessages}>
+                Tải tin cũ hơn
+              </Button>
+            </div>
+          ) : null
+
           if (infoPanel === 'search' && !panelSearch.trim()) {
-            return <Empty description="Nhập từ khóa để tìm" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            return <><Empty description="Nhập từ khóa để tìm" image={Empty.PRESENTED_IMAGE_SIMPLE} />{olderHint}</>
           }
           if (list.length === 0) {
-            return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={infoPanel === 'pinned' ? 'Chưa ghim tin nào' : infoPanel === 'files' ? 'Chưa có file/ảnh' : 'Không tìm thấy'} />
+            return <><Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={infoPanel === 'pinned' ? 'Chưa ghim tin nào' : infoPanel === 'files' ? 'Chưa có file/ảnh' : 'Không tìm thấy'} />{olderHint}</>
           }
 
           const whoOf = (m: ChatMessage) =>
@@ -1897,10 +1954,11 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
           }
           const previewOf = (m: ChatMessage) =>
             m.content || (m.message_type === 'image' ? '📷 Ảnh' : m.message_type === 'file' ? '📎 Tệp'
-              : m.message_type === 'audio' ? '🎤 Voice' : m.message_type === 'booking' ? '📋 Phiếu chốt'
+              : m.message_type === 'audio' ? '🎤 Ghi âm' : m.message_type === 'booking' ? '📋 Phiếu chốt'
               : m.message_type === 'deal' ? '🤝 Deal' : '(không có nội dung)')
 
           return (
+            <>
             <List
               dataSource={list}
               renderItem={(m) => {
@@ -1934,6 +1992,8 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
                 )
               }}
             />
+            {olderHint}
+            </>
           )
         })()}
       </Drawer>

@@ -29,6 +29,8 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import PageState from '../../components/common/PageState'
+import { fmtDate } from '../../utils/format'
 import resourceService, {
   type DepartmentCapacity,
   type EmployeeWorkload,
@@ -61,7 +63,7 @@ interface Department {
 
 const VIEW_TABS: Array<{ key: ViewTab; label: string; icon: React.ReactNode }> = [
   { key: 'table', label: 'Bảng', icon: <Table2 size={16} /> },
-  { key: 'heatmap', label: 'Heatmap', icon: <Grid3X3 size={16} /> },
+  { key: 'heatmap', label: 'Bản đồ nhiệt', icon: <Grid3X3 size={16} /> },
   { key: 'chart', label: 'Biểu đồ', icon: <BarChart3 size={16} /> },
 ]
 
@@ -81,7 +83,8 @@ export default function CapacityPlanningPage() {
   const [capacityData, setCapacityData] = useState<DepartmentCapacity | null>(null)
   const [allWorkloads, setAllWorkloads] = useState<EmployeeWorkload[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Giữ lỗi gốc để PageState dịch; trước đây hiện e.message thô VÀ vẫn vẽ thẻ số 0 bên dưới
+  const [error, setError] = useState<unknown>(null)
 
   // --- View state ---
   const [viewTab, setViewTab] = useState<ViewTab>('table')
@@ -172,7 +175,8 @@ export default function CapacityPlanningPage() {
         })
       }
     } catch (err: any) {
-      setError(err.message || 'Không thể tải dữ liệu')
+      console.error('[CapacityPlanningPage] Load error:', err)
+      setError(err || 'Không thể tải dữ liệu')
     } finally {
       setLoading(false)
     }
@@ -432,9 +436,9 @@ export default function CapacityPlanningPage() {
                             <div className="text-[11px] text-gray-400">
                               {MEMBER_ROLE_LABELS[p.role as keyof typeof MEMBER_ROLE_LABELS] || p.role}
                               {p.start_date &&
-                                ` • ${new Date(p.start_date).toLocaleDateString('vi-VN')}`}
+                                ` • ${fmtDate(p.start_date)}`}
                               {p.end_date &&
-                                ` → ${new Date(p.end_date).toLocaleDateString('vi-VN')}`}
+                                ` → ${fmtDate(p.end_date)}`}
                             </div>
                           </div>
                         </div>
@@ -577,19 +581,9 @@ export default function CapacityPlanningPage() {
 
       {/* ===== CONTENT ===== */}
       <div className="p-4 pb-20 max-w-4xl mx-auto">
-        {/* Error */}
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Loading */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <div className="w-10 h-10 border-3 border-[#1B4D3E] border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-gray-500">Đang tải dữ liệu...</p>
-          </div>
+        {/* Đang tải / Lỗi (+ Thử lại) — khối dùng chung, lỗi không rơi xuống thẻ số 0 giả */}
+        {(loading || !!error) ? (
+          <PageState loading={loading} error={error} onRetry={loadData} minHeight={240} />
         ) : (
           <>
             {/* Stat cards */}

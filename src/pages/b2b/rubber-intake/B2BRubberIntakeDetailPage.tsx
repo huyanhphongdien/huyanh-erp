@@ -18,6 +18,10 @@ import {
 } from '../../../services/b2b/rubberIntakeB2BService'
 import { supabase } from '../../../lib/supabase'
 import { message } from 'antd'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import PageState from '../../../components/common/PageState'
+import { TIER_LABELS, TIER_ICONS } from '../../../services/b2b/partnerService'
+import { enumLabel } from '../../../components/common/EnumTag'
 
 // ============================================================================
 // TYPES
@@ -84,11 +88,15 @@ export default function B2BRubberIntakeDetailPage() {
   const openDealTab = useOpenDealTab()
   const [item, setItem] = useState<B2BRubberIntake | null>(null)
   const [loading, setLoading] = useState(true)
+  // Lỗi tải: trước đây promise không có catch → spinner quay mãi khi mất mạng (audit 17/11/2026)
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [stockIns, setStockIns] = useState<StockInInfo[]>([])
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
+    setLoadError(null)
     rubberIntakeB2BService.getById(id).then(data => {
       setItem(data)
       setLoading(false)
@@ -124,13 +132,24 @@ export default function B2BRubberIntakeDetailPage() {
             setStockIns(result)
           })
       }
+    }).catch((e) => {
+      setLoadError(e)
+      setLoading(false)
     })
-  }, [id])
+  }, [id, reloadKey])
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600" />
+      </div>
+    )
+  }
+
+  if (loadError && !item) {
+    return (
+      <div className="p-6">
+        <PageState error={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
       </div>
     )
   }
@@ -201,7 +220,8 @@ export default function B2BRubberIntakeDetailPage() {
                 <div className="text-xs text-gray-500">{item.partner.code} • B2B Đại lý</div>
               </div>
               <span className="text-sm px-2 py-0.5 rounded bg-purple-50 text-purple-600 font-medium">
-                {item.partner.tier === 'diamond' ? '💎' : item.partner.tier === 'gold' ? '🥇' : item.partner.tier === 'silver' ? '🥈' : '🆕'} {item.partner.tier}
+                {/* Hạng đại lý: biểu tượng + nhãn tiếng Việt từ map chung (trước in mã thô 'diamond') */}
+                {TIER_ICONS[item.partner.tier as keyof typeof TIER_ICONS] || '🆕'} {enumLabel(TIER_LABELS, item.partner.tier)}
               </span>
             </div>
           ) : item.supplier ? (
@@ -306,19 +326,19 @@ export default function B2BRubberIntakeDetailPage() {
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-xs text-gray-500 mb-1">Đơn giá</div>
               <div className="text-base font-bold text-gray-800">
-                {price ? `${price.toLocaleString('vi-VN')} đ/${item.settled_price_per_ton ? 'tấn' : 'kg'}` : <span className="text-gray-300 font-normal">Chưa có giá</span>}
+                {price ? `${price.toLocaleString('vi-VN')} ₫/${item.settled_price_per_ton ? 'tấn' : 'kg'}` : <span className="text-gray-300 font-normal">Chưa có giá</span>}
               </div>
             </div>
             <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
               <div className="text-xs text-emerald-600 mb-1">Tổng giá trị</div>
               <div className="text-base font-bold text-emerald-700">
-                {amount ? `${amount.toLocaleString('vi-VN')} đ` : <span className="text-emerald-300 font-normal">—</span>}
+                {amount ? `${amount.toLocaleString('vi-VN')} ₫` : <span className="text-emerald-300 font-normal">—</span>}
               </div>
             </div>
           </div>
           {item.finished_product_ton && (
             <div className="mt-3 text-xs text-gray-500 flex items-center gap-1">
-              <Package size={12} /> Thành phẩm dự kiến: <strong className="text-gray-700">{item.finished_product_ton.toFixed(2)} tấn</strong>
+              <Package size={12} /> Thành phẩm dự kiến: <strong className="text-gray-700">{item.finished_product_ton.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} tấn</strong>
             </div>
           )}
         </div>
@@ -339,14 +359,14 @@ export default function B2BRubberIntakeDetailPage() {
             <div className="mt-2">
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-gray-500">Đã trả</span>
-                <span className="font-medium">{(item.paid_amount || 0).toLocaleString('vi-VN')} đ</span>
+                <span className="font-medium">{(item.paid_amount || 0).toLocaleString('vi-VN')} ₫</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(((item.paid_amount || 0) / amount) * 100, 100)}%` }} />
               </div>
               <div className="flex justify-between text-xs text-gray-400 mt-1">
                 <span>{((item.paid_amount || 0) / amount * 100).toFixed(0)}%</span>
-                <span>/ {amount.toLocaleString('vi-VN')} đ</span>
+                <span>/ {amount.toLocaleString('vi-VN')} ₫</span>
               </div>
             </div>
           )}
@@ -469,7 +489,7 @@ function RubberTypePicker({
       const bonusType: 'tap' | 'nuoc' = rawType === 'mu_nuoc' ? 'nuoc' : 'tap'
       onChange(bonusType)
     } catch (e) {
-      message.error(`Lỗi: ${(e as Error).message}`)
+      message.error(dichLoiHeThong(e, 'Lưu loại mủ thất bại'))
     } finally {
       setSaving(false)
     }
@@ -481,11 +501,11 @@ function RubberTypePicker({
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4">
       <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-        Loại mủ chi tiết {isB2B && <span className="text-emerald-600 normal-case">(để tính bonus đại lý)</span>}
+        Loại mủ chi tiết {isB2B && <span className="text-emerald-600 normal-case">(để tính thưởng đại lý)</span>}
       </h3>
       {!isB2B && intakeRaw == null && (
         <p className="text-xs text-gray-500 mb-2">
-          Phiếu này không gắn đại lý B2B — không cần phân loại để tính bonus. Có thể bỏ qua.
+          Phiếu này không gắn đại lý B2B — không cần phân loại để tính thưởng. Có thể bỏ qua.
         </p>
       )}
       <div className="grid grid-cols-5 gap-1">
@@ -513,7 +533,7 @@ function RubberTypePicker({
       </div>
       {bonusGroup && (
         <p className="text-xs text-gray-500 mt-2">
-          ⇒ Nhóm bonus: <strong className={intake.rubber_type === 'nuoc' ? 'text-blue-700' : 'text-amber-700'}>{bonusGroup}</strong>
+          ⇒ Nhóm thưởng: <strong className={intake.rubber_type === 'nuoc' ? 'text-blue-700' : 'text-amber-700'}>{bonusGroup}</strong>
         </p>
       )}
       {saving && <p className="text-xs text-gray-400 mt-1">Đang lưu…</p>}

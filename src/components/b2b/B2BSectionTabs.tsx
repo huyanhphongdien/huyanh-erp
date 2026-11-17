@@ -81,10 +81,11 @@ export const INTAKE_TABS: SectionTab[] = [
   { key: 'manual-entry',  label: 'Nhập tay phiếu cân',   path: '/b2b/intake-manual' },
 ]
 
-// Section "Mua hàng" — ẩn Nhu cầu mua + Đấu giá (2026-05), chỉ còn Deals.
+// Section "Mua hàng" — ẩn Nhu cầu mua + Đấu giá (2026-05), chỉ còn Deal.
 // Route /b2b/demands, /b2b/auctions vẫn giữ (chỉ ẩn khỏi menu/tab) để bật lại dễ.
+// Thuật ngữ (Đợt 3 audit UI): thương vụ B2B gọi "Deal" SỐ ÍT — không "Deals".
 export const MUA_HANG_TABS: SectionTab[] = [
-  { key: 'deals',    label: 'Deals',       path: '/b2b/deals' },
+  { key: 'deals',    label: 'Deal',        path: '/b2b/deals' },
 ]
 
 export const PARTNER_TABS: SectionTab[] = [

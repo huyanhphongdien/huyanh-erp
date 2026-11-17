@@ -5,6 +5,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { App } from 'antd';
 import {
   shiftAssignmentService,
   shiftService,
@@ -13,6 +14,9 @@ import {
   shiftTeamService,
 } from '../../services';
 import { Modal, Button } from '../../components/ui';
+import { eachDayStr } from '../../utils/dateVN';
+import { fmtDate } from '../../utils/format';
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong';
 import {
   Users, Calendar, RotateCcw, Check, AlertCircle,
   ChevronDown, ChevronUp, Layers, Eye, UsersRound,
@@ -41,21 +45,12 @@ interface PatternWeek {
 // HELPERS
 // ============================================================
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('vi-VN');
-}
+const formatDate = fmtDate;
 
+// Duyệt ngày thuần lịch — bản cũ dựng nửa đêm giờ máy rồi toISOString (UTC) nên MỌI ngày
+// lùi 1 (đếm "ngày làm việc" bỏ nhầm thứ Bảy thay vì Chủ nhật)
 function getDateRange(from: string, to: string): string[] {
-  const dates: string[] = [];
-  const start = new Date(from + 'T00:00:00');
-  const end = new Date(to + 'T00:00:00');
-  const current = new Date(start);
-  while (current <= end) {
-    dates.push(current.toISOString().split('T')[0]);
-    current.setDate(current.getDate() + 1);
-  }
-  return dates;
+  return eachDayStr(from, to);
 }
 
 function countWorkingDays(from: string, to: string): number {
@@ -78,6 +73,7 @@ export function BatchScheduleModal({
   preSelectedDepartmentId,
 }: BatchScheduleModalProps) {
   const queryClient = useQueryClient();
+  const { modal } = App.useApp();
 
   // === STATE ===
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -174,9 +170,17 @@ export function BatchScheduleModal({
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calendar'] });
       queryClient.invalidateQueries({ queryKey: ['shift-assignments'] });
-      alert(
-        `Phân ca hoàn tất!\n• Tạo mới: ${result.created} ngày\n• Bỏ qua: ${result.skipped} ngày\n• Ghi đè: ${result.overwritten} ngày`
-      );
+      modal.success({
+        title: 'Phân ca hoàn tất',
+        content: (
+          <div>
+            <div>• Tạo mới: {result.created} ngày</div>
+            <div>• Bỏ qua: {result.skipped} ngày</div>
+            <div>• Ghi đè: {result.overwritten} ngày</div>
+          </div>
+        ),
+        okText: 'Đóng',
+      });
       handleClose();
     },
   });
@@ -210,12 +214,25 @@ export function BatchScheduleModal({
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calendar'] });
       queryClient.invalidateQueries({ queryKey: ['shift-assignments'] });
-      const detailStr = result.details
-        .map(d => `  ${d.team_code}: ${d.created} ca`)
-        .join('\n');
-      alert(
-        `Phân ca theo đội hoàn tất!\n• Tạo mới: ${result.created}\n• Bỏ qua: ${result.skipped}\n• Ghi đè: ${result.overwritten}\n\nChi tiết:\n${detailStr}`
-      );
+      modal.success({
+        title: 'Phân ca theo đội hoàn tất',
+        content: (
+          <div>
+            <div>• Tạo mới: {result.created}</div>
+            <div>• Bỏ qua: {result.skipped}</div>
+            <div>• Ghi đè: {result.overwritten}</div>
+            {result.details.length > 0 && (
+              <div className="mt-2">
+                <div className="font-medium">Chi tiết:</div>
+                {result.details.map(d => (
+                  <div key={d.team_code}>{d.team_code}: {d.created} ca</div>
+                ))}
+              </div>
+            )}
+          </div>
+        ),
+        okText: 'Đóng',
+      });
       handleClose();
     },
   });
@@ -1010,7 +1027,7 @@ export function BatchScheduleModal({
             {(batchMutation.isError || teamBatchMutation.isError) && (
               <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
                 <AlertCircle size={16} />
-                <span>Lỗi: {(mutationError as Error)?.message || 'Đã xảy ra lỗi'}</span>
+                <span>{dichLoiHeThong(mutationError, 'Phân ca thất bại')}</span>
               </div>
             )}
           </div>

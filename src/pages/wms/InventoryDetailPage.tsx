@@ -47,6 +47,9 @@ import WeightLossIndicator from '../../components/wms/WeightLossIndicator'
 import ContaminationBadge from '../../components/wms/ContaminationBadge'
 import BatchSplitModal from '../../components/wms/BatchSplitModal'
 import BatchMergeModal from '../../components/wms/BatchMergeModal'
+import PageState from '../../components/common/PageState'
+import { fmtDate, fmtDateShort, fmtNum } from '../../utils/format'
+import { BATCH_QC_STATUS_LABELS } from './qc/qcLabels'
 
 const { Title, Text } = Typography
 
@@ -71,6 +74,8 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "Không có lô hàng nào" / "Chưa có dữ liệu biến động"
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   // Split/Merge modal state
   const [splitBatch, setSplitBatch] = useState<StockBatch | null>(null)
@@ -87,6 +92,7 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
     if (!materialId) return
     try {
       setLoading(true)
+      setLoadError(null)
 
       const [batchData, movementData, txData] = await Promise.all([
         inventoryService.getStockByBatch(materialId),
@@ -107,6 +113,7 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
       }
     } catch (err) {
       console.error('Load inventory detail error:', err)
+      setLoadError(err)
     } finally {
       setLoading(false)
     }
@@ -136,16 +143,17 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
 
   const getQCTag = (status: string) => {
     switch (status) {
+      // Nhãn từ qcLabels (một nguồn với Xuất kho / Sơ đồ bãi) — trước 'Dat', 'Can phoi tron' không dấu
       case 'passed':
-        return <Tag icon={<CheckCircleOutlined />} color="success">Dat</Tag>
+        return <Tag icon={<CheckCircleOutlined />} color="success">{BATCH_QC_STATUS_LABELS.passed}</Tag>
       case 'warning':
-        return <Tag icon={<ExclamationCircleOutlined />} color="warning">Cảnh báo</Tag>
+        return <Tag icon={<ExclamationCircleOutlined />} color="warning">{BATCH_QC_STATUS_LABELS.warning}</Tag>
       case 'failed':
-        return <Tag color="error">Không đạt</Tag>
+        return <Tag color="error">{BATCH_QC_STATUS_LABELS.failed}</Tag>
       case 'needs_blend':
-        return <Tag icon={<ExperimentOutlined />} color="purple">Can phoi tron</Tag>
+        return <Tag icon={<ExperimentOutlined />} color="purple">{BATCH_QC_STATUS_LABELS.needs_blend}</Tag>
       case 'pending':
-        return <Tag icon={<ClockCircleOutlined />} color="default">Chờ QC</Tag>
+        return <Tag icon={<ClockCircleOutlined />} color="default">{BATCH_QC_STATUS_LABELS.pending}</Tag>
       default:
         return <Tag>{status}</Tag>
     }
@@ -157,8 +165,8 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
       case 'out': return { label: 'Xuất kho', color: 'error' as const, icon: '-' }
       case 'adjust': return { label: 'Điều chỉnh', color: 'processing' as const, icon: '+-' }
       case 'transfer': return { label: 'Chuyển kho', color: 'purple' as const, icon: '<>' }
-      case 'blend_in': return { label: 'Nhap phoi tron', color: 'success' as const, icon: '+' }
-      case 'blend_out': return { label: 'Xuat phoi tron', color: 'warning' as const, icon: '-' }
+      case 'blend_in': return { label: 'Nhập phối trộn', color: 'success' as const, icon: '+' }
+      case 'blend_out': return { label: 'Xuất phối trộn', color: 'warning' as const, icon: '-' }
       default: return { label: type, color: 'default' as const, icon: '' }
     }
   }
@@ -173,7 +181,7 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
         <Card>
           <Empty
             image={<BarChartOutlined style={{ fontSize: 40, color: '#ccc' }} />}
-            description="Chưa có du lieu bien dong"
+            description="Chưa có dữ liệu biến động"
           />
         </Card>
       )
@@ -184,7 +192,7 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
     const barWidth = Math.max(4, Math.floor(280 / movements.length) - 1)
 
     return (
-      <Card title="Bien dong tồn kho 30 ngay" size="small">
+      <Card title="Biến động tồn kho 30 ngày" size="small">
         <div style={{ overflowX: 'auto' }}>
           <svg
             width={Math.max(300, movements.length * (barWidth + 2))}
@@ -249,11 +257,11 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
         <Space style={{ marginTop: 8 }}>
           <Space size={4}>
             <div style={{ width: 12, height: 12, borderRadius: 2, background: '#2D8B6E' }} />
-            <Text type="secondary" style={{ fontSize: 11 }}>Ton binh thuong</Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>Tồn bình thường</Text>
           </Space>
           <Space size={4}>
             <div style={{ width: 12, height: 12, borderRadius: 2, background: '#EF4444' }} />
-            <Text type="secondary" style={{ fontSize: 11 }}>Duoi ton min</Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>Dưới tồn tối thiểu</Text>
           </Space>
         </Space>
       </Card>
@@ -266,7 +274,7 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
 
   const batchColumns = [
     {
-      title: 'Lo',
+      title: 'Mã lô',
       dataIndex: 'batch_no',
       key: 'batch_no',
       render: (val: string) => (
@@ -301,7 +309,7 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
       align: 'right' as const,
       render: (val: number) => (
         <Text strong style={{ fontFamily: MONO_FONT, color: '#1B4D3E' }}>
-          {val?.toLocaleString('vi-VN')}
+          {fmtNum(val)}
         </Text>
       ),
     },
@@ -309,7 +317,7 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
       title: 'Ngày nhập',
       dataIndex: 'received_date',
       key: 'date',
-      render: (val: string) => val ? new Date(val).toLocaleDateString('vi-VN') : '—',
+      render: (val: string) => fmtDate(val),
     },
     {
       title: 'Vị trí',
@@ -384,10 +392,10 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
       },
     },
     {
-      title: 'Ngay',
+      title: 'Ngày',
       dataIndex: 'created_at',
       key: 'date',
-      render: (val: string) => new Date(val).toLocaleDateString('vi-VN'),
+      render: (val: string) => fmtDate(val),
     },
     {
       title: 'Ghi chú',
@@ -406,6 +414,15 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F7F5F2' }}>
         <Spin size="large" />
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState error={loadError} onRetry={() => loadData()} />
+        <div style={{ textAlign: 'center', marginTop: 16 }}><Button onClick={() => navigate(-1)}>Quay lại</Button></div>
       </div>
     )
   }
@@ -440,17 +457,18 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
             <Card size="small" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', textAlign: 'center' }}>
               <Statistic
                 value={totalQty}
-                suffix={material?.unit || 'banh'}
+                suffix={material?.unit || 'bành'}
                 valueStyle={{ color: '#fff', fontSize: 18, fontFamily: MONO_FONT }}
-                title={<span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Ton</span>}
+                formatter={(v) => fmtNum(Number(v))}
+                title={<span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Tồn</span>}
               />
             </Card>
           </Col>
           <Col span={8}>
             <Card size="small" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', textAlign: 'center' }}>
               <Statistic
-                value={(totalWeight / 1000).toFixed(1)}
-                suffix="tan"
+                value={fmtNum(totalWeight / 1000, 1)}
+                suffix="tấn"
                 valueStyle={{ color: '#fff', fontSize: 18, fontFamily: MONO_FONT }}
                 title={<span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Khối lượng</span>}
               />
@@ -460,7 +478,7 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
             <Card size="small" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', textAlign: 'center' }}>
               <Statistic
                 value={batches.length}
-                suffix="lo"
+                suffix="lô"
                 valueStyle={{ color: '#fff', fontSize: 18, fontFamily: MONO_FONT }}
                 title={<span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Số lô</span>}
               />
@@ -479,7 +497,7 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
               label: (
                 <Space size={4}>
                   <InboxOutlined />
-                  <span>Theo lo ({batches.length})</span>
+                  <span>Theo lô ({batches.length})</span>
                 </Space>
               ),
               children: (
@@ -489,13 +507,13 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
                     <Col>
                       <Space>
                         {qcPassed > 0 && (
-                          <Tag icon={<CheckCircleOutlined />} color="success">{qcPassed} dat</Tag>
+                          <Tag icon={<CheckCircleOutlined />} color="success">{qcPassed} đạt</Tag>
                         )}
                         {qcWarning > 0 && (
-                          <Tag icon={<ExclamationCircleOutlined />} color="warning">{qcWarning} canh bao</Tag>
+                          <Tag icon={<ExclamationCircleOutlined />} color="warning">{qcWarning} cảnh báo</Tag>
                         )}
                         {qcFailed > 0 && (
-                          <Tag icon={<ExperimentOutlined />} color="error">{qcFailed} can xu ly</Tag>
+                          <Tag icon={<ExperimentOutlined />} color="error">{qcFailed} cần xử lý</Tag>
                         )}
                       </Space>
                     </Col>
@@ -510,7 +528,7 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
                           setMergeModalOpen(true)
                         }}
                       >
-                        Gop lo ({selectedBatchIds.length})
+                        Gộp lô ({selectedBatchIds.length})
                       </Button>
                     </Col>
                   </Row>
@@ -532,8 +550,8 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
                     expandable={{
                       expandedRowRender: (batch: StockBatch) => (
                         <Descriptions size="small" column={2} bordered>
-                          <Descriptions.Item label="SL ban dau">{batch.initial_quantity}</Descriptions.Item>
-                          <Descriptions.Item label="SL còn lai">
+                          <Descriptions.Item label="SL ban đầu">{batch.initial_quantity}</Descriptions.Item>
+                          <Descriptions.Item label="SL còn lại">
                             <Text strong style={{ color: '#1B4D3E' }}>{batch.quantity_remaining}</Text>
                           </Descriptions.Item>
                           <Descriptions.Item label="DRC ban đầu">
@@ -544,12 +562,12 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
                           </Descriptions.Item>
                           {batch.expiry_date && (
                             <Descriptions.Item label="Hết hạn">
-                              {new Date(batch.expiry_date).toLocaleDateString('vi-VN')}
+                              {fmtDate(batch.expiry_date)}
                             </Descriptions.Item>
                           )}
                           {batch.next_recheck_date && (
                             <Descriptions.Item label="Tái kiểm">
-                              {new Date(batch.next_recheck_date).toLocaleDateString('vi-VN')}
+                              {fmtDate(batch.next_recheck_date)}
                             </Descriptions.Item>
                           )}
                         </Descriptions>
@@ -565,18 +583,18 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
               label: (
                 <Space size={4}>
                   <BarChartOutlined />
-                  <span>Bien dong</span>
+                  <span>Biến động</span>
                 </Space>
               ),
               children: (
                 <div>
                   {renderChart()}
 
-                  <Card title="7 ngay gan nhat" size="small" style={{ marginTop: 16 }}>
+                  <Card title="7 ngày gần nhất" size="small" style={{ marginTop: 16 }}>
                     {movements.slice(-7).reverse().map(m => (
                       <div key={m.date} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
                         <Text type="secondary" style={{ width: 80, fontSize: 12 }}>
-                          {new Date(m.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                          {fmtDateShort(m.date)}
                         </Text>
                         <Space>
                           {m.in_quantity > 0 && (
@@ -614,7 +632,7 @@ const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPage
                   rowKey="id"
                   size="small"
                   pagination={false}
-                  locale={{ emptyText: <Empty description="Chưa có lich su giao dich" /> }}
+                  locale={{ emptyText: <Empty description="Chưa có lịch sử giao dịch" /> }}
                 />
               ),
             },

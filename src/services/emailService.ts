@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
+import { fmtDate } from '../utils/format';
 
 // ============================================================================
 // TEST MODE — Redirect MỌI email notification về Minh LD (debug/test)
@@ -82,7 +83,7 @@ const EMAIL_TEMPLATES: Record<EmailNotificationType, {
           <p><strong>Người giao:</strong> ${data.assigner_name}</p>
           <p><strong>Phòng ban:</strong> ${data.department_name || 'Chưa xác định'}</p>
           <p><strong>Độ ưu tiên:</strong> ${PRIORITY_LABELS[data.priority] || 'Bình thường'}</p>
-          ${data.due_date ? `<p><strong>Hạn hoàn thành:</strong> ${new Date(data.due_date).toLocaleDateString('vi-VN')}</p>` : ''}
+          ${data.due_date ? `<p><strong>Hạn hoàn thành:</strong> ${fmtDate(data.due_date)}</p>` : ''}
         </div>
         ${data.description ? `<p><strong>Mô tả:</strong></p><p style="background-color: #fafafa; padding: 15px; border-left: 4px solid #3b82f6;">${data.description}</p>` : ''}
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
@@ -103,7 +104,7 @@ const EMAIL_TEMPLATES: Record<EmailNotificationType, {
         <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <p><strong>Mã công việc:</strong> ${data.task_code}</p>
           <p><strong>Tên công việc:</strong> ${data.task_name}</p>
-          <p><strong>Ngày hoàn thành:</strong> ${data.completed_date ? new Date(data.completed_date).toLocaleDateString('vi-VN') : 'Hôm nay'}</p>
+          <p><strong>Ngày hoàn thành:</strong> ${data.completed_date ? fmtDate(data.completed_date) : 'Hôm nay'}</p>
         </div>
         <p>Công việc của bạn đã được đánh dấu hoàn thành. Vui lòng hoàn thành <strong>tự đánh giá</strong> để quản lý có thể phê duyệt kết quả.</p>
         <a href="${APP_URL}/my-tasks" style="display: inline-block; background-color: #10B981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
@@ -205,7 +206,7 @@ const EMAIL_TEMPLATES: Record<EmailNotificationType, {
         <p><strong>Nội dung cần bổ sung:</strong></p>
         <p style="background-color: #fef3c7; padding: 15px; border-left: 4px solid #f59e0b;">${data.additional_request}</p>
         ${data.additional_deadline ? `
-          <p><strong>⏰ Hạn bổ sung:</strong> ${new Date(data.additional_deadline).toLocaleDateString('vi-VN')}</p>
+          <p><strong>⏰ Hạn bổ sung:</strong> ${fmtDate(data.additional_deadline)}</p>
         ` : ''}
         ${data.comments ? `
           <p><strong>Ghi chú thêm:</strong></p>
@@ -249,7 +250,7 @@ const EMAIL_TEMPLATES: Record<EmailNotificationType, {
           <p><strong>Vấn đề:</strong> ${data.issue_title}</p>
           <p><strong>Mức độ:</strong> <span style="color: ${data.severity === 'critical' ? '#dc2626' : data.severity === 'high' ? '#ea580c' : '#d97706'}; font-weight: bold;">${data.severity_label}</span></p>
           <p><strong>Người báo cáo:</strong> ${data.reporter_name}</p>
-          ${data.due_date ? `<p><strong>Hạn xử lý:</strong> <span style="color: #dc2626; font-weight: bold;">${new Date(data.due_date).toLocaleDateString('vi-VN')}</span></p>` : ''}
+          ${data.due_date ? `<p><strong>Hạn xử lý:</strong> <span style="color: #dc2626; font-weight: bold;">${fmtDate(data.due_date)}</span></p>` : ''}
         </div>
         ${data.description ? `
           <p><strong>Mô tả chi tiết:</strong></p>
@@ -276,7 +277,7 @@ const EMAIL_TEMPLATES: Record<EmailNotificationType, {
         <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fca5a5;">
           <p><strong>Mã công việc:</strong> ${data.task_code}</p>
           <p><strong>Tên công việc:</strong> ${data.task_name}</p>
-          <p><strong>Hạn hoàn thành:</strong> <span style="color: #dc2626; font-weight: bold;">${new Date(data.due_date).toLocaleDateString('vi-VN')}</span></p>
+          <p><strong>Hạn hoàn thành:</strong> <span style="color: #dc2626; font-weight: bold;">${fmtDate(data.due_date)}</span></p>
           <p><strong>Còn lại:</strong> <span style="font-size: 18px; font-weight: bold; color: #dc2626;">${data.days_remaining} ngày</span></p>
           <p><strong>Tiến độ hiện tại:</strong> ${data.progress || 0}%</p>
         </div>
@@ -298,7 +299,7 @@ const EMAIL_TEMPLATES: Record<EmailNotificationType, {
           <p><strong>Mã công việc:</strong> ${data.task_code}</p>
           <p><strong>Tên công việc:</strong> ${data.task_name}</p>
           <p><strong>Người thực hiện:</strong> ${data.assignee_name || 'Chưa gán'}</p>
-          <p><strong>Hạn hoàn thành:</strong> <span style="color: #dc2626; font-weight: bold;">${new Date(data.due_date).toLocaleDateString('vi-VN')}</span></p>
+          <p><strong>Hạn hoàn thành:</strong> <span style="color: #dc2626; font-weight: bold;">${fmtDate(data.due_date)}</span></p>
           <p><strong>Quá hạn:</strong> <span style="font-size: 18px; font-weight: bold; color: #dc2626;">${data.days_overdue} ngày</span></p>
           <p><strong>Tiến độ:</strong> ${data.progress || 0}%</p>
         </div>
@@ -319,7 +320,7 @@ const EMAIL_TEMPLATES: Record<EmailNotificationType, {
         <div style="background-color: #fffbeb; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fbbf24;">
           <p><strong>Mã công việc:</strong> ${data.task_code}</p>
           <p><strong>Tên công việc:</strong> ${data.task_name}</p>
-          <p><strong>Hoàn thành lúc:</strong> ${data.finished_at ? new Date(data.finished_at).toLocaleDateString('vi-VN') : '—'}</p>
+          <p><strong>Hoàn thành lúc:</strong> ${data.finished_at ? fmtDate(data.finished_at) : '—'}</p>
           <p><strong>Đã qua:</strong> <span style="font-weight: bold; color: #d97706;">${data.days_since_finished} ngày</span> chưa tự đánh giá</p>
         </div>
         <p>Bạn đã hoàn thành công việc nhưng chưa tự đánh giá. Vui lòng thực hiện tự đánh giá để quản lý có thể phê duyệt.</p>
@@ -340,7 +341,7 @@ const EMAIL_TEMPLATES: Record<EmailNotificationType, {
           <p><strong>Mã công việc:</strong> ${data.task_code}</p>
           <p><strong>Tên công việc:</strong> ${data.task_name}</p>
           <p><strong>Người thực hiện:</strong> ${data.assignee_name}</p>
-          <p><strong>Gửi đánh giá lúc:</strong> ${data.submitted_at ? new Date(data.submitted_at).toLocaleDateString('vi-VN') : '—'}</p>
+          <p><strong>Gửi đánh giá lúc:</strong> ${data.submitted_at ? fmtDate(data.submitted_at) : '—'}</p>
           <p><strong>Chờ duyệt:</strong> <span style="font-weight: bold; color: #7c3aed;">${data.days_waiting} ngày</span></p>
         </div>
         <p>Nhân viên đã hoàn thành tự đánh giá. Vui lòng phê duyệt.</p>

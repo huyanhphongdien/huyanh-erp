@@ -47,7 +47,7 @@ const TABS: Tab[] = [
     label: 'Phân tích hiệu suất',
     shortLabel: 'Hiệu suất',
     icon: <TrendingUp className="w-4 h-4" />,
-    description: 'Đánh giá hiệu suất làm việc và top performers'
+    description: 'Đánh giá hiệu suất làm việc và nhân viên tiêu biểu'
   },
   {
     key: 'custom',

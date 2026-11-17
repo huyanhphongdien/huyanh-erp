@@ -7,9 +7,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, Trash2, Save, X } from 'lucide-react'
-import { message } from 'antd'
+import { message, Modal } from 'antd'
 
 import { bonusRulesService } from '../../../services/b2b/bonusRulesService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import type { BonusRule, RubberType } from '../../../types/b2b.types'
 
 const RUBBER_TABS: { value: RubberType; label: string }[] = [
@@ -31,9 +32,10 @@ export function BonusRulesPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => bonusRulesService.delete(id),
     onSuccess: () => {
+      message.success('Đã xoá quy chế')
       qc.invalidateQueries({ queryKey: ['bonus-rules'] })
     },
-    onError: (e: Error) => message.error(`Lỗi xoá: ${e.message}`),
+    onError: (e: Error) => message.error(dichLoiHeThong(e, 'Xoá quy chế thất bại')),
   })
 
   return (
@@ -42,7 +44,7 @@ export function BonusRulesPage() {
         onClick={() => navigate('/b2b/bonuses')}
         className="text-sm text-emerald-700 hover:underline flex items-center gap-1"
       >
-        <ArrowLeft className="w-4 h-4" /> Quay lại danh sách bonus
+        <ArrowLeft className="w-4 h-4" /> Quay lại danh sách thưởng
       </button>
 
       <div className="flex items-center justify-between">
@@ -84,7 +86,7 @@ export function BonusRulesPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-700">
             <tr>
-              <th className="px-3 py-2 text-left">Tier</th>
+              <th className="px-3 py-2 text-left">Bậc thưởng</th>
               <th className="px-3 py-2 text-right">Min (T)</th>
               <th className="px-3 py-2 text-right">Max (T)</th>
               <th className="px-3 py-2 text-right">Đơn thưởng</th>
@@ -114,7 +116,15 @@ export function BonusRulesPage() {
                 key={r.id}
                 rule={r}
                 onDelete={() => {
-                  if (confirm(`Xoá rule "${r.tier_label}"?`)) deleteMutation.mutate(r.id)
+                  // Modal antd (nút đỏ, nêu hệ quả) thay confirm() của trình duyệt — audit 17/11/2026
+                  Modal.confirm({
+                    title: `Xoá quy chế "${r.tier_label}"?`,
+                    content: 'Lần tính lại thưởng sau sẽ không còn áp mức này nữa.',
+                    okText: 'Xoá',
+                    cancelText: 'Không',
+                    okButtonProps: { danger: true },
+                    onOk: () => deleteMutation.mutate(r.id),
+                  })
                 }}
               />
             ))}
@@ -144,7 +154,7 @@ function RuleRow({ rule, onDelete }: { rule: BonusRule; onDelete: () => void }) 
       <td className="px-3 py-2 font-medium">{rule.tier_label}</td>
       <td className="px-3 py-2 text-right font-mono">{rule.threshold_min_tons}</td>
       <td className="px-3 py-2 text-right font-mono">{rule.threshold_max_tons ?? '∞'}</td>
-      <td className="px-3 py-2 text-right font-mono">{Number(rule.bonus_per_ton_vnd).toLocaleString('vi-VN')}đ/T</td>
+      <td className="px-3 py-2 text-right font-mono">{Number(rule.bonus_per_ton_vnd).toLocaleString('vi-VN')} ₫/T</td>
       <td className="px-3 py-2 text-center text-xs">{rule.effective_from}</td>
       <td className="px-3 py-2 text-center text-xs">{rule.effective_to ?? '—'}</td>
       <td className="px-3 py-2 text-xs text-slate-600">{rule.notes ?? ''}</td>
@@ -189,7 +199,7 @@ function AddRuleForm({
         notes: notes.trim() || null,
       }),
     onSuccess: () => onSaved(),
-    onError: (e: Error) => message.error(`Lỗi: ${e.message}`),
+    onError: (e: Error) => message.error(dichLoiHeThong(e, 'Lưu quy chế thất bại')),
   })
 
   return (
@@ -204,7 +214,7 @@ function AddRuleForm({
 
         <div className="space-y-3 text-sm">
           <div>
-            <label className="block text-xs text-slate-600 mb-0.5">Tên tier *</label>
+            <label className="block text-xs text-slate-600 mb-0.5">Tên bậc thưởng *</label>
             <input
               value={tierLabel}
               onChange={(e) => setTierLabel(e.target.value)}
@@ -243,7 +253,7 @@ function AddRuleForm({
             />
             {bonusPerTon > 0 && (
               <div className="text-xs text-slate-500 mt-0.5">
-                = {bonusPerTon.toLocaleString('vi-VN')}đ/T
+                = {bonusPerTon.toLocaleString('vi-VN')} ₫/T
               </div>
             )}
           </div>

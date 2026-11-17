@@ -4,9 +4,13 @@
 // Gộp: tồn quỹ + tiền VÀO (phải thu) vs tiền RA (gốc + lãi + phải nộp) theo tuần.
 // ============================================================================
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { Card, Row, Col, Statistic, Table, Typography, Button, Space, message, Alert, Tag, InputNumber, Tooltip } from 'antd'
+import { useNavigate } from 'react-router-dom'
+import { Card, Row, Col, Statistic, Table, Typography, Button, Space, Alert, Tag, InputNumber, Tooltip } from 'antd'
 import { ReloadOutlined, RiseOutlined, FallOutlined, BankOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { fmtVnd, fmtVndNum, fmtTy, fmtUsd, fmtDate, vndInputProps } from '../../utils/format'
+import { VND_PER_USD_MIN, VND_PER_USD_MAX } from '../../services/sales/salesMoney'
+import PageState from '../../components/common/PageState'
 import { loanService } from '../../services/finance/loanService'
 import { interestService } from '../../services/finance/interestService'
 import { receivableService } from '../../services/finance/receivableService'
@@ -16,20 +20,42 @@ import { depositService } from '../../services/finance/depositService'
 import { collateralService } from '../../services/finance/collateralService'
 
 const { Title, Text } = Typography
-const fmtVnd = (n?: number | null) => (Math.round(n || 0)).toLocaleString('vi-VN')
-const fmtTy = (n: number) => `${((n || 0) / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} tỷ`
-const fmtUsd = (n?: number | null) => '$' + Math.round(n || 0).toLocaleString('en-US')
 const WEEKS = 6
+// Tỷ giá quy đổi USD → VNĐ áp cho MỌI khoản USD của trang. Nhớ trên máy người xem (localStorage — tiện ích
+// cá nhân, không phải số liệu chung); chưa nhập bao giờ thì dùng mặc định và gắn nhãn "tỷ giá mặc định".
+const USD_RATE_DEFAULT = 25400
+const USD_RATE_KEY = 'fin_usd_rate'
+// Cùng khoảng hợp lý với tỷ giá đơn VNĐ (salesMoney) — số lỡ lưu kiểu '1000' bị bỏ qua
+const rateOk = (n: number) => n >= VND_PER_USD_MIN && n <= VND_PER_USD_MAX
+const readSavedRate = (): number | null => {
+  try { const n = Number(localStorage.getItem(USD_RATE_KEY)); return rateOk(n) ? n : null } catch { return null }
+}
 
 interface Bucket { start: Date; end: Date; label: string; inV: number; outP: number; outI: number; outPay: number }
 
 export default function FinanceCashflowDashboard() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
-  const [usdRate, setUsdRate] = useState(25400)
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [usdRate, setUsdRate] = useState<number>(() => readSavedRate() ?? USD_RATE_DEFAULT)
+  const [rateIsDefault, setRateIsDefault] = useState(() => readSavedRate() === null)
   const [raw, setRaw] = useState<any>(null)
 
+  const changeRate = (v: number | string | null) => {
+    if (v === null || v === undefined || v === '') {   // xoá trắng ô → quay về tỷ giá mặc định
+      setUsdRate(USD_RATE_DEFAULT); setRateIsDefault(true)
+      try { localStorage.removeItem(USD_RATE_KEY) } catch { /* trình duyệt chặn lưu */ }
+      return
+    }
+    const n = Number(v)
+    // Đang gõ dở hoặc số vô lý (25, 1000…) → không áp, không lưu; rời ô thì ô tự về tỷ giá đang dùng
+    if (!rateOk(n)) return
+    setUsdRate(n); setRateIsDefault(false)
+    try { localStorage.setItem(USD_RATE_KEY, String(n)) } catch { /* trình duyệt chặn lưu — vẫn áp trong phiên này */ }
+  }
+
   const load = useCallback(async () => {
-    setLoading(true)
+    setLoading(true); setLoadError(null)
     try {
       const [loans, ints, ars, bals, pays, lines, deps, cols] = await Promise.all([
         loanService.list(), interestService.listAll(), receivableService.list(),
@@ -37,7 +63,7 @@ export default function FinanceCashflowDashboard() {
         depositService.list(), collateralService.list(),
       ])
       setRaw({ loans, ints, ars, bals, pays, lines, deps, cols })
-    } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
+    } catch (e) { setLoadError(e) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
@@ -101,15 +127,16 @@ export default function FinanceCashflowDashboard() {
     }
   }, [raw, usdRate])
 
+  // Đỏ CHỈ = thiếu hụt (chênh lệch âm / tồn dự kiến âm). Tiền ra dùng nâu "nghĩa vụ trả" như các màn vay.
   const cfCols = [
     { title: 'Tuần', dataIndex: 'label', width: 110, render: (v: string, _r: any, i: number) => <span>{v}{i === 0 ? <Tag color="blue" style={{ marginLeft: 4 }}>tuần này</Tag> : null}</span> },
-    { title: '⬆ Tiền vào', dataIndex: 'inV', align: 'right' as const, render: (v: number) => v ? <b style={{ color: '#16a34a' }}>{fmtVnd(v)}</b> : <Text type="secondary">—</Text> },
-    { title: 'Gốc vay', dataIndex: 'outP', align: 'right' as const, render: (v: number) => v ? fmtVnd(v) : '—' },
-    { title: 'Lãi', dataIndex: 'outI', align: 'right' as const, render: (v: number) => v ? fmtVnd(v) : '—' },
-    { title: 'Phải nộp', dataIndex: 'outPay', align: 'right' as const, render: (v: number) => v ? fmtVnd(v) : '—' },
-    { title: '⬇ Tổng ra', dataIndex: 'out', align: 'right' as const, render: (v: number) => v ? <b style={{ color: '#dc2626' }}>{fmtVnd(v)}</b> : <Text type="secondary">—</Text> },
-    { title: 'Net', dataIndex: 'net', align: 'right' as const, render: (v: number) => <b style={{ color: v >= 0 ? '#16a34a' : '#dc2626' }}>{v >= 0 ? '+' : ''}{fmtVnd(v)}</b> },
-    { title: 'Tồn dự kiến', dataIndex: 'running', align: 'right' as const, render: (v: number) => <b style={{ color: v < 0 ? '#dc2626' : '#1E3A5F' }}>{fmtVnd(v)}</b> },
+    { title: '⬆ Tiền vào', dataIndex: 'inV', align: 'right' as const, render: (v: number) => v ? <b style={{ color: '#16a34a' }}>{fmtVndNum(v)}</b> : <Text type="secondary">—</Text> },
+    { title: 'Gốc vay', dataIndex: 'outP', align: 'right' as const, render: (v: number) => v ? fmtVndNum(v) : '—' },
+    { title: 'Lãi', dataIndex: 'outI', align: 'right' as const, render: (v: number) => v ? fmtVndNum(v) : '—' },
+    { title: 'Phải nộp', dataIndex: 'outPay', align: 'right' as const, render: (v: number) => v ? fmtVndNum(v) : '—' },
+    { title: '⬇ Tổng ra', dataIndex: 'out', align: 'right' as const, render: (v: number) => v ? <b style={{ color: '#92400E' }}>{fmtVndNum(v)}</b> : <Text type="secondary">—</Text> },
+    { title: 'Chênh lệch', dataIndex: 'net', align: 'right' as const, render: (v: number) => <b style={{ color: v >= 0 ? '#16a34a' : '#dc2626' }}>{v >= 0 ? '+' : ''}{fmtVndNum(v)}</b> },
+    { title: 'Tồn dự kiến', dataIndex: 'running', align: 'right' as const, render: (v: number) => <b style={{ color: v < 0 ? '#dc2626' : '#1E3A5F' }}>{fmtVndNum(v)}</b> },
   ]
 
   return (
@@ -117,32 +144,47 @@ export default function FinanceCashflowDashboard() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}><RiseOutlined /> Dòng tiền tổng hợp</Title>
         <Space>
-          <Tooltip title="Tỷ giá quy đổi USD → VNĐ (cho phải thu)"><span style={{ fontSize: 12, color: '#64748b' }}>USD≈</span></Tooltip>
-          <InputNumber size="small" value={usdRate} min={1000} step={100} onChange={(v) => setUsdRate(Number(v) || 25400)} style={{ width: 100 }} />
+          <Tooltip title="Tỷ giá quy đổi MỌI khoản USD sang VNĐ trên trang: tồn quỹ, phải thu, dư nợ gốc + lãi vay. Trang nhớ tỷ giá trên máy này cho lần sau.">
+            <span style={{ fontSize: 12, color: '#64748b' }}>Tỷ giá USD≈</span>
+          </Tooltip>
+          <InputNumber size="small" value={usdRate} step={100} onChange={changeRate} style={{ width: 100 }}
+            formatter={vndInputProps.formatter}
+            parser={(t) => (t ? vndInputProps.parser(t) : ('' as unknown as number))} />
+          {rateIsDefault && (
+            <Tooltip title={`Chưa nhập tỷ giá trên máy này — đang tạm dùng ${fmtVnd(USD_RATE_DEFAULT)}. Gõ tỷ giá thực để các số quy đổi đúng.`}>
+              <Tag color="orange" style={{ marginInlineEnd: 0 }}>tỷ giá mặc định</Tag>
+            </Tooltip>
+          )}
           <Button icon={<ReloadOutlined />} onClick={load} />
         </Space>
       </div>
 
-      {!d ? <Card loading /> : <>
-        {/* Thẻ sức khỏe */}
+      {loadError ? <PageState error={loadError} onRetry={load} /> : !d ? <Card loading /> : <>
+        {/* Thẻ sức khỏe — bấm thẻ để mở màn xử lý */}
         <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-          <Col xs={12} md={8} lg={4}><Card size="small"><Statistic title={<span><BankOutlined /> Tồn quỹ</span>} value={fmtTy(d.cashTotalVnd)} valueStyle={{ color: '#1E3A5F', fontWeight: 800, fontSize: 19 }} />
-            <Text type="secondary" style={{ fontSize: 11 }}>{fmtVnd(d.cashVnd)}đ + {fmtUsd(d.cashUsd)}</Text></Card></Col>
-          <Col xs={12} md={8} lg={4}><Card size="small"><Statistic title="⬆ Phải thu" value={fmtTy(d.arTotalVnd)} valueStyle={{ color: '#16a34a', fontWeight: 800, fontSize: 19 }} />
+          <Col xs={12} md={8} lg={4}><Card size="small" hoverable onClick={() => navigate('/finance/cash')}><Statistic title={<span><BankOutlined /> Tồn quỹ</span>} value={fmtTy(d.cashTotalVnd)} valueStyle={{ color: '#1E3A5F', fontWeight: 800, fontSize: 19 }} />
+            <Text type="secondary" style={{ fontSize: 11 }}>{fmtVnd(d.cashVnd)} + {fmtUsd(d.cashUsd)}</Text></Card></Col>
+          <Col xs={12} md={8} lg={4}><Card size="small" hoverable onClick={() => navigate('/finance/receivables')}><Statistic title="⬆ Phải thu" value={fmtTy(d.arTotalVnd)} valueStyle={{ color: '#16a34a', fontWeight: 800, fontSize: 19 }} />
             <Text type="secondary" style={{ fontSize: 11 }}>{fmtUsd(d.arUsd)} · {d.arCount} khoản</Text></Card></Col>
-          <Col xs={12} md={8} lg={4}><Card size="small"><Statistic title="⬇ Dư nợ vay" value={fmtTy(d.loanRemaining)} valueStyle={{ color: '#dc2626', fontWeight: 800, fontSize: 19 }} /></Card></Col>
-          <Col xs={12} md={8} lg={4}><Card size="small"><Statistic title="Room hạn mức" value={fmtTy(d.roomTotal)} valueStyle={{ color: d.roomTotal < 0 ? '#dc2626' : '#16a34a', fontWeight: 800, fontSize: 19 }} /></Card></Col>
-          <Col xs={12} md={8} lg={4}><Card size="small"><Statistic title="🔒 Tiền gửi" value={fmtTy(d.depositTotal)} valueStyle={{ color: '#1677ff', fontWeight: 800, fontSize: 19 }} /></Card></Col>
-          <Col xs={12} md={8} lg={4}><Card size="small"><Statistic title="🏛 Tài sản ĐB" value={fmtTy(d.collateralTotal)} valueStyle={{ color: '#7c3aed', fontWeight: 800, fontSize: 19 }} /></Card></Col>
+          <Col xs={12} md={8} lg={4}><Card size="small" hoverable onClick={() => navigate('/finance/loans')}><Statistic title="⬇ Dư nợ vay" value={fmtTy(d.loanRemaining)} valueStyle={{ color: '#92400E', fontWeight: 800, fontSize: 19 }} /></Card></Col>
+          <Col xs={12} md={8} lg={4}><Card size="small" hoverable onClick={() => navigate('/finance/credit-lines')}><Statistic title="Room hạn mức" value={fmtTy(d.roomTotal)} valueStyle={{ color: d.roomTotal < 0 ? '#dc2626' : '#16a34a', fontWeight: 800, fontSize: 19 }} /></Card></Col>
+          <Col xs={12} md={8} lg={4}><Card size="small" hoverable onClick={() => navigate('/finance/deposits')}><Statistic title="🔒 Tiền gửi" value={fmtTy(d.depositTotal)} valueStyle={{ color: '#1677ff', fontWeight: 800, fontSize: 19 }} /></Card></Col>
+          <Col xs={12} md={8} lg={4}><Card size="small" hoverable onClick={() => navigate('/finance/collaterals')}><Statistic title="🏛 Tài sản ĐB" value={fmtTy(d.collateralTotal)} valueStyle={{ color: '#7c3aed', fontWeight: 800, fontSize: 19 }} /></Card></Col>
         </Row>
 
         {d.shortfall.length > 0 && (
           <Alert type="warning" showIcon style={{ marginBottom: 12 }} icon={<FallOutlined />}
-            message={<span><b>Cảnh báo thiếu hụt dòng tiền</b> — tồn dự kiến âm ở {d.shortfall.length} tuần (sớm nhất {d.shortfall[0].label}). Cần thu hồi công nợ / giãn chi / dùng room hạn mức.</span>} />
+            message={<span><b>Cảnh báo thiếu hụt dòng tiền</b> — tồn dự kiến âm ở {d.shortfall.length} tuần (sớm nhất {d.shortfall[0].label}). Cần thu hồi công nợ / giãn chi / dùng room hạn mức.</span>}
+            action={(
+              <Space size={4} wrap>
+                <Button size="small" type="link" onClick={() => navigate('/finance/receivables')}>Xem phải thu</Button>
+                <Button size="small" type="link" onClick={() => navigate('/finance/credit-lines')}>Xem hạn mức</Button>
+              </Space>
+            )} />
         )}
 
         {/* Bảng dòng tiền theo tuần */}
-        <Card size="small" title={<span>Dự báo dòng tiền {WEEKS} tuần tới {d.asOf ? <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>· tồn quỹ cập nhật {dayjs(d.asOf).format('DD/MM/YYYY')}</Text> : null}</span>}
+        <Card size="small" title={<span>Dự báo dòng tiền {WEEKS} tuần tới (₫) {d.asOf ? <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>· tồn quỹ cập nhật {fmtDate(d.asOf)}</Text> : null}</span>}
           styles={{ body: { padding: 0 } }}>
           <Table rowKey="label" size="small" columns={cfCols as any} dataSource={d.rows} pagination={false}
             loading={loading}
@@ -151,16 +193,16 @@ export default function FinanceCashflowDashboard() {
               return (
                 <Table.Summary.Row style={{ background: '#f8fafc', fontWeight: 800 }}>
                   <Table.Summary.Cell index={0}>TỔNG {WEEKS} tuần</Table.Summary.Cell>
-                  <Table.Summary.Cell index={1} align="right"><span style={{ color: '#16a34a' }}>{fmtVnd(sIn)}</span></Table.Summary.Cell>
+                  <Table.Summary.Cell index={1} align="right"><span style={{ color: '#16a34a' }}>{fmtVndNum(sIn)}</span></Table.Summary.Cell>
                   <Table.Summary.Cell index={2} colSpan={3} />
-                  <Table.Summary.Cell index={5} align="right"><span style={{ color: '#dc2626' }}>{fmtVnd(sOut)}</span></Table.Summary.Cell>
-                  <Table.Summary.Cell index={6} align="right"><span style={{ color: sIn - sOut >= 0 ? '#16a34a' : '#dc2626' }}>{sIn - sOut >= 0 ? '+' : ''}{fmtVnd(sIn - sOut)}</span></Table.Summary.Cell>
+                  <Table.Summary.Cell index={5} align="right"><span style={{ color: '#92400E' }}>{fmtVndNum(sOut)}</span></Table.Summary.Cell>
+                  <Table.Summary.Cell index={6} align="right"><span style={{ color: sIn - sOut >= 0 ? '#16a34a' : '#dc2626' }}>{sIn - sOut >= 0 ? '+' : ''}{fmtVndNum(sIn - sOut)}</span></Table.Summary.Cell>
                   <Table.Summary.Cell index={7} />
                 </Table.Summary.Row>)
             }} />
           <div style={{ padding: '8px 12px', fontSize: 11, color: '#94a3b8' }}>
-            Tiền vào = phải thu đến hạn (USD quy đổi ≈ {fmtVnd(usdRate)}đ). Tiền ra = gốc vay đến hạn + lãi đến kỳ + phải nộp định kỳ.
-            Khoản quá hạn dồn vào "tuần này". Tồn dự kiến = tồn quỹ hiện tại cộng dồn Net.
+            Tiền vào = phải thu đến hạn. Mọi khoản USD quy đổi ≈ {fmtVnd(usdRate)}{rateIsDefault ? ' (tỷ giá mặc định)' : ''}. Tiền ra = gốc vay đến hạn + lãi đến kỳ + phải nộp định kỳ.
+            Khoản quá hạn dồn vào "tuần này". Tồn dự kiến = tồn quỹ hiện tại cộng dồn Chênh lệch.
           </div>
         </Card>
       </>}

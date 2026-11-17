@@ -13,9 +13,16 @@ import {
   Loader2, Wallet, TrendingUp, Eye,
 } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { App as AntdApp } from 'antd'
 import rubberSupplierService from '../../../services/rubber/rubberSupplierService'
-import rubberIntakeService from '../../../services/rubber/rubberIntakeService'
+import rubberIntakeService, { RUBBER_INTAKE_STATUS_LABELS, RUBBER_INTAKE_PAYMENT_LABELS } from '../../../services/rubber/rubberIntakeService'
 import type { RubberIntake } from '../../../services/rubber/rubberIntakeService'
+import { fmtNum, fmtPct, fmtVndCompact, fmtDate, fmtDateTime } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { LimitNotice } from '../../../components/common/tableDefaults'
+
+/** Trần tải phiếu nhập của 1 NCC — công nợ tính trên các phiếu đã tải, chạm trần thì báo */
+const INTAKE_LIMIT = 100
 
 // ============================================================================
 // TYPES
@@ -69,17 +76,18 @@ const TYPE_CONFIG: Record<string, { label: string; icon: string; className: stri
   cong_ty: { label: 'Công ty', icon: '🏢', className: 'bg-purple-50 text-purple-700 border-purple-200' },
 }
 
+// Nhãn lấy từ rubberIntakeService (một nguồn với sổ Lý lịch mủ / chi tiết phiếu) — ở đây chỉ giữ icon + màu
 const INTAKE_STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
-  draft: { label: 'Nháp', icon: <Clock size={12} />, className: 'bg-gray-50 text-gray-600' },
-  confirmed: { label: 'Đã XN', icon: <CheckCircle2 size={12} />, className: 'bg-emerald-50 text-emerald-700' },
-  settled: { label: 'Đã chốt', icon: <CheckCircle2 size={12} />, className: 'bg-blue-50 text-blue-700' },
-  cancelled: { label: 'Đã hủy', icon: <XCircle size={12} />, className: 'bg-red-50 text-red-600' },
+  draft: { label: RUBBER_INTAKE_STATUS_LABELS.draft, icon: <Clock size={12} />, className: 'bg-gray-50 text-gray-600' },
+  confirmed: { label: RUBBER_INTAKE_STATUS_LABELS.confirmed, icon: <CheckCircle2 size={12} />, className: 'bg-emerald-50 text-emerald-700' },
+  settled: { label: RUBBER_INTAKE_STATUS_LABELS.settled, icon: <CheckCircle2 size={12} />, className: 'bg-blue-50 text-blue-700' },
+  cancelled: { label: RUBBER_INTAKE_STATUS_LABELS.cancelled, icon: <XCircle size={12} />, className: 'bg-red-50 text-red-600' },
 }
 
 const PAYMENT_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  unpaid: { label: '⏳ Chưa TT', className: 'text-amber-600' },
-  partial: { label: '🔶 TT 1 phần', className: 'text-orange-600' },
-  paid: { label: '✅ Đã TT', className: 'text-emerald-600' },
+  unpaid: { label: `⏳ ${RUBBER_INTAKE_PAYMENT_LABELS.unpaid}`, className: 'text-amber-600' },
+  partial: { label: `🔶 ${RUBBER_INTAKE_PAYMENT_LABELS.partial}`, className: 'text-orange-600' },
+  paid: { label: `✅ ${RUBBER_INTAKE_PAYMENT_LABELS.paid}`, className: 'text-emerald-600' },
 }
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
@@ -93,28 +101,17 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 // HELPERS
 // ============================================================================
 
+// Thẻ hẹp: tấn rút gọn "T"; tiền VND rút gọn chung fmtVndCompact ("9,33 tỷ" / "350,5 tr" / "12.000 ₫")
+// — số theo vi-VN qua format.ts (toFixed cũ ra DẤU CHẤM thập phân, hậu tố 'đ').
 function formatWeight(kg?: number | null): string {
   if (!kg) return '—'
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}T`
-  return `${Math.round(kg).toLocaleString('vi-VN')} kg`
+  if (kg >= 1000) return `${fmtNum(kg / 1000, 1)}T`
+  return `${fmtNum(kg)} kg`
 }
 
-function formatMoney(amount?: number | null): string {
-  if (!amount) return '—'
-  if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1)} tỷ`
-  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)} tr`
-  return amount.toLocaleString('vi-VN') + 'đ'
-}
-
-function formatDate(s?: string): string {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-function formatDateTime(s?: string): string {
-  if (!s) return '—'
-  return new Date(s).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
+const formatMoney = (amount?: number | null): string => (amount ? fmtVndCompact(amount) : '—')
+const formatDate = (s?: string): string => fmtDate(s)
+const formatDateTime = (s?: string): string => fmtDateTime(s)
 
 // ============================================================================
 // SUB-COMPONENTS
@@ -193,7 +190,7 @@ const DRCBar: React.FC<{ label: string; value: number; max: number }> = ({ label
       <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
         <div className="h-full rounded-full bg-gradient-to-r from-[#8B5E3C] to-[#E8A838]" style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
-      <span className="text-[13px] font-mono font-bold text-gray-700 w-14 text-right">{value.toFixed(1)}%</span>
+      <span className="text-[13px] font-mono font-bold text-gray-700 w-14 text-right">{fmtPct(value, 1)}</span>
     </div>
   )
 }
@@ -206,8 +203,11 @@ export default function RubberSupplierDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
+  const { message } = AntdApp.useApp()
   const [supplier, setSupplier] = useState<Supplier | null>(null)
   const [intakes, setIntakes] = useState<RubberIntake[]>([])
+  // Lỗi tải phiếu nhập: KHÔNG để tab Công nợ hiện "Hết nợ ✓" / tab Phiếu nhập trống giả
+  const [intakeErr, setIntakeErr] = useState<unknown>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
 
@@ -222,17 +222,19 @@ export default function RubberSupplierDetailPage() {
         try {
           const result = await rubberIntakeService.getAll({
             page: 1,
-            pageSize: 100,
+            pageSize: INTAKE_LIMIT,
             rubber_supplier_id: id,
           })
           setIntakes(result.data || [])
+          setIntakeErr(null)
         } catch (ticketErr) {
           console.warn('Không tải được phiếu nhập:', ticketErr)
           setIntakes([])
+          setIntakeErr(ticketErr || 'Không tải được phiếu nhập')
         }
       } catch (err) {
         console.error('Lỗi tải NCC:', err)
-        alert('Không thể tải thông tin NCC')
+        message.error(dichLoiHeThong(err, 'Không thể tải thông tin NCC'))
         navigate('/rubber/suppliers')
       } finally {
         setLoading(false)
@@ -316,7 +318,7 @@ export default function RubberSupplierDetailPage() {
             )}
             {supplier.quality_rating > 0 && (
               <span className="inline-flex items-center gap-1 px-2 py-1 text-[12px] font-semibold rounded-lg bg-amber-400/20 text-amber-200">
-                <Star size={12} /> {supplier.quality_rating.toFixed(1)}
+                <Star size={12} /> {fmtNum(supplier.quality_rating, 1)}
               </span>
             )}
             {supplier.eudr_compliant && (
@@ -338,7 +340,7 @@ export default function RubberSupplierDetailPage() {
             </div>
             <div className="text-center">
               <p className="text-white/50 text-[11px] mb-0.5">DRC TB</p>
-              <p className="text-[18px] font-bold font-mono">{avgDrc > 0 ? avgDrc.toFixed(1) + '%' : '—'}</p>
+              <p className="text-[18px] font-bold font-mono">{avgDrc > 0 ? fmtPct(avgDrc, 1) : '—'}</p>
             </div>
           </div>
         </div>
@@ -363,6 +365,12 @@ export default function RubberSupplierDetailPage() {
 
       {/* TAB CONTENT */}
       <div className="px-4 pt-4 space-y-4">
+        {!!intakeErr && activeTab !== 'overview' && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-700">
+            <b>Không tải được phiếu nhập</b> — số phiếu, công nợ, thống kê dưới đây CHƯA đúng. {dichLoiHeThong(intakeErr, 'Có lỗi khi tải')}. Tải lại trang để thử lại.
+          </div>
+        )}
+        {!intakeErr && activeTab !== 'overview' && <LimitNotice shown={intakes.length} limit={INTAKE_LIMIT} what="phiếu nhập" />}
 
         {/* ===== OVERVIEW ===== */}
         {activeTab === 'overview' && (
@@ -453,8 +461,8 @@ export default function RubberSupplierDetailPage() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-4 text-center border-b border-gray-50">
                 <p className="text-[12px] text-gray-400 mb-1">Tổng công nợ</p>
-                <p className={`text-[24px] font-bold font-mono ${totalDebt > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                  {totalDebt > 0 ? formatMoney(totalDebt) : 'Hết nợ ✓'}
+                <p className={`text-[24px] font-bold font-mono ${intakeErr ? 'text-gray-400' : totalDebt > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                  {intakeErr ? 'Chưa đọc được' : totalDebt > 0 ? formatMoney(totalDebt) : 'Hết nợ ✓'}
                 </p>
                 <p className="text-[12px] text-gray-400 mt-1">{debtIntakes.length} phiếu chưa TT đủ</p>
               </div>

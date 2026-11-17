@@ -14,6 +14,8 @@ import {
   AlertTriangle, Wallet, TrendingDown, CreditCard,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { fmtNum, fmtVndCompact, fmtDateShort } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -48,24 +50,14 @@ interface Settlement {
 // HELPERS
 // ============================================================================
 
-function fmt(n?: number | null): string {
-  if (n == null || n === 0) return '–'
-  return n.toLocaleString('vi-VN')
-}
-function fmtMoney(a?: number | null): string {
-  if (!a) return '–'
-  if (Math.abs(a) >= 1e9) return `${(a / 1e9).toFixed(2)} tỷ`
-  if (Math.abs(a) >= 1e6) return `${(a / 1e6).toFixed(1)} tr`
-  return fmt(a)
-}
+// Thẻ hẹp nên rút gọn: tiền "9,33 tỷ"/"350,5 tr" (fmtVndCompact), tấn "T" — số theo vi-VN qua format.ts.
+// Trống → '—'; số 0 in "0" (kế toán phân biệt "còn nợ 0" với "chưa ghi").
+const fmtMoney = (a?: number | null): string => fmtVndCompact(a)
 function fmtTon(t?: number | null): string {
-  if (!t) return '–'
-  return `${t.toFixed(3)}T`
+  if (t === null || t === undefined) return '—'
+  return `${fmtNum(t, 3)}T`
 }
-function fmtDate(s?: string): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-}
+const fmtDate = (s?: string): string => fmtDateShort(s)
 function getMonthLabel(y: number, m: number) { return `Tháng ${m}/${y}` }
 
 const SOURCE_CFG: Record<string, { label: string; flag: string }> = {
@@ -233,7 +225,7 @@ const RubberSettlementPage: React.FC = () => {
       setSettlements((data || []) as unknown as Settlement[])
     } catch (err: unknown) {
       console.error('Lỗi tải quyết toán:', err)
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
+      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu'))
     } finally {
       setLoading(false)
     }

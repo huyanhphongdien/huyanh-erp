@@ -12,22 +12,12 @@ import {
   EditOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
 import type { Settlement } from '../../services/b2b/settlementService'
+import { PAYMENT_METHOD_LABELS } from '../../services/b2b/paymentService'
+import { enumLabel } from '../common/EnumTag'
+import { fmtDateTime } from '../../utils/format'
 
 const { Text } = Typography
-
-const formatDateTime = (dateStr: string | null): string => {
-  if (!dateStr) return ''
-  return format(new Date(dateStr), 'dd/MM/yyyy HH:mm', { locale: vi })
-}
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  bank_transfer: 'Chuyển khoản',
-  cash: 'Tiền mặt',
-  check: 'Séc',
-}
 
 interface ApprovalTimelineProps {
   settlement: Settlement
@@ -49,7 +39,7 @@ const ApprovalTimeline = ({ settlement }: ApprovalTimelineProps) => {
         <Text strong>Tạo phiếu</Text>
         <br />
         <Text type="secondary" style={{ fontSize: 12 }}>
-          {formatDateTime(settlement.created_at)}
+          {fmtDateTime(settlement.created_at)}
         </Text>
         {settlement.created_by && (
           <>
@@ -75,7 +65,7 @@ const ApprovalTimeline = ({ settlement }: ApprovalTimelineProps) => {
           <Text strong>Gửi duyệt</Text>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>
-            {formatDateTime(settlement.submitted_at)}
+            {fmtDateTime(settlement.submitted_at)}
           </Text>
         </div>
       ),
@@ -92,7 +82,7 @@ const ApprovalTimeline = ({ settlement }: ApprovalTimelineProps) => {
           <Text strong style={{ color: '#52c41a' }}>Đã duyệt</Text>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>
-            {formatDateTime(settlement.approved_at)}
+            {fmtDateTime(settlement.approved_at)}
           </Text>
           {settlement.approved_by && (
             <>
@@ -125,7 +115,7 @@ const ApprovalTimeline = ({ settlement }: ApprovalTimelineProps) => {
           <Text strong style={{ color: '#ff4d4f' }}>Từ chối</Text>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>
-            {formatDateTime(settlement.rejected_at)}
+            {fmtDateTime(settlement.rejected_at)}
           </Text>
           {settlement.rejected_by && (
             <>
@@ -158,13 +148,13 @@ const ApprovalTimeline = ({ settlement }: ApprovalTimelineProps) => {
           <Text strong style={{ color: '#722ed1' }}>Đã thanh toán</Text>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>
-            {formatDateTime(settlement.paid_at)}
+            {fmtDateTime(settlement.paid_at)}
           </Text>
           {settlement.payment_method && (
             <>
               <br />
               <Text type="secondary" style={{ fontSize: 12 }}>
-                Phương thức: {PAYMENT_METHOD_LABELS[settlement.payment_method] || settlement.payment_method}
+                Phương thức: {enumLabel(PAYMENT_METHOD_LABELS, settlement.payment_method)}
               </Text>
             </>
           )}

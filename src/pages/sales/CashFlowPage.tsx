@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Card, Table, Tag, Typography, Row, Col, Statistic, Tabs, Progress, Space, Badge,
 } from 'antd'
@@ -13,6 +14,10 @@ import {
   WarningOutlined, CheckCircleOutlined, CalendarOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../lib/supabase'
+import { fmtUsd, fmtDate } from '../../utils/format'
+import PageState from '../../components/common/PageState'
+import { EnumTag } from '../../components/common/EnumTag'
+import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS, soDisplayCode } from '../../services/sales/salesTypes'
 
 const { Title, Text } = Typography
 
@@ -32,6 +37,7 @@ interface CashFlowMonth {
 interface LCRecord {
   id: string
   code: string
+  contract_no: string | null
   customer_name: string
   lc_number: string
   lc_bank: string
@@ -47,28 +53,26 @@ interface LCRecord {
 // HELPERS
 // ============================================================================
 
-const formatUSD = (v: number): string =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v)
-
-const formatDate = (v: string | null): string => {
-  if (!v) return '-'
-  return new Date(v).toLocaleDateString('vi-VN')
-}
+// Định dạng: fmtUsd (0 số lẻ) / fmtDate — utils/format. Nhãn thanh toán: PAYMENT_STATUS_LABELS (salesTypes).
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
 export default function CashFlowPage() {
+  const navigate = useNavigate()
   const [cashFlow, setCashFlow] = useState<CashFlowMonth[]>([])
   const [lcRecords, setLcRecords] = useState<LCRecord[]>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "không có L/C sắp hết hạn" — trước đây catch chỉ console.error, bảng trống giả
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       // ═══ Cash Flow: dự báo tiền về theo tháng ═══
-      const { data: orders } = await supabase
+      const { data: orders, error: ordersErr } = await supabase
         .from('sales_orders')
         .select(`
           id, code, total_value_usd, actual_payment_amount, deposit_amount, payment_status,
@@ -76,6 +80,7 @@ export default function CashFlowPage() {
           customer:sales_customers!customer_id(name, short_name)
         `)
         .in('status', ['confirmed', 'producing', 'ready', 'packing', 'shipped', 'delivered', 'invoiced', 'paid'])
+      if (ordersErr) throw ordersErr
 
       const monthMap = new Map<string, CashFlowMonth>()
 
@@ -125,15 +130,16 @@ export default function CashFlowPage() {
       setCashFlow(cfData)
 
       // ═══ LC Management ═══
-      const { data: lcOrders } = await supabase
+      const { data: lcOrders, error: lcErr } = await supabase
         .from('sales_orders')
         .select(`
-          id, code, lc_number, lc_bank, lc_amount, lc_expiry_date,
+          id, code, contract_no, lc_number, lc_bank, lc_amount, lc_expiry_date,
           currency, status, payment_status, total_value_usd,
           customer:sales_customers!customer_id(name, short_name)
         `)
         .not('lc_number', 'is', null)
         .neq('lc_number', '')
+      if (lcErr) throw lcErr
 
       const lcData: LCRecord[] = (lcOrders || []).map((o: any) => {
         const customer = Array.isArray(o.customer) ? o.customer[0] : o.customer
@@ -143,6 +149,7 @@ export default function CashFlowPage() {
         return {
           id: o.id,
           code: o.code,
+          contract_no: o.contract_no ?? null,
           customer_name: customer?.short_name || customer?.name || '-',
           lc_number: o.lc_number,
           lc_bank: o.lc_bank || '-',
@@ -158,6 +165,7 @@ export default function CashFlowPage() {
       setLcRecords(lcData)
     } catch (e) {
       console.error('CashFlow load error:', e)
+      setLoadError(e)
     }
     setLoading(false)
   }, [])
@@ -182,10 +190,10 @@ export default function CashFlowPage() {
   const cfColumns: ColumnsType<CashFlowMonth> = [
     { title: 'Tháng', dataIndex: 'label', key: 'label', width: 100, render: (v: string) => <Text strong>{v}</Text> },
     { title: 'Đơn hàng', dataIndex: 'order_count', key: 'orders', width: 80, align: 'center' },
-    { title: 'Dự kiến thu', dataIndex: 'expected', key: 'expected', width: 130, align: 'right', render: (v: number) => <Text style={{ color: '#1890ff' }}>{formatUSD(v)}</Text> },
-    { title: 'Đã thu', dataIndex: 'received', key: 'received', width: 130, align: 'right', render: (v: number) => <Text type="success">{formatUSD(v)}</Text> },
+    { title: 'Dự kiến thu', dataIndex: 'expected', key: 'expected', width: 130, align: 'right', render: (v: number) => <Text style={{ color: '#1890ff' }}>{fmtUsd(v)}</Text> },
+    { title: 'Đã thu', dataIndex: 'received', key: 'received', width: 130, align: 'right', render: (v: number) => <Text type="success">{fmtUsd(v)}</Text> },
     { title: 'Chênh lệch', dataIndex: 'gap', key: 'gap', width: 130, align: 'right',
-      render: (v: number) => <Text strong style={{ color: v > 0 ? '#f5222d' : '#52c41a' }}>{formatUSD(v)}</Text> },
+      render: (v: number) => <Text strong style={{ color: v > 0 ? '#f5222d' : '#52c41a' }}>{fmtUsd(v)}</Text> },
     { title: 'Thu nợ', key: 'progress', width: 120,
       render: (_, r) => {
         const pct = r.expected > 0 ? Math.round((r.received / r.expected) * 100) : 0
@@ -196,12 +204,13 @@ export default function CashFlowPage() {
 
   // LC columns
   const lcColumns: ColumnsType<LCRecord> = [
-    { title: 'Đơn hàng', dataIndex: 'code', key: 'code', width: 120 },
+    // Số HĐ (HA…) — số người dùng nhớ; đơn chưa có HĐ mới hiện mã SO nội bộ
+    { title: 'Số HĐ', dataIndex: 'contract_no', key: 'code', width: 130, render: (_: unknown, r) => <Text strong>{soDisplayCode(r)}</Text> },
     { title: 'Khách hàng', dataIndex: 'customer_name', key: 'customer', width: 140 },
-    { title: 'Số LC', dataIndex: 'lc_number', key: 'lc', width: 150 },
+    { title: 'Số L/C', dataIndex: 'lc_number', key: 'lc', width: 150 },
     { title: 'Ngân hàng', dataIndex: 'lc_bank', key: 'bank', width: 130 },
-    { title: 'Giá trị LC', dataIndex: 'lc_amount', key: 'amount', width: 120, align: 'right', render: (v: number) => formatUSD(v) },
-    { title: 'Hết hạn', dataIndex: 'lc_expiry_date', key: 'expiry', width: 110, render: (v: string) => formatDate(v) },
+    { title: 'Giá trị L/C', dataIndex: 'lc_amount', key: 'amount', width: 120, align: 'right', render: (v: number) => fmtUsd(v) },
+    { title: 'Hết hạn', dataIndex: 'lc_expiry_date', key: 'expiry', width: 110, render: (v: string) => fmtDate(v) },
     { title: 'Còn lại', dataIndex: 'days_until_expiry', key: 'days', width: 100, align: 'center',
       render: (v: number) => {
         if (v <= 0) return <Tag color="red">Hết hạn</Tag>
@@ -210,12 +219,8 @@ export default function CashFlowPage() {
         return <Tag color="green">{v} ngày</Tag>
       },
     },
-    { title: 'Thanh toán', dataIndex: 'payment_status', key: 'pay', width: 100,
-      render: (v: string) => {
-        const colors: Record<string, string> = { paid: 'green', partial: 'orange', unpaid: 'red' }
-        const labels: Record<string, string> = { paid: 'Đã TT', partial: 'Một phần', unpaid: 'Chưa TT' }
-        return <Tag color={colors[v] || 'default'}>{labels[v] || v}</Tag>
-      },
+    { title: 'Thanh toán', dataIndex: 'payment_status', key: 'pay', width: 160,
+      render: (v: string) => <EnumTag value={v} labels={PAYMENT_STATUS_LABELS} colors={PAYMENT_STATUS_COLORS} />,
     },
   ]
 
@@ -223,9 +228,12 @@ export default function CashFlowPage() {
     <div style={{ padding: 24 }}>
       <Title level={4} style={{ marginBottom: 24 }}>
         <DollarOutlined style={{ marginRight: 8 }} />
-        Dòng tiền & Quản lý LC
+        Dòng tiền & Quản lý L/C
       </Title>
 
+      {loadError && !loading ? (
+        <PageState error={loadError} onRetry={load} />
+      ) : (
       <Tabs defaultActiveKey="cashflow" items={[
         {
           key: 'cashflow',
@@ -261,7 +269,7 @@ export default function CashFlowPage() {
           key: 'lc',
           label: (
             <span>
-              <BankOutlined /> LC Management
+              <BankOutlined /> Quản lý L/C
               {lcTotals.expiring > 0 && <Badge count={lcTotals.expiring} offset={[8, -4]} style={{ backgroundColor: '#fa8c16' }} />}
               {lcTotals.expired > 0 && <Badge count={lcTotals.expired} offset={[8, -4]} style={{ backgroundColor: '#f5222d' }} />}
             </span>
@@ -272,7 +280,7 @@ export default function CashFlowPage() {
               <Row gutter={16} style={{ marginBottom: 24 }}>
                 <Col xs={12} sm={6}>
                   <Card size="small" style={{ borderRadius: 12 }}>
-                    <Statistic title="LC đang mở" value={lcTotals.active} valueStyle={{ color: '#1890ff' }} />
+                    <Statistic title="L/C đang mở" value={lcTotals.active} valueStyle={{ color: '#1890ff' }} />
                   </Card>
                 </Col>
                 <Col xs={12} sm={6}>
@@ -282,25 +290,28 @@ export default function CashFlowPage() {
                 </Col>
                 <Col xs={12} sm={6}>
                   <Card size="small" style={{ borderRadius: 12, borderLeft: '4px solid #fa8c16' }}>
-                    <Statistic title="Sắp hết hạn" value={lcTotals.expiring} suffix="LC" valueStyle={{ color: '#fa8c16' }}
+                    <Statistic title="Sắp hết hạn (≤ 7 ngày)" value={lcTotals.expiring} suffix="L/C" valueStyle={{ color: '#fa8c16' }}
                       prefix={<WarningOutlined />} />
                   </Card>
                 </Col>
                 <Col xs={12} sm={6}>
                   <Card size="small" style={{ borderRadius: 12, borderLeft: '4px solid #f5222d' }}>
-                    <Statistic title="Đã hết hạn" value={lcTotals.expired} suffix="LC" valueStyle={{ color: '#f5222d' }}
+                    <Statistic title="Đã hết hạn" value={lcTotals.expired} suffix="L/C" valueStyle={{ color: '#f5222d' }}
                       prefix={<ClockCircleOutlined />} />
                   </Card>
                 </Col>
               </Row>
 
               <Card size="small" style={{ borderRadius: 12 }}>
-                <Table columns={lcColumns} dataSource={lcRecords} rowKey="id" loading={loading} pagination={false} size="small" scroll={{ x: 1000 }} />
+                <Table columns={lcColumns} dataSource={lcRecords} rowKey="id" loading={loading} pagination={false} size="small" scroll={{ x: 1000 }}
+                  locale={{ emptyText: 'Chưa có đơn nào khai số L/C' }}
+                  onRow={(r) => ({ onClick: () => navigate(`/sales/orders/${r.id}`), style: { cursor: 'pointer' } })} />
               </Card>
             </div>
           ),
         },
       ]} />
+      )}
     </div>
   )
 }

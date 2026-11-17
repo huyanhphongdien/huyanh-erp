@@ -9,13 +9,10 @@ import {
   ORDER_STATUS_LABELS, ORDER_STATUS_COLORS,
   INCOTERM_LABELS, CONTAINER_TYPE_LABELS, PACKING_TYPE_LABELS, PAYMENT_TERMS_LABELS,
   CUSTOMER_TIER_COLORS, CUSTOMER_TIER_LABELS, SVR_GRADE_OPTIONS,
-  soDisplayCode,
+  soDisplayCode, polLabel, countryFlag, countryLabel,
 } from '../../../services/sales/salesTypes'
 import { isVnd, fmtMoney, orderTotalInCurrency } from '../../../services/sales/salesMoney'
-
-const fDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString('vi-VN') : '-')
-const fUsd = (v?: number | null) => (v != null ? '$' + v.toLocaleString('en-US') : '-')
-const fVnd = (v?: number | null) => (v ? v.toLocaleString('vi-VN') + ' đ' : '-')
+import { fmtDate as fDate, fmtKg, fmtNum } from '../../../utils/format'
 
 export default function OrderInfoTab({ order }: { order: SalesOrder }) {
   const navigate = useNavigate()
@@ -38,11 +35,12 @@ export default function OrderInfoTab({ order }: { order: SalesOrder }) {
               <Tag color="blue" style={{ whiteSpace: 'normal', height: 'auto', lineHeight: 1.5, padding: '2px 8px', wordBreak: 'break-word' }}>{gradeLabel}</Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Khách hàng" span={2}>{cust?.name || '-'} {cust?.country ? `(${cust.country})` : ''}</Descriptions.Item>
-            <Descriptions.Item label="Số lượng">{order.quantity_tons} tấn ({order.quantity_kg?.toLocaleString('vi-VN')} kg)</Descriptions.Item>
+            <Descriptions.Item label="Số lượng">{fmtNum(order.quantity_tons, 3)} tấn ({fmtKg(order.quantity_kg)} kg)</Descriptions.Item>
             <Descriptions.Item label="Đơn giá">{fmtMoney(order.unit_price, order.currency, { decimals: 0 })} / tấn</Descriptions.Item>
             <Descriptions.Item label="Giá trị">{fmtMoney(orderTotalInCurrency(order), order.currency, { decimals: 0 })}</Descriptions.Item>
             <Descriptions.Item label="Incoterm">{INCOTERM_LABELS[order.incoterm as Incoterm] || order.incoterm}</Descriptions.Item>
-            <Descriptions.Item label="Cảng xếp">{order.port_of_loading || '-'}</Descriptions.Item>
+            {/* polLabel: tên cảng, không in thẳng mã 'HCM_CAT_LAI' (audit 17/11/2026) */}
+            <Descriptions.Item label="Cảng xếp">{polLabel(order.port_of_loading)}</Descriptions.Item>
             <Descriptions.Item label="Cảng đích">{order.port_of_destination || '-'}</Descriptions.Item>
             <Descriptions.Item label="Container">{order.container_count || 0} × {CONTAINER_TYPE_LABELS[order.container_type as keyof typeof CONTAINER_TYPE_LABELS] || order.container_type || '20ft'}</Descriptions.Item>
             <Descriptions.Item label="Tổng bành / KL bành">{order.total_bales || '-'} · {order.bale_weight_kg} kg</Descriptions.Item>
@@ -54,8 +52,8 @@ export default function OrderInfoTab({ order }: { order: SalesOrder }) {
             </Descriptions.Item>
             <Descriptions.Item label="PO# KH">{order.customer_po || '-'}</Descriptions.Item>
             {isVnd(order.currency)
-              ? <Descriptions.Item label="Quy đổi USD">{fUsd(order.total_value_usd)}</Descriptions.Item>
-              : <Descriptions.Item label="Giá trị VND">{fVnd(order.total_value_vnd)}</Descriptions.Item>}
+              ? <Descriptions.Item label="Quy đổi USD">{fmtMoney(order.total_value_usd, 'USD', { decimals: 0 })}</Descriptions.Item>
+              : <Descriptions.Item label="Giá trị VND">{fmtMoney(order.total_value_vnd, 'VND')}</Descriptions.Item>}
             <Descriptions.Item label="Tỷ giá">{order.exchange_rate ? `${order.exchange_rate.toLocaleString('vi-VN')} VND/USD` : '-'}</Descriptions.Item>
             <Descriptions.Item label="Thanh toán" span={2}>
               {PAYMENT_TERMS_LABELS[order.payment_terms as PaymentTerms] || order.payment_terms || '-'}
@@ -89,7 +87,7 @@ export default function OrderInfoTab({ order }: { order: SalesOrder }) {
             <Descriptions column={1} size="small">
               <Descriptions.Item label="Mã">{cust.code}</Descriptions.Item>
               <Descriptions.Item label="Tên">{cust.name}</Descriptions.Item>
-              <Descriptions.Item label="Quốc gia">{cust.country || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Quốc gia">{cust.country ? `${countryFlag(cust.country)} ${countryLabel(cust.country)}`.trim() : '—'}</Descriptions.Item>
               {cust.tier && <Descriptions.Item label="Hạng"><Tag color={CUSTOMER_TIER_COLORS[cust.tier]}>{CUSTOMER_TIER_LABELS[cust.tier]}</Tag></Descriptions.Item>}
             </Descriptions>
           </Card>

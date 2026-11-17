@@ -56,7 +56,7 @@ export async function executeOutrightIntake(
   input: OutrightIntakeInput
 ): Promise<OutrightIntakeResult> {
   // Validate input
-  if (input.quantity_kg <= 0) throw new Error('quantity_kg phải > 0')
+  if (input.quantity_kg <= 0) throw new Error('Khối lượng phải > 0')
   if (input.drc_percent <= 0 || input.drc_percent > 100) {
     throw new Error('DRC cáp phải trong khoảng 0-100%')
   }
@@ -64,8 +64,8 @@ export async function executeOutrightIntake(
     // Per roadmap default 1: 25-70% range
     console.warn(`DRC cáp ${input.drc_percent}% ngoài range 25-70% khuyến nghị`)
   }
-  if (input.unit_price <= 0) throw new Error('unit_price phải > 0')
-  if (!input.buyer_user_id) throw new Error('buyer_user_id bắt buộc cho outright (người cáp DRC)')
+  if (input.unit_price <= 0) throw new Error('Đơn giá phải > 0')
+  if (!input.buyer_user_id) throw new Error('Phải chọn người cáp DRC (bắt buộc với mua đứt)')
 
   // Tính tổng tiền (default 2: qty × price, DRC đã bake)
   const totalAmount = input.quantity_kg * input.unit_price

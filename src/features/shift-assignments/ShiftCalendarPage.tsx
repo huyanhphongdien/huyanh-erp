@@ -21,6 +21,8 @@ import { BatchScheduleModal } from './BatchScheduleModal';
 import { ShiftOverrideModal } from './ShiftOverrideModal';
 import { useAuthStore } from '../../stores/authStore';
 import { todayVN, toDateStrVN } from '../../utils/dateVN';
+import { TEAM_SOLID } from '../attendance/labels';
+import PageState from '../../components/common/PageState';
 import {
   CalendarDays, ChevronLeft, ChevronRight,
   Users, Layers, BarChart3, Building2,
@@ -194,6 +196,7 @@ export function ShiftCalendarPage() {
   const {
     data: calendarData = [],
     isLoading,
+    error: calendarError,
     refetch,
   } = useQuery({
     queryKey: ['shift-calendar', departmentId, dateFrom, dateTo],
@@ -481,6 +484,11 @@ export function ShiftCalendarPage() {
             <span className="text-sm">Đang tải lịch...</span>
           </div>
         </div>
+      ) : calendarError ? (
+        // Lỗi tải ≠ "chưa có nhân viên" — xét lỗi TRƯỚC trạng thái trống
+        <div className="flex-1 px-4 py-6">
+          <PageState error={calendarError} onRetry={() => refetch()} />
+        </div>
       ) : filteredCalendar.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-gray-400">
@@ -610,12 +618,13 @@ export function ShiftCalendarPage() {
 
         {ensureArray(teams).length > 0 && (
           <>
+            {/* Màu đội — cùng nguồn với ô lịch (ShiftCell) + Bảng chấm công: Đội B = hồng, không phải vàng */}
             <span className="border-l pl-2 ml-1 flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />
+              <span className={`w-2.5 h-2.5 rounded-sm ${TEAM_SOLID.A}`} />
               <span className="text-gray-500">Đội A</span>
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-sm bg-amber-500" />
+              <span className={`w-2.5 h-2.5 rounded-sm ${TEAM_SOLID.B}`} />
               <span className="text-gray-500">Đội B</span>
             </span>
           </>

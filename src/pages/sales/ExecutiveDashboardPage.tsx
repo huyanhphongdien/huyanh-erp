@@ -37,7 +37,10 @@ import { supabase } from '../../lib/supabase'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { salesAlertService } from '../../services/sales/salesAlertService'
 import type { SalesAlert } from '../../services/sales/salesAlertService'
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '../../services/sales/salesTypes'
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, PAYMENT_STATUS_LABELS, soDisplayCode } from '../../services/sales/salesTypes'
+import { fmtMoney } from '../../services/sales/salesMoney'
+import { fmtDate, fmtUsd } from '../../utils/format'
+import PageState from '../../components/common/PageState'
 
 const { Title, Text } = Typography
 
@@ -58,14 +61,18 @@ const YEAR_OPTIONS = Array.from({ length: 3 }, (_, i) => ({
   label: `${currentYear - i}`,
 }))
 
+// ĐỦ 9 trạng thái sống, nhãn ORDER_STATUS_LABELS. Bản cũ thiếu 'delivered' + 'invoiced' → thanh
+// pipeline không lấp đủ 100% và chú thích không có 2 trạng thái đó (tổng vẫn đếm chúng).
 const PIPELINE_STAGES = [
-  { key: 'draft', label: 'Nháp', color: '#d9d9d9' },
-  { key: 'confirmed', label: 'Xác nhận', color: '#1890ff' },
-  { key: 'producing', label: 'Đang SX', color: '#fa8c16' },
-  { key: 'ready', label: 'Sẵn sàng', color: '#722ed1' },
-  { key: 'packing', label: 'Đóng gói', color: '#13c2c2' },
-  { key: 'shipped', label: 'Đã xuất', color: '#52c41a' },
-  { key: 'paid', label: 'Đã TT', color: '#1B4D3E' },
+  { key: 'draft', label: ORDER_STATUS_LABELS.draft, color: '#d9d9d9' },
+  { key: 'confirmed', label: ORDER_STATUS_LABELS.confirmed, color: '#1890ff' },
+  { key: 'producing', label: ORDER_STATUS_LABELS.producing, color: '#fa8c16' },
+  { key: 'ready', label: ORDER_STATUS_LABELS.ready, color: '#722ed1' },
+  { key: 'packing', label: ORDER_STATUS_LABELS.packing, color: '#13c2c2' },
+  { key: 'shipped', label: ORDER_STATUS_LABELS.shipped, color: '#52c41a' },
+  { key: 'delivered', label: ORDER_STATUS_LABELS.delivered, color: '#389e0d' },
+  { key: 'invoiced', label: ORDER_STATUS_LABELS.invoiced, color: '#d48806' },
+  { key: 'paid', label: ORDER_STATUS_LABELS.paid, color: '#1B4D3E' },
 ] as const
 
 // ============================================================================
@@ -97,6 +104,7 @@ interface TopCustomer {
 interface RecentShipment {
   id: string
   code: string
+  contract_no: string | null
   customer_name: string
   grade: string
   quantity_tons: number
@@ -114,6 +122,7 @@ export default function ExecutiveDashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(currentYear)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
 
   const [kpi, setKpi] = useState<KpiData>({ revenue_month: 0, collected: 0, order_count: 0, uncollected: 0 })
   const [alerts, setAlerts] = useState<SalesAlert[]>([])
@@ -130,6 +139,7 @@ export default function ExecutiveDashboardPage() {
   const loadData = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       await Promise.all([
         loadKpi(),
         loadAlerts(),
@@ -138,6 +148,10 @@ export default function ExecutiveDashboardPage() {
         loadTopCustomers(),
         loadRecentShipments(),
       ])
+    } catch (e) {
+      // Lỗi tải ≠ "tháng này 0 đơn" — khối lỗi + Thử lại
+      console.error('Executive dashboard load error:', e)
+      setLoadError(e)
     } finally {
       setLoading(false)
     }
@@ -233,7 +247,7 @@ export default function ExecutiveDashboardPage() {
   const loadRecentShipments = async () => {
     const { data } = await supabase
       .from('sales_orders')
-      .select('id, code, grade, quantity_tons, etd, status, payment_date, customer:sales_customers!customer_id(name)')
+      .select('id, code, contract_no, grade, quantity_tons, etd, status, payment_date, customer:sales_customers!customer_id(name)')
       .in('status', ['shipped', 'delivered', 'invoiced', 'paid'])
       .order('etd', { ascending: false })
       .limit(10)
@@ -242,6 +256,7 @@ export default function ExecutiveDashboardPage() {
       (data || []).map(o => ({
         id: o.id,
         code: o.code,
+        contract_no: (o as any).contract_no ?? null,
         customer_name: (o.customer as any)?.name || '',
         grade: o.grade || '',
         quantity_tons: o.quantity_tons || 0,
@@ -289,6 +304,14 @@ export default function ExecutiveDashboardPage() {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
         <Spin size="large" tip="Đang tải dữ liệu..." />
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState error={loadError} onRetry={loadData} />
       </div>
     )
   }
@@ -462,7 +485,7 @@ export default function ExecutiveDashboardPage() {
                       opacity={0.85}
                     />
                     <text x={x + 30} y={175 - barH} textAnchor="middle" fontSize="11" fill="#333" fontWeight="600">
-                      {m.revenue >= 1000 ? `${(m.revenue / 1000).toFixed(0)}k` : m.revenue.toLocaleString('vi-VN')}
+                      {fmtMoney(m.revenue, 'USD', { compact: true })}
                     </text>
                     <text x={x + 30} y={200} textAnchor="middle" fontSize="11" fill="#666">
                       {m.month}
@@ -495,7 +518,7 @@ export default function ExecutiveDashboardPage() {
                   dataIndex: 'revenue',
                   key: 'revenue',
                   align: 'right' as const,
-                  render: (v: number) => <Text style={{ color: PRIMARY, fontWeight: 600 }}>${v.toLocaleString('vi-VN')}</Text>,
+                  render: (v: number) => <Text style={{ color: PRIMARY, fontWeight: 600 }}>{fmtUsd(v)}</Text>,
                 },
                 {
                   title: 'Đơn',
@@ -523,10 +546,10 @@ export default function ExecutiveDashboardPage() {
           })}
           columns={[
             {
-              title: 'Mã đơn',
-              dataIndex: 'code',
+              title: 'Số HĐ',
+              dataIndex: 'contract_no',
               key: 'code',
-              render: (v: string) => <Text strong style={{ color: PRIMARY }}>{v}</Text>,
+              render: (_: string, r: RecentShipment) => <Text strong style={{ color: PRIMARY }}>{soDisplayCode(r)}</Text>,
             },
             {
               title: 'Khách hàng',
@@ -550,7 +573,7 @@ export default function ExecutiveDashboardPage() {
               title: 'ETD',
               dataIndex: 'etd',
               key: 'etd',
-              render: (v: string | null) => v ? new Date(v).toLocaleDateString('vi-VN') : '-',
+              render: (v: string | null) => fmtDate(v),
             },
             {
               title: 'Trạng thái',
@@ -567,8 +590,8 @@ export default function ExecutiveDashboardPage() {
               dataIndex: 'payment_date',
               key: 'payment_date',
               render: (v: string | null) => v
-                ? <Tag color="green">Đã TT</Tag>
-                : <Tag color="orange">Chưa TT</Tag>,
+                ? <Tag color="green">{PAYMENT_STATUS_LABELS.paid}</Tag>
+                : <Tag color="orange">{PAYMENT_STATUS_LABELS.unpaid}</Tag>,
             },
           ]}
         />

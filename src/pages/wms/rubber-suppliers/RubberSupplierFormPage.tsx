@@ -34,7 +34,16 @@ import {
   Navigation,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { App as AntdApp } from 'antd'
 import rubberSupplierService from '../../../services/rubber/rubberSupplierService'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+
+// Lỗi định vị của trình duyệt (tiếng Anh) → câu tiếng Việt hành động được
+const GPS_ERR: Record<number, string> = {
+  1: 'Chưa cho phép truy cập vị trí — bật quyền Vị trí cho trang này rồi thử lại',
+  2: 'Không xác định được vị trí — ra chỗ thoáng hoặc bật GPS rồi thử lại',
+  3: 'Lấy vị trí quá lâu — thử lại',
+}
 
 // ============================================================================
 // TYPES
@@ -210,6 +219,8 @@ export default function RubberSupplierFormPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [loadFailed, setLoadFailed] = useState(false)
+  const { message } = AntdApp.useApp()
 
   const [sections, setSections] = useState({
     basic: true,
@@ -266,7 +277,9 @@ export default function RubberSupplierFormPage() {
         }
       } catch (err) {
         console.error('Lỗi tải NCC:', err)
-        alert('Không thể tải thông tin NCC')
+        // Chặn lưu khi chưa tải được: form đang trống, lưu là ghi đè NCC thật bằng dữ liệu rỗng
+        setLoadFailed(true)
+        message.error(dichLoiHeThong(err, 'Không thể tải thông tin NCC'))
       } finally {
         setLoading(false)
       }
@@ -292,6 +305,7 @@ export default function RubberSupplierFormPage() {
 
   // ✅ V2: Submit via service
   const handleSubmit = async () => {
+    if (loadFailed) { message.warning('Chưa tải được dữ liệu NCC — tải lại trang trước khi lưu (tránh ghi đè bằng ô trống)'); return }
     if (!validate()) return
     setSaving(true)
 
@@ -332,20 +346,20 @@ export default function RubberSupplierFormPage() {
       navigate('/rubber/suppliers')
     } catch (err: any) {
       console.error('Lỗi lưu NCC:', err)
-      alert(`Lỗi: ${err.message || 'Không thể lưu'}`)
+      message.error(dichLoiHeThong(err, 'Không thể lưu NCC'))
     } finally {
       setSaving(false)
     }
   }
 
   const handleGetGPS = () => {
-    if (!navigator.geolocation) { alert('Trình duyệt không hỗ trợ GPS'); return }
+    if (!navigator.geolocation) { message.warning('Trình duyệt không hỗ trợ GPS'); return }
     navigator.geolocation.getCurrentPosition(
       pos => {
         setField('geo_latitude', pos.coords.latitude.toFixed(7))
         setField('geo_longitude', pos.coords.longitude.toFixed(7))
       },
-      err => alert('Không lấy được vị trí GPS: ' + err.message),
+      err => message.error(GPS_ERR[err.code] || 'Không lấy được vị trí GPS — thử lại'),
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }

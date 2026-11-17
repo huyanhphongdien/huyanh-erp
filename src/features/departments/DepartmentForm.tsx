@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form'
 import { useMutation } from '@tanstack/react-query'
 import { departmentService } from '../../services'
 import { Button, Input, Select } from '../../components/ui'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import type { Department } from '../../types'
 
 // Define DepartmentFormData inline
@@ -86,7 +87,7 @@ export function DepartmentForm({ department, onSuccess, onCancel }: DepartmentFo
 
       {mutation.error && (
         <p className="text-danger text-sm">
-          {(mutation.error as Error).message}
+          {dichLoiHeThong(mutation.error, 'Lưu phòng ban thất bại')}
         </p>
       )}
 

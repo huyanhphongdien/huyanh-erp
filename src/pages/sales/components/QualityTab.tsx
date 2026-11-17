@@ -22,14 +22,17 @@ interface QualityRow {
 
 export default function QualityTab({ order }: { order: SalesOrder }) {
   const [gradeStandard, setGradeStandard] = useState<RubberGradeStandard | null>(null)
+  // Không tải được tiêu chuẩn grade → nói rõ, đừng để cả cột "Trạng thái" hiện "thiếu số liệu" mà không lý do
+  const [stdError, setStdError] = useState(false)
   const gradeLabel = SVR_GRADE_OPTIONS.find((g: any) => g.value === order.grade)?.label || order.grade
 
   useEffect(() => {
     let alive = true
+    setStdError(false)
     if (order.grade) {
       rubberGradeService.getByGrade(order.grade as any)
         .then((std) => { if (alive) setGradeStandard(std) })
-        .catch(() => {})
+        .catch(() => { if (alive) setStdError(true) })
     }
     return () => { alive = false }
   }, [order.grade])
@@ -66,7 +69,7 @@ export default function QualityTab({ order }: { order: SalesOrder }) {
       title: 'Trạng thái',
       key: 'status',
       render: (_: unknown, row: QualityRow) => {
-        if (row.required == null || row.standard == null) return <Tag>N/A</Tag>
+        if (row.required == null || row.standard == null) return <Tag>Thiếu số liệu</Tag>
         const inSpec = row.type === 'min' ? row.required >= row.standard : row.required <= row.standard
         return inSpec ? <Tag color="green">Đạt</Tag> : <Tag color="red">Không đạt</Tag>
       },
@@ -74,7 +77,8 @@ export default function QualityTab({ order }: { order: SalesOrder }) {
   ]
 
   return (
-    <Card title="So sánh chỉ tiêu kỹ thuật" size="small">
+    <Card title="So sánh chỉ tiêu kỹ thuật" size="small"
+      extra={stdError ? <span style={{ color: '#B91C1C', fontSize: 12 }}>Không tải được tiêu chuẩn grade — tải lại trang để thử lại</span> : null}>
       <Table dataSource={rows} columns={columns} pagination={false} size="small" bordered />
     </Card>
   )

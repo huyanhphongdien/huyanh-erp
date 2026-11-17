@@ -4,11 +4,12 @@
 // ============================================================================
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Table, Tag, Space, Typography, Empty, Spin, Popover } from 'antd'
+import { Button, Table, Tag, Space, Typography, Popover } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { ContainerOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
 import { containerService } from '../../../services/sales/containerService'
+import PageState from '../../../components/common/PageState'
+import { fmtDate } from '../../../utils/format'
 import { dispatchService, type DeliveryState } from '../../../services/logistics/dispatchService'
 import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
@@ -26,10 +27,14 @@ export default function PackingTabPanel({ orderId }: { orderId: string }) {
   // Lệnh điều động đã chở container của đơn này → cho bấm nhảy sang xem.
   const [dispatches, setDispatches] = useState<Array<{ id: string; code: string }>>([])
   const [loading, setLoading] = useState(true)
+  // Lỗi tải ≠ "chưa có container" — trước đây nuốt lỗi rồi hiện màn trống giả
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let alive = true
     setLoading(true)
+    setLoadError(null)
     containerService.getContainers(orderId)
       .then(async (cs) => {
         if (!alive) return
@@ -41,10 +46,10 @@ export default function PackingTabPanel({ orderId }: { orderId: string }) {
           if (alive) setDispatches(d)
         } catch { /* ignore */ }
       })
-      .catch(() => { /* ignore */ })
+      .catch((e) => { if (alive) setLoadError(e || true) })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [orderId])
+  }, [orderId, reloadKey])
 
   const rows = buildLotTrackRows(containers, deliveryMap)
   const { lotsTotal, lotsDelivered } = lotDeliveryStats(rows)
@@ -52,7 +57,7 @@ export default function PackingTabPanel({ orderId }: { orderId: string }) {
 
   const cols: ColumnsType<typeof rows[number]> = [
     { title: 'Lô', key: 'lo', width: 80, render: (_: unknown, r) => r.lotNo != null ? <Text strong>Lô {r.lotNo}</Text> : <Text type="secondary">Chưa gán</Text> },
-    { title: 'Hạn', key: 'hg', width: 92, render: (_: unknown, r) => r.deadline ? dayjs(r.deadline).format('DD/MM/YY') : '—' },
+    { title: 'Hạn', key: 'hg', width: 92, render: (_: unknown, r) => fmtDate(r.deadline) },
     { title: 'Cont', key: 'sc', width: 52, align: 'center' as const, render: (_: unknown, r) => r.total },
     {
       title: 'Tiến độ', key: 'td', render: (_: unknown, r) => (
@@ -82,11 +87,14 @@ export default function PackingTabPanel({ orderId }: { orderId: string }) {
         Quản lý đóng gói → (chia lô · nhập số cont/seal)
       </Button>
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
-      ) : containers.length === 0 ? (
-        <Empty description="Chưa có container — bấm nút trên để tạo & chia lô" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-      ) : (
+      <PageState
+        loading={loading}
+        error={loadError}
+        onRetry={() => setReloadKey((k) => k + 1)}
+        empty={containers.length === 0}
+        emptyText="Chưa có container — bấm nút trên để tạo & chia lô"
+        minHeight={120}
+      >
         <>
           <Space size={[6, 6]} wrap style={{ marginBottom: 10 }}>
             <Tag color="blue">{containers.length} cont</Tag>
@@ -129,7 +137,7 @@ export default function PackingTabPanel({ orderId }: { orderId: string }) {
           </Space>
           <Table dataSource={rows} columns={cols} rowKey="key" size="small" pagination={false} bordered scroll={{ x: 460 }} />
         </>
-      )}
+      </PageState>
     </div>
   )
 }

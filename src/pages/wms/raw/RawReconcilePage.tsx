@@ -6,20 +6,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Alert, Button, Card, Col, Input, InputNumber, Popconfirm, Row, Select, Space, Statistic, Table, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Col, DatePicker, Input, InputNumber, Popconfirm, Row, Select, Space, Statistic, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, ReloadOutlined, SaveOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { rawReconcileService, type RawReconcileRow, type RawTonDenNgay, type RawTypeLite } from '../../../services/wms/rawReconcileService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
 import { useRawRole } from '../../../hooks/useRawRole'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { fmtKg, fmtSigned, fmtPct, fmtDate, todayLocal } from '../../../utils/format'
+import { toDateStrVN } from '../../../utils/dateVN'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { stdPagination } from '../../../components/common/tableDefaults'
 
 const { Title, Text } = Typography
-const fmtKg = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d }))
-const fmtSigned = (n: number | null | undefined, d = 0) => (n === null || n === undefined ? '—' : (n > 0 ? '+' : '') + fmtKg(n, d))
-const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
 interface EntryRow {
   rubber_type: string
@@ -64,7 +66,8 @@ export default function RawReconcilePage() {
       const from = new Date(); from.setDate(from.getDate() - 60)
       const [may, hist, s, t] = await Promise.all([
         rawReconcileService.tonDenNgay(facilityId, date),
-        rawReconcileService.list(facilityId, { from: from.toISOString().slice(0, 10) }),
+        // ngày theo GIỜ VN — toISOString() (UTC) lùi 1 ngày nếu mở trang trước 7 giờ sáng
+        rawReconcileService.list(facilityId, { from: toDateStrVN(from) }),
         rawSettingsService.getForFacility(facilityId),
         types.length ? Promise.resolve(types) : rawReconcileService.listTypes(),
       ])
@@ -76,7 +79,7 @@ export default function RawReconcilePage() {
         return { rubber_type: m.rubber_type, rubber_type_name: m.rubber_type_name, so_lo: m.so_lo, may_wet_kg: m.wet_kg, may_dry_kg: m.dry_kg, may_drc_pct: m.drc_pct, giay_wet: h?.giay_wet_kg ?? null, giay_dry: h?.giay_dry_kg ?? null, ly_do: h?.ly_do ?? '', note: h?.note ?? '', saved_id: h?.id ?? null }
       }))
       setHistory(hist); setSettings(s); setTypes(t)
-    } catch (e: any) { setError(e?.message || 'Không tải được đối chiếu') }
+    } catch (e: any) { setError(dichLoiHeThong(e, 'Không tải được đối chiếu')) }
     finally { setLoading(false) }
   }, [facilityId, date]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -97,7 +100,7 @@ export default function RawReconcilePage() {
     try {
       await rawReconcileService.ghi({ facilityId, ngay: date, rubberType: r.rubber_type, giayWetKg: r.giay_wet, giayDryKg: r.giay_dry, lyDo: r.ly_do.trim() || null, note: r.note.trim() || null })
       message.success(`Đã ghi đối chiếu ${r.rubber_type_name}`); await load()
-    } catch (e: any) { message.error(e?.message || 'Không ghi được') }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Không ghi được')) }
     finally { setSaving(null) }
   }
 
@@ -109,8 +112,8 @@ export default function RawReconcilePage() {
     setSaving('*')
     try {
       for (const r of todo) await rawReconcileService.ghi({ facilityId: facilityId!, ngay: date, rubberType: r.rubber_type, giayWetKg: r.giay_wet!, giayDryKg: r.giay_dry, lyDo: r.ly_do.trim() || null, note: r.note.trim() || null })
-      message.success(`Đã ghi ${todo.length} dòng đối chiếu ngày ${new Date(date).toLocaleDateString('vi-VN')}`); await load()
-    } catch (e: any) { message.error(e?.message || 'Không ghi được') }
+      message.success(`Đã ghi ${todo.length} dòng đối chiếu ngày ${fmtDate(date)}`); await load()
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Không ghi được')) }
     finally { setSaving(null) }
   }
 
@@ -136,7 +139,7 @@ export default function RawReconcilePage() {
   const columns: ColumnsType<EntryRow> = [
     { title: 'Loại mủ', dataIndex: 'rubber_type_name', key: 'rubber_type_name', render: (v, r) => <span><Text strong>{v}</Text> <Text type="secondary">({r.rubber_type}) · {r.so_lo} lô</Text>{r.saved_id && <Tag color="green" style={{ marginLeft: 6 }}>đã ghi</Tag>}</span> },
     { title: 'Máy · ướt (kg)', dataIndex: 'may_wet_kg', key: 'may_wet_kg', align: 'right', render: (v) => fmtKg(v) },
-    { title: 'Máy · khô (kg)', dataIndex: 'may_dry_kg', key: 'may_dry_kg', align: 'right', render: (v, r) => <span>{fmtKg(v)} <Text type="secondary">({r.may_drc_pct ?? '—'} %)</Text></span> },
+    { title: 'Máy · khô (kg)', dataIndex: 'may_dry_kg', key: 'may_dry_kg', align: 'right', render: (v, r) => <span>{fmtKg(v)} <Text type="secondary">({fmtPct(r.may_drc_pct)})</Text></span> },
     { title: 'Giấy · ướt (kg) *', key: 'giay_wet', width: 150, render: (_, r) => <InputNumber style={{ width: '100%' }} min={0} step={10} value={r.giay_wet} disabled={!canWrite} onChange={(v) => up(r.rubber_type, { giay_wet: v === null || v === undefined ? null : Number(v) })} /> },
     { title: 'Giấy · khô (kg)', key: 'giay_dry', width: 140, render: (_, r) => <InputNumber style={{ width: '100%' }} min={0} step={10} value={r.giay_dry} disabled={!canWrite} placeholder="nếu giấy có" onChange={(v) => up(r.rubber_type, { giay_dry: v === null || v === undefined ? null : Number(v) })} /> },
     { title: 'Lệch (giấy − máy)', key: 'lech', align: 'right', render: (_, r) => { const l = lech(r); const p = lechPct(r); if (l === null) return '—'; const bad = vuot(r); return <Text strong type={bad ? 'danger' : 'success'}>{fmtSigned(l)} kg ({fmtSigned(p, 2)} %)</Text> } },
@@ -146,7 +149,7 @@ export default function RawReconcilePage() {
   ]
 
   const histCols: ColumnsType<RawReconcileRow> = [
-    { title: 'Ngày', dataIndex: 'ngay', key: 'ngay', render: (v) => new Date(v).toLocaleDateString('vi-VN') },
+    { title: 'Ngày', dataIndex: 'ngay', key: 'ngay', render: (v) => fmtDate(v) },
     { title: 'Loại mủ', dataIndex: 'rubber_type_name', key: 'rubber_type_name' },
     { title: 'Giấy ướt', dataIndex: 'giay_wet_kg', key: 'giay_wet_kg', align: 'right', render: (v) => fmtKg(v) },
     { title: 'Máy ướt', dataIndex: 'may_wet_kg', key: 'may_wet_kg', align: 'right', render: (v) => fmtKg(v) },
@@ -155,7 +158,7 @@ export default function RawReconcilePage() {
     { title: 'Ngưỡng', dataIndex: 'nguong_pct', key: 'nguong_pct', align: 'right', render: (v, r) => (r.vuot_nguong ? <Tag color="red">vượt {v} %</Tag> : <Tag color="green">≤ {v} %</Tag>) },
     { title: 'Lý do', dataIndex: 'ly_do', key: 'ly_do', render: (v, r) => v || (r.vuot_nguong ? <Tag color="red">chưa ghi</Tag> : '—') },
     { title: 'Người ghi', dataIndex: 'nguoi_ghi', key: 'nguoi_ghi' },
-    { title: '', key: 'x', render: (_, r) => <Popconfirm title="Xóa dòng đối chiếu này?" okText="Xóa" cancelText="Không" onConfirm={async () => { try { await rawReconcileService.xoa(r.id); message.success('Đã xóa'); load() } catch (e: any) { message.error(e?.message) } }}><Button size="small" danger icon={<DeleteOutlined />} disabled={!canWrite} /></Popconfirm> },
+    { title: '', key: 'x', render: (_, r) => <Popconfirm title="Xóa dòng đối chiếu này?" okText="Xóa" cancelText="Không" onConfirm={async () => { try { await rawReconcileService.xoa(r.id); message.success('Đã xóa'); load() } catch (e: any) { message.error(dichLoiHeThong(e, 'Không xóa được')) } }}><Button size="small" danger icon={<DeleteOutlined />} disabled={!canWrite} /></Popconfirm> },
   ]
 
   return (
@@ -174,7 +177,9 @@ export default function RawReconcilePage() {
           <Col>
             <Space wrap>
               <FacilityPicker value={facilityId} onChange={(id) => setFacilityId(id)} allowAll={false} style={{ minWidth: 180 }} />
-              <Input type="date" value={date} max={todayLocal()} onChange={(e) => setDate(e.target.value || todayLocal())} style={{ width: 150 }} />
+              {/* DatePicker DD/MM/YYYY như các màn NVL khác — ô date của trình duyệt hiện theo locale máy (mm/dd/yyyy…) */}
+              <DatePicker value={dayjs(date)} format="DD/MM/YYYY" allowClear={false} disabledDate={(d) => d.isAfter(dayjs(), 'day')}
+                onChange={(d) => setDate(d ? d.format('YYYY-MM-DD') : todayLocal())} style={{ width: 150 }} />
               <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>Làm mới</Button>
               <Button icon={<DownloadOutlined />} onClick={exportCsv} disabled={!history.length}>CSV 60 ngày</Button>
             </Space>
@@ -186,16 +191,16 @@ export default function RawReconcilePage() {
         <Row gutter={[12, 12]}>
           <Col xs={8}><Card size="small"><Statistic title="Ngày đã đối chiếu (60 ngày)" value={stats.days} /></Card></Col>
           <Col xs={8}><Card size="small"><Statistic title="Dòng vượt ngưỡng" value={stats.over} valueStyle={{ color: stats.over ? '#C1291F' : '#1E7D3A' }} /></Card></Col>
-          <Col xs={8}><Card size="small"><Statistic title="Lần gần nhất" value={stats.last ? new Date(stats.last).toLocaleDateString('vi-VN') : '—'} /></Card></Col>
+          <Col xs={8}><Card size="small"><Statistic title="Lần gần nhất" value={stats.last ? fmtDate(stats.last) : '—'} /></Card></Col>
         </Row>
 
-        <Card size="small" title={<Space>Số sổ giấy ngày {new Date(date).toLocaleDateString('vi-VN')}<Text type="secondary">· máy: tồn đến hết ngày này</Text></Space>}
+        <Card size="small" title={<Space>Số sổ giấy ngày {fmtDate(date)}<Text type="secondary">· máy: tồn đến hết ngày này</Text></Space>}
           extra={<Space><Select style={{ minWidth: 220 }} showSearch optionFilterProp="label" allowClear placeholder="Thêm loại giấy có, máy không" value={addType} onChange={setAddType} options={types.filter((t) => !rows.some((r) => r.rubber_type === t.code)).map((t) => ({ value: t.code, label: `${t.name} (${t.code})` }))} /><Button onClick={addRow} disabled={!addType}>Thêm dòng</Button><Button type="primary" icon={<SaveOutlined />} onClick={saveAll} loading={saving === '*'} disabled={!canWrite}>Lưu tất cả</Button></Space>}>
           <Table<EntryRow> rowKey="rubber_type" columns={columns} dataSource={rows} size="small" loading={loading} pagination={false} locale={{ emptyText: 'Sổ máy chưa có tồn đến ngày này. Nếu giấy có hàng, thêm loại ở trên.' }} />
         </Card>
 
         <Card size="small" bodyStyle={{ padding: 0 }} title="Lịch sử đối chiếu · 60 ngày">
-          <Table<RawReconcileRow> rowKey="id" columns={histCols} dataSource={history} size="small" pagination={{ pageSize: 20, showSizeChanger: false }} locale={{ emptyText: 'Chưa đối chiếu lần nào' }} />
+          <Table<RawReconcileRow> rowKey="id" columns={histCols} dataSource={history} size="small" pagination={stdPagination(20)} locale={{ emptyText: 'Chưa đối chiếu lần nào' }} />
         </Card>
       </Space>
     </div>

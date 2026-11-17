@@ -9,6 +9,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { vnDayStartTs, vnDayEndTs } from '../../utils/dateVN'
 import { pickingService } from './pickingService'
 import { batchService } from './batchService'
 import type {
@@ -21,6 +22,14 @@ import type {
   PaginatedResponse,
 } from './wms.types'
 import type { PickingOptions } from './pickingService'
+import { STOCK_OUT_STATUS_LABELS as SO_ST, ticketTypeLabel } from './wms.types'
+
+// Nhãn + màu phiếu xuất / lý do xuất / trạng thái lấy hàng — MỘT bản ở wms.types (Đợt 3 audit UI).
+export {
+  STOCK_OUT_STATUS_LABELS, STOCK_OUT_STATUS_COLORS,
+  STOCK_OUT_REASON_LABELS, STOCK_OUT_REASON_COLORS,
+  PICKING_STATUS_LABELS, PICKING_STATUS_COLORS,
+} from './wms.types'
 
 // ============================================================================
 // TYPES — Form data
@@ -229,7 +238,7 @@ export const stockOutService = {
     if (orderErr) throw orderErr
     if (!order) throw new Error('Không tìm thấy phiếu xuất kho')
     if (order.status !== 'draft' && order.status !== 'picking') {
-      throw new Error('Chỉ có thể thêm sản phẩm khi phiếu Nháp hoặc Đang picking')
+      throw new Error(`Chỉ có thể thêm sản phẩm khi phiếu "${SO_ST.draft}" hoặc "${SO_ST.picking}"`)
     }
 
     const now = new Date().toISOString()
@@ -296,8 +305,8 @@ export const stockOutService = {
     if (status) query = query.eq('status', status)
     if (warehouse_id) query = query.eq('warehouse_id', warehouse_id)
     if (type) query = query.eq('type', type)
-    if (from_date) query = query.gte('created_at', `${from_date}T00:00:00`)
-    if (to_date) query = query.lte('created_at', `${to_date}T23:59:59`)
+    if (from_date) query = query.gte('created_at', vnDayStartTs(from_date))
+    if (to_date) query = query.lte('created_at', vnDayEndTs(to_date))
 
     if (search && search.trim()) {
       // Tìm theo mã phiếu hoặc tên khách
@@ -364,7 +373,7 @@ export const stockOutService = {
     if (orderErr) throw orderErr
     if (!order) throw new Error('Không tìm thấy phiếu xuất kho')
     if (order.status !== 'draft' && order.status !== 'picking') {
-      throw new Error('Chỉ có thể thêm sản phẩm khi phiếu ở trạng thái Nháp hoặc Đang picking')
+      throw new Error(`Chỉ có thể thêm sản phẩm khi phiếu ở trạng thái "${SO_ST.draft}" hoặc "${SO_ST.picking}"`)
     }
 
     // 2. Lấy danh sách batch_id đã có trong phiếu (exclude khỏi picking mới)
@@ -742,7 +751,7 @@ export const stockOutService = {
     if (!ticket) throw new Error('Không tìm thấy phiếu cân')
     if (ticket.status !== 'completed') throw new Error('Phiếu cân chưa hoàn tất')
     if (ticket.ticket_type !== 'out') {
-      throw new Error(`Phiếu cân không phải outbound (type=${ticket.ticket_type})`)
+      throw new Error(`Phiếu cân không phải phiếu XUẤT (loại phiếu: ${ticketTypeLabel(ticket.ticket_type)})`)
     }
 
     // 2. Idempotency check — match notes pattern
@@ -1004,7 +1013,7 @@ export const stockOutService = {
       .select('id, code, grade, quantity_kg')
       .eq('id', sales_order_id)
       .single()
-    if (!so) throw new Error('Sales Order không tồn tại')
+    if (!so) throw new Error('Đơn hàng bán không tồn tại')
 
     // ── 2. Tìm container info ──
     const { data: container } = await supabase
@@ -1013,7 +1022,7 @@ export const stockOutService = {
       .eq('id', container_id)
       .single()
     if (!container) throw new Error('Container không tồn tại')
-    if (container.status === 'shipped') throw new Error('Container đã shipped — không cân lại')
+    if (container.status === 'shipped') throw new Error('Container đã xuất đi — không cân lại')
 
     const baleCount = container.bale_count || 0
 
@@ -1088,7 +1097,7 @@ export const stockOutService = {
     if (gradeCol) batchQuery = batchQuery.eq('rubber_grade', gradeCol)
 
     const { data: batches } = await batchQuery
-    if (!batches || batches.length === 0) throw new Error(`Không còn batch ${gradeCol || ''} trong kho TP để pick`)
+    if (!batches || batches.length === 0) throw new Error(`Không còn lô ${gradeCol || ''} trong kho thành phẩm để lấy hàng`)
 
     // Pick FIFO cho đủ baleCount (hoặc net_weight nếu baleCount=0)
     // Pick theo KG (universal) — vì unit kho (kiện 111kg) có thể khác unit SO (bành 35kg).
@@ -1113,7 +1122,7 @@ export const stockOutService = {
       remainWeight -= takeWeight
     }
 
-    if (picks.length === 0) throw new Error('Không pick được batch nào')
+    if (picks.length === 0) throw new Error('Không lấy được lô nào cho container này')
 
     // ── 5. Insert picked details — KHÔNG trừ kho ở đây ──
     // Trừ kho dồn về confirmStockOut (khi ERP bấm "Xác nhận"), giống luồng xuất lẻ.

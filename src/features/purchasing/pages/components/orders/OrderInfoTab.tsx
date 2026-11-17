@@ -23,6 +23,7 @@ import {
   formatCurrency,
 } from '../../../../../services/purchaseOrderService'
 import { OrderProgressBar } from './OrderProgressBar'
+import { fmtDate, fmtDateTime } from '../../../../../utils/format'
 
 // ============================================================================
 // APPROVAL EVIDENCE (Thông tin phê duyệt bên ngoài)
@@ -87,7 +88,7 @@ function ApprovalEvidence({ order, onEdit }: { order: PurchaseOrder; onEdit?: ()
               <div>
                 <span className="text-xs text-gray-500">Ngày duyệt</span>
                 <p className="text-sm font-medium text-gray-900">
-                  {new Date(order.approval_date).toLocaleDateString('vi-VN')}
+                  {fmtDate(order.approval_date)}
                 </p>
               </div>
             )}
@@ -151,7 +152,7 @@ function CancellationBanner({ order }: { order: PurchaseOrder }) {
           {order.cancelled_by_name && (
             <p className="text-xs text-red-500 mt-1">
               Hủy bởi: {order.cancelled_by_name}
-              {order.cancelled_at && ` • ${new Date(order.cancelled_at).toLocaleString('vi-VN')}`}
+              {order.cancelled_at && ` • ${fmtDateTime(order.cancelled_at)}`}
             </p>
           )}
         </div>
@@ -187,11 +188,11 @@ export function OrderInfoTab({ order, onEditApproval }: OrderInfoTabProps) {
             Ngày đơn hàng
           </div>
           <p className="text-sm font-semibold text-gray-900">
-            {new Date(order.order_date || order.created_at).toLocaleDateString('vi-VN')}
+            {fmtDate(order.order_date || order.created_at)}
           </p>
           {order.expected_delivery_date && (
             <p className="text-xs text-gray-400 mt-0.5">
-              Giao: {new Date(order.expected_delivery_date).toLocaleDateString('vi-VN')}
+              Giao: {fmtDate(order.expected_delivery_date)}
             </p>
           )}
         </div>
@@ -235,7 +236,7 @@ export function OrderInfoTab({ order, onEditApproval }: OrderInfoTabProps) {
           <p className="text-sm text-blue-700">
             <strong>Xác nhận bởi:</strong>{' '}
             {order.confirmed_by_name || order.confirmed_by}
-            {order.confirmed_at && ` • ${new Date(order.confirmed_at).toLocaleString('vi-VN')}`}
+            {order.confirmed_at && ` • ${fmtDateTime(order.confirmed_at)}`}
           </p>
         </div>
       )}
@@ -283,7 +284,7 @@ export function OrderInfoTab({ order, onEditApproval }: OrderInfoTabProps) {
           <User className="w-3.5 h-3.5" />
           Tạo bởi: {order.creator?.full_name || '-'}
         </div>
-        <span>Cập nhật: {new Date(order.updated_at).toLocaleString('vi-VN')}</span>
+        <span>Cập nhật: {fmtDateTime(order.updated_at)}</span>
       </div>
     </div>
   )

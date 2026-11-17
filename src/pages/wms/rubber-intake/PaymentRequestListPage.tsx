@@ -8,17 +8,18 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, RefreshCw, Loader2, ChevronRight, Receipt,
-  Calendar, Scale, Building2, AlertTriangle,
+  Calendar, Scale, Building2, AlertTriangle, Search,
 } from 'lucide-react'
+import { DatePicker } from 'antd'
+import type { Dayjs } from 'dayjs'
 import { paymentRequestService, type PaymentRequest, type PaymentRequestStatus } from '../../../services/wms/paymentRequestService'
+import { fmtVnd, fmtDate, fmtKg } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
+import { LimitNotice } from '../../../components/common/tableDefaults'
+import { useDebounce } from '../../../hooks/useDebounce'
 
-function fmtVnd(a?: number | null): string {
-  return (a || 0).toLocaleString('vi-VN') + 'đ'
-}
-function fmtDate(s?: string | null): string {
-  if (!s) return '–'
-  return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
+/** Trần tải một lần — chạm trần thì LimitNotice báo, không im lặng mất phiếu cũ (finding #12). */
+const LOAD_LIMIT = 200
 
 const STATUS_CFG: Record<PaymentRequestStatus, { label: string; cls: string }> = {
   draft:     { label: 'Nháp',     cls: 'bg-gray-100 text-gray-600' },
@@ -34,8 +35,13 @@ const PaymentRequestListPage: React.FC = () => {
   const navigate = useNavigate()
   const [rows, setRows] = useState<PaymentRequest[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [filter, setFilter] = useState<FilterStatus>('all')
+  // Tìm theo mã/tiêu đề (server, sau khi ngừng gõ) + lọc theo THÁNG của ngày đề nghị.
+  // Mặc định KHÔNG lọc tháng: phiếu đã duyệt chờ chi của tháng trước vẫn phải hiện.
+  const [search, setSearch] = useState('')
+  const searchDebounced = useDebounce(search.trim(), 400)
+  const [month, setMonth] = useState<Dayjs | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -43,15 +49,19 @@ const PaymentRequestListPage: React.FC = () => {
     try {
       const data = await paymentRequestService.list({
         status: filter === 'all' ? undefined : filter,
-        limit: 200,
+        // ký tự , ( ) phá cú pháp .or() của PostgREST → thay bằng khoảng trắng
+        search: searchDebounced ? searchDebounced.replace(/[,()]/g, ' ') : undefined,
+        date_from: month ? month.startOf('month').format('YYYY-MM-DD') : undefined,
+        date_to: month ? month.endOf('month').format('YYYY-MM-DD') : undefined,
+        limit: LOAD_LIMIT,
       })
       setRows(data)
     } catch (e: any) {
       console.error('[PaymentRequestList] load error', e)
-      setError(e?.message || 'Không tải được danh sách')
+      setError(e || 'Không tải được danh sách')
     }
     setLoading(false)
-  }, [filter])
+  }, [filter, searchDebounced, month])
 
   useEffect(() => { load() }, [load])
 
@@ -91,6 +101,28 @@ const PaymentRequestListPage: React.FC = () => {
             </button>
           ))}
         </div>
+
+        {/* Tìm mã/tiêu đề + chọn tháng */}
+        <div className="px-3 pb-2.5 flex gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Tìm mã phiếu, tiêu đề…"
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 text-[13px]"
+            />
+          </div>
+          <DatePicker
+            picker="month"
+            format="MM/YYYY"
+            value={month}
+            onChange={d => setMonth(d)}
+            placeholder="Mọi tháng"
+            allowClear
+            style={{ width: 130 }}
+          />
+        </div>
       </div>
 
       {/* Summary */}
@@ -107,6 +139,7 @@ const PaymentRequestListPage: React.FC = () => {
             <Plus className="w-4 h-4" /> Tạo đề nghị
           </button>
         </div>
+        {!loading && !error && <LimitNotice shown={rows.length} limit={LOAD_LIMIT} what="phiếu" />}
       </div>
 
       {/* List */}
@@ -117,7 +150,7 @@ const PaymentRequestListPage: React.FC = () => {
           <div className="text-center py-16">
             <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-red-300" />
             <p className="text-[14px] font-medium text-red-600">Không tải được danh sách đề nghị</p>
-            <p className="text-[12px] text-gray-400 mt-1">{error}</p>
+            <p className="text-[12px] text-gray-400 mt-1">{dichLoiHeThong(error, 'Không tải được danh sách')}</p>
             <button
               onClick={load}
               className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 text-red-600 text-[13px] font-semibold active:bg-red-100"
@@ -128,7 +161,7 @@ const PaymentRequestListPage: React.FC = () => {
         ) : rows.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <Receipt className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-[14px]">Chưa có đề nghị thanh toán</p>
+            <p className="text-[14px]">{search.trim() || month || filter !== 'all' ? 'Không có đề nghị nào khớp bộ lọc' : 'Chưa có đề nghị thanh toán'}</p>
             <button onClick={() => navigate('/rubber/payment-requests/new')} className="mt-3 text-emerald-600 text-[13px] font-semibold">+ Tạo phiếu đầu tiên</button>
           </div>
         ) : (
@@ -148,7 +181,7 @@ const PaymentRequestListPage: React.FC = () => {
                 <div className="flex items-center gap-3 text-[12px] text-gray-400 flex-wrap">
                   <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{fmtDate(r.request_date)}</span>
                   {r.facility && <span className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5" />{r.facility.name}</span>}
-                  <span className="flex items-center gap-1"><Scale className="w-3.5 h-3.5" />{r.total_weight.toLocaleString('vi-VN')} kg</span>
+                  <span className="flex items-center gap-1"><Scale className="w-3.5 h-3.5" />{fmtKg(r.total_weight, 2)} kg</span>
                   <span>{r.line_count} dòng</span>
                 </div>
                 <div className="flex items-center justify-between mt-2">

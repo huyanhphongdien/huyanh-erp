@@ -5,6 +5,9 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { PAYMENT_METHOD_LABELS as SETTLEMENT_PAYMENT_METHOD_LABELS } from './paymentService'
+import { TIER_LABELS, type PartnerTier } from './partnerService'
+import { fmtVnd } from '../../utils/format'
 
 // ============================================
 // P26: ADVANCE MAX % BY TIER
@@ -79,12 +82,12 @@ async function validateAdvanceTierLimit(input: {
   const combinedTotal = existingTotal + newAmount
 
   if (combinedTotal > maxAllowed) {
-    const fmt = (n: number) => n.toLocaleString('vi-VN')
+    const tierLabel = TIER_LABELS[tier as PartnerTier] || tier
     throw new Error(
-      `Vượt hạn mức tạm ứng tier ${tier.toUpperCase()} (${Math.round(maxPct * 100)}%): ` +
-      `Deal ${(deal as any)?.deal_number} giá trị=${fmt(baseValue)} → ` +
-      `max=${fmt(maxAllowed)} VND. Đã ứng ${fmt(existingTotal)}, ` +
-      `muốn thêm ${fmt(newAmount)} → tổng ${fmt(combinedTotal)} vượt hạn.`
+      `Vượt hạn mức tạm ứng của hạng ${tierLabel} (${Math.round(maxPct * 100)}%): ` +
+      `Deal ${(deal as any)?.deal_number} giá trị ${fmtVnd(baseValue)} → ` +
+      `tối đa ${fmtVnd(maxAllowed)}. Đã ứng ${fmtVnd(existingTotal)}, ` +
+      `muốn thêm ${fmtVnd(newAmount)} → tổng ${fmtVnd(combinedTotal)} vượt hạn.`
     )
   }
 }
@@ -180,18 +183,17 @@ export const ADVANCE_STATUS_LABELS: Record<AdvanceStatus, string> = {
   rejected: 'Từ chối',
 }
 
+// Luật màu dòng tiền (CLAUDE.md): chờ = cam · đã duyệt CHỜ chi = xanh DƯƠNG · đã chi = xanh LÁ.
+// Bản cũ đảo ngược (approved xanh lá, paid xanh dương) → phiếu "Đã duyệt" trông như đã chi.
 export const ADVANCE_STATUS_COLORS: Record<AdvanceStatus, string> = {
   pending: 'orange',
-  approved: 'green',
-  paid: 'blue',
+  approved: 'blue',
+  paid: 'green',
   rejected: 'red',
 }
 
-export const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  cash: 'Tiền mặt',
-  bank_transfer: 'Chuyển khoản',
-  check: 'Séc',
-}
+/** Hình thức chi — CÙNG bộ nhãn với thanh toán quyết toán (paymentService). Alias giữ tên cũ. */
+export const PAYMENT_METHOD_LABELS: Record<string, string> = SETTLEMENT_PAYMENT_METHOD_LABELS
 
 // ============================================
 // HELPER

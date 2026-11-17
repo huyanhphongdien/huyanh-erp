@@ -5,6 +5,7 @@
 // Trọng tâm: tính đèn "nhảy nhóm" CIC (quá hạn ≥10 ngày = nhóm 2).
 // ============================================================================
 import { supabase } from '../../lib/supabase'
+import { toDateStrVN } from '../../utils/dateVN'
 
 export type LoanStatus = 'active' | 'paid' | 'cancelled'
 export type CicLight = 'green' | 'yellow' | 'overdue' | 'orange' | 'red' | 'paid'
@@ -72,6 +73,10 @@ export const CIC_BG: Record<CicLight, string> = {
   green: '#f0fdf4', yellow: '#fefce8', overdue: '#fff7ed', orange: '#fff7ed', red: '#fef2f2', paid: '#f9fafb',
 }
 
+// Một nguồn nhãn cho form + bảng (trước đây form ghi "Tiền hàng KH", bảng lịch sử ghi "Tiền hàng")
+export const LOAN_STATUS_LABELS: Record<LoanStatus, string> = { active: 'Đang vay', paid: 'Đã tất toán', cancelled: 'Đã huỷ' }
+export const REPAYMENT_SOURCE_LABELS: Record<string, string> = { customer: 'Tiền hàng KH', cash: 'Quỹ', other: 'Khác' }
+
 // Ngân hàng hay dùng (gợi ý dropdown — vẫn gõ tự do được)
 export const BANKS = ['Agribank', 'Vietinbank', 'BIDV', 'Sacombank', 'TPBank', 'Eximbank', 'UOB', 'Seabank', 'KBank', 'MSB', 'ACB', 'CTBC']
 
@@ -82,9 +87,8 @@ function dayDiff(a: Date, b: Date): number {
            - Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())
   return Math.round(ms / 86_400_000)
 }
-// Định dạng ngày theo LỊCH ĐỊA PHƯƠNG (tránh toISOString lệch -1 ngày ở UTC+7)
-const pad = (n: number) => String(n).padStart(2, '0')
-const toLocalISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+// Định dạng ngày theo LỊCH ĐỊA PHƯƠNG (tránh toISOString lệch -1 ngày ở UTC+7) — dùng chung utils/dateVN
+const toLocalISO = toDateStrVN
 
 /** Tính còn lại + số ngày quá hạn + đèn CIC. */
 export function computeLoan(l: FinLoan, today = new Date()): FinLoanComputed {

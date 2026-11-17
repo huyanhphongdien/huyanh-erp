@@ -21,6 +21,13 @@ import {
   taskTemplateService, TaskTemplate, TEMPLATE_CATEGORIES,
   taskRecurringService, RecurringRule, FREQ_LABELS, DAY_LABELS,
 } from '../../services/taskTemplateService'
+import { TASK_PRIORITY_LABELS } from '../../types'
+import { TASK_PRIORITY_TAG_COLORS } from '../../features/tasks/taskUi'
+import { EnumTag } from '../../components/common/EnumTag'
+import PageState from '../../components/common/PageState'
+import { stdPagination } from '../../components/common/tableDefaults'
+import { fmtDate } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Title } = Typography
 
@@ -37,6 +44,8 @@ export default function TaskTemplateListPage() {
   // ── Templates state ──
   const [templates, setTemplates] = useState<TaskTemplate[]>([])
   const [loadingTemplates, setLoadingTemplates] = useState(false)
+  // Lỗi tải: trước đây chỉ toast rồi bảng hiện "Không có dữ liệu" như thật
+  const [templatesError, setTemplatesError] = useState<unknown>(null)
   const [categoryFilter, setCategoryFilter] = useState<string | undefined>(undefined)
   const [templateModalOpen, setTemplateModalOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<TaskTemplate | null>(null)
@@ -45,6 +54,7 @@ export default function TaskTemplateListPage() {
   // ── Recurring state ──
   const [recurringRules, setRecurringRules] = useState<RecurringRule[]>([])
   const [loadingRules, setLoadingRules] = useState(false)
+  const [rulesError, setRulesError] = useState<unknown>(null)
   const [recurringModalOpen, setRecurringModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<RecurringRule | null>(null)
   const [recurringForm] = Form.useForm()
@@ -63,8 +73,9 @@ export default function TaskTemplateListPage() {
       setLoadingTemplates(true)
       const data = await taskTemplateService.getAll(true)
       setTemplates(data)
+      setTemplatesError(null)
     } catch (err: any) {
-      message.error('Lỗi tải danh sách mẫu: ' + err.message)
+      setTemplatesError(err)
     } finally {
       setLoadingTemplates(false)
     }
@@ -75,8 +86,9 @@ export default function TaskTemplateListPage() {
       setLoadingRules(true)
       const data = await taskRecurringService.getAll()
       setRecurringRules(data)
+      setRulesError(null)
     } catch (err: any) {
-      message.error('Lỗi tải lịch tự động: ' + err.message)
+      setRulesError(err)
     } finally {
       setLoadingRules(false)
     }
@@ -200,7 +212,7 @@ export default function TaskTemplateListPage() {
       loadTemplates()
     } catch (err: any) {
       if (err.errorFields) return
-      message.error('Lỗi lưu mẫu: ' + err.message)
+      message.error(dichLoiHeThong(err, 'Lỗi lưu mẫu'))
     }
   }
 
@@ -210,7 +222,7 @@ export default function TaskTemplateListPage() {
       setTemplates(prev => prev.filter(t => t.id !== id))
       message.success('Đã xóa mẫu!')
     } catch (err: any) {
-      message.error('Lỗi xóa: ' + err.message)
+      message.error(dichLoiHeThong(err, 'Lỗi xóa mẫu'))
     }
   }
 
@@ -263,7 +275,7 @@ export default function TaskTemplateListPage() {
       loadRecurringRules()
     } catch (err: any) {
       if (err.errorFields) return
-      message.error('Lỗi lưu lịch: ' + err.message)
+      message.error(dichLoiHeThong(err, 'Lỗi lưu lịch'))
     }
   }
 
@@ -273,7 +285,7 @@ export default function TaskTemplateListPage() {
       message.success(rule.is_active ? 'Đã tắt lịch' : 'Đã bật lịch')
       loadRecurringRules()
     } catch (err: any) {
-      message.error('Lỗi cập nhật: ' + err.message)
+      message.error(dichLoiHeThong(err, 'Lỗi cập nhật lịch'))
     }
   }
 
@@ -283,7 +295,7 @@ export default function TaskTemplateListPage() {
       setRecurringRules(prev => prev.filter(r => r.id !== id))
       message.success('Đã xóa lịch!')
     } catch (err: any) {
-      message.error('Lỗi xóa: ' + err.message)
+      message.error(dichLoiHeThong(err, 'Lỗi xóa lịch'))
     }
   }
 
@@ -321,16 +333,10 @@ export default function TaskTemplateListPage() {
       dataIndex: 'default_priority',
       key: 'priority',
       width: 100,
-      render: (p: string) => {
-        const map: Record<string, { color: string; label: string }> = {
-          urgent: { color: 'red', label: 'Khẩn cấp' },
-          high: { color: 'orange', label: 'Cao' },
-          medium: { color: 'blue', label: 'Trung bình' },
-          low: { color: 'default', label: 'Thấp' },
-        }
-        const cfg = map[p] || { color: 'default', label: p }
-        return <Tag color={cfg.color}>{cfg.label}</Tag>
-      },
+      // Nhãn + màu ưu tiên: MỘT nguồn TASK_PRIORITY_* (types/index.ts) qua taskUi
+      render: (p: string) => (
+        <EnumTag value={p} labels={TASK_PRIORITY_LABELS as Record<string, string>} colors={TASK_PRIORITY_TAG_COLORS} />
+      ),
     },
     {
       title: 'Thời gian',
@@ -366,7 +372,14 @@ export default function TaskTemplateListPage() {
           </Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openTemplateModal(record)} />
           {canDelete && (
-            <Popconfirm title="Xóa mẫu này?" onConfirm={() => handleDeleteTemplate(record.id)} okText="Xóa" cancelText="Hủy">
+            <Popconfirm
+              title="Xóa mẫu này?"
+              description="Mẫu sẽ bị ẩn khỏi danh sách mẫu; công việc đã tạo từ mẫu không bị ảnh hưởng."
+              onConfirm={() => handleDeleteTemplate(record.id)}
+              okText="Xóa"
+              cancelText="Không"
+              okButtonProps={{ danger: true }}
+            >
               <Button size="small" danger icon={<DeleteOutlined />} />
             </Popconfirm>
           )}
@@ -412,14 +425,14 @@ export default function TaskTemplateListPage() {
       dataIndex: 'last_generated_at',
       key: 'last_run',
       width: 150,
-      render: (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—',
+      render: (d: string | null) => fmtDate(d),
     },
     {
       title: 'Lần tiếp theo',
       dataIndex: 'next_generation_at',
       key: 'next_run',
       width: 150,
-      render: (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—',
+      render: (d: string | null) => fmtDate(d),
     },
     {
       title: 'Trạng thái',
@@ -502,14 +515,18 @@ export default function TaskTemplateListPage() {
                       Tạo mẫu mới
                     </Button>
                   </div>
-                  <Table
-                    dataSource={filteredTemplates}
-                    columns={templateColumns}
-                    rowKey="id"
-                    loading={loadingTemplates}
-                    pagination={{ pageSize: 10 }}
-                    size="middle"
-                  />
+                  {templatesError ? (
+                    <PageState error={templatesError} onRetry={loadTemplates} />
+                  ) : (
+                    <Table
+                      dataSource={filteredTemplates}
+                      columns={templateColumns}
+                      rowKey="id"
+                      loading={loadingTemplates}
+                      pagination={stdPagination(20)}
+                      size="middle"
+                    />
+                  )}
                 </>
               ),
             },
@@ -528,14 +545,18 @@ export default function TaskTemplateListPage() {
                       Tạo lịch mới
                     </Button>
                   </div>
-                  <Table
-                    dataSource={recurringRules}
-                    columns={recurringColumns}
-                    rowKey="id"
-                    loading={loadingRules}
-                    pagination={{ pageSize: 10 }}
-                    size="middle"
-                  />
+                  {rulesError ? (
+                    <PageState error={rulesError} onRetry={loadRecurringRules} />
+                  ) : (
+                    <Table
+                      dataSource={recurringRules}
+                      columns={recurringColumns}
+                      rowKey="id"
+                      loading={loadingRules}
+                      pagination={stdPagination(20)}
+                      size="middle"
+                    />
+                  )}
                 </>
               ),
             },

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { Button, Input, Card } from '../../components/ui'
+import { dichLoiAuth } from '../../utils/dichLoiAuth'
 
 export function RegisterPage() {
   // const navigate = useNavigate()
@@ -129,7 +130,7 @@ export function RegisterPage() {
 
           {(error || formError) && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-danger">{error || formError}</p>
+              <p className="text-sm text-danger">{error ? dichLoiAuth(error, 'Đăng ký thất bại — thử lại sau') : formError}</p>
             </div>
           )}
 

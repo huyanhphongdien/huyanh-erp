@@ -24,11 +24,13 @@ import {
 } from 'lucide-react';
 
 // Import path: 5 cấp lên từ components/suppliers/
-import { 
-  supplierService, 
+import {
+  supplierService,
   type SupplierContact,
-  type SupplierContactFormData 
+  type SupplierContactFormData
 } from '../../../../../services/supplierService';
+import { App as AntdApp } from 'antd';
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong';
 
 // ============================================================================
 // TYPES
@@ -132,7 +134,7 @@ const ContactFormModal: React.FC<ContactFormModalProps> = ({
       onSuccess();
     } catch (err: any) {
       console.error('Save contact error:', err);
-      setError(err.message || 'Không thể lưu thông tin liên hệ');
+      setError(dichLoiHeThong(err, 'Không thể lưu thông tin liên hệ'));
     } finally {
       setLoading(false);
     }
@@ -438,6 +440,7 @@ const ContactCard: React.FC<ContactCardProps> = ({
 // ============================================================================
 
 export const SupplierContacts: React.FC<SupplierContactsProps> = ({ supplierId }) => {
+  const { message } = AntdApp.useApp();
   const [contacts, setContacts] = useState<SupplierContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -460,7 +463,7 @@ export const SupplierContacts: React.FC<SupplierContactsProps> = ({ supplierId }
       setContacts(data);
     } catch (err) {
       console.error('Load contacts error:', err);
-      setError('Không thể tải danh sách liên hệ');
+      setError(dichLoiHeThong(err, 'Không thể tải danh sách liên hệ'));
     } finally {
       setLoading(false);
     }
@@ -500,7 +503,7 @@ export const SupplierContacts: React.FC<SupplierContactsProps> = ({ supplierId }
       loadContacts();
     } catch (err) {
       console.error('Delete contact error:', err);
-      alert('Không thể xóa liên hệ');
+      message.error(dichLoiHeThong(err, 'Không thể xóa liên hệ'));
     } finally {
       setDeleting(false);
     }
@@ -512,7 +515,7 @@ export const SupplierContacts: React.FC<SupplierContactsProps> = ({ supplierId }
       loadContacts();
     } catch (err) {
       console.error('Set primary contact error:', err);
-      alert('Không thể đặt làm liên hệ chính');
+      message.error(dichLoiHeThong(err, 'Không thể đặt làm liên hệ chính'));
     }
   };
 

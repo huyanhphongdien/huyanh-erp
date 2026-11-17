@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useTaskExtensionHistory, useTaskPendingExtension } from '../hooks/useExtensionRequests';
 import type { ExtensionHistory as ExtensionHistoryType } from '../../../types/extensionRequest';
+import { fmtDate, fmtDateTime } from '../../../utils/format';
 
 // ============================================================================
 // TYPES
@@ -30,13 +31,9 @@ interface ExtensionHistoryProps {
 // HELPERS
 // ============================================================================
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('vi-VN');
-}
-
-function formatDateTime(dateString: string): string {
-  return new Date(dateString).toLocaleString('vi-VN');
-}
+// Ngày / ngày-giờ: chuẩn chung utils/format ('DD/MM/YYYY' · 'DD/MM HH:mm')
+const formatDate = fmtDate;
+const formatDateTime = fmtDateTime;
 
 function getStatusIcon(status: string) {
   switch (status) {

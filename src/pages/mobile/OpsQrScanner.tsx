@@ -2,6 +2,8 @@
 // OpsQrScanner — lớp phủ quét QR tem máy bằng camera (BarcodeDetector).
 // Máy không có BarcodeDetector (Safari/iOS) → vẫn quét bằng html5-qrcode: chụp khung
 // hình video ra canvas rồi đọc. Camera không mở được → nhập mã tay. Bắt được mã → onDetect(code).
+// Dùng chung cho tem MÁY (mặc định) và tem lô/pallet kho → nơi gọi truyền title/hint/placeholder
+// đúng ngữ cảnh (vd Kho: "Quẹt tem lô / pallet" · "vd NVL-PD-…, CH-PD-…, HC7"), đừng để gợi ý HA-LL-01.
 // ============================================================================
 import { useEffect, useRef, useState } from 'react'
 
@@ -24,7 +26,21 @@ export function parseEquipCode(raw: string): string | null {
 // Container ẩn cho html5-qrcode — scanFile đòi một phần tử có id trong DOM
 const HTML5_QRCODE_DIV_ID = 'ops-qr-html5qrcode'
 
-export default function OpsQrScanner({ onDetect, onClose }: { onDetect: (code: string) => void; onClose: () => void }) {
+export default function OpsQrScanner({
+  onDetect, onClose,
+  title = 'Quẹt tem QR trên máy',
+  hint = 'Hoặc gõ mã trên tem (vd HA-LL-01)',
+  placeholder = 'HA-…',
+}: {
+  onDetect: (code: string) => void
+  onClose: () => void
+  /** tiêu đề thanh trên (mặc định: tem máy) */
+  title?: string
+  /** dòng gợi ý trên ô gõ mã tay */
+  hint?: string
+  /** chữ mờ trong ô gõ mã tay */
+  placeholder?: string
+}) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [err, setErr] = useState<string | null>(null)
   const [manual, setManual] = useState('')
@@ -103,8 +119,8 @@ export default function OpsQrScanner({ onDetect, onClose }: { onDetect: (code: s
   return (
     <div style={S.wrap}>
       <div style={S.bar}>
-        <button onClick={onClose} style={{ background: 'none', border: 0, color: '#fff', fontSize: 24, cursor: 'pointer' }}>✕</button>
-        <span>Quẹt tem QR trên máy</span>
+        <button type="button" onClick={onClose} aria-label="Đóng" style={{ background: 'none', border: 0, color: '#fff', fontSize: 24, cursor: 'pointer', minWidth: 44, minHeight: 44 }}>✕</button>
+        <span>{title}</span>
       </div>
       <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
         {!err ? <>
@@ -122,9 +138,9 @@ export default function OpsQrScanner({ onDetect, onClose }: { onDetect: (code: s
         <div id={HTML5_QRCODE_DIV_ID} style={{ display: 'none' }} />
       </div>
       <div style={S.foot}>
-        <div style={{ fontSize: 12, opacity: .7, marginBottom: 6 }}>Hoặc gõ mã trên tem (vd HA-LL-01)</div>
+        <div style={{ fontSize: 12, opacity: .7, marginBottom: 6 }}>{hint}</div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <input style={S.input} value={manual} onChange={e => setManual(e.target.value)} placeholder="HA-…" autoCapitalize="characters" />
+          <input style={S.input} value={manual} onChange={e => setManual(e.target.value)} placeholder={placeholder} autoCapitalize="characters" aria-label={hint} />
           <button onClick={() => { const c = parseEquipCode(manual); if (c) onDetect(c) }} disabled={!manual.trim()}
             style={{ border: 0, borderRadius: 12, padding: '0 18px', background: '#52C41A', color: '#06210A', fontWeight: 800, fontSize: 14, cursor: 'pointer', opacity: manual.trim() ? 1 : .5 }}>Đi</button>
         </div>

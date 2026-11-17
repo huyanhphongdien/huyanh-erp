@@ -19,7 +19,6 @@ import {
   Input,
   InputNumber,
   Select,
-  Alert,
   message,
 } from 'antd'
 import {
@@ -31,6 +30,8 @@ import {
 import { supabase } from '../../../lib/supabase'
 import productionService from '../../../services/wms/productionService'
 import GradeBadge from '../../../components/wms/GradeBadge'
+import PageState from '../../../components/common/PageState'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import type { ProductionMaterialSpec } from '../../../services/wms/wms.types'
 import { RUBBER_GRADE_LABELS } from '../../../services/wms/wms.types'
 
@@ -60,7 +61,7 @@ const ProductionSpecsPage = () => {
       const data = await productionService.getMaterialSpecs()
       setSpecs(data)
     } catch (err: any) {
-      setError(err.message || 'Không thể tải du lieu')
+      setError(dichLoiHeThong(err, 'Không tải được định mức sản xuất'))
     } finally {
       setLoading(false)
     }
@@ -123,7 +124,7 @@ const ProductionSpecsPage = () => {
       loadData()
     } catch (err: any) {
       if (err.errorFields) return
-      message.error(err.message || 'Không thể cập nhật')
+      message.error(dichLoiHeThong(err, 'Không cập nhật được định mức'))
     } finally {
       setSaving(false)
     }
@@ -243,11 +244,11 @@ const ProductionSpecsPage = () => {
         </Col>
       </Row>
 
-      {error && (
-        <Alert type="error" message={error} closable onClose={() => setError(null)} style={{ marginBottom: 16, borderRadius: 8 }} showIcon />
-      )}
-
       <Card bodyStyle={{ padding: 0 }} style={{ borderRadius: 12 }}>
+        {/* Lỗi tải → khối lỗi + Thử lại; "Chưa có định mức" chỉ khi tải được mà rỗng */}
+        {error ? (
+          <PageState error={error} onRetry={loadData} />
+        ) : (
         <Table
           dataSource={specs}
           columns={columns}
@@ -255,8 +256,9 @@ const ProductionSpecsPage = () => {
           loading={loading}
           size="small"
           pagination={false}
-          locale={{ emptyText: 'Chưa có dinh muc' }}
+          locale={{ emptyText: 'Chưa có định mức' }}
         />
+        )}
       </Card>
 
       {/* Edit modal */}
@@ -267,7 +269,6 @@ const ProductionSpecsPage = () => {
         onOk={handleSave}
         okText="Cập nhật"
         confirmLoading={saving}
-        okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
         width={640}
       >
         <Form form={form} layout="vertical">
@@ -295,18 +296,18 @@ const ProductionSpecsPage = () => {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="optimal_input_drc_min" label="DRC NL min (%)">
+              <Form.Item name="optimal_input_drc_min" label="DRC NL tối thiểu (%)">
                 <InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="optimal_input_drc_max" label="DRC NL max (%)">
+              <Form.Item name="optimal_input_drc_max" label="DRC NL tối đa (%)">
                 <InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
 
-          <Title level={5} style={{ marginTop: 8 }}>Thoi gian cong doan</Title>
+          <Title level={5} style={{ marginTop: 8 }}>Thời gian công đoạn</Title>
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item name="washing_duration_hours" label="Rửa (giờ)">
@@ -314,7 +315,7 @@ const ProductionSpecsPage = () => {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="washing_water_ratio" label="Ti le nuoc rua">
+              <Form.Item name="washing_water_ratio" label="Tỉ lệ nước rửa">
                 <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
@@ -331,19 +332,19 @@ const ProductionSpecsPage = () => {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="drying_temperature_target" label="Nhiet do say (°C)">
+              <Form.Item name="drying_temperature_target" label="Nhiệt độ sấy (°C)">
                 <InputNumber min={0} max={200} step={1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="pressing_duration_hours" label="Ep (gio)">
+              <Form.Item name="pressing_duration_hours" label="Ép (giờ)">
                 <InputNumber min={0} step={0.5} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
 
           <Form.Item name="notes" label="Ghi chú">
-            <Input.TextArea rows={2} placeholder="Ghi chú dinh muc..." />
+            <Input.TextArea rows={2} placeholder="Ghi chú định mức..." />
           </Form.Item>
         </Form>
       </Modal>

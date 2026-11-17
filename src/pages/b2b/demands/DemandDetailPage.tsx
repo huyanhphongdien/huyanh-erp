@@ -62,8 +62,10 @@ import {
   DEAL_STATUS_LABELS,
   DEAL_STATUS_COLORS,
 } from '../../../services/b2b/dealService'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import { TIER_LABELS, TIER_COLORS } from '../../../services/b2b/partnerService'
+import EnumTag from '../../../components/common/EnumTag'
+import { fmtDate, fmtDateTime } from '../../../utils/format'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -72,27 +74,15 @@ const { TextArea } = Input
 // CONSTANTS
 // ============================================
 
-const TIER_COLORS: Record<string, string> = {
-  diamond: 'purple',
-  gold: 'gold',
-  silver: 'default',
-  bronze: 'orange',
-  new: 'cyan',
-}
+// Hạng đại lý: nhãn/màu dùng chung TIER_LABELS/TIER_COLORS (partnerService) — trước in mã thô 'DIAMOND'
 
 // ============================================
 // HELPERS
 // ============================================
 
-const formatDate = (dateStr: string | null): string => {
-  if (!dateStr) return '-'
-  return format(new Date(dateStr), 'dd/MM/yyyy', { locale: vi })
-}
-
-const formatDateTime = (dateStr: string | null): string => {
-  if (!dateStr) return '-'
-  return format(new Date(dateStr), 'dd/MM/yyyy HH:mm', { locale: vi })
-}
+// Ngày / ngày-giờ: dùng chung src/utils/format.ts (null → '—')
+const formatDate = (dateStr: string | null): string => fmtDate(dateStr)
+const formatDateTime = (dateStr: string | null): string => fmtDateTime(dateStr)
 
 // ============================================
 // MAIN COMPONENT
@@ -132,7 +122,7 @@ const DemandDetailPage = () => {
       setDemand(data)
     } catch (error) {
       console.error('Error fetching demand:', error)
-      message.error('Không thể tải thông tin nhu cầu')
+      message.error(dichLoiHeThong(error, 'Không thể tải thông tin nhu cầu'))
     } finally {
       setLoading(false)
     }
@@ -147,6 +137,8 @@ const DemandDetailPage = () => {
       setOffers(data)
     } catch (error) {
       console.error('Error fetching offers:', error)
+      // Bảng chào giá trống vì LỖI chứ không phải chưa có chào giá — báo rõ
+      message.error(dichLoiHeThong(error, 'Không tải được danh sách chào giá'))
     } finally {
       setOffersLoading(false)
     }
@@ -161,6 +153,7 @@ const DemandDetailPage = () => {
       setLinkedDeals(data)
     } catch (error) {
       console.error('Error fetching linked deals:', error)
+      message.error(dichLoiHeThong(error, 'Không tải được danh sách deal liên kết'))
     } finally {
       setDealsLoading(false)
     }
@@ -184,7 +177,7 @@ const DemandDetailPage = () => {
       message.success('Đã đăng nhu cầu!')
       fetchDemand()
     } catch (error) {
-      message.error('Không thể đăng nhu cầu')
+      message.error(dichLoiHeThong(error, 'Không thể đăng nhu cầu'))
     } finally {
       setActionLoading(false)
     }
@@ -198,7 +191,7 @@ const DemandDetailPage = () => {
       message.success('Đã đóng nhu cầu!')
       fetchDemand()
     } catch (error) {
-      message.error('Không thể đóng nhu cầu')
+      message.error(dichLoiHeThong(error, 'Không thể đóng nhu cầu'))
     } finally {
       setActionLoading(false)
     }
@@ -212,7 +205,7 @@ const DemandDetailPage = () => {
       message.success('Đã hủy nhu cầu!')
       fetchDemand()
     } catch (error) {
-      message.error('Không thể hủy nhu cầu')
+      message.error(dichLoiHeThong(error, 'Không thể hủy nhu cầu'))
     } finally {
       setActionLoading(false)
     }
@@ -226,7 +219,7 @@ const DemandDetailPage = () => {
       message.success('Đã xóa nhu cầu!')
       navigate('/b2b/demands')
     } catch (error: any) {
-      message.error(error.message || 'Không thể xóa nhu cầu')
+      message.error(dichLoiHeThong(error, 'Không thể xóa nhu cầu'))
     } finally {
       setActionLoading(false)
     }
@@ -242,7 +235,7 @@ const DemandDetailPage = () => {
           <p>Chấp nhận chào giá từ <strong>{offer.partner?.name}</strong>?</p>
           <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0' }}>
             <li>Số lượng: <strong>{(offer.offered_quantity_kg / 1000).toFixed(1)} tấn</strong></li>
-            <li>Giá: <strong>{offer.offered_price.toLocaleString('vi-VN')} đ/kg</strong></li>
+            <li>Giá: <strong>{offer.offered_price.toLocaleString('vi-VN')} ₫/kg</strong></li>
             {offer.offered_drc && <li>DRC: <strong>{offer.offered_drc}%</strong></li>}
           </ul>
           <p>Hệ thống sẽ tự động tạo Deal mới từ chào giá này.</p>
@@ -259,7 +252,7 @@ const DemandDetailPage = () => {
           fetchOffers()
           fetchLinkedDeals()
         } catch (error: any) {
-          message.error(error.message || 'Không thể chấp nhận chào giá')
+          message.error(dichLoiHeThong(error, 'Không thể chấp nhận chào giá'))
         }
       },
     })
@@ -277,7 +270,7 @@ const DemandDetailPage = () => {
       fetchOffers()
     } catch (error: any) {
       if (error.errorFields) return // validation error
-      message.error(error.message || 'Không thể từ chối chào giá')
+      message.error(dichLoiHeThong(error, 'Không thể từ chối chào giá'))
     }
   }
 
@@ -298,17 +291,10 @@ const DemandDetailPage = () => {
       ),
     },
     {
-      title: 'Tier',
+      title: 'Hạng',
       key: 'tier',
-      width: 80,
-      render: (_, record) =>
-        record.partner?.tier ? (
-          <Tag color={TIER_COLORS[record.partner.tier]}>
-            {record.partner.tier.toUpperCase()}
-          </Tag>
-        ) : (
-          '-'
-        ),
+      width: 90,
+      render: (_, record) => <EnumTag value={record.partner?.tier} labels={TIER_LABELS} colors={TIER_COLORS} />,
     },
     {
       title: 'Mã lô',
@@ -338,7 +324,7 @@ const DemandDetailPage = () => {
       align: 'right',
       render: (price: number) => (
         <Text strong style={{ color: '#1B4D3E' }}>
-          {price.toLocaleString('vi-VN')} đ/kg
+          {price.toLocaleString('vi-VN')} ₫/kg
         </Text>
       ),
     },
@@ -457,7 +443,7 @@ const DemandDetailPage = () => {
       key: 'unit_price',
       width: 120,
       align: 'right',
-      render: (price: number) => price ? `${price.toLocaleString('vi-VN')} đ/kg` : '-',
+      render: (price: number) => price ? `${price.toLocaleString('vi-VN')} ₫/kg` : '-',
     },
     {
       title: 'Trạng thái',
@@ -700,7 +686,7 @@ const DemandDetailPage = () => {
                       </Descriptions.Item>
                       <Descriptions.Item label="Khoảng giá">
                         {demand.price_min || demand.price_max
-                          ? `${demand.price_min?.toLocaleString('vi-VN') || '?'} - ${demand.price_max?.toLocaleString('vi-VN') || '?'} đ/kg`
+                          ? `${demand.price_min?.toLocaleString('vi-VN') || '?'} - ${demand.price_max?.toLocaleString('vi-VN') || '?'} ₫/kg`
                           : '-'}
                       </Descriptions.Item>
                       <Descriptions.Item label="Hạn chót">
@@ -743,7 +729,7 @@ const DemandDetailPage = () => {
                         <>
                           {demand.processing_fee_per_ton && (
                             <Descriptions.Item label="Phí gia công">
-                              {demand.processing_fee_per_ton.toLocaleString('vi-VN')} đ/tấn
+                              {demand.processing_fee_per_ton.toLocaleString('vi-VN')} ₫/tấn
                             </Descriptions.Item>
                           )}
                           {demand.expected_output_rate && (

@@ -27,26 +27,24 @@ import {
   salesLotService,
   type LotLedger, type SalesLotRow, type OrderWithoutLots, type LotPaymentStatus,
   type LotDeliveryState,
+  LOT_PAYMENT_STATUS_LABELS, LOT_PAYMENT_STATUS_COLORS, LOT_STATUS_LABELS,
 } from '../../services/sales/salesLotService'
 import QuickPayModal, { type QuickPayTarget } from './components/QuickPayModal'
 import { useAuthStore } from '../../stores/authStore'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, PAYMENT_STATUS_LABELS } from '../../services/sales/salesTypes'
+import { EnumTag } from '../../components/common/EnumTag'
+import { fmtDate, fmtUsd, usdInputProps } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 const { Title, Text } = Typography
 
-const fmtUSD = (v: number | null | undefined): string =>
-  v == null ? '—'
-    : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v)
+// USD: fmtUsd (utils/format). Nhãn thu tiền của lô: LOT_PAYMENT_STATUS_LABELS (salesLotService —
+// cùng chữ với PAYMENT_STATUS_LABELS của đơn, thêm 'Chưa có trị giá').
 
+/** kg → tấn (đơn vị riêng của sổ lô, 3 số lẻ). */
 const fmtTon = (kg: number | null | undefined): string =>
   kg == null ? '—' : `${(kg / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 3 })} T`
-
-const PAY_TAG: Record<LotPaymentStatus, { color: string; label: string }> = {
-  paid:    { color: 'green',  label: 'Đã thu đủ' },
-  partial: { color: 'gold',   label: 'Thu 1 phần' },
-  unpaid:  { color: 'red',    label: 'Chưa thu' },
-  unknown: { color: 'default', label: 'Chưa có trị giá' },
-}
 
 /**
  * Trục GIAO — màu và nhãn. Tính từ chứng cứ container, KHÔNG từ `lot_status`.
@@ -59,10 +57,7 @@ const DELIVERY_TAG: Record<LotDeliveryState, { color: string; label: string; bar
   none:    { color: 'default', label: 'Chưa đi',  bar: '#d1d5db' },
 }
 
-const LOT_STATUS_LABEL: Record<string, string> = {
-  planning: 'Kế hoạch', packing: 'Đang đóng', shipped: 'Đã đi',
-  delivered: 'Đã giao', cancelled: 'Đã huỷ',
-}
+const LOT_STATUS_LABEL: Record<string, string> = LOT_STATUS_LABELS
 
 /**
  * Bộ lọc nhanh. Trộn hai trục vào một dải nút là cố ý: người dùng đến trang này với
@@ -122,7 +117,7 @@ export default function SalesLotLedgerPage() {
           unit_price_usd: priceTarget.unit_price_usd,
         })
       }
-      message.success(`Đã chốt trị giá lô ${priceTarget.lot_no} — ${fmtUSD(v)}`)
+      message.success(`Đã chốt trị giá lô ${priceTarget.lot_no} — ${fmtUsd(v)}`)
       setPriceTarget(null)
       setPriceValue(null)
       load()
@@ -132,7 +127,7 @@ export default function SalesLotLedgerPage() {
         message.warning('Lô này vừa được người khác chốt trị giá. Đang tải lại.')
         setPriceTarget(null); setPriceValue(null); load()
       } else {
-        message.error(e?.message || 'Không chốt được trị giá lô')
+        message.error(dichLoiHeThong(e, 'Không chốt được trị giá lô'))
       }
     } finally {
       setPricing(false)
@@ -146,7 +141,7 @@ export default function SalesLotLedgerPage() {
       setLedger(await salesLotService.getLedger())
     } catch (e: any) {
       // Không nuốt lỗi thành "không có dữ liệu" — đó là cách các trang cũ giấu sự cố.
-      setErr(e?.message || 'Không tải được sổ lô')
+      setErr(dichLoiHeThong(e, 'Không tải được sổ lô'))
     } finally {
       setLoading(false)
     }
@@ -290,7 +285,7 @@ export default function SalesLotLedgerPage() {
       title: 'Trị giá lô', dataIndex: 'value_usd', width: 150, align: 'right',
       render: (v: number | null, r) => {
         // ĐÃ CHỐT — đây là số dùng làm mẫu số thật.
-        if (r.value_source === 'lot') return <strong>{fmtUSD(v)}</strong>
+        if (r.value_source === 'lot') return <strong>{fmtUsd(v)}</strong>
 
         // TẠM TÍNH — lô có container nhưng chưa ai chốt trị giá. KHÔNG được hiện như số
         // chốt: net_weight_kg bị ghi đè mỗi lần gán cont nên con số này đổi SAU khi hoá
@@ -299,7 +294,7 @@ export default function SalesLotLedgerPage() {
           return (
             <div>
               <Tooltip title="Số TẠM TÍNH theo công thức hoá đơn (tấn × đơn giá). Chưa chốt nên có thể đổi khi gán thêm container. Bấm Chốt để ghi lại theo đúng chứng từ.">
-                <Text type="warning" style={{ fontStyle: 'italic' }}>≈ {fmtUSD(r.value_est_usd)}</Text>
+                <Text type="warning" style={{ fontStyle: 'italic' }}>≈ {fmtUsd(r.value_est_usd)}</Text>
               </Tooltip>
               {canPay && (
                 <div>
@@ -325,10 +320,10 @@ export default function SalesLotLedgerPage() {
       title: 'Đã thu', dataIndex: 'paid_usd', width: 120, align: 'right',
       render: (v: number, r) => (
         <div>
-          <span style={{ color: v > 0 ? '#15803d' : '#9ca3af', fontWeight: v > 0 ? 600 : 400 }}>{fmtUSD(v)}</span>
+          <span style={{ color: v > 0 ? '#15803d' : '#9ca3af', fontWeight: v > 0 ? 600 : 400 }}>{fmtUsd(v)}</span>
           {r.payment_count > 0 && (
             <div style={{ fontSize: 10, color: '#6b7280' }}>
-              {r.payment_count} lần{r.last_payment_date ? ` · ${r.last_payment_date}` : ''}
+              {r.payment_count} lần{r.last_payment_date ? ` · ${fmtDate(r.last_payment_date)}` : ''}
             </div>
           )}
         </div>
@@ -337,13 +332,13 @@ export default function SalesLotLedgerPage() {
     },
     {
       title: 'Còn nợ', dataIndex: 'remaining_usd', width: 120, align: 'right',
-      render: (v: number) => <span style={{ color: v > 0 ? '#dc2626' : '#15803d', fontWeight: 600 }}>{fmtUSD(v)}</span>,
+      render: (v: number) => <span style={{ color: v > 0 ? '#dc2626' : '#15803d', fontWeight: 600 }}>{fmtUsd(v)}</span>,
       sorter: (a, b) => a.remaining_usd - b.remaining_usd,
     },
     {
       title: 'Thu tiền', dataIndex: 'payment_status', width: 118, align: 'center',
-      render: (v: LotPaymentStatus) => <Tag color={PAY_TAG[v].color}>{PAY_TAG[v].label}</Tag>,
-      filters: (Object.keys(PAY_TAG) as LotPaymentStatus[]).map((k) => ({ text: PAY_TAG[k].label, value: k })),
+      render: (v: LotPaymentStatus) => <EnumTag value={v} labels={LOT_PAYMENT_STATUS_LABELS} colors={LOT_PAYMENT_STATUS_COLORS} />,
+      filters: (Object.keys(LOT_PAYMENT_STATUS_LABELS) as LotPaymentStatus[]).map((k) => ({ text: LOT_PAYMENT_STATUS_LABELS[k], value: k })),
       onFilter: (val, r) => r.payment_status === val,
     },
     {
@@ -352,7 +347,7 @@ export default function SalesLotLedgerPage() {
         <div style={{ fontSize: 11, lineHeight: 1.5 }}>
           {r.invoice_no ? <div>INV: {r.invoice_no}</div> : null}
           {r.bl_no ? <div>B/L: {r.bl_no}</div> : null}
-          {r.etd ? <div style={{ color: '#6b7280' }}>ETD: {r.etd}</div> : null}
+          {r.etd ? <div style={{ color: '#6b7280' }}>ETD: {fmtDate(r.etd)}</div> : null}
           {!r.invoice_no && !r.bl_no && !r.etd ? <Text type="secondary">—</Text> : null}
         </div>
       ),
@@ -390,7 +385,9 @@ export default function SalesLotLedgerPage() {
         </div>
       ),
     },
-    { title: 'Trạng thái', dataIndex: 'order_status', width: 120, render: (v) => <Tag>{v || '—'}</Tag> },
+    // Trước 17/11/2026 in thô mã tiếng Anh ('confirmed', 'producing') — nay nhãn chuẩn ORDER_STATUS_LABELS
+    { title: 'Trạng thái', dataIndex: 'order_status', width: 130,
+      render: (v: string | null) => <EnumTag value={v} labels={ORDER_STATUS_LABELS} colors={ORDER_STATUS_COLORS} /> },
     {
       title: 'Container', dataIndex: 'container_count', width: 110, align: 'right',
       render: (v: number) => v > 0
@@ -400,12 +397,12 @@ export default function SalesLotLedgerPage() {
     },
     {
       title: 'Trị giá HĐ', dataIndex: 'total_value_usd', width: 130, align: 'right',
-      render: (v: number | null) => fmtUSD(v),
+      render: (v: number | null) => fmtUsd(v),
       sorter: (a, b) => (a.total_value_usd || 0) - (b.total_value_usd || 0),
     },
     {
       title: 'Đã thu (mức HĐ)', dataIndex: 'actual_payment_amount', width: 140, align: 'right',
-      render: (v: number | null) => <span style={{ color: (v || 0) > 0 ? '#15803d' : '#9ca3af' }}>{fmtUSD(v || 0)}</span>,
+      render: (v: number | null) => <span style={{ color: (v || 0) > 0 ? '#15803d' : '#9ca3af' }}>{fmtUsd(v || 0)}</span>,
     },
     {
       title: '', width: 200,
@@ -459,7 +456,7 @@ export default function SalesLotLedgerPage() {
           <Card size="small">
             <Statistic title="Số lô" value={t?.lotCount ?? 0} />
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-              {t?.lotsPaid ?? 0} đã thu · {t?.lotsPartial ?? 0} thu 1 phần · {t?.lotsUnpaid ?? 0} chưa thu
+              {t?.lotsPaid ?? 0} đã thu đủ · {t?.lotsPartial ?? 0} thu một phần · {t?.lotsUnpaid ?? 0} chưa thu
             </div>
           </Card>
         </Col>
@@ -478,18 +475,18 @@ export default function SalesLotLedgerPage() {
         <Col xs={12} md={6}>
           <Card size="small">
             <Statistic
-              title="Đã thu theo lô" value={fmtUSD(t?.lotPaidUsd ?? 0)}
+              title="Đã thu theo lô" value={fmtUsd(t?.lotPaidUsd ?? 0)}
               valueStyle={{ fontSize: 20, color: '#15803d' }}
             />
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-              trên {fmtUSD(t?.lotValueUsd ?? 0)} trị giá lô
+              trên {fmtUsd(t?.lotValueUsd ?? 0)} trị giá lô
             </div>
           </Card>
         </Col>
         <Col xs={12} md={6}>
           <Card size="small">
             <Statistic
-              title="Còn nợ theo lô" value={fmtUSD(t?.lotRemainingUsd ?? 0)}
+              title="Còn nợ theo lô" value={fmtUsd(t?.lotRemainingUsd ?? 0)}
               valueStyle={{ fontSize: 20, color: '#dc2626' }}
             />
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
@@ -550,9 +547,9 @@ export default function SalesLotLedgerPage() {
             options={[
               { label: 'Tất cả', value: 'all' },
               { label: `Đã giao, chưa thu${t ? ` (${t.lotsDeliveredUnpaid})` : ''}`, value: 'shipped_unpaid' },
-              { label: 'Chưa thu', value: 'unpaid' },
-              { label: 'Thu 1 phần', value: 'partial' },
-              { label: 'Đã thu đủ', value: 'paid' },
+              { label: PAYMENT_STATUS_LABELS.unpaid, value: 'unpaid' },
+              { label: PAYMENT_STATUS_LABELS.partial, value: 'partial' },
+              { label: PAYMENT_STATUS_LABELS.paid, value: 'paid' },
               { label: `Chưa đi${t ? ` (${t.lotsNotShipped})` : ''}`, value: 'not_shipped' },
               { label: `Lệch trạng thái${t ? ` (${t.lotsMismatch})` : ''}`, value: 'mismatch' },
               { label: `Chưa chốt giá${t ? ` (${t.lotsUnpriced})` : ''}`, value: 'unpriced' },
@@ -605,7 +602,7 @@ export default function SalesLotLedgerPage() {
                   <Table.Summary.Cell index={3} />
                   <Table.Summary.Cell index={4} />
                   <Table.Summary.Cell index={5} align="right">
-                    {fmtUSD(v)}
+                    {fmtUsd(v)}
                     {vEstimated && (
                       <Tooltip title="Có lô chưa chốt trị giá — tổng này gồm cả số tạm tính (net/1000 × đơn giá) và sẽ đổi nếu gán lại container.">
                         <span style={{ color: '#8a5a05', cursor: 'help' }}> ~</span>
@@ -613,10 +610,10 @@ export default function SalesLotLedgerPage() {
                     )}
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={6} align="right">
-                    <span style={{ color: '#15803d' }}>{fmtUSD(p)}</span>
+                    <span style={{ color: '#15803d' }}>{fmtUsd(p)}</span>
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={7} align="right">
-                    <span style={{ color: '#dc2626' }}>{fmtUSD(rm)}</span>
+                    <span style={{ color: '#dc2626' }}>{fmtUsd(rm)}</span>
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={8} />
                   <Table.Summary.Cell index={9} />
@@ -663,14 +660,14 @@ export default function SalesLotLedgerPage() {
               message="Nhập đúng số trên Commercial Invoice đã phát cho khách"
               description={
                 <span style={{ fontSize: 13 }}>
-                  Số gợi ý <strong>{fmtUSD(priceTarget.value_est_usd)}</strong> là tạm tính, có thể khác chứng từ.
+                  Số gợi ý <strong>{fmtUsd(priceTarget.value_est_usd)}</strong> là tạm tính, có thể khác chứng từ.
                 </span>
               }
             />
             <div style={{ fontSize: 13, color: '#6b7280' }}>
               {priceTarget.containers_delivered}/{priceTarget.container_count} container đã giao ·
               {' '}{fmtTon(priceTarget.net_kg_total)} · đơn giá{' '}
-              {priceTarget.unit_price_usd ? fmtUSD(priceTarget.unit_price_usd) + '/tấn' : '—'}
+              {priceTarget.unit_price_usd ? fmtUsd(priceTarget.unit_price_usd) + '/tấn' : '—'}
             </div>
             <div>
               <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Trị giá lô (USD)</div>
@@ -682,11 +679,10 @@ export default function SalesLotLedgerPage() {
                 autoFocus
                 style={{ width: '100%' }}
                 min={0.01}
-                step={100}
                 value={priceValue ?? priceTarget.value_est_usd ?? undefined}
                 onChange={(v) => setPriceValue(v as number | null)}
-                formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(v) => Number((v || '').replace(/,/g, ''))}
+                {...usdInputProps}
+                step={100}
               />
             </div>
           </div>

@@ -16,8 +16,8 @@ import {
 import dayjs from 'dayjs';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
-import { createEvaluation } from '../../services/evaluationService';
-import { calculateRating } from '../../types/evaluation.types';
+import { approveTasksScored, computeFinalScore, explainScore, lateDays, starsToPoints, DEFAULT_MANAGER_STARS, LATE_PENALTY_PER_DAY, DIFFICULTY_COEF } from '../../services/taskScoring';
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -85,7 +85,7 @@ const BatchApprovePage: React.FC = () => {
   const [filterDateRange, setFilterDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
 
   // Batch action
-  const [batchScore, setBatchScore] = useState<number>(4);
+  const [batchScore, setBatchScore] = useState<number>(DEFAULT_MANAGER_STARS);
 
   // Inline edits: task_id -> { manager_score, note }
   const [inlineEdits, setInlineEdits] = useState<Record<string, { manager_score?: number; note?: string }>>({});
@@ -195,8 +195,10 @@ const BatchApprovePage: React.FC = () => {
   // INLINE EDIT HANDLERS
   // ============================================================================
 
+  // Ô sao từng dòng mặc định = số sao "cả lô" — HIỆN đúng số sẽ dùng khi bấm duyệt
+  // (bản cũ hiện 4★ nhưng lúc duyệt lại đọc state cũ → bỏ qua số sao cả lô).
   const getManagerScore = (taskId: string, fallback?: number): number => {
-    return inlineEdits[taskId]?.manager_score ?? fallback ?? 4;
+    return inlineEdits[taskId]?.manager_score ?? fallback ?? batchScore;
   };
 
   const getNote = (taskId: string): string => {
@@ -221,129 +223,36 @@ const BatchApprovePage: React.FC = () => {
   // APPROVE LOGIC
   // ============================================================================
 
-  const approveTasks = async (taskIds: string[]) => {
+  // Duyệt qua cửa CHUNG (taskScoring.approveTasksScored): MỘT lô lệnh thay vòng for-await từng việc,
+  // điểm cuối = đúng công thức của ô "Điểm cuối" bên dưới, thông báo NV do trigger DB gửi (không đúp).
+  // `starsById` truyền số sao TƯỜNG MINH — bản cũ setInlineEdits rồi gọi ngay nên đọc state cũ.
+  const approveTasks = async (taskIds: string[], starsById: Record<string, number>) => {
     if (!user?.employee_id) {
       message.error('Không xác định được thông tin người dùng');
       return;
     }
 
     setApproving(true);
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const taskId of taskIds) {
-      try {
-        const task = tasks.find(t => t.id === taskId);
-        if (!task) continue;
-
-        const managerStars = getManagerScore(taskId);
-        const managerScorePoints = managerStars * 20; // ★ 1-5 sao → 20-100 điểm
-        const note = getNote(taskId);
-
-        // Hệ số độ khó: normal=1.0, hard=1.2, critical=1.5
-        const difficultyMultiplier = task.difficulty === 'critical' ? 1.5 : task.difficulty === 'hard' ? 1.2 : 1.0;
-        const qualityScore = Math.min(100, Math.round(managerScorePoints * difficultyMultiplier));
-
-        // Trừ điểm quá hạn (nếu không miễn trừ)
-        let overduePenalty = 0;
-        if (task.due_date && task.completed_date && !task.overdue_exempt) {
-          const daysLate = Math.max(0, Math.ceil((new Date(task.completed_date).getTime() - new Date(task.due_date).getTime()) / 86400000));
-          overduePenalty = daysLate * 2;
-        }
-
-        const finalScore = Math.max(0, qualityScore - overduePenalty);
-        const rating = calculateRating(finalScore);
-
-        // 1. Insert into task_evaluations
-        const { error: evalError } = await createEvaluation({
-          task_id: taskId,
-          employee_id: task.assignee?.id || '',
-          evaluator_id: user.employee_id,
-          score: finalScore,
-          content: note || undefined,
-        });
-
-        if (evalError) {
-          console.error('Evaluation insert error for task', taskId, evalError);
-          // Skip - evaluation might already exist from previous attempt
-        }
-
-        // Also update task_self_evaluations if exists
-        await supabase.from('task_self_evaluations')
-          .update({ status: 'approved' })
-          .eq('task_id', taskId)
-          .eq('status', 'pending');
-
-        // 2. Insert into task_approvals
-        const { error: approvalError } = await supabase
-          .from('task_approvals')
-          .insert({
-            task_id: taskId,
-            approver_id: user.employee_id,
-            action: 'approved',
-            approved_score: finalScore,
-            original_score: managerScorePoints,
-            rating,
-            comments: note || 'Phê duyệt nhanh hàng loạt',
-          });
-
-        if (approvalError) {
-          console.error('Approval insert error for task', taskId, approvalError);
-        }
-
-        // 3. Update task evaluation_status + final_score + status
-        const { error: updateError } = await supabase
-          .from('tasks')
-          .update({
-            status: 'finished',
-            evaluation_status: 'approved',
-            final_score: finalScore,
-          })
-          .eq('id', taskId);
-
-        if (updateError) throw updateError;
-
-        // 4. Update self_evaluation status if exists
-        await supabase
-          .from('task_self_evaluations')
-          .update({ status: 'approved', updated_at: new Date().toISOString() })
-          .eq('task_id', taskId)
-          .eq('status', 'pending');
-
-        // ★ Thông báo NV: task đã được duyệt
-        try {
-          const { notify } = await import('../../services/notificationHelper');
-          if (task.assignee?.id) {
-            await notify({
-              recipientId: task.assignee.id,
-              senderId: user.employee_id,
-              module: 'task',
-              type: 'task_approved',
-              title: `Công việc đã được duyệt: ${finalScore} điểm`,
-              message: `${task.name} (${task.code})`,
-              referenceUrl: `/tasks/${taskId}`,
-            });
-          }
-        } catch (e) { console.error('[notify] approved:', e); }
-
-        successCount++;
-      } catch (err: any) {
-        console.error('Error approving task:', taskId, err);
-        errorCount++;
+    try {
+      const res = await approveTasksScored(
+        taskIds.map(id => ({
+          taskId: id,
+          managerPoints: starsToPoints(starsById[id] ?? batchScore),
+          note: getNote(id) || null,
+        })),
+        user.employee_id,
+        'Phê duyệt nhanh hàng loạt',
+      );
+      if (res.ok.length > 0) message.success(`Đã duyệt thành công ${res.ok.length} công việc`);
+      if (res.failed.length > 0) {
+        message.error(`Lỗi duyệt ${res.failed.length} công việc: ${dichLoiHeThong(res.failed[0].error, 'không duyệt được')}`);
       }
+    } catch (err) {
+      message.error(dichLoiHeThong(err, 'Không duyệt được'));
+    } finally {
+      setApproving(false);
+      fetchTasks();
     }
-
-    setApproving(false);
-
-    if (successCount > 0) {
-      message.success(`Đã duyệt thành công ${successCount} công việc`);
-    }
-    if (errorCount > 0) {
-      message.error(`Lỗi duyệt ${errorCount} công việc`);
-    }
-
-    // Refresh
-    fetchTasks();
   };
 
   const handleApproveSelected = () => {
@@ -351,18 +260,8 @@ const BatchApprovePage: React.FC = () => {
       message.warning('Chưa chọn công việc nào');
       return;
     }
-
-    // Apply batch score to selected tasks that don't have individual scores
-    const updatedEdits = { ...inlineEdits };
-    selectedRowKeys.forEach(key => {
-      const id = key as string;
-      if (!updatedEdits[id]?.manager_score) {
-        updatedEdits[id] = { ...updatedEdits[id], manager_score: batchScore };
-      }
-    });
-    setInlineEdits(updatedEdits);
-
-    approveTasks(selectedRowKeys as string[]);
+    const ids = selectedRowKeys as string[];
+    approveTasks(ids, Object.fromEntries(ids.map(id => [id, getManagerScore(id)])));
   };
 
   const handleApproveAll = () => {
@@ -373,22 +272,14 @@ const BatchApprovePage: React.FC = () => {
 
     Modal.confirm({
       title: 'Xác nhận duyệt tất cả',
-      content: `Bạn sắp duyệt tất cả ${filteredTasks.length} công việc với điểm manager: ${batchScore} sao. Hành động này không thể hoàn tác.`,
+      content: `Bạn sắp duyệt tất cả ${filteredTasks.length} công việc — dòng chưa chấm riêng dùng ${batchScore} sao. Hành động này không thể hoàn tác.`,
       okText: 'Duyệt tất cả',
       okButtonProps: { danger: true, style: { backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' } },
       cancelText: 'Hủy',
       icon: <AlertTriangle className="w-5 h-5 text-orange-500" />,
       onOk: () => {
-        // Apply batch score to all
-        const updatedEdits = { ...inlineEdits };
-        filteredTasks.forEach(t => {
-          if (!updatedEdits[t.id]?.manager_score) {
-            updatedEdits[t.id] = { ...updatedEdits[t.id], manager_score: batchScore };
-          }
-        });
-        setInlineEdits(updatedEdits);
-
-        approveTasks(filteredTasks.map(t => t.id));
+        const ids = filteredTasks.map(t => t.id);
+        approveTasks(ids, Object.fromEntries(ids.map(id => [id, getManagerScore(id)])));
       },
     });
   };
@@ -461,8 +352,8 @@ const BatchApprovePage: React.FC = () => {
       width: 90,
       align: 'center',
       render: (d: string) => {
-        if (d === 'critical') return <Tag color="red">Rất khó ×1.5</Tag>;
-        if (d === 'hard') return <Tag color="orange">Khó ×1.2</Tag>;
+        if (d === 'critical') return <Tag color="red">Rất khó ×{String(DIFFICULTY_COEF.critical).replace('.', ',')}</Tag>;
+        if (d === 'hard') return <Tag color="orange">Khó ×{String(DIFFICULTY_COEF.hard).replace('.', ',')}</Tag>;
         return <Tag>Bình thường</Tag>;
       },
       filters: [
@@ -479,13 +370,14 @@ const BatchApprovePage: React.FC = () => {
       align: 'center',
       render: (_: any, record: PendingTask) => {
         if (!record.due_date || !record.completed_date) return <Text type="secondary">—</Text>;
-        const days = Math.ceil((new Date(record.completed_date).getTime() - new Date(record.due_date).getTime()) / 86400000);
+        const days = lateDays(record.due_date, record.completed_date);
         if (days <= 0) return <Tag color="green">Đúng hạn</Tag>;
-        return <Tag color="red">Trễ {days}d (-{days * 2}đ)</Tag>;
+        if (record.overdue_exempt) return <Tag>Trễ {days} ngày · đã miễn</Tag>;
+        return <Tag color="red">Trễ {days} ngày (−{days * LATE_PENALTY_PER_DAY}đ)</Tag>;
       },
     },
     {
-      title: 'Manager chấm',
+      title: 'QL chấm',
       key: 'manager_score',
       width: 150,
       align: 'center',
@@ -505,10 +397,14 @@ const BatchApprovePage: React.FC = () => {
       render: (_: any, record: PendingTask) => {
         const ms = getManagerScore(record.id)
         if (!ms) return <Text type="secondary" style={{ fontSize: 11 }}>—</Text>
-        const selfScore = record.self_score ?? 60 // Default 60 (3 sao) nếu chưa tự đánh giá
-        const final = Math.round(selfScore * 0.4 + (ms * 20) * 0.6)
+        // CÙNG hàm với lúc lưu (taskScoring) — xem trước = số sẽ ghi
+        const input = {
+          managerPoints: starsToPoints(ms), selfScore: record.self_score, difficulty: record.difficulty,
+          dueDate: record.due_date, completedDate: record.completed_date, overdueExempt: record.overdue_exempt,
+        }
+        const final = computeFinalScore(input).final
         const color = final >= 75 ? '#52c41a' : final >= 60 ? '#faad14' : '#ff4d4f'
-        return <Text strong style={{ fontSize: 15, color }}>{final}</Text>
+        return <Tooltip title={explainScore(input)}><Text strong style={{ fontSize: 15, color, cursor: 'help' }}>{final}</Text></Tooltip>
       },
     },
     {
@@ -674,7 +570,7 @@ const BatchApprovePage: React.FC = () => {
               Đã chọn: <span style={{ color: '#1B4D3E' }}>{selectedCount}</span> công việc
             </Text>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Text>Manager chấm:</Text>
+              <Text>QL chấm (dòng chưa chấm riêng):</Text>
               <Rate
                 value={batchScore}
                 onChange={setBatchScore}

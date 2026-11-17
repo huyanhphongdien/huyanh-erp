@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X, Save, Package, AlertCircle } from 'lucide-react'
+import { dichLoiHeThong } from '../../../../../utils/dichLoiHeThong'
 import { 
   unitService, 
   Unit, 
@@ -114,7 +115,7 @@ const UnitForm: React.FC<UnitFormProps> = ({ unit, onClose, onSuccess }) => {
 
       onSuccess()
     } catch (err: any) {
-      setError(err.message || 'Có lỗi xảy ra')
+      setError(dichLoiHeThong(err, 'Có lỗi xảy ra khi lưu đơn vị tính'))
     } finally {
       setLoading(false)
     }

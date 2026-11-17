@@ -33,14 +33,18 @@ import type { ColumnsType } from 'antd/es/table'
 import {
   ArrowLeftOutlined,
   EditOutlined,
-  DeleteOutlined,
+  StopOutlined,
   PlusOutlined,
   ShoppingOutlined,
   DollarOutlined,
   BarChartOutlined,
   FileTextOutlined,
 } from '@ant-design/icons'
-import { salesCustomerService } from '../../services/sales/salesCustomerService'
+import { salesCustomerService, customSpecsToRows, rowsToCustomSpecs } from '../../services/sales/salesCustomerService'
+import { CustomSpecsFormList } from './CustomerSpecsField'
+import { DASH, fmtUsd, fmtDate, usdInputProps } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import PageState from '../../components/common/PageState'
 import CustomerExportProfileTab from './components/CustomerExportProfileTab'
 import CustomerDocSetHistoryTab from './components/CustomerDocSetHistoryTab'
 import type {
@@ -66,6 +70,8 @@ import {
   PAYMENT_TERMS_LABELS,
   SVR_GRADE_OPTIONS,
   COUNTRY_OPTIONS,
+  soDisplayCode,
+  countryLabel,
 } from '../../services/sales/salesTypes'
 
 const { Title } = Typography
@@ -74,22 +80,7 @@ const { Title } = Typography
 // HELPERS
 // ============================================
 
-const formatCurrency = (value: number | null | undefined): string => {
-  if (!value) return '-'
-  if (value >= 1000000000) return `${(value / 1000000000).toFixed(2)} tỷ`
-  if (value >= 1000000) return `${(value / 1000000).toFixed(1)} tr`
-  return new Intl.NumberFormat('vi-VN').format(value) + ' đ'
-}
-
-const formatUSD = (value: number | null | undefined): string => {
-  if (!value) return '-'
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
-}
-
-const formatDate = (dateStr: string | null | undefined): string => {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleDateString('vi-VN')
-}
+// Định dạng: fmtUsd / fmtDate / DASH (utils/format) — bỏ formatCurrency ' đ' (không dùng) + formatUSD cục bộ.
 
 const GradeBadge = ({ grade }: { grade: string }) => (
   <Tag color="blue" style={{ marginBottom: 4 }}>{grade}</Tag>
@@ -125,6 +116,8 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
   const [orders, setOrders] = useState<SalesOrder[]>([])
   const [stats, setStats] = useState<CustomerDetailStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [ordersError, setOrdersError] = useState<unknown>(null)
   // Deep-link: ?tab=export mở thẳng tab "Hồ sơ chứng từ" (chỉ ở chế độ route, không phải khi nhúng tab)
   const [activeTab, setActiveTab] = useState<string>(() => {
     const t = searchParams.get('tab')
@@ -139,6 +132,8 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
   const loadData = useCallback(async () => {
     if (!customerId) return
     setLoading(true)
+    setLoadError(null)
+    setOrdersError(null)
     try {
       const customerData = await salesCustomerService.getById(customerId)
       setCustomer(customerData)
@@ -155,13 +150,17 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
           totalQuantity: ordersList.reduce((sum, o) => sum + (o.quantity_tons || 0), 0),
           processingOrders: ordersList.filter(o => o.status === 'producing' || o.status === 'ready' || o.status === 'packing').length,
         })
-      } catch {
+      } catch (e) {
+        // Lỗi tải đơn ≠ "chưa có đơn" — tab Đơn hàng/Thống kê hiện khối lỗi thay cho số 0
         setOrders([])
-        setStats({ totalOrders: 0, totalRevenue: 0, totalQuantity: 0, processingOrders: 0 })
+        setStats(null)
+        setOrdersError(e)
       }
     } catch (err) {
+      // Lỗi tải ≠ "không tìm thấy khách hàng" (nạp lại sau khi sửa mà hỏng thì toast: đang xem bản cũ)
       console.error('Lỗi tải dữ liệu khách hàng:', err)
-      message.error('Không thể tải dữ liệu khách hàng')
+      setLoadError(err)
+      message.error(dichLoiHeThong(err, 'Không thể tải dữ liệu khách hàng'))
     } finally {
       setLoading(false)
     }
@@ -193,6 +192,8 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
       quality_standard: customer.quality_standard,
       preferred_grades: customer.preferred_grades,
       requires_pre_shipment_sample: customer.requires_pre_shipment_sample,
+      // Cùng ô với modal ở trang danh sách (trước đây modal này thiếu hẳn trường này → 2 form lệch nhau)
+      custom_specs: customSpecsToRows(customer.custom_specs),
     })
     setEditModalOpen(true)
   }
@@ -202,40 +203,47 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
     try {
       const values = await form.validateFields()
       setSaving(true)
-      await salesCustomerService.update(customerId, values as Partial<CreateCustomerData>)
+      await salesCustomerService.update(customerId, {
+        ...(values as Partial<CreateCustomerData>),
+        custom_specs: rowsToCustomSpecs(values.custom_specs),   // dòng form → object jsonb
+      })
       message.success('Đã cập nhật khách hàng')
       setEditModalOpen(false)
       loadData()
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.errorFields) return // lỗi nhập liệu — form đã tô đỏ
       console.error('Lỗi cập nhật:', err)
-      message.error('Cập nhật thất bại')
+      message.error(dichLoiHeThong(err, 'Cập nhật thất bại'))
     } finally {
       setSaving(false)
     }
   }
 
-  // ── Delete ──
-  const handleDelete = async () => {
+  // ── Ngừng hoạt động ──
+  // salesCustomerService.delete() KHÔNG xoá: chuyển khách sang "Ngừng HĐ" (giữ lịch sử) và từ chối khi
+  // khách còn đơn đang xử lý. Nhãn cũ "Xóa"/"Đã xóa" + nhảy về danh sách là nói sai việc hệ thống làm.
+  const handleDeactivate = async () => {
     if (!customerId) return
     try {
       await salesCustomerService.delete(customerId)
-      message.success('Đã xóa khách hàng')
-      navigate('/sales/customers')
+      message.success(`Đã chuyển khách sang ${CUSTOMER_STATUS_LABELS.inactive}`)
+      loadData()
     } catch (err) {
-      console.error('Lỗi xóa:', err)
-      message.error('Xóa thất bại')
+      console.error('Lỗi ngừng hoạt động:', err)
+      message.error(dichLoiHeThong(err, 'Không chuyển được sang Ngừng hoạt động'), 6)
     }
   }
 
   // ── Order table columns ──
   const orderColumns: ColumnsType<SalesOrder> = [
     {
-      title: 'Mã đơn',
-      dataIndex: 'code',
-      key: 'code',
-      render: (code: string, record: SalesOrder) => (
+      // Số HĐ (HA…) là số người dùng nhớ; đơn chưa có HĐ mới rơi về mã SO nội bộ
+      title: 'Số HĐ',
+      dataIndex: 'contract_no',
+      key: 'contract_no',
+      render: (_: string, record: SalesOrder) => (
         <Button type="link" onClick={() => navigate(`/sales/orders/${record.id}`)}>
-          {code}
+          {soDisplayCode(record)}
         </Button>
       ),
     },
@@ -243,21 +251,21 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
       title: 'Grade',
       dataIndex: 'grade',
       key: 'grade',
-      render: (grade: string | null) => grade ? <Tag color="blue">{grade}</Tag> : '-',
+      render: (grade: string | null) => grade ? <Tag color="blue">{grade}</Tag> : DASH,
     },
     {
       title: 'Số lượng (tấn)',
       dataIndex: 'quantity_tons',
       key: 'quantity_tons',
       align: 'right',
-      render: (v: number | null) => v != null ? v.toFixed(2) : '-',
+      render: (v: number | null) => v != null ? v.toFixed(2) : DASH,
     },
     {
       title: 'Giá trị (USD)',
       dataIndex: 'total_value_usd',
       key: 'total_value_usd',
       align: 'right',
-      render: (v: number | null) => formatUSD(v),
+      render: (v: number | null) => fmtUsd(v),
     },
     {
       title: 'Trạng thái',
@@ -273,7 +281,7 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
       title: 'Ngày đặt',
       dataIndex: 'order_date',
       key: 'order_date',
-      render: (d: string) => formatDate(d),
+      render: (d: string) => fmtDate(d),
     },
   ]
 
@@ -292,18 +300,20 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
     )
   }
 
+  if (loadError && !customer) {
+    return <PageState error={loadError} onRetry={loadData} />
+  }
+
   if (!customer) {
     return <Empty description="Không tìm thấy khách hàng" />
   }
 
-  // ── Custom specs data ──
-  const customSpecData = customer.custom_specs
-    ? Object.entries(customer.custom_specs).map(([k, v]) => ({
-        key: k,
-        spec_key: k,
-        spec_value: String(v),
-      }))
-    : []
+  // ── Custom specs data ── (đọc được cả bản cũ lỡ lưu thành chuỗi JSON — trước đây vỡ thành từng ký tự)
+  const customSpecData = customSpecsToRows(customer.custom_specs).map((r, i) => ({
+    key: `${i}-${r.key}`,
+    spec_key: r.key,
+    spec_value: r.value,
+  }))
 
   // ============================================
   // TAB ITEMS
@@ -324,17 +334,15 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
             >
               <Descriptions.Item label="Mã KH">{customer.code}</Descriptions.Item>
               <Descriptions.Item label="Tên">{customer.name}</Descriptions.Item>
-              <Descriptions.Item label="Tên viết tắt">{customer.short_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Tên viết tắt">{customer.short_name || DASH}</Descriptions.Item>
               <Descriptions.Item label="Quốc gia">
-                {customer.country
-                  ? (COUNTRY_OPTIONS.find(c => c.value === customer.country)?.label || customer.country)
-                  : '-'}
+                {countryLabel(customer.country)}
               </Descriptions.Item>
-              <Descriptions.Item label="Khu vực">{customer.region || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Người liên hệ">{customer.contact_person || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Email">{customer.email || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Điện thoại">{customer.phone || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Địa chỉ">{customer.address || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Khu vực">{customer.region || DASH}</Descriptions.Item>
+              <Descriptions.Item label="Người liên hệ">{customer.contact_person || DASH}</Descriptions.Item>
+              <Descriptions.Item label="Email">{customer.email || DASH}</Descriptions.Item>
+              <Descriptions.Item label="Điện thoại">{customer.phone || DASH}</Descriptions.Item>
+              <Descriptions.Item label="Địa chỉ">{customer.address || DASH}</Descriptions.Item>
               <Descriptions.Item label="Hạng">
                 <Tag color={CUSTOMER_TIER_COLORS[customer.tier]}>
                   {CUSTOMER_TIER_LABELS[customer.tier]}
@@ -353,21 +361,21 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
                 <Descriptions.Item label="Điều khoản TT">
                   {customer.payment_terms
                     ? PAYMENT_TERMS_LABELS[customer.payment_terms]
-                    : '-'}
+                    : DASH}
                 </Descriptions.Item>
                 <Descriptions.Item label="Incoterm mặc định">
                   {customer.default_incoterm
                     ? INCOTERM_LABELS[customer.default_incoterm]
-                    : '-'}
+                    : DASH}
                 </Descriptions.Item>
                 <Descriptions.Item label="Tiền tệ">
-                  {customer.default_currency || '-'}
+                  {customer.default_currency || DASH}
                 </Descriptions.Item>
                 <Descriptions.Item label="Hạn mức tín dụng">
-                  {customer.credit_limit != null ? formatUSD(customer.credit_limit) : '-'}
+                  {fmtUsd(customer.credit_limit)}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ghi chú">
-                  {customer.notes || '-'}
+                  {customer.notes || DASH}
                 </Descriptions.Item>
               </Descriptions>
             </Card>
@@ -385,7 +393,7 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
               <Descriptions.Item label="Tiêu chuẩn">
                 {customer.quality_standard
                   ? QUALITY_STANDARD_LABELS[customer.quality_standard]
-                  : '-'}
+                  : DASH}
               </Descriptions.Item>
               <Descriptions.Item label="Yêu cầu mẫu trước xuất">
                 {customer.requires_pre_shipment_sample ? (
@@ -399,7 +407,7 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
                   ? customer.preferred_grades.map((g) => (
                       <GradeBadge key={g} grade={g} />
                     ))
-                  : '-'}
+                  : DASH}
               </Descriptions.Item>
             </Descriptions>
           </Card>
@@ -441,6 +449,9 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
               Tạo đơn hàng mới
             </Button>
           </div>
+          {ordersError ? (
+            <PageState error={ordersError} onRetry={loadData} />
+          ) : (
           <Table
             dataSource={orders}
             columns={orderColumns}
@@ -449,13 +460,16 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
             locale={{ emptyText: <Empty description="Chưa có đơn hàng" /> }}
             size="middle"
           />
+          )}
         </div>
       ),
     },
     {
       key: 'stats',
       label: 'Thống kê',
-      children: (
+      children: ordersError ? (
+        <PageState error={ordersError} onRetry={loadData} />
+      ) : (
         <Row gutter={[16, 16]}>
           <Col xs={12} sm={6}>
             <Card>
@@ -472,7 +486,7 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
                 title="Doanh thu (USD)"
                 value={stats?.totalRevenue || 0}
                 prefix={<DollarOutlined />}
-                formatter={(v) => formatUSD(Number(v))}
+                formatter={(v) => fmtUsd(Number(v))}
               />
             </Card>
           </Col>
@@ -550,18 +564,27 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
           <Button icon={<EditOutlined />} onClick={handleEdit}>
             Sửa
           </Button>
-          <Popconfirm
-            title="Xóa khách hàng?"
-            description="Bạn có chắc muốn xóa khách hàng này?"
-            onConfirm={handleDelete}
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true }}
-          >
-            <Button danger icon={<DeleteOutlined />}>
-              Xóa
-            </Button>
-          </Popconfirm>
+          {/* Chỉ khách đang hoạt động — khách "Cấm GD" bấm vào sẽ bị hạ xuống "Ngừng HĐ" (mất cờ cấm) */}
+          {customer.status === 'active' && (
+            <Popconfirm
+              title="Chuyển khách sang Ngừng hoạt động?"
+              description={
+                <div style={{ maxWidth: 340 }}>
+                  Khách không bị xoá: {customer.order_count ? `${customer.order_count} đơn` : 'các đơn'} và lịch sử giữ
+                  nguyên, chỉ không hiện trong danh sách chọn khi tạo đơn. Bật lại bằng Sửa → Trạng thái.
+                  Khách còn đơn đang xử lý thì hệ thống sẽ từ chối.
+                </div>
+              }
+              onConfirm={handleDeactivate}
+              okText="Ngừng hoạt động"
+              cancelText="Không"
+              okButtonProps={{ danger: true }}
+            >
+              <Button danger icon={<StopOutlined />}>
+                Ngừng hoạt động
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       </div>
 
@@ -694,8 +717,8 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
               <Form.Item name="credit_limit" label="Hạn mức tín dụng (USD)">
                 <InputNumber
                   style={{ width: '100%' }}
-                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(v) => v?.replace(/,/g, '') as any}
+                  min={0}
+                  {...usdInputProps}
                 />
               </Form.Item>
             </Col>
@@ -732,6 +755,7 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
           <Form.Item name="notes" label="Ghi chú">
             <Input.TextArea rows={3} />
           </Form.Item>
+          <CustomSpecsFormList />
         </Form>
       </Modal>
     </div>

@@ -13,18 +13,12 @@ import {
   CheckCheck,
   Ban,
 } from 'lucide-react'
+import { PO_STATUS_LABELS } from '../../../../../services/purchaseOrderService'
 
 // ===== STATUS CONFIG =====
 
-type SimpleStatus = 'draft' | 'confirmed' | 'partial' | 'completed' | 'cancelled'
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Nháp',
-  confirmed: 'Đã xác nhận',
-  partial: 'Đang giao',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
-}
+// Nhãn lấy từ service (MỘT nguồn) — file này chỉ giữ icon + lớp màu Tailwind cho badge
+const STATUS_LABELS: Record<string, string> = PO_STATUS_LABELS
 
 export const STATUS_ICONS: Record<string, React.ElementType> = {
   draft: FileText,
@@ -39,7 +33,7 @@ export const STATUS_BADGE_CLASSES: Record<string, string> = {
   confirmed: 'bg-blue-50 text-blue-700 border-blue-300',
   partial: 'bg-orange-50 text-orange-700 border-orange-300',
   completed: 'bg-green-50 text-green-700 border-green-300',
-  cancelled: 'bg-gray-50 text-gray-500 border-gray-300',
+  cancelled: 'bg-red-50 text-red-600 border-red-300', // huỷ = đỏ (khớp PO_STATUS_COLORS)
 }
 
 // ===== COMPONENT =====

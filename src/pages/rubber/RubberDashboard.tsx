@@ -13,6 +13,8 @@ import {
   Wallet, CircleDollarSign, Droplets,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { fmtNum, fmtPct, fmtVndCompact } from '../../utils/format'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -32,11 +34,12 @@ interface ShipmentInfo { count: number; total_kg: number; arrived: number; in_tr
 // HELPERS
 // ============================================================================
 
-function fmt(n?: number | null): string { if (n == null || n === 0) return '0'; return n.toLocaleString('vi-VN') }
-function fmtTon(t?: number | null): string { if (!t) return '0T'; return `${t.toFixed(2)}T` }
-function fmtWeight(kg?: number | null): string { if (!kg) return '0'; if (kg >= 1000) return `${(kg / 1000).toFixed(1)}T`; return `${fmt(Math.round(kg))} kg` }
-function fmtMoney(a?: number | null): string { if (!a) return '0đ'; if (Math.abs(a) >= 1e9) return `${(a / 1e9).toFixed(2)} tỷ`; if (Math.abs(a) >= 1e6) return `${(a / 1e6).toFixed(1)} tr`; return fmt(a) + 'đ' }
-function fmtForeign(a?: number | null, c?: string): string { if (!a) return '0'; const sym = c === 'BATH' ? '฿' : (c === 'LAK' || c === 'KIP') ? '₭' : ''; if (Math.abs(a) >= 1e6) return `${(a / 1e6).toFixed(1)}M ${sym}`; if (Math.abs(a) >= 1e3) return `${(a / 1e3).toFixed(0)}K ${sym}`; return fmt(a) + ` ${sym}` }
+// Thẻ hẹp nên rút gọn (T / K / M) — nhưng số theo vi-VN qua format.ts (trước đây toFixed ra DẤU CHẤM
+// thập phân: "1.5T" đọc nhầm thành 15 tấn). Tiền VND rút gọn dùng chung fmtVndCompact ("9,33 tỷ").
+function fmtTon(t?: number | null): string { return `${fmtNum(t ?? 0, 2)}T` }
+function fmtWeight(kg?: number | null): string { if (!kg) return '0'; if (kg >= 1000) return `${fmtNum(kg / 1000, 1)}T`; return `${fmtNum(kg)} kg` }
+const fmtMoney = (a?: number | null): string => fmtVndCompact(a ?? 0)
+function fmtForeign(a?: number | null, c?: string): string { if (!a) return '0'; const sym = c === 'BATH' ? '฿' : (c === 'LAK' || c === 'KIP') ? '₭' : ''; if (Math.abs(a) >= 1e6) return `${fmtNum(a / 1e6, 1)}M ${sym}`; if (Math.abs(a) >= 1e3) return `${fmtNum(a / 1e3, 0)}K ${sym}`; return `${fmtNum(a)} ${sym}` }
 function pct(part: number, total: number): number { return total > 0 ? Math.round((part / total) * 100) : 0 }
 
 const MONTHS_VN = ['', 'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12']
@@ -95,22 +98,27 @@ const RubberPurchaseSummaryPage: React.FC = () => {
       }
       setSources(['vietnam', 'lao_direct', 'lao_agent'].map(s => map[s]).filter(Boolean))
 
-      const { data: stl } = await supabase.from('rubber_settlements').select('supplier_id, remaining_amount').neq('status', 'cancelled')
+      // Lỗi ở các query phụ PHẢI báo — trước đây bị bỏ qua nên thẻ Công nợ hiện "Hết nợ ✓" khi không đọc được sổ
+      const { data: stl, error: stlErr } = await supabase.from('rubber_settlements').select('supplier_id, remaining_amount').neq('status', 'cancelled')
+      if (stlErr) throw stlErr
       const td = (stl || []).reduce((s, r) => s + (r.remaining_amount || 0), 0)
       const ds = new Set((stl || []).filter(s => (s.remaining_amount || 0) > 0).map(s => s.supplier_id))
       setDebt({ total_debt: td, suppliers_with_debt: ds.size, total_suppliers: allSup.size })
 
-      const { data: tr } = await supabase.from('lao_fund_transfers').select('net_received_lak, net_received_bath')
+      const { data: tr, error: trErr } = await supabase.from('lao_fund_transfers').select('net_received_lak, net_received_bath')
+      if (trErr) throw trErr
       const tL = (tr || []).reduce((s, t) => s + (t.net_received_lak ?? 0), 0)
       const tB = (tr || []).reduce((s, t) => s + (t.net_received_bath ?? 0), 0)
-      const { data: li } = await supabase.from('rubber_intake_batches').select('total_amount, price_currency').eq('source_type', 'lao_direct').neq('status', 'cancelled')
+      const { data: li, error: liErr } = await supabase.from('rubber_intake_batches').select('total_amount, price_currency').eq('source_type', 'lao_direct').neq('status', 'cancelled')
+      if (liErr) throw liErr
       let sL = 0, sB = 0
       for (const i of (li || [])) { if (i.price_currency === 'LAK' || i.price_currency === 'KIP') sL += (i.total_amount ?? 0); else if (i.price_currency === 'BATH') sB += (i.total_amount ?? 0) }
       setFund({ total_lak: tL, spent_lak: sL, balance_lak: tL - sL, total_bath: tB, spent_bath: sB, balance_bath: tB - sB })
 
-      const { data: sh } = await supabase.from('lao_shipments').select('total_weight_kg, status').gte('shipment_date', startDate).lt('shipment_date', endDate).neq('status', 'cancelled')
+      const { data: sh, error: shErr } = await supabase.from('lao_shipments').select('total_weight_kg, status').gte('shipment_date', startDate).lt('shipment_date', endDate).neq('status', 'cancelled')
+      if (shErr) throw shErr
       setShip({ count: (sh || []).length, total_kg: (sh || []).reduce((s, x) => s + (x.total_weight_kg || 0), 0), arrived: (sh || []).filter(s => s.status === 'arrived').length, in_transit: (sh || []).filter(s => s.status === 'in_transit').length })
-    } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Lỗi') } finally { setLoading(false) }
+    } catch (err: unknown) { setError(dichLoiHeThong(err, 'Không tải được tổng hợp thu mua')) } finally { setLoading(false) }
   }, [year, month])
 
   useEffect(() => { loadData() }, [loadData])
@@ -218,7 +226,7 @@ const RubberPurchaseSummaryPage: React.FC = () => {
                       {src.avg_drc > 0 && (
                         <div className="col-span-2 flex items-center gap-2 pt-1">
                           <Droplets className="w-3.5 h-3.5 text-white/20" />
-                          <span className="text-[12px] text-white/40">DRC TB: <span className="text-white/70 font-mono font-semibold">{src.avg_drc.toFixed(1)}%</span></span>
+                          <span className="text-[12px] text-white/40">DRC TB: <span className="text-white/70 font-mono font-semibold">{fmtPct(src.avg_drc, 1)}</span></span>
                         </div>
                       )}
                     </div>

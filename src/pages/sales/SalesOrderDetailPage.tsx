@@ -18,7 +18,6 @@ import {
   Spin,
   Empty,
   Breadcrumb,
-  Timeline,
   message,
   Checkbox,
 } from 'antd'
@@ -63,20 +62,11 @@ import type {
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
-  INCOTERM_LABELS,
-  PAYMENT_TERMS_LABELS,
-  PACKING_TYPE_LABELS,
   PORT_OF_LOADING_OPTIONS,
-  CONTAINER_TYPE_LABELS,
-  CONTAINER_STATUS_LABELS,
-  CONTAINER_STATUS_COLORS,
   SVR_GRADE_OPTIONS,
   COUNTRY_OPTIONS,
-  CUSTOMER_TIER_LABELS,
-  CUSTOMER_TIER_COLORS,
   soDisplayCode,
 } from '../../services/sales/salesTypes'
-import type { Incoterm, PaymentTerms, PackingType } from '../../services/sales/salesTypes'
 
 const { Title, Text } = Typography
 
@@ -107,22 +97,6 @@ const formatDate = (d: string | null | undefined): string => {
 }
 
 // ============================================================================
-// STATUS FLOW
-// ============================================================================
-
-const STATUS_FLOW: SalesOrderStatus[] = [
-  'draft',
-  'confirmed',
-  'producing',
-  'ready',
-  'packing',
-  'shipped',
-  'delivered',
-  'invoiced',
-  'paid',
-]
-
-// ============================================================================
 // COMPONENT
 // ============================================================================
 
@@ -151,7 +125,6 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState(false)
 
   // (Production + Packing tab: chuyển sang component gọn + trang riêng.
   //  Container/lot quản lý ở <PackingTabPanel /> → /sales/orders/:id/packing,
@@ -175,27 +148,6 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
   useEffect(() => {
     loadOrder()
   }, [loadOrder])
-
-  // ── Actions ──
-  const handleStatusAction = async (newStatus: SalesOrderStatus) => {
-    if (!order) return
-    try {
-      setActionLoading(true)
-      const actor = { id: user?.employee_id || user?.id || null, name: user?.full_name || user?.email || null }
-      if (newStatus === 'cancelled') {
-        await salesOrderService.cancelOrder(order.id, 'Hủy bởi người dùng', actor)
-      } else {
-        await salesOrderService.updateStatus(order.id, newStatus, { actor })
-      }
-      message.success(`Đã cập nhật trạng thái: ${ORDER_STATUS_LABELS[newStatus]}`)
-      loadOrder()
-    } catch (err: any) {
-      message.error(err?.message || 'Không thể cập nhật trạng thái')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
 
   // ── Loading / not found ──
   if (loading) {
@@ -243,7 +195,8 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
       <Button
         key="edit"
         icon={<EditOutlined />}
-        onClick={() => navigate(`/sales/orders/${order.id}`)}
+        onClick={() => handleTabChange('contract')}
+        title="Mở tab Hợp đồng để chỉnh sửa đơn"
       >
         Sửa
       </Button>
@@ -315,69 +268,6 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
           readonly={['draft', 'cancelled'].includes(order.status)}
         />
       </div>
-    )
-  }
-
-  // ══════════════════════════════════════════════════════════════
-  // STATUS TIMELINE
-  // ══════════════════════════════════════════════════════════════
-
-  const renderTimeline = () => {
-    const currentIdx = STATUS_FLOW.indexOf(order.status)
-    const cancelled = order.status === 'cancelled'
-
-    return (
-      <Card title="Tiến trình đơn hàng" size="small" style={{ marginTop: 24 }}>
-        <Timeline
-          mode="left"
-          items={[
-            ...STATUS_FLOW.map((s, i) => {
-              let color: string = 'gray'
-              if (cancelled) {
-                color = 'gray'
-              } else if (i < currentIdx) {
-                color = 'green'
-              } else if (i === currentIdx) {
-                color = 'blue'
-              }
-
-              const dateMap: Record<string, string | null | undefined> = {
-                draft: order.created_at,
-                confirmed: order.confirmed_at,
-                shipped: order.shipped_at,
-              }
-
-              return {
-                color,
-                children: (
-                  <div>
-                    <Text strong={i === currentIdx}>
-                      {ORDER_STATUS_LABELS[s]}
-                    </Text>
-                    {dateMap[s] && (
-                      <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
-                        {formatDate(dateMap[s]!)}
-                      </Text>
-                    )}
-                  </div>
-                ),
-              }
-            }),
-            ...(cancelled
-              ? [
-                  {
-                    color: 'red' as const,
-                    children: (
-                      <Text type="danger" strong>
-                        Đã hủy
-                      </Text>
-                    ),
-                  },
-                ]
-              : []),
-          ]}
-        />
-      </Card>
     )
   }
 

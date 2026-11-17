@@ -26,6 +26,15 @@ const fmtUsd = (n: number) => '$' + (n || 0).toLocaleString('en-US', { maximumFr
 const fDate = (s?: string | null) => (s ? dayjs(s).format('DD/MM/YYYY') : '—')
 const numFmt = (v?: number | string) => `${v ?? ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 const numParse = (v?: string) => (v || '').replace(/\./g, '')
+// Props nhập tiền theo đồng tiền (mẫu vndInputProps của salesMoney.ts):
+// VND chấm nghìn (không lẻ); USD phẩy nghìn + GIỮ dấu chấm thập phân (nhập được cent).
+const vndMoneyInput = { formatter: numFmt, parser: numParse as any }
+const usdFmt = (v?: number | string) => {
+  const [i, dec] = `${v ?? ''}`.split('.')
+  const int = i.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return dec !== undefined ? `${int}.${dec}` : int
+}
+const usdMoneyInput = { formatter: usdFmt, parser: ((v?: string) => (v || '').replace(/,/g, '')) as any, step: 0.01 }
 const pill = (bg: string, txt: string) => (
   <span style={{ display: 'inline-block', background: bg, color: '#fff', fontWeight: 700, fontSize: 12, padding: '2px 9px', borderRadius: 5, whiteSpace: 'nowrap' }}>{txt}</span>
 )
@@ -42,6 +51,8 @@ export default function FinanceReceivablePage() {
   const [editing, setEditing] = useState<FinReceivableComputed | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
+  const formCurrency = Form.useWatch('currency', form)
+  const moneyInput = formCurrency === 'VND' ? vndMoneyInput : usdMoneyInput
   const [attach, setAttach] = useState<FinReceivableComputed | null>(null)
   const [attachCounts, setAttachCounts] = useState<Map<string, number>>(new Map())
 
@@ -58,15 +69,22 @@ export default function FinanceReceivablePage() {
 
   const k = useMemo(() => {
     const openR = rows.filter((r) => r.alert !== 'received')
+    // Tách theo đồng tiền — KHÔNG cộng lẫn USD + VND, không tự quy đổi tỷ giá ở trang này
+    const isVnd = (r: FinReceivableComputed) => r.currency === 'VND'
+    const sumUsd = (list: FinReceivableComputed[]) => list.filter((r) => !isVnd(r)).reduce((s, r) => s + r.remaining, 0)
+    const sumVnd = (list: FinReceivableComputed[]) => list.filter(isVnd).reduce((s, r) => s + r.remaining, 0)
     const aging: Record<AgingBucket, number> = { current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90p: 0 }
-    openR.forEach((r) => { aging[r.aging] += r.remaining })
+    const agingVnd: Record<AgingBucket, number> = { current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90p: 0 }
+    openR.forEach((r) => { (isVnd(r) ? agingVnd : aging)[r.aging] += r.remaining })
+    const overdueR = openR.filter((r) => r.alert === 'overdue')
+    const soonR = openR.filter((r) => r.alert === 'due' || r.alert === 'soon')
     return {
-      total: openR.reduce((s, r) => s + r.remaining, 0),
-      overdue: openR.filter((r) => r.alert === 'overdue').reduce((s, r) => s + r.remaining, 0),
-      overdueN: openR.filter((r) => r.alert === 'overdue').length,
-      soon: openR.filter((r) => r.alert === 'due' || r.alert === 'soon').reduce((s, r) => s + r.remaining, 0),
+      total: sumUsd(openR), totalVnd: sumVnd(openR),
+      overdue: sumUsd(overdueR), overdueVnd: sumVnd(overdueR),
+      overdueN: overdueR.length,
+      soon: sumUsd(soonR), soonVnd: sumVnd(soonR),
       buyers: new Set(openR.map((r) => r.buyer_name)).size,
-      aging,
+      aging, agingVnd,
     }
   }, [rows])
 
@@ -150,9 +168,12 @@ export default function FinanceReceivablePage() {
       </div>
 
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-        <Col xs={12} md={6}><Card size="small"><Statistic title="Tổng phải thu (USD)" value={fmtUsd(k.total)} valueStyle={{ color: '#1677ff', fontWeight: 800, fontSize: 20 }} /></Card></Col>
-        <Col xs={12} md={6}><Card size="small" style={{ background: k.overdueN ? '#fef2f2' : undefined }}><Statistic title={`Quá hạn (${k.overdueN})`} value={fmtUsd(k.overdue)} valueStyle={{ color: '#dc2626', fontWeight: 800, fontSize: 20 }} /></Card></Col>
-        <Col xs={12} md={6}><Card size="small"><Statistic title="Sắp về ≤30 ngày" value={fmtUsd(k.soon)} valueStyle={{ color: '#ea580c', fontWeight: 800, fontSize: 20 }} /></Card></Col>
+        <Col xs={12} md={6}><Card size="small"><Statistic title="Tổng phải thu (USD)" value={fmtUsd(k.total)} valueStyle={{ color: '#1677ff', fontWeight: 800, fontSize: 20 }} />
+          {k.totalVnd > 0 && <Text type="secondary" style={{ fontSize: 11 }}>+ {fmtMoney(k.totalVnd, 'VND')}</Text>}</Card></Col>
+        <Col xs={12} md={6}><Card size="small" style={{ background: k.overdueN ? '#fef2f2' : undefined }}><Statistic title={`Quá hạn (${k.overdueN})`} value={fmtUsd(k.overdue)} valueStyle={{ color: '#dc2626', fontWeight: 800, fontSize: 20 }} />
+          {k.overdueVnd > 0 && <Text type="secondary" style={{ fontSize: 11 }}>+ {fmtMoney(k.overdueVnd, 'VND')}</Text>}</Card></Col>
+        <Col xs={12} md={6}><Card size="small"><Statistic title="Sắp về ≤30 ngày" value={fmtUsd(k.soon)} valueStyle={{ color: '#ea580c', fontWeight: 800, fontSize: 20 }} />
+          {k.soonVnd > 0 && <Text type="secondary" style={{ fontSize: 11 }}>+ {fmtMoney(k.soonVnd, 'VND')}</Text>}</Card></Col>
         <Col xs={12} md={6}><Card size="small"><Statistic title="Số khách còn nợ" value={k.buyers} valueStyle={{ color: '#1E3A5F', fontWeight: 800 }} suffix="KH" /></Card></Col>
       </Row>
 
@@ -161,18 +182,19 @@ export default function FinanceReceivablePage() {
         <Row gutter={8}>
           {BUCKETS.map((b) => (
             <Col key={b} xs={12} md={24 / 5 as any} style={{ flex: 1 }}>
-              <div style={{ textAlign: 'center', padding: '6px 4px', borderRadius: 8, background: k.aging[b] ? BUCKET_COLOR[b] + '14' : '#f8fafc' }}>
+              <div style={{ textAlign: 'center', padding: '6px 4px', borderRadius: 8, background: (k.aging[b] || k.agingVnd[b]) ? BUCKET_COLOR[b] + '14' : '#f8fafc' }}>
                 <div style={{ fontSize: 12, color: BUCKET_COLOR[b], fontWeight: 600 }}>{AGING_LABEL[b]}</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: k.aging[b] ? BUCKET_COLOR[b] : '#cbd5e1' }}>{fmtUsd(k.aging[b])}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: (k.aging[b] || k.agingVnd[b]) ? BUCKET_COLOR[b] : '#cbd5e1' }}>{fmtUsd(k.aging[b])}</div>
+                {k.agingVnd[b] > 0 && <div style={{ fontSize: 11, color: BUCKET_COLOR[b] }}>+ {fmtMoney(k.agingVnd[b], 'VND')}</div>}
               </div>
             </Col>
           ))}
         </Row>
       </Card>
 
-      {k.overdue > 0 && (
+      {(k.overdue > 0 || k.overdueVnd > 0) && (
         <Alert type="error" showIcon style={{ marginBottom: 12 }}
-          message={<span><b>{k.overdueN} khoản phải thu QUÁ HẠN</b> — tổng {fmtUsd(k.overdue)}. Cần đốc thu / kiểm tra bộ chứng từ.</span>} />
+          message={<span><b>{k.overdueN} khoản phải thu QUÁ HẠN</b> — tổng {[k.overdue > 0 ? fmtUsd(k.overdue) : null, k.overdueVnd > 0 ? fmtMoney(k.overdueVnd, 'VND') : null].filter(Boolean).join(' + ')}. Cần đốc thu / kiểm tra bộ chứng từ.</span>} />
       )}
 
       <Card size="small" styles={{ body: { padding: 0 } }}>
@@ -200,8 +222,8 @@ export default function FinanceReceivablePage() {
             <Form.Item name="contract_no" label="Số hợp đồng" style={{ gridColumn: '1 / 3' }}><Input placeholder="vd: HA2026… / LTC2025/PD-…" /></Form.Item>
             <Form.Item name="bank" label="Bank xử lý"><Input placeholder="VTB / Eximbank…" /></Form.Item>
             <Form.Item name="currency" label="Tiền tệ"><Select options={[{ value: 'USD', label: 'USD' }, { value: 'VND', label: 'VND' }]} /></Form.Item>
-            <Form.Item name="amount" label="Giá trị hóa đơn" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} /></Form.Item>
-            <Form.Item name="amount_received" label="Đã thu"><InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} /></Form.Item>
+            <Form.Item name="amount" label="Giá trị hóa đơn" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} {...moneyInput} /></Form.Item>
+            <Form.Item name="amount_received" label="Đã thu"><InputNumber min={0} style={{ width: '100%' }} {...moneyInput} /></Form.Item>
             <Form.Item name="etd" label="ETD (dự kiến)"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="atd" label="ATD (tàu chạy thực)"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="term_days" label="Term (ngày)" tooltip="Số ngày thanh toán kể từ ATD/ETD"><InputNumber min={0} style={{ width: '100%' }} placeholder="90" /></Form.Item>

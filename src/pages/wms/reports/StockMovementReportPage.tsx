@@ -86,7 +86,7 @@ const StockMovementReportPage = () => {
       render: (v: string) => <Text style={numStyle}>{dayjs(v).format('DD/MM/YYYY')}</Text>,
     },
     {
-      title: 'Nháp', dataIndex: 'in_quantity', key: 'in', align: 'right' as const, width: 120,
+      title: 'Nhập', dataIndex: 'in_quantity', key: 'in', align: 'right' as const, width: 120,
       render: (v: number) => <Text style={{ ...numStyle, color: v > 0 ? '#16A34A' : undefined }}>{v.toLocaleString()}</Text>,
     },
     {
@@ -98,11 +98,11 @@ const StockMovementReportPage = () => {
       render: (v: number) => <Text style={{ ...numStyle, color: v !== 0 ? '#F59E0B' : undefined }}>{v.toLocaleString()}</Text>,
     },
     {
-      title: 'Blend In', dataIndex: 'blend_in_quantity', key: 'blend_in', align: 'right' as const, width: 120,
+      title: 'Trộn vào', dataIndex: 'blend_in_quantity', key: 'blend_in', align: 'right' as const, width: 120,
       render: (v: number) => <Text style={{ ...numStyle, color: v > 0 ? '#2563EB' : undefined }}>{v.toLocaleString()}</Text>,
     },
     {
-      title: 'Blend Out', dataIndex: 'blend_out_quantity', key: 'blend_out', align: 'right' as const, width: 120,
+      title: 'Trộn ra', dataIndex: 'blend_out_quantity', key: 'blend_out', align: 'right' as const, width: 120,
       render: (v: number) => <Text style={{ ...numStyle, color: v > 0 ? '#7C3AED' : undefined }}>{v.toLocaleString()}</Text>,
     },
     {
@@ -121,7 +121,7 @@ const StockMovementReportPage = () => {
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
           <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
-            <FileTextOutlined style={{ marginRight: 8 }} />Bao cao XNT — Xuat Nhap Ton
+            <FileTextOutlined style={{ marginRight: 8 }} />Báo cáo Xuất – Nhập – Tồn
           </Title>
         </Col>
         <Col>
@@ -183,14 +183,14 @@ const StockMovementReportPage = () => {
             />
             {/* Summary row */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, padding: '8px 16px', background: '#f5f5f5', borderRadius: 8 }}>
-              <Text strong>Tong cong:</Text>
+              <Text strong>Tổng cộng:</Text>
               <Space size="large">
-                <Text style={{ ...numStyle, color: '#16A34A' }}>Nhap: {totals.in_quantity.toLocaleString()}</Text>
-                <Text style={{ ...numStyle, color: '#DC2626' }}>Xuat: {totals.out_quantity.toLocaleString()}</Text>
-                <Text style={{ ...numStyle, color: '#F59E0B' }}>DC: {totals.adjust_quantity.toLocaleString()}</Text>
-                <Text style={{ ...numStyle, color: '#2563EB' }}>BI: {totals.blend_in_quantity.toLocaleString()}</Text>
-                <Text style={{ ...numStyle, color: '#7C3AED' }}>BO: {totals.blend_out_quantity.toLocaleString()}</Text>
-                <Text strong style={{ ...numStyle, color: '#1B4D3E' }}>Ton: {data.length > 0 ? data[data.length - 1].balance.toLocaleString() : 0}</Text>
+                <Text style={{ ...numStyle, color: '#16A34A' }}>Nhập: {totals.in_quantity.toLocaleString()}</Text>
+                <Text style={{ ...numStyle, color: '#DC2626' }}>Xuất: {totals.out_quantity.toLocaleString()}</Text>
+                <Text style={{ ...numStyle, color: '#F59E0B' }}>Điều chỉnh: {totals.adjust_quantity.toLocaleString()}</Text>
+                <Text style={{ ...numStyle, color: '#2563EB' }}>Trộn vào: {totals.blend_in_quantity.toLocaleString()}</Text>
+                <Text style={{ ...numStyle, color: '#7C3AED' }}>Trộn ra: {totals.blend_out_quantity.toLocaleString()}</Text>
+                <Text strong style={{ ...numStyle, color: '#1B4D3E' }}>Tồn cuối: {data.length > 0 ? data[data.length - 1].balance.toLocaleString() : 0}</Text>
               </Space>
             </div>
           </>

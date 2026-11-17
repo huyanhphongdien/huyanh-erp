@@ -32,7 +32,8 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
-import { salesProductionService, type ProductionProgress } from '../../../services/sales/salesProductionService'
+import { salesProductionService, canCreateProduction, type ProductionProgress } from '../../../services/sales/salesProductionService'
+import { defaultBalesPerContainer } from '../../../services/sales/baleMath'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
@@ -101,7 +102,8 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
   // ── Computed ──
   const totalBales = order.total_bales || 0
   const containerCount = order.container_count || 0
-  const balesPerContainer = order.bales_per_container || 576
+  const balesPerContainer = order.bales_per_container
+    || defaultBalesPerContainer(order.bale_weight_kg, order.container_type)
 
   // ═══════════════════════════════��══════════════════════════════
   // PRODUCTION PROGRESS SECTION
@@ -109,12 +111,8 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
 
   const renderProductionProgress = () => {
     if (!order.production_order_id) {
-      // Cho phép tạo Lệnh SX ở 2 status:
-      //  - confirmed: chưa start sản xuất, đang xếp hàng đợi
-      //  - producing: đã chuyển status nhưng chưa có Lệnh SX (vd user revert
-      //    từ packing về producing để cấp lại NVL/làm lại lô mới)
-      const canCreate = ['confirmed', 'producing'].includes(order.status) &&
-        (salesRole === 'production' || salesRole === 'admin')
+      // Luật chung với trang /production: canCreateProduction (salesProductionService)
+      const canCreate = canCreateProduction(order.status, salesRole)
       return (
         <Card size="small" style={{ marginBottom: 16 }}>
           <Empty

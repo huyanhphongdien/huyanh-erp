@@ -89,6 +89,7 @@ export default function OvertimeListPage() {
   // ── State ──
   const [requests, setRequests] = useState<OvertimeRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -109,6 +110,7 @@ export default function OvertimeListPage() {
   const loadRequests = useCallback(async () => {
     if (!employeeId) return
     setLoading(true)
+    setLoadError(null)
     try {
       const data = await overtimeRequestService.getByEmployee(
         employeeId,
@@ -127,8 +129,9 @@ export default function OvertimeListPage() {
           rejected: data.filter(r => r.status === 'rejected').length,
         })
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Load requests error:', err)
+      setLoadError(err?.message || 'Không tải được danh sách')
     } finally {
       setLoading(false)
     }
@@ -337,6 +340,25 @@ export default function OvertimeListPage() {
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
             <p className="text-sm text-gray-500">Đang tải dữ liệu...</p>
+          </div>
+        ) : loadError ? (
+          /* Load error */
+          <div className="flex flex-col items-center justify-center py-16 gap-4">
+            <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center">
+              <AlertCircle className="w-8 h-8 text-red-400" />
+            </div>
+            <div className="text-center">
+              <p className="text-base font-medium text-gray-700">Không tải được danh sách</p>
+              <p className="text-sm text-gray-500 mt-1">{loadError}</p>
+            </div>
+            <button
+              onClick={loadRequests}
+              className="inline-flex items-center gap-2 px-5 py-3 bg-blue-600 text-white
+                         rounded-xl text-sm font-medium active:bg-blue-700
+                         transition-colors min-h-[44px]"
+            >
+              Thử lại
+            </button>
           </div>
         ) : requests.length === 0 ? (
           /* Empty state */

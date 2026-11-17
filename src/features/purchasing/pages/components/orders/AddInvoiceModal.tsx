@@ -310,7 +310,7 @@ export function AddInvoiceModal({
         sort_order: idx,
       }));
 
-      // 3. Create invoice
+      // 3. Create invoice (kèm ảnh hóa đơn đã upload)
       await supplierInvoiceService.create({
         order_id: orderId,
         supplier_id: selectedSupplierId,
@@ -319,12 +319,9 @@ export function AddInvoiceModal({
         due_date: dueDate || undefined,
         notes: notes || undefined,
         created_by: currentUserId || undefined,
+        image_urls: imageUrls.length > 0 ? imageUrls : undefined,
         items,
       });
-
-      // 4. Update image_urls nếu có (post-create)
-      // Note: supplierInvoiceService.create chưa support image_urls trực tiếp
-      // Có thể thêm sau bằng update
 
       onSuccess();
       handleClose();

@@ -6,7 +6,7 @@
 
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
-import type { AgingItem, BalanceSummary } from '../services/b2b/ledgerService'
+import type { AgingItem, BalanceSummary, PartnerBalance } from '../services/b2b/ledgerService'
 
 const COLORS = {
   BLUE_DARK: 'FF1F4E79',
@@ -184,4 +184,104 @@ export async function exportLedgerReport(data: LedgerReportExportData): Promise<
   const ymd = new Date().toISOString().slice(0, 10)
   const filename = `bao-cao-cong-no-b2b_${ymd}.xlsx`
   saveAs(new Blob([buffer]), filename)
+}
+
+// ============================================================================
+// Xuất Sổ công nợ đối tác (LedgerOverviewPage) — 1 dòng = 1 đối tác
+// ============================================================================
+export async function exportPartnerBalances(balances: PartnerBalance[]): Promise<void> {
+  const wb = new ExcelJS.Workbook()
+  wb.creator = 'Huy Anh Rubber ERP'
+  wb.created = new Date()
+
+  const ws = wb.addWorksheet('Công nợ đối tác')
+  ws.mergeCells('A1:G1')
+  const title = ws.getCell('A1')
+  title.value = 'SỔ CÔNG NỢ ĐỐI TÁC B2B'
+  title.font = FONT_TITLE
+  title.alignment = { horizontal: 'center' }
+
+  ws.mergeCells('A2:G2')
+  const sub = ws.getCell('A2')
+  sub.value = `Xuất lúc: ${new Date().toLocaleString('vi-VN')}`
+  sub.font = FONT_SUBTITLE
+  sub.alignment = { horizontal: 'center' }
+
+  const headers = ['Mã đối tác', 'Tên đối tác', 'Hạng', 'Tổng nợ', 'Tổng có', 'Số dư', 'Giao dịch gần nhất']
+  headers.forEach((h, i) => {
+    const cell = ws.getCell(4, i + 1)
+    cell.value = h
+    cell.font = FONT_HEADER
+    cell.fill = FILL_HEADER
+    cell.alignment = { horizontal: 'center', vertical: 'middle' }
+    cell.border = BORDER_THIN
+  })
+
+  let row = 5
+  balances.forEach((b) => {
+    const cells: (string | number)[] = [
+      b.partner_code,
+      b.partner_name,
+      b.partner_tier?.toUpperCase() || '',
+      b.total_debit || 0,
+      b.total_credit || 0,
+      b.balance || 0,
+      b.last_entry_date ? new Date(b.last_entry_date).toLocaleDateString('vi-VN') : '',
+    ]
+    cells.forEach((val, i) => {
+      const cell = ws.getCell(row, i + 1)
+      cell.value = val
+      cell.font = FONT_DATA
+      cell.border = BORDER_THIN
+      if (i >= 3 && i <= 5) {
+        cell.numFmt = VND_FORMAT
+        cell.alignment = { horizontal: 'right' }
+        if (i === 5) {
+          cell.font = FONT_TOTAL
+          if ((b.balance || 0) > 0) cell.fill = FILL_AMBER
+        }
+      }
+      if (i === 6) cell.alignment = { horizontal: 'center' }
+    })
+    row++
+  })
+
+  // Totals row
+  if (balances.length > 0) {
+    ws.mergeCells(row, 1, row, 3)
+    const totalLabel = ws.getCell(row, 1)
+    totalLabel.value = 'TỔNG CỘNG'
+    totalLabel.font = FONT_TOTAL
+    totalLabel.fill = FILL_TOTAL
+    totalLabel.alignment = { horizontal: 'right' }
+    totalLabel.border = BORDER_THIN
+
+    const sums = [
+      balances.reduce((a, x) => a + (x.total_debit || 0), 0),
+      balances.reduce((a, x) => a + (x.total_credit || 0), 0),
+      balances.reduce((a, x) => a + (x.balance || 0), 0),
+    ]
+    sums.forEach((val, i) => {
+      const cell = ws.getCell(row, i + 4)
+      cell.value = val
+      cell.font = FONT_TOTAL
+      cell.fill = FILL_TOTAL
+      cell.numFmt = VND_FORMAT
+      cell.alignment = { horizontal: 'right' }
+      cell.border = BORDER_THIN
+    })
+    const lastCell = ws.getCell(row, 7)
+    lastCell.fill = FILL_TOTAL
+    lastCell.border = BORDER_THIN
+  }
+
+  ws.getColumn(1).width = 15
+  ws.getColumn(2).width = 30
+  ws.getColumn(3).width = 10
+  for (let c = 4; c <= 6; c++) ws.getColumn(c).width = 18
+  ws.getColumn(7).width = 20
+
+  const buffer = await wb.xlsx.writeBuffer()
+  const ymd = new Date().toISOString().slice(0, 10)
+  saveAs(new Blob([buffer]), `so-cong-no-doi-tac-b2b_${ymd}.xlsx`)
 }

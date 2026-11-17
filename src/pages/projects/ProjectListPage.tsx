@@ -10,6 +10,7 @@
 // ============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { App } from 'antd'
 import {
   Search,
   Plus,
@@ -533,6 +534,8 @@ const ProjectTableRow: React.FC<{
 export const ProjectListPage: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useAuthStore()
+  // Báo lỗi cho người dùng thay vì chỉ console (AntdApp đã bọc toàn app trong main.tsx)
+  const { message } = App.useApp()
 
   // State
   const [projects, setProjects] = useState<ProjectListItem[]>([])
@@ -648,8 +651,9 @@ export const ProjectListPage: React.FC = () => {
         total: normalized.length,
         totalPages: Math.ceil(normalized.length / 20),
       })
-    } catch (err) {
+    } catch (err: any) {
       console.error('Load projects failed:', err)
+      message.error(err?.message || 'Không tải được danh sách dự án, thử lại')
     } finally {
       setLoading(false)
     }

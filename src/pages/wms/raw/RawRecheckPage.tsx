@@ -4,10 +4,10 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Card, Col, Input, InputNumber, Modal, Row, Select, Space, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { ArrowLeftOutlined, ReloadOutlined, ExperimentOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ReloadOutlined, ExperimentOutlined, SearchOutlined } from '@ant-design/icons'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { rawStockService, type RawBatchBalance } from '../../../services/wms/rawStockService'
 import { rawRecheckService, type DryVariance } from '../../../services/wms/rawRecheckService'
@@ -23,11 +23,15 @@ const fmtSigned = (n: number, d = 0) => (n > 0 ? '+' : '') + fmtKg(n, d)
 
 export default function RawRecheckPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const rawRole = useRawRole()
   const { data: facilities } = useActiveFacilities()
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined)
   const [facilityInit, setFacilityInit] = useState(false)
   const [filter, setFilter] = useState<'due' | 'all'>('due')
+  const [search, setSearch] = useState('')
+  // Điều hướng từ chi tiết lô mang ?batch=<batch_id> — mở sẵn modal cân lại đúng lô
+  const [pendingBatchId, setPendingBatchId] = useState<string | null>(() => searchParams.get('batch'))
   const [batches, setBatches] = useState<RawBatchBalance[]>([])
   const [dueIds, setDueIds] = useState<Set<string>>(new Set())
   const [variance, setVariance] = useState<DryVariance[]>([])
@@ -44,9 +48,10 @@ export default function RawRecheckPage() {
   useEffect(() => {
     if (facilityInit || !facilities?.length) return
     const pd = facilities.find((f) => f.code.toUpperCase() === 'PD')
-    if (pd) setFacilityId(pd.id)
+    // Có ?batch= thì giữ "Tất cả nhà máy" để chắc chắn tìm thấy lô, kể cả lô TL/Lào
+    if (pd && !pendingBatchId) setFacilityId(pd.id)
     setFacilityInit(true)
-  }, [facilities, facilityInit])
+  }, [facilities, facilityInit, pendingBatchId])
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -66,13 +71,26 @@ export default function RawRecheckPage() {
 
   const rows = useMemo(() => {
     const list = filter === 'due' ? batches.filter((b) => dueIds.has(b.batch_id)) : batches
-    return [...list].sort((a, b) => b.ngay_tu_lan_do - a.ngay_tu_lan_do)
-  }, [batches, dueIds, filter])
+    const s = search.trim().toLowerCase()
+    const matched = s ? list.filter((b) => [b.batch_no, b.supplier_name].some((v) => (v || '').toLowerCase().includes(s))) : list
+    return [...matched].sort((a, b) => b.ngay_tu_lan_do - a.ngay_tu_lan_do)
+  }, [batches, dueIds, filter, search])
 
   const canWrite = rawRole.isKeeper || rawRole.isQC || rawRole.isBGD
   const preview = target && wet !== null ? rawRecheckService.preview(target, wet, drc, settings.nguong_lech_kho_pct) : null
 
   const openModal = (b: RawBatchBalance) => { setTarget(b); setWet(b.wet_kg); setDrc(null); setLyDo(''); setNote('') }
+
+  // Từ chi tiết lô bấm "Cân lại": dữ liệu về là mở thẳng modal, khỏi dò tay trong bảng
+  useEffect(() => {
+    if (!pendingBatchId || loading) return
+    if (error) return // tải lỗi thì giữ lại, "Làm mới" thành công sẽ mở
+    const b = batches.find((x) => x.batch_id === pendingBatchId)
+    if (b) openModal(b)
+    else message.warning('Không tìm thấy lô cần cân lại trong danh sách lô còn hàng')
+    setPendingBatchId(null)
+    setSearchParams({}, { replace: true })
+  }, [pendingBatchId, loading, error, batches])
 
   const submit = async () => {
     if (!target || wet === null) return
@@ -122,6 +140,7 @@ export default function RawRecheckPage() {
           </Col>
           <Col>
             <Space wrap>
+              <Input allowClear prefix={<SearchOutlined />} placeholder="Mã lô, nhà cung cấp" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 210 }} />
               <FacilityPicker value={facilityId} onChange={setFacilityId} allowAll placeholder="Tất cả nhà máy" style={{ minWidth: 180 }} />
               <Select value={filter} onChange={setFilter} style={{ minWidth: 160 }} options={[{ value: 'due', label: `Đến hạn (${dueIds.size})` }, { value: 'all', label: 'Mọi lô còn hàng' }]} />
               <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>Làm mới</Button>

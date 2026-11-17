@@ -463,6 +463,144 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
           </Row>
         </Space>
       </div>
+
+      {/* ===== BẢN IN A4 — màn hình giấu đi, chỉ hiện khi window.print() ===== */}
+      <div className="print-only"><PrintSheet ticket={ticket} /></div>
+
+      <style>{`
+        .print-only { display: none; }
+        @media print {
+          /* Ẩn TOÀN BỘ app shell + giao diện màn hình — chỉ in Sheet phiếu cân.
+             (Khuôn in chép từ PaymentRequestPrintPage; .print-hidden gắn trên
+             header/nút từ trước nhưng chưa từng có CSS — định nghĩa tại đây.) */
+          body * { visibility: hidden !important; }
+          .print-hidden { display: none !important; }
+          .print-only, .print-only * { visibility: visible !important; }
+          .print-only {
+            display: block !important;
+            position: absolute !important; left: 0; top: 0; width: 100%;
+            padding: 12mm !important; box-sizing: border-box;
+          }
+          html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
+          /* margin:0 → trình duyệt KHÔNG in header/footer (ngày giờ, URL, số trang).
+             Lề tài liệu trả lại bằng padding của .print-only ở trên. */
+          @page { size: A4; margin: 0; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// ============================================================================
+// BẢN IN A4 — phiếu cân gọn (mã phiếu, xe, Gross/Tare/NET, DRC quy kho, chữ ký)
+// ============================================================================
+
+const SHEET_TD_LABEL: React.CSSProperties = { border: '1px solid #D1D5DB', background: '#F9FAFB', padding: '6px 10px', fontWeight: 600, color: '#374151', width: 110 }
+const SHEET_TD_VALUE: React.CSSProperties = { border: '1px solid #D1D5DB', padding: '6px 10px' }
+const SHEET_WEIGHT_CELL: React.CSSProperties = { border: '1px solid #D1D5DB', padding: '10px 8px', textAlign: 'center', width: '33.33%' }
+const SHEET_WEIGHT_LABEL: React.CSSProperties = { fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#6B7280' }
+
+function PrintSheet({ ticket }: { ticket: WeighbridgeTicket }) {
+  const drc = (ticket as any).drc
+  const sc = STATUS_TAG_CONFIG[ticket.status]
+  return (
+    <div style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 13, color: '#111' }}>
+      {/* Header công ty */}
+      <div style={{ borderBottom: '2px solid #1B4D3E', paddingBottom: 8, marginBottom: 10 }}>
+        <div style={{ fontSize: 12, fontWeight: 600 }}>CÔNG TY TNHH MỘT THÀNH VIÊN</div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#1B4D3E' }}>CAO SU HUY ANH PHONG ĐIỀN</div>
+        <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>Khe Mạ, Phường Phong Điền, TP Huế · MST: 3301549896</div>
+      </div>
+
+      {/* Tiêu đề */}
+      <div style={{ textAlign: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 2 }}>PHIẾU CÂN XE</div>
+        <div style={{ fontSize: 13, marginTop: 2 }}>Số: <strong style={{ ...MONO_FONT, color: '#92400E' }}>{ticket.code}</strong></div>
+        <div style={{ fontSize: 12, color: '#6B7280' }}>Ngày tạo: {new Date(ticket.created_at).toLocaleString('vi-VN')}</div>
+        {ticket.status !== 'completed' && (
+          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, color: ticket.status === 'cancelled' ? '#DC2626' : '#B45309' }}>
+            ({sc.label})
+          </div>
+        )}
+      </div>
+
+      {/* Thông tin xe */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 10 }}>
+        <tbody>
+          <tr>
+            <td style={SHEET_TD_LABEL}>Biển số xe</td>
+            <td style={{ ...SHEET_TD_VALUE, fontSize: 16, fontWeight: 800 }}>{ticket.vehicle_plate}</td>
+            <td style={SHEET_TD_LABEL}>Tài xế</td>
+            <td style={SHEET_TD_VALUE}>{ticket.driver_name || '—'}</td>
+          </tr>
+          <tr>
+            <td style={SHEET_TD_LABEL}>Loại phiếu</td>
+            <td style={SHEET_TD_VALUE}>{ticketTypeLabel(ticket.ticket_type, 'long')}</td>
+            <td style={SHEET_TD_LABEL}>Nhà máy</td>
+            <td style={SHEET_TD_VALUE}>{ticket.facility?.name || '—'}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Kết quả cân */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 10 }}>
+        <tbody>
+          <tr>
+            <td style={SHEET_WEIGHT_CELL}>
+              <div style={SHEET_WEIGHT_LABEL}>Gross</div>
+              <div style={{ ...MONO_FONT, fontSize: 20, fontWeight: 700 }}>
+                {ticket.gross_weight != null ? `${ticket.gross_weight.toLocaleString('vi-VN')} kg` : '—'}
+              </div>
+              {ticket.gross_weighed_at && (
+                <div style={{ fontSize: 10, color: '#9CA3AF' }}>{new Date(ticket.gross_weighed_at).toLocaleString('vi-VN')}</div>
+              )}
+            </td>
+            <td style={SHEET_WEIGHT_CELL}>
+              <div style={SHEET_WEIGHT_LABEL}>Tare</div>
+              <div style={{ ...MONO_FONT, fontSize: 20, fontWeight: 700 }}>
+                {ticket.tare_weight != null ? `${ticket.tare_weight.toLocaleString('vi-VN')} kg` : '—'}
+              </div>
+              {ticket.tare_weighed_at && (
+                <div style={{ fontSize: 10, color: '#9CA3AF' }}>{new Date(ticket.tare_weighed_at).toLocaleString('vi-VN')}</div>
+              )}
+            </td>
+            <td style={{ ...SHEET_WEIGHT_CELL, background: '#F0FDF4' }}>
+              <div style={SHEET_WEIGHT_LABEL}>NET</div>
+              <div style={{ ...MONO_FONT, fontSize: 20, fontWeight: 700, color: '#15803D' }}>
+                {ticket.net_weight != null ? `${ticket.net_weight.toLocaleString('vi-VN')} kg` : '—'}
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Quy kho theo DRC — cùng công thức với khối hiển thị trên màn hình */}
+      {ticket.net_weight != null && drc ? (
+        <div style={{ border: '1px solid #F59E0B', background: '#FFFBEB', borderRadius: 4, padding: '6px 10px', marginBottom: 10, textAlign: 'center' }}>
+          Quy kho (DRC {drc}%): <strong style={{ ...MONO_FONT, color: '#B45309' }}>{((ticket.net_weight * drc) / 100).toLocaleString('vi-VN')} kg</strong>
+        </div>
+      ) : null}
+
+      {/* Ghi chú */}
+      {ticket.notes && (
+        <div style={{ marginBottom: 10 }}>
+          <strong>Ghi chú:</strong> <span style={{ whiteSpace: 'pre-wrap' }}>{ticket.notes}</span>
+        </div>
+      )}
+
+      {/* Chữ ký — cùng 3 cột với phiếu in của app Trạm cân */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28, textAlign: 'center', gap: 12, fontSize: 13 }}>
+        {['Nhân viên cân', 'Tài xế/Đại lý', 'Xác nhận'].map(t => (
+          <div key={t} style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, marginBottom: 56 }}>{t}</div>
+            <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: 11, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 12, textAlign: 'center', fontSize: 10, color: '#9CA3AF', borderTop: '1px solid #E5E7EB', paddingTop: 6 }}>
+        In từ hệ thống ERP Huy Anh — {new Date().toLocaleString('vi-VN')}
+      </div>
     </div>
   )
 }

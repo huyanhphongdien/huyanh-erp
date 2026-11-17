@@ -43,6 +43,7 @@ import {
 import { supabase } from '../../../lib/supabase';
 import { invoicePaymentService } from '../../../services/invoicePaymentService';
 import type { InvoicePayment } from '../../../services/invoicePaymentService';
+import { supplierInvoiceService, INVOICE_CONFIG } from '../../../services/supplierInvoiceService';
 import PaymentFormModal from './components/payments/PaymentFormModal';
 import { useAuthStore } from '../../../stores/authStore';
 
@@ -153,6 +154,9 @@ const InvoiceDetailPage: React.FC = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
+  // Upload ảnh HĐ gốc (bổ sung ảnh cho hóa đơn cũ chưa có)
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   // ========================================================================
   // FETCH DATA
   // ========================================================================
@@ -240,6 +244,24 @@ const InvoiceDetailPage: React.FC = () => {
       fetchInvoice();
     } catch (err: any) {
       alert('Lỗi xóa thanh toán: ' + err.message);
+    }
+  };
+
+  const handleAddImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!invoiceId || files.length === 0) return;
+    setUploadingImage(true);
+    try {
+      for (const file of files) {
+        await supplierInvoiceService.uploadImage(invoiceId, file);
+      }
+      setSuccessMsg(files.length > 1 ? `Đã thêm ${files.length} ảnh hóa đơn` : 'Đã thêm ảnh hóa đơn');
+    } catch (err: any) {
+      alert('Lỗi tải ảnh hóa đơn: ' + (err.message || 'Không rõ nguyên nhân'));
+    } finally {
+      setUploadingImage(false);
+      fetchInvoice();
     }
   };
 
@@ -695,6 +717,29 @@ const InvoiceDetailPage: React.FC = () => {
           {/* ============================================================ */}
           {activeTab === 'images' && (
             <div>
+              {/* Nút thêm ảnh — bổ sung chứng từ cho hóa đơn chưa có/thiếu ảnh */}
+              {images.length < INVOICE_CONFIG.MAX_FILES_PER_INVOICE && (
+                <div className="flex justify-end mb-4">
+                  <label
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors min-h-[44px] ${
+                      uploadingImage
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                    }`}
+                  >
+                    {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    {uploadingImage ? 'Đang tải ảnh...' : 'Thêm ảnh'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      multiple
+                      disabled={uploadingImage}
+                      onChange={handleAddImages}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              )}
               {images.length === 0 ? (
                 <EmptyState icon={ImageIcon} text="Chưa có ảnh hóa đơn" />
               ) : (

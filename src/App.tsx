@@ -320,9 +320,9 @@ const PriceLockFormPage = lazy(() => import('./pages/b2b/price-lock/PriceLockFor
 const PriceLockPrintPage = lazy(() => import('./pages/b2b/price-lock/PriceLockPrintPage'));
 // B2B Demands
 const DemandListPage = lazy(() => import('./pages/b2b/demands/DemandListPage'));
-// B2B Intake v4 — 3 flow wizards + daily price admin
+// B2B Intake v4 — flow wizards + daily price admin
+// (WalkinWizardPage đã KHAI TỬ — thay bằng app Cân mủ lẻ canle.huyanhrubber.vn, xem route intake/walkin)
 const OutrightWizardPage = lazy(() => import('./pages/b2b/intake/OutrightWizardPage'));
-const WalkinWizardPage = lazy(() => import('./pages/b2b/intake/WalkinWizardPage'));
 const ProductionWizardPage = lazy(() => import('./pages/b2b/intake/ProductionWizardPage'));
 const DailyPriceListPage = lazy(() => import('./pages/b2b/settings/DailyPriceListPage'));
 const DemandCreatePage = lazy(() => import('./pages/b2b/demands/DemandCreatePage'));
@@ -538,7 +538,20 @@ function App() {
                 <Route path="demands/:id" element={<Suspense fallback={<LoadingSpinner />}><DemandDetailPage /></Suspense>} />
                 {/* B2B Intake v4 wizards */}
                 <Route path="intake/outright" element={<Suspense fallback={<LoadingSpinner />}><OutrightWizardPage /></Suspense>} />
-                <Route path="intake/walkin" element={<Suspense fallback={<LoadingSpinner />}><WalkinWizardPage /></Suspense>} />
+                {/* Flow walk-in CŨ đã khai tử (owner chốt 08/09/2026) — chặn route, chỉ còn trang báo chuyển hướng */}
+                <Route path="intake/walkin" element={
+                  <div style={{ padding: 24, maxWidth: 640 }}>
+                    <div style={{ background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 8, padding: '16px 20px' }}>
+                      <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 8 }}>Luồng này đã ngừng sử dụng</div>
+                      <div style={{ marginBottom: 12 }}>
+                        Cân mủ lẻ cho hộ dân vãng lai đã chuyển sang app Cân mủ lẻ — canle.huyanhrubber.vn (giá tính theo kg khô).
+                      </div>
+                      <a href="https://canle.huyanhrubber.vn" style={{ fontWeight: 600, color: '#1B4D3E' }}>
+                        Mở app Cân mủ lẻ →
+                      </a>
+                    </div>
+                  </div>
+                } />
                 <Route path="intake/production" element={<Suspense fallback={<LoadingSpinner />}><ProductionWizardPage /></Suspense>} />
                 <Route path="settings/daily-prices" element={<Suspense fallback={<LoadingSpinner />}><DailyPriceListPage /></Suspense>} />
                 {/* B2B Rubber Intake (Lý lịch mủ) */}

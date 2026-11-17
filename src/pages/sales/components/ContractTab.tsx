@@ -23,7 +23,7 @@ import {
 import { EditOutlined, SaveOutlined, CloseOutlined, LockOutlined, PlusOutlined, DeleteOutlined, FileWordOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
-import { balesFromTons, containersFromBales } from '../../../services/sales/baleMath'
+import { balesFromTons, containersFromBales, defaultBalesPerContainer } from '../../../services/sales/baleMath'
 import { supabase } from '../../../lib/supabase'
 import type { SalesOrder, SalesOrderItem } from '../../../services/sales/salesTypes'
 import { isVnd, fmtMoney, priceUnitLabel, orderTotalInCurrency, toUsdEquivalent, vndInputProps } from '../../../services/sales/salesMoney'
@@ -183,7 +183,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         quantity_tons: it.quantity_tons,
         unit_price: it.unit_price,
         bale_weight_kg: it.bale_weight_kg || 33.33,
-        bales_per_container: it.bales_per_container || 576,
+        bales_per_container: it.bales_per_container || defaultBalesPerContainer(it.bale_weight_kg, order.container_type),
         packing_type: it.packing_type || 'loose_bale',
         payment_terms: it.payment_terms,
       })))
@@ -194,7 +194,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         quantity_tons: order.quantity_tons || 0,
         unit_price: order.unit_price || 0,
         bale_weight_kg: order.bale_weight_kg || 33.33,
-        bales_per_container: order.bales_per_container || 576,
+        bales_per_container: order.bales_per_container || defaultBalesPerContainer(order.bale_weight_kg, order.container_type),
         packing_type: order.packing_type || 'loose_bale',
         payment_terms: order.payment_terms || undefined,
       }])
@@ -280,7 +280,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         const qtyKg = it.quantity_tons * 1000
         const bw = it.bale_weight_kg || 33.33
         const bales = balesFromTons(it.quantity_tons, bw)
-        const bpc = it.bales_per_container || 576
+        const bpc = it.bales_per_container || defaultBalesPerContainer(bw, order.container_type)
         return {
           sales_order_id: order.id,
           grade: it.grade,
@@ -489,7 +489,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                           value={it.bales_per_container}
                           style={{ width: '100%' }}
                           onChange={(v) => {
-                            const next = [...editItems]; next[idx] = { ...it, bales_per_container: Number(v) || 576 }; setEditItems(next)
+                            const next = [...editItems]; next[idx] = { ...it, bales_per_container: Number(v) || defaultBalesPerContainer(it.bale_weight_kg, order.container_type) }; setEditItems(next)
                           }}
                         />
                       </td>
@@ -553,7 +553,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                   quantity_tons: 0,
                   unit_price: 0,
                   bale_weight_kg: editItems[0]?.bale_weight_kg || 33.33,
-                  bales_per_container: editItems[0]?.bales_per_container || 576,
+                  bales_per_container: editItems[0]?.bales_per_container || defaultBalesPerContainer(editItems[0]?.bale_weight_kg, order.container_type),
                   packing_type: editItems[0]?.packing_type || 'loose_bale',
                 },
               ])}

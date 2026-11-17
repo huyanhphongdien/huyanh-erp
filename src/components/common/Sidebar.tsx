@@ -191,11 +191,20 @@ const getMenuGroups = (
         icon: <CalendarClock size={18} />,
         badge: pendingLeave > 0 ? pendingLeave : undefined,
       },
-      { path: '/attendance/business-trips', label: 'Đơn công tác', icon: <Briefcase size={18} /> },
       {
-        path: '/overtime',
-        label: 'Tăng ca',
-        icon: <AlarmClockPlus size={18} />,
+        path: '/leave-approvals',
+        label: 'Duyệt nghỉ phép',
+        icon: <CheckSquare size={18} />,
+        managerOnly: true,
+        badge: pendingLeave > 0 ? pendingLeave : undefined,
+      },
+      { path: '/attendance/business-trips', label: 'Đơn công tác', icon: <Briefcase size={18} /> },
+      { path: '/overtime', label: 'Tăng ca', icon: <AlarmClockPlus size={18} /> },
+      {
+        path: '/overtime/approval',
+        label: 'Duyệt tăng ca',
+        icon: <ClipboardCheck size={18} />,
+        managerOnly: true,
         badge: pendingOT > 0 ? pendingOT : undefined,
       },
     ],
@@ -218,6 +227,7 @@ const getMenuGroups = (
       },
       { path: '/task-templates', label: 'Mẫu công việc', icon: <FileText size={18} />, managerOnly: true },
       { path: '/performance', label: 'Hiệu suất', icon: <TrendingUp size={18} />, managerOnly: true },
+      { path: '/reports/tasks', label: 'Báo cáo công việc', icon: <FileBarChart size={18} />, managerOnly: true },
     ],
   },
   {
@@ -243,7 +253,6 @@ const getMenuGroups = (
     icon: <ShoppingCart size={18} />,
     collapsible: true,
     requirePurchaseAccess: true,
-    hiddenByDefault: true,
     items: [
       { path: '/purchasing/suppliers', label: 'Nhà cung cấp', icon: <Building2 size={18} />, requirePurchaseAccess: true },
       { path: '/purchasing/categories', label: 'Nhóm vật tư', icon: <Layers size={18} />, requirePurchaseAccess: true },
@@ -338,6 +347,20 @@ const getMenuGroups = (
         icon: <ArrowLeftRight size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-settlement-list', componentId: 'b2b-settlement-list' },
+      },
+      {
+        path: '/rubber/dashboard',
+        label: 'Thu mua mủ VN–Lào',
+        icon: <Droplets size={18} />,
+        requireB2BPurchaser: true,
+      },
+      {
+        path: '/rubber/intake',
+        label: 'Phiếu nhập mủ',
+        icon: <ScrollText size={18} />,
+        requireB2BPurchaser: true,
+        // Sáng khi đứng ở bất kỳ trang con /rubber/* nào (suppliers, debt, daily-report, lao/vn…)
+        extraActivePaths: ['/rubber'],
       },
       {
         path: '/rubber/payment-requests',
@@ -476,17 +499,8 @@ const getMenuGroups = (
   },
 
   // QUẢN TRỊ: đã gộp vào MUA HÀNG (Phân quyền)
-  {
-    title: 'BÁO CÁO',
-    icon: <BarChart3 size={18} />,
-    collapsible: true,
-    hiddenByDefault: true,
-    items: [
-      { path: '/reports/tasks', label: 'Báo cáo công việc', icon: <FileBarChart size={18} />, managerOnly: true },
-      { path: '/purchasing/reports', label: 'Báo cáo mua hàng', icon: <TrendingUp size={18} />, managerOnly: true },
-
-    ],
-  },
+  // BÁO CÁO: giải tán 17/11/2026 — 'Báo cáo công việc' chuyển vào QUẢN LÝ CÔNG VIỆC,
+  // 'Báo cáo mua hàng' đã có sẵn trong nhóm MUA HÀNG.
   {
     title: 'CÀI ĐẶT',
     icon: <Settings size={18} />,
@@ -521,8 +535,6 @@ export function Sidebar() {
     'QUẢN LÝ DỰ ÁN': true,
     'MUA HÀNG': true,
     'B2B THU MUA': true,
-    'BÁO CÁO': true,
-    'QUẢN TRỊ': true,
     'CÀI ĐẶT': true,
   });
 
@@ -1015,7 +1027,8 @@ export function Sidebar() {
   return (
     <>
       {/* ─── MOBILE HEADER BAR ─── */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-b border-black/[0.06] px-4 flex items-center justify-between" style={{ paddingTop: 'max(0.75rem, var(--safe-top))', paddingBottom: '0.75rem' }}>
+      {/* Cao đúng 3.5rem + safe-top — PHẢI khớp pt của <main> trong MainLayout.tsx, lệch là tiêu đề trang bị che */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-b border-black/[0.06] px-4 flex items-center justify-between" style={{ height: 'calc(3.5rem + var(--safe-top))', paddingTop: 'var(--safe-top)' }}>
         <button
           onClick={() => setIsMobileOpen(true)}
           className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#5A6B63] hover:text-[#1B4D3E] hover:bg-black/[0.04] rounded-xl transition-colors"

@@ -23,6 +23,8 @@ import {
   Empty,
   Alert,
   Divider,
+  Modal,
+  message,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -36,6 +38,8 @@ import {
   EnvironmentOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
+import stockInService from '../../../services/wms/stockInService'
+import { useAuthStore } from '../../../stores/authStore'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import { QCBadge } from '../../../components/wms/QCInputForm'
 import { rubberGradeService } from '../../../services/wms/rubberGradeService'
@@ -144,10 +148,14 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
   const id = propId || paramId
   const navigate = useNavigate()
   const openDealTab = useOpenDealTab()
+  const { user } = useAuthStore()
 
   const [order, setOrder] = useState<OrderData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!id) return
@@ -246,7 +254,55 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
       }
     }
     load()
-  }, [id])
+  }, [id, reloadKey])
+
+  // Xác nhận nhập kho (phiếu Nháp) — theo mẫu handleConfirm của StockOutDetailPage
+  const handleConfirm = () => {
+    if (!order) return
+    Modal.confirm({
+      title: 'Xác nhận nhập kho?',
+      content: `Phiếu ${order.code} sẽ được xác nhận nhập, tồn kho sẽ tăng tương ứng. Hành động này KHÔNG thể hoàn tác.`,
+      okText: 'Xác nhận nhập',
+      cancelText: 'Huỷ',
+      okButtonProps: { style: { background: '#1B4D3E', borderColor: '#1B4D3E' } },
+      onOk: async () => {
+        setConfirming(true)
+        try {
+          await stockInService.confirmStockIn(order.id, user?.employee_id || user?.id || 'system')
+          message.success(`Đã xác nhận nhập phiếu ${order.code}`)
+          setReloadKey(k => k + 1)
+        } catch (err: any) {
+          message.error(err?.message || 'Không thể xác nhận nhập kho')
+        } finally {
+          setConfirming(false)
+        }
+      },
+    })
+  }
+
+  // Huỷ phiếu nhập kho (chỉ phiếu Nháp)
+  const handleCancelOrder = () => {
+    if (!order) return
+    Modal.confirm({
+      title: 'Huỷ phiếu nhập kho?',
+      content: `Phiếu ${order.code} sẽ bị huỷ, các lô hàng chưa nhập kèm theo sẽ bị xoá. Hành động này KHÔNG thể hoàn tác.`,
+      okText: 'Huỷ phiếu',
+      cancelText: 'Không',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setCancelling(true)
+        try {
+          await stockInService.cancelStockIn(order.id)
+          message.success(`Đã huỷ phiếu ${order.code}`)
+          setReloadKey(k => k + 1)
+        } catch (err: any) {
+          message.error(err?.message || 'Không thể huỷ phiếu nhập kho')
+        } finally {
+          setCancelling(false)
+        }
+      },
+    })
+  }
 
   if (loading) {
     return <div style={{ padding: 24, textAlign: 'center', paddingTop: 100 }}><Spin size="large" /></div>
@@ -377,6 +433,27 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
         </Col>
         <Col>
           <Space>
+            {order.status === 'draft' && (
+              <>
+                <Button
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  onClick={handleConfirm}
+                  loading={confirming}
+                  style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
+                >
+                  Xác nhận nhập kho
+                </Button>
+                <Button
+                  danger
+                  icon={<CloseCircleOutlined />}
+                  onClick={handleCancelOrder}
+                  loading={cancelling}
+                >
+                  Huỷ phiếu
+                </Button>
+              </>
+            )}
             <Button icon={<PrinterOutlined />}>In phiếu</Button>
           </Space>
         </Col>

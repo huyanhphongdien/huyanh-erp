@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
+import { RATING_LABELS, calculateRating } from '../../types/evaluation.types';
 
 // ============================================================================
 // TYPES
@@ -94,30 +95,24 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   revision_requested: { label: 'Cần sửa', color: 'text-orange-700', bg: 'bg-orange-100', icon: <AlertCircle className="w-4 h-4" /> },
 };
 
+// Nhãn xếp loại lấy MỘT nguồn từ RATING_LABELS (evaluation.types.ts) — màu là của riêng trang
 const QUALITY_OPTIONS = [
-  { value: 'excellent', label: 'Xuất sắc', description: 'Vượt kỳ vọng', color: 'border-emerald-500 bg-emerald-50 text-emerald-700' },
-  { value: 'good', label: 'Tốt', description: 'Đạt yêu cầu tốt', color: 'border-blue-500 bg-blue-50 text-blue-700' },
-  { value: 'average', label: 'Khá', description: 'Đạt yêu cầu cơ bản', color: 'border-yellow-500 bg-yellow-50 text-yellow-700' },
-  { value: 'below_average', label: 'Trung bình', description: 'Cần cải thiện', color: 'border-orange-500 bg-orange-50 text-orange-700' },
+  { value: 'excellent', label: RATING_LABELS.excellent, description: 'Vượt kỳ vọng', color: 'border-emerald-500 bg-emerald-50 text-emerald-700' },
+  { value: 'good', label: RATING_LABELS.good, description: 'Đạt yêu cầu tốt', color: 'border-blue-500 bg-blue-50 text-blue-700' },
+  { value: 'average', label: RATING_LABELS.average, description: 'Đạt yêu cầu cơ bản', color: 'border-yellow-500 bg-yellow-50 text-yellow-700' },
+  { value: 'below_average', label: RATING_LABELS.below_average, description: 'Chưa đạt yêu cầu', color: 'border-orange-500 bg-orange-50 text-orange-700' },
 ];
 
 const QUALITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  excellent: { label: 'Xuất sắc', color: 'text-emerald-700', bg: 'bg-emerald-100' },
-  good: { label: 'Tốt', color: 'text-blue-700', bg: 'bg-blue-100' },
-  average: { label: 'Khá', color: 'text-yellow-700', bg: 'bg-yellow-100' },
-  below_average: { label: 'Trung bình', color: 'text-orange-700', bg: 'bg-orange-100' },
+  excellent: { label: RATING_LABELS.excellent, color: 'text-emerald-700', bg: 'bg-emerald-100' },
+  good: { label: RATING_LABELS.good, color: 'text-blue-700', bg: 'bg-blue-100' },
+  average: { label: RATING_LABELS.average, color: 'text-yellow-700', bg: 'bg-yellow-100' },
+  below_average: { label: RATING_LABELS.below_average, color: 'text-orange-700', bg: 'bg-orange-100' },
 };
 
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
-
-function calculateRating(score: number): string {
-  if (score >= 90) return 'excellent';
-  if (score >= 70) return 'good';
-  if (score >= 50) return 'average';
-  return 'below_average';
-}
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';

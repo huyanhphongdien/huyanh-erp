@@ -10,6 +10,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { Modal } from 'antd'
 import { useAuthStore } from '../../stores/authStore'
 import {
   Bell, Check, CheckCheck, Trash2, Filter, Search, X,
@@ -177,6 +178,10 @@ export default function NotificationPage() {
   })
 
   function invalidateAll() {
+    // Key thật của trang này — invalidate thiếu là bấm 'Đọc hết'/'Xóa' xong UI đứng yên tới khi F5
+    queryClient.invalidateQueries({ queryKey: ['notifications-page'] })
+    queryClient.invalidateQueries({ queryKey: ['notification-count-by-module'] })
+    // Giữ 2 key cũ cho chuông thông báo ở nơi khác
     queryClient.invalidateQueries({ queryKey: ['notifications'] })
     queryClient.invalidateQueries({ queryKey: ['notification-count'] })
   }
@@ -321,9 +326,14 @@ export default function NotificationPage() {
             )}
             <button
               onClick={() => {
-                if (confirm('Xóa tất cả thông báo đã đọc?')) {
-                  deleteAllReadMutation.mutate()
-                }
+                Modal.confirm({
+                  title: 'Dọn thông báo đã đọc?',
+                  content: 'Xóa tất cả thông báo đã đọc. Thao tác này không hoàn tác được.',
+                  okText: 'Xóa',
+                  okButtonProps: { danger: true },
+                  cancelText: 'Hủy',
+                  onOk: () => deleteAllReadMutation.mutate(),
+                })
               }}
               disabled={deleteAllReadMutation.isPending}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg active:bg-red-100 disabled:opacity-50"

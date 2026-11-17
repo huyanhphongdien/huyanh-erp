@@ -25,6 +25,7 @@ import {
   Descriptions,
   Checkbox,
   Statistic,
+  Modal,
   message,
   Progress,
 } from 'antd'
@@ -169,6 +170,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
             setOutputDrc(s.output_drc ?? null)
             setTemperature(s.temperature_avg ?? null)
             setHumidity(s.humidity_avg ?? null)
+            setDurationDays(s.duration_days ?? null)
             setOperatorId(s.operator_id || '')
             setQcPassed(s.qc_checkpoint_passed || false)
             setQcNotes(s.qc_notes || '')
@@ -191,11 +193,21 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
     load()
   }, [id, stageNumber])
 
-  const handleCompleteStage = async () => {
+  const doCompleteStage = async () => {
     if (!id) return
     setActionLoading(true)
     setError(null)
     try {
+      // "Số ngày sấy": completeStage của service chưa nhận field này — ghi thẳng vào cột
+      // duration_days TRƯỚC khi hoàn thành (update trong completeStage không đụng cột này)
+      if (durationDays != null) {
+        const { error: durErr } = await supabase
+          .from('production_stage_progress')
+          .update({ duration_days: durationDays })
+          .eq('production_order_id', id)
+          .eq('stage_number', stageNumber)
+        if (durErr) throw durErr
+      }
       await productionService.completeStage(id, stageNumber, {
         input_quantity: inputQty ?? undefined,
         output_quantity: outputQty ?? undefined,
@@ -215,6 +227,18 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
     } finally {
       setActionLoading(false)
     }
+  }
+
+  const handleCompleteStage = () => {
+    if (!id) return
+    Modal.confirm({
+      title: `Hoàn thành công đoạn ${stageNumber}: ${STAGE_NAMES[stageNumber]}?`,
+      content: 'Số liệu sẽ được lưu và khoá lại, không sửa được sau khi hoàn thành.',
+      okText: 'Hoàn thành',
+      cancelText: 'Huỷ',
+      okButtonProps: { style: { background: '#1B4D3E', borderColor: '#1B4D3E' } },
+      onOk: doCompleteStage,
+    })
   }
 
   // Calculations
@@ -455,7 +479,7 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
                 <InputNumber
                   value={durationDays}
                   onChange={setDurationDays}
-                  min={0} step={0.5}
+                  min={0} step={1} precision={0}
                   placeholder="3"
                   style={{ width: '100%', marginTop: 4 }}
                   disabled={isCompleted}

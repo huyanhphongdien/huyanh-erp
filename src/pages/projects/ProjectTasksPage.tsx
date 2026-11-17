@@ -9,6 +9,7 @@
 // ============================================================================
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { App } from 'antd'
 import {
   Plus,
   ChevronDown,
@@ -107,6 +108,8 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
 }) => {
   // ✅ FIX: Lấy user để set assigner_id + department_id khi tạo task
   const { user } = useAuthStore()
+  // Báo lỗi mutation cho người dùng (AntdApp đã bọc toàn app trong main.tsx)
+  const { message } = App.useApp()
 
   // State
   const [viewMode, setViewMode] = useState<ViewMode>('by_phase')
@@ -252,6 +255,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       await loadData()
     } catch (err: any) {
       console.error('Status update failed:', err)
+      message.error(err?.message || 'Không lưu được trạng thái, thử lại')
     }
   }
 
@@ -263,6 +267,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       await loadData()
     } catch (err: any) {
       console.error('Bulk update failed:', err)
+      message.error(err?.message || 'Không cập nhật được các task đã chọn, thử lại')
     }
   }
 
@@ -272,6 +277,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       await loadData()
     } catch (err: any) {
       console.error('Sync failed:', err)
+      message.error(err?.message || 'Không đồng bộ được tiến độ, thử lại')
     }
   }
 
@@ -686,11 +692,13 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       priority: 'medium',
     })
     const [saving, setSaving] = useState(false)
+    const [submitError, setSubmitError] = useState<string | null>(null)
 
     const handleSubmit = async () => {
       if (!form.name?.trim()) return
       try {
         setSaving(true)
+        setSubmitError(null)
         // ✅ FIX: Truyền assigner_id + department_id + created_by từ user hiện tại
         await projectTaskService.createProjectTask({
           ...form,
@@ -703,6 +711,8 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
         handleTaskCreated()
       } catch (err: any) {
         console.error('Create task failed:', err)
+        // Giữ modal mở + hiện lỗi cạnh nút Lưu để người dùng biết chưa lưu được
+        setSubmitError(err?.message || 'Không tạo được task, thử lại')
       } finally {
         setSaving(false)
       }
@@ -846,21 +856,26 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex gap-2 safe-area-bottom">
-            <button
-              onClick={() => setShowCreateModal(false)}
-              className="flex-1 py-2.5 text-[14px] text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              Hủy
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={!form.name?.trim() || saving}
-              className="flex-1 py-2.5 text-[14px] text-white bg-[#1B4D3E] rounded-lg hover:bg-[#153F33] disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Tạo task
-            </button>
+          <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 safe-area-bottom">
+            {submitError && (
+              <p className="text-[12px] text-red-600 mb-2" role="alert">{submitError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 py-2.5 text-[14px] text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={!form.name?.trim() || saving}
+                className="flex-1 py-2.5 text-[14px] text-white bg-[#1B4D3E] rounded-lg hover:bg-[#153F33] disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Tạo task
+              </button>
+            </div>
           </div>
         </div>
       </div>

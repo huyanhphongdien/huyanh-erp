@@ -513,7 +513,12 @@ export default function PerformanceDashboardPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16, marginBottom: 24 }}>
         {/* Grade distribution */}
         <div style={sectionCardStyle}>
-          <h3 style={sectionTitleStyle}>Phân bố xếp hạng</h3>
+          <h3 style={{ ...sectionTitleStyle, margin: '0 0 4px 0' }}>Phân bố xếp hạng tháng (A–F)</h3>
+          {/* Thang A-F là thang tổng hợp THÁNG, mốc khác xếp loại từng việc — ghi rõ kẻo NV so 2 con chữ */}
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 14 }}>
+            Thang A–F tổng hợp theo tháng (A ≥ 90 · B 75–89 · C 60–74 · D 40–59 · F &lt; 40) — khác thang
+            xếp loại từng việc (Xuất sắc / Tốt / Trung bình / Cần cải thiện).
+          </div>
           {kpis && <GradeDistributionBar distribution={kpis.grade_distribution} />}
         </div>
 

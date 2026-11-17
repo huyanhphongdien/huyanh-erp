@@ -29,6 +29,7 @@ import {
 } from '@ant-design/icons'
 import { ledgerService, PartnerBalance, ENTRY_TYPE_LABELS } from '../../../services/b2b/ledgerService'
 import type { BalanceSummary } from '../../../services/b2b/ledgerService'
+import { exportPartnerBalances } from '../../../utils/b2bLedgerExportExcel'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
 
@@ -122,6 +123,20 @@ const LedgerOverviewPage = () => {
 
   const handleViewPartner = (partnerId: string) => {
     navigate(`/b2b/ledger/${partnerId}`)
+  }
+
+  const handleExport = async () => {
+    if (balances.length === 0) {
+      message.warning('Không có dữ liệu công nợ để xuất')
+      return
+    }
+    try {
+      await exportPartnerBalances(balances)
+      message.success('Đã xuất file Excel sổ công nợ')
+    } catch (err) {
+      console.error(err)
+      message.error('Xuất Excel thất bại')
+    }
   }
 
   // ============================================
@@ -252,7 +267,7 @@ const LedgerOverviewPage = () => {
               <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
                 Làm mới
               </Button>
-              <Button icon={<ExportOutlined />}>
+              <Button icon={<ExportOutlined />} onClick={handleExport}>
                 Xuất Excel
               </Button>
             </Space>

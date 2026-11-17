@@ -76,6 +76,7 @@ export default function OvertimeApprovalPage() {
   const [historyList, setHistoryList] = useState<OvertimeRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Multi-select
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -104,6 +105,7 @@ export default function OvertimeApprovalPage() {
   const loadData = useCallback(async () => {
     if (!employeeId) return
     setLoading(true)
+    setLoadError(null)
     try {
       const [pending, history] = await Promise.all([
         overtimeRequestService.getPendingApprovals(employeeId, 'pending', dateFrom || undefined, dateTo || undefined),
@@ -112,8 +114,9 @@ export default function OvertimeApprovalPage() {
       setPendingList(pending)
       setHistoryList(history)
       setSelected(new Set())
-    } catch (err) {
+    } catch (err: any) {
       console.error('Load error:', err)
+      setLoadError(err?.message || 'Không tải được danh sách')
     } finally {
       setLoading(false)
     }
@@ -364,6 +367,20 @@ export default function OvertimeApprovalPage() {
           <div className="flex flex-col items-center justify-center py-16">
             <Loader2 className="w-7 h-7 animate-spin text-blue-500" />
             <span className="mt-2 text-sm text-gray-500">Đang tải...</span>
+          </div>
+        ) : loadError ? (
+          /* LOAD ERROR */
+          <div className="text-center py-16 bg-white rounded-2xl border">
+            <AlertTriangle className="w-14 h-14 text-red-300 mx-auto mb-4" />
+            <p className="text-gray-700 font-medium">Không tải được danh sách</p>
+            <p className="text-xs text-gray-400 mt-1 px-6">{loadError}</p>
+            <button
+              onClick={loadData}
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl active:bg-red-100"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Thử lại
+            </button>
           </div>
         ) : tab === 'pending' ? (
           /* PENDING */

@@ -255,7 +255,7 @@ export default function SalesDashboardPage() {
             </div>
             <div style={aiActions}>
               {data.slaRisk.length > 0 && (
-                <span style={aiAction} onClick={() => navigate('/sales/orders')}>→ Xem đơn quá hạn</span>
+                <span style={aiAction} onClick={() => navigate('/sales/orders?filter=overdue_etd')}>→ Xem đơn quá hạn</span>
               )}
               {data.lcNearExpiry.length > 0 && (
                 <span style={aiAction} onClick={() => navigate('/sales/cash-flow')}>→ Xem L/C</span>

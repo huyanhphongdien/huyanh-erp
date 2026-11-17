@@ -721,6 +721,13 @@ const SalesOrderListPage = () => {
       setSortBy('etd')
       setSortOrder('asc')
     }
+    // Lịch giao trên Sales Dashboard truyền ?etd=YYYY-MM-DD → áp vào bộ lọc ngày
+    // (lưu ý: bộ lọc ngày hiện lọc theo order_date "Ngày đặt" — chip hiện rõ, gỡ được)
+    const etd = searchParams.get('etd')
+    if (etd) {
+      const d = dayjs(etd)
+      if (d.isValid()) setDateRange([d, d])
+    }
   }, [searchParams])
 
   // ============================================

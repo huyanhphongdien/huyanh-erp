@@ -85,6 +85,9 @@ export default function RawOpeningStockPage() {
         note: v.note?.trim() || null,
       })
       message.success('Đã thêm dòng tồn đầu (chưa ghi sổ)')
+      if (v.facility_code.toUpperCase() !== facilityCode.toUpperCase()) {
+        message.warning(`Dòng vừa thêm thuộc nhà máy ${v.facility_code} — bảng đang lọc ${facilityCode} nên chưa hiển thị`)
+      }
       form.resetFields(['batch_code', 'wet_kg', 'drc_pct', 'supplier_name', 'ticket_code', 'note'])
       await load()
     } catch (e: any) {
@@ -153,7 +156,8 @@ export default function RawOpeningStockPage() {
           </Col>
           <Col>
             <Space wrap>
-              <Select value={facilityCode} onChange={setFacilityCode} style={{ minWidth: 180 }}
+              {/* Đồng bộ 2 chiều với ô "Nhà máy" của form Thêm dòng — tránh thêm dòng cho nhà máy đang không lọc */}
+              <Select value={facilityCode} onChange={(v) => { setFacilityCode(v); form.setFieldValue('facility_code', v) }} style={{ minWidth: 180 }}
                 options={(facilities ?? []).map((f) => ({ value: f.code, label: `${f.code} · ${f.name}` }))} />
               <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>Làm mới</Button>
               <Button type="primary" icon={<CheckCircleOutlined />} disabled={!canWrite || pendingOk.length === 0} onClick={handleCommit}>

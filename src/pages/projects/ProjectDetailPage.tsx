@@ -18,6 +18,7 @@
 // ============================================================================
 
 import React, { useState, useEffect, useCallback, useRef, TouchEvent } from 'react'
+import { App } from 'antd'
 import {
   ArrowLeft,
   MoreHorizontal,
@@ -579,6 +580,8 @@ const PhasesTab: React.FC<{
   onUpdateStatus: (id: string, status: PhaseStatus) => void
   onDelete: (id: string) => void
 }> = ({ phases, projectId, onRefresh, onUpdateStatus, onDelete }) => {
+  // Báo lỗi mutation milestone cho người dùng (AntdApp đã bọc toàn app trong main.tsx)
+  const { message } = App.useApp()
   const [expandedId, setExpandedId] = useState<string | null>(phases[0]?.id || null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [newPhaseName, setNewPhaseName] = useState('')
@@ -740,8 +743,9 @@ const PhasesTab: React.FC<{
       if (error) { alert('Lỗi: ' + error.message); return }
       if (phaseId) await loadMilestones(phaseId)
       else await loadProjectMilestones()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Update milestone status failed:', err)
+      message.error(err?.message || 'Không lưu được trạng thái milestone, thử lại')
     }
   }
 
@@ -758,11 +762,14 @@ const PhasesTab: React.FC<{
   const handleDeleteMilestone = async (msId: string, phaseId: string | null) => {
     if (!confirm('Xóa milestone này?')) return
     try {
-      await supabase.from('project_milestones').delete().eq('id', msId)
+      // Supabase không throw — phải đọc error trả về, kẻo xoá hụt mà vẫn im lặng
+      const { error } = await supabase.from('project_milestones').delete().eq('id', msId)
+      if (error) throw error
       if (phaseId) await loadMilestones(phaseId)
       else await loadProjectMilestones()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Delete milestone failed:', err)
+      message.error(err?.message || 'Không xóa được milestone, thử lại')
     }
   }
 

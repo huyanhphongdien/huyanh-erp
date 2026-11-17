@@ -48,6 +48,7 @@ import {
 } from '../../features/tasks/utils/taskPermissions';
 
 import TaskParticipantsSection from '../../features/tasks/components/TaskParticipantsSection';
+import { RATING_LABELS } from '../../types/evaluation.types';
 
 // ============================================================================
 // TYPES
@@ -78,16 +79,18 @@ interface TaskDetail {
   parent_task?: { id: string; code: string; name: string } | null;
 }
 
+// Cột thật của bảng task_self_evaluations: self_score + quality_assessment
+// (không phải score/rating — đối chiếu QuickEvalModal.tsx + evaluation.types.ts)
 interface SelfEvaluation {
   id: string;
   task_id: string;
   employee_id: string;
-  score: number;
-  rating: string;
+  self_score: number | null;
+  quality_assessment: string | null;
   achievements?: string | null;
-  challenges?: string | null;
-  improvements?: string | null;
-  comments?: string | null;
+  difficulties?: string | null;
+  solutions?: string | null;
+  recommendations?: string | null;
   status: string;
   submitted_at?: string;
   employee?: { full_name: string } | null;
@@ -124,12 +127,13 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string; bgColor: s
   urgent: { label: 'Khẩn cấp', color: 'text-red-600', bgColor: 'bg-red-100' },
 };
 
+// Nhãn xếp loại lấy MỘT nguồn từ RATING_LABELS (evaluation.types.ts);
+// key là giá trị thật trong DB ('excellent'/'good'/...), màu chữ là của riêng trang.
 const RATING_CONFIG: Record<string, { label: string; color: string }> = {
-  A: { label: 'Xuất sắc', color: 'text-green-600' },
-  B: { label: 'Tốt', color: 'text-blue-600' },
-  C: { label: 'Đạt', color: 'text-yellow-600' },
-  D: { label: 'Cần cải thiện', color: 'text-orange-600' },
-  F: { label: 'Không đạt', color: 'text-red-600' },
+  excellent: { label: RATING_LABELS.excellent, color: 'text-green-600' },
+  good: { label: RATING_LABELS.good, color: 'text-blue-600' },
+  average: { label: RATING_LABELS.average, color: 'text-yellow-600' },
+  below_average: { label: RATING_LABELS.below_average, color: 'text-orange-600' },
 };
 
 // ============================================================================
@@ -537,12 +541,14 @@ const TaskDetailPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                   <div className="flex-1">
                     <p className="text-xs sm:text-sm text-gray-500">Điểm tự đánh giá</p>
-                    <p className="text-xl sm:text-2xl font-bold text-blue-600">{selfEvaluation.score}/100</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-600">{selfEvaluation.self_score ?? '—'}/100</p>
                   </div>
                   <div className="flex-1">
                     <p className="text-xs sm:text-sm text-gray-500">Xếp loại</p>
-                    <p className={`text-lg sm:text-xl font-bold ${RATING_CONFIG[selfEvaluation.rating]?.color || 'text-gray-600'}`}>
-                      {selfEvaluation.rating} - {RATING_CONFIG[selfEvaluation.rating]?.label || selfEvaluation.rating}
+                    <p className={`text-lg sm:text-xl font-bold ${RATING_CONFIG[selfEvaluation.quality_assessment || '']?.color || 'text-gray-600'}`}>
+                      {selfEvaluation.quality_assessment
+                        ? RATING_CONFIG[selfEvaluation.quality_assessment]?.label || selfEvaluation.quality_assessment
+                        : '—'}
                     </p>
                   </div>
                 </div>
@@ -552,16 +558,22 @@ const TaskDetailPage: React.FC = () => {
                     <p className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-2.5 sm:p-3 rounded-lg">{selfEvaluation.achievements}</p>
                   </div>
                 )}
-                {selfEvaluation.challenges && (
+                {selfEvaluation.difficulties && (
                   <div>
                     <p className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Khó khăn gặp phải</p>
-                    <p className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-2.5 sm:p-3 rounded-lg">{selfEvaluation.challenges}</p>
+                    <p className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-2.5 sm:p-3 rounded-lg">{selfEvaluation.difficulties}</p>
                   </div>
                 )}
-                {selfEvaluation.comments && (
+                {selfEvaluation.solutions && (
                   <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Nhận xét</p>
-                    <p className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-2.5 sm:p-3 rounded-lg">{selfEvaluation.comments}</p>
+                    <p className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Giải pháp đã áp dụng</p>
+                    <p className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-2.5 sm:p-3 rounded-lg">{selfEvaluation.solutions}</p>
+                  </div>
+                )}
+                {selfEvaluation.recommendations && (
+                  <div>
+                    <p className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Đề xuất, kiến nghị</p>
+                    <p className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-2.5 sm:p-3 rounded-lg">{selfEvaluation.recommendations}</p>
                   </div>
                 )}
                 <div className="text-[10px] sm:text-xs text-gray-400 pt-2">
@@ -589,7 +601,7 @@ const TaskDetailPage: React.FC = () => {
                     <div className="flex-1">
                       <p className="text-xs sm:text-sm text-gray-500">Xếp loại cuối</p>
                       <p className={`text-lg sm:text-xl font-bold ${RATING_CONFIG[approval.rating]?.color || 'text-gray-600'}`}>
-                        {approval.rating} - {RATING_CONFIG[approval.rating]?.label || approval.rating}
+                        {RATING_CONFIG[approval.rating]?.label || approval.rating}
                       </p>
                     </div>
                   )}

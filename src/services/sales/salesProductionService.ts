@@ -8,6 +8,26 @@
 import { supabase } from '../../lib/supabase'
 
 // ============================================================================
+// LUẬT TẠO LỆNH SẢN XUẤT — DÙNG CHUNG cho tab Sản xuất (ProductionTab) và trang
+// /sales/orders/:id/production (SalesOrderProductionPage). Đừng gõ lại luật ở màn khác.
+// ============================================================================
+
+// Trạng thái đơn được phép tạo lệnh SX:
+//  - confirmed: đơn đã xác nhận, chưa bắt đầu sản xuất
+//  - producing: đã chuyển trạng thái nhưng chưa gắn lệnh SX (vd user revert
+//    từ packing về producing để cấp lại NVL / làm lại lô mới)
+export const CREATE_PRODUCTION_STATUSES = ['confirmed', 'producing'] as const
+
+/** Được tạo lệnh SX? = đơn ở trạng thái cho phép + role production/admin. */
+export function canCreateProduction(
+  status: string | null | undefined,
+  salesRole: string | null | undefined,
+): boolean {
+  if (!status || !(CREATE_PRODUCTION_STATUSES as readonly string[]).includes(status)) return false
+  return salesRole === 'production' || salesRole === 'admin'
+}
+
+// ============================================================================
 // TYPES
 // ============================================================================
 

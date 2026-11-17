@@ -17,12 +17,10 @@ import { B2BSectionTabs, SETTLEMENT_TABS } from '../../../components/b2b/B2BSect
 
 const { Text } = Typography
 
+// Đủ 7 trạng thái của SettlementStatus — lấy thẳng từ SETTLEMENT_STATUS_LABELS để không lệch service
 const STATUS_TABS = [
   { key: 'all', label: 'Tất cả' },
-  { key: 'draft', label: 'Nháp' },
-  { key: 'pending_approval', label: 'Chờ duyệt' },
-  { key: 'approved', label: 'Đã duyệt' },
-  { key: 'paid', label: 'Đã thanh toán' },
+  ...Object.entries(SETTLEMENT_STATUS_LABELS).map(([key, label]) => ({ key, label })),
 ]
 const STATUS_OPTIONS = STATUS_TABS.filter(t => t.key !== 'all').map(t => ({ value: t.key, label: t.label }))
 
@@ -59,18 +57,18 @@ export default function SettlementListPage() {
   }, [allSettlements])
 
   const columns: ColumnDef<Settlement>[] = [
-    { key: 'settlement_number', title: 'Mã QT', dataIndex: 'settlement_number', width: 130, sortable: true,
+    { key: 'code', title: 'Mã QT', dataIndex: 'code', width: 130, sortable: true,
       render: (v) => <Text strong style={{ color: '#1B4D3E' }}>{v}</Text> },
     { key: 'partner', title: 'Đại lý', dataIndex: ['partner', 'name'], width: 160, ellipsis: true,
       render: (_, r) => <Text>{(r as any).partner?.name || '—'}</Text>,
       exportRender: (_, r) => (r as any).partner?.name || '' },
     { key: 'settlement_type', title: 'Loại', dataIndex: 'settlement_type', width: 100,
       render: (v) => <Tag color={SETTLEMENT_TYPE_COLORS[v as keyof typeof SETTLEMENT_TYPE_COLORS]}>{SETTLEMENT_TYPE_LABELS[v as keyof typeof SETTLEMENT_TYPE_LABELS] || v}</Tag> },
-    { key: 'total_amount', title: 'Tổng giá trị', dataIndex: 'total_amount', width: 120, align: 'right', sortable: true,
+    { key: 'gross_amount', title: 'Tổng giá trị', dataIndex: 'gross_amount', width: 120, align: 'right', sortable: true,
       render: (v) => <Text strong style={{ color: '#1B4D3E' }}>{formatCurrency(v)}</Text>, exportRender: (v) => v || 0 },
-    { key: 'total_advanced', title: 'Đã ứng', dataIndex: 'total_advanced', width: 110, align: 'right',
+    { key: 'total_advance', title: 'Đã ứng', dataIndex: 'total_advance', width: 110, align: 'right',
       render: (v) => <Text style={{ color: '#722ed1' }}>{formatCurrency(v)}</Text>, exportRender: (v) => v || 0 },
-    { key: 'balance_due', title: 'Còn nợ', dataIndex: 'balance_due', width: 110, align: 'right', sortable: true,
+    { key: 'remaining_amount', title: 'Còn nợ', dataIndex: 'remaining_amount', width: 110, align: 'right', sortable: true,
       render: (v) => <Text strong style={{ color: v > 0 ? '#cf1322' : '#52c41a' }}>{formatCurrency(v)}</Text>, exportRender: (v) => v || 0 },
     { key: 'status', title: 'Trạng thái', dataIndex: 'status', width: 110,
       filterType: 'select', filterOptions: STATUS_OPTIONS,
@@ -95,7 +93,7 @@ export default function SettlementListPage() {
             <Statistic title="Còn nợ" value={s.remaining_amount || 0} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: (s.remaining_amount || 0) > 0 ? '#cf1322' : '#52c41a' }} />
           </Card></Col>
           <Col xs={6}><Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-            <Statistic title="Aging" value={aging} suffix="ngày" valueStyle={{ fontSize: 18, color: aging > 30 ? '#cf1322' : aging > 14 ? '#fa8c16' : '#52c41a' }} />
+            <Statistic title="Tuổi nợ" value={aging} suffix="ngày" valueStyle={{ fontSize: 18, color: aging > 30 ? '#cf1322' : aging > 14 ? '#fa8c16' : '#52c41a' }} />
           </Card></Col>
         </Row>
         <Descriptions size="small" column={{ xs: 1, sm: 2, md: 3 }} labelStyle={{ fontWeight: 600 }}>

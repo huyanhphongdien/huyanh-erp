@@ -476,6 +476,17 @@ async function update(
 }
 
 async function remove(id: string): Promise<void> {
+  // ⚠ CHẶN XOÁ LỆNH ĐÃ PHÁT HÀNH — service không tin UI (cùng khuôn chốt của markWeighed).
+  //   Lệnh dispatched/in_transit/completed là mốc dispatch_date cho "đã giao" và tuổi nợ A/R;
+  //   muốn bỏ thì "Đổi trạng thái → Đã huỷ" (setStatus). Chỉ nháp / đã huỷ mới xoá hẳn được.
+  const { data: don } = await supabase
+    .from('dispatch_orders').select('status').eq('id', id).single()
+  const tt = (don as { status?: string } | null)?.status
+  if (tt && tt !== 'draft' && tt !== 'cancelled') {
+    throw new Error(tt === 'completed'
+      ? 'Lệnh đã hoàn tất — là mốc ngày giao cho đơn hàng & công nợ, không xoá hẳn được.'
+      : 'Lệnh đã phát hành — không xoá hẳn được. Muốn bỏ lệnh, hãy đổi trạng thái sang "Đã huỷ".')
+  }
   const { error } = await supabase.from('dispatch_orders').delete().eq('id', id)
   if (error) throw error
 }

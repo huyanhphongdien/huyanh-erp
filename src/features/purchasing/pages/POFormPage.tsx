@@ -179,6 +179,13 @@ function POFormPage() {
     if (!hasValid) return 'Cần ít nhất 1 dòng vật tư hợp lệ (tên, NCC, SL, đơn giá, ĐVT)'
     const missing = items.filter((i) => i.material_name && !i.supplier_id)
     if (missing.length > 0) return 'Vui lòng chọn NCC cho tất cả vật tư'
+    // Dòng "dở dang" (có tên nhưng thiếu SL/đơn giá/ĐVT) sẽ bị filter bỏ lúc lưu → chặn lại, không vứt im lặng
+    const incompleteRows = items
+      .map((i, idx) => (i.material_name && (!(i.quantity > 0) || !(i.unit_price > 0) || !i.unit) ? idx + 1 : null))
+      .filter((r): r is number => r !== null)
+    if (incompleteRows.length > 0) {
+      return `${incompleteRows.length} dòng vật tư chưa đủ SL/đơn giá/ĐVT (dòng ${incompleteRows.join(', ')}) sẽ không được lưu. Vui lòng nhập đủ hoặc xóa dòng trước khi lưu.`
+    }
     return null
   }
 

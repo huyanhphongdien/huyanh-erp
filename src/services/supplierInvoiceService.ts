@@ -93,6 +93,7 @@ export interface InvoiceFormData {
   due_date?: string;
   notes?: string;
   created_by?: string;
+  image_urls?: string[];
   items: InvoiceItemFormData[];
 }
 
@@ -506,6 +507,8 @@ export const supplierInvoiceService = {
         paid_amount: 0,
         remaining_amount: totals.totalAmount,
         status: 'pending',
+        image_url: formData.image_urls?.length ? formData.image_urls[0] : null,  // First image as primary
+        image_urls: formData.image_urls?.length ? formData.image_urls : null,
         notes: formData.notes || null,
         created_by: formData.created_by || null,
       })

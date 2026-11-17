@@ -154,9 +154,10 @@ export const settlementStatusConfig: Record<SettlementStatus, StatusConfig> = {
     icon: <ClockCircleOutlined />,
   },
   approved: {
+    // xanh DƯƠNG = đã duyệt CHỜ chi (ngữ nghĩa màu dòng tiền chung, xem CLAUDE.md)
     label: 'Đã duyệt',
-    color: '#52c41a',
-    bgColor: '#f6ffed',
+    color: '#1890ff',
+    bgColor: '#e6f7ff',
     icon: <CheckCircleOutlined />,
   },
   partial_paid: {
@@ -166,9 +167,10 @@ export const settlementStatusConfig: Record<SettlementStatus, StatusConfig> = {
     icon: <CheckCircleOutlined />,
   },
   paid: {
+    // xanh LÁ = tiền đã ra xong
     label: 'Đã thanh toán',
-    color: '#1890ff',
-    bgColor: '#e6f7ff',
+    color: '#52c41a',
+    bgColor: '#f6ffed',
     icon: <CheckCircleOutlined />,
   },
   cancelled: {

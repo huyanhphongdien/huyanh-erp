@@ -1,6 +1,7 @@
 // ============================================================================
 // OpsQrScanner — lớp phủ quét QR tem máy bằng camera (BarcodeDetector).
-// Máy nào không có BarcodeDetector → cho nhập mã tay. Bắt được mã → onDetect(code).
+// Máy không có BarcodeDetector (Safari/iOS) → vẫn quét bằng html5-qrcode: chụp khung
+// hình video ra canvas rồi đọc. Camera không mở được → nhập mã tay. Bắt được mã → onDetect(code).
 // ============================================================================
 import { useEffect, useRef, useState } from 'react'
 
@@ -20,18 +21,25 @@ export function parseEquipCode(raw: string): string | null {
   return m ? m[0] : (v || null)
 }
 
+// Container ẩn cho html5-qrcode — scanFile đòi một phần tử có id trong DOM
+const HTML5_QRCODE_DIV_ID = 'ops-qr-html5qrcode'
+
 export default function OpsQrScanner({ onDetect, onClose }: { onDetect: (code: string) => void; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [err, setErr] = useState<string | null>(null)
   const [manual, setManual] = useState('')
-  const [supported] = useState(() => 'BarcodeDetector' in window)
 
   useEffect(() => {
-    if (!supported) return
     let stream: MediaStream | null = null
     let raf = 0
     let stopped = false
-    const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] })
+    // Safari/iOS không có BarcodeDetector → detector = null, quét bằng html5-qrcode bên dưới
+    const detector = 'BarcodeDetector' in window
+      ? new (window as any).BarcodeDetector({ formats: ['qr_code'] })
+      : null
+    let qr: import('html5-qrcode').Html5Qrcode | null = null
+    const canvas = document.createElement('canvas')
+    let lastScan = 0
 
     async function start() {
       try {
@@ -48,17 +56,41 @@ export default function OpsQrScanner({ onDetect, onClose }: { onDetect: (code: s
       const v = videoRef.current
       if (!v || stopped) return
       try {
-        const codes = await detector.detect(v)
-        if (codes && codes.length) {
-          const code = parseEquipCode(codes[0].rawValue)
-          if (code) { stopped = true; onDetect(code); return }
+        if (detector) {
+          const codes = await detector.detect(v)
+          if (codes && codes.length) {
+            const code = parseEquipCode(codes[0].rawValue)
+            if (code) { stopped = true; onDetect(code); return }
+          }
+        } else if (v.readyState === 4 && Date.now() - lastScan > 250) {
+          // Fallback html5-qrcode: chụp khung hình ra canvas rồi đọc (giãn ~4 lần/giây)
+          lastScan = Date.now()
+          if (!qr) {
+            const { Html5Qrcode } = await import('html5-qrcode')
+            qr = new Html5Qrcode(HTML5_QRCODE_DIV_ID, false)
+          }
+          canvas.width = v.videoWidth
+          canvas.height = v.videoHeight
+          canvas.getContext('2d')?.drawImage(v, 0, 0)
+          const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
+          if (blob && !stopped) {
+            const file = new File([blob], 'frame.png', { type: 'image/png' })
+            const text = await qr.scanFile(file, false) // reject khi khung không có QR → xuống catch
+            const code = parseEquipCode(text)
+            if (code) { stopped = true; onDetect(code); return }
+          }
         }
       } catch { /* bỏ qua khung lỗi */ }
       raf = requestAnimationFrame(loop)
     }
     start()
-    return () => { stopped = true; cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach(t => t.stop()) }
-  }, [supported, onDetect])
+    return () => {
+      stopped = true
+      cancelAnimationFrame(raf)
+      if (qr) { try { qr.clear() } catch { /* đã dọn */ } }
+      if (stream) stream.getTracks().forEach(t => t.stop())
+    }
+  }, [onDetect])
 
   const S = {
     wrap: { position: 'fixed', inset: 0, zIndex: 60, background: '#000', display: 'flex', flexDirection: 'column' } as React.CSSProperties,
@@ -75,7 +107,7 @@ export default function OpsQrScanner({ onDetect, onClose }: { onDetect: (code: s
         <span>Quẹt tem QR trên máy</span>
       </div>
       <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
-        {supported && !err ? <>
+        {!err ? <>
           <video ref={videoRef} style={S.video} muted playsInline />
           <div style={S.frame} />
           <div style={{ position: 'absolute', bottom: 18, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: 13, opacity: .9 }}>Đưa ô xanh trùm lên tem QR</div>
@@ -83,10 +115,11 @@ export default function OpsQrScanner({ onDetect, onClose }: { onDetect: (code: s
           <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: '#fff', textAlign: 'center', padding: 24 }}>
             <div>
               <div style={{ fontSize: 40 }}>📷</div>
-              <div style={{ marginTop: 10, fontSize: 14, opacity: .9, maxWidth: 260 }}>{err || 'Máy này không quét QR trong app được. Nhập mã tem tay.'}</div>
+              <div style={{ marginTop: 10, fontSize: 14, opacity: .9, maxWidth: 260 }}>{err}</div>
             </div>
           </div>
         )}
+        <div id={HTML5_QRCODE_DIV_ID} style={{ display: 'none' }} />
       </div>
       <div style={S.foot}>
         <div style={{ fontSize: 12, opacity: .7, marginBottom: 6 }}>Hoặc gõ mã trên tem (vd HA-LL-01)</div>

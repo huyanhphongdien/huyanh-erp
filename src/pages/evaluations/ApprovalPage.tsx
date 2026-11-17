@@ -37,17 +37,8 @@ import {
 } from 'lucide-react';
 import { ExtensionApprovalTab } from '../../features/tasks/components/ExtensionApprovalTab';
 import { extensionService } from '../../services/extensionService';
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const RATING_LABELS: Record<string, string> = {
-  excellent: 'Xuất sắc',
-  good: 'Tốt',
-  average: 'Trung bình',
-  below_average: 'Cần cải thiện',
-};
+// Nhãn xếp loại dùng MỘT nguồn chung (evaluation.types.ts), không giữ bản cục bộ
+import { RATING_LABELS, calculateRating, type RatingLevel } from '../../types/evaluation.types';
 
 // ============================================================================
 // TYPES
@@ -66,7 +57,7 @@ interface ApprovalModalData {
 
 function getRatingLabel(rating: string | null): string {
   if (!rating) return '—';
-  return RATING_LABELS[rating] || rating;
+  return RATING_LABELS[rating as RatingLevel] || rating;
 }
 
 function getRatingBgColor(rating: string | null): string {
@@ -81,10 +72,7 @@ function getRatingBgColor(rating: string | null): string {
 }
 
 function getScoreRating(score: number): string {
-  if (score >= 90) return 'Xuất sắc';
-  if (score >= 70) return 'Tốt';
-  if (score >= 50) return 'Trung bình';
-  return 'Cần cải thiện';
+  return RATING_LABELS[calculateRating(score)];
 }
 
 function formatDate(dateStr: string): string {

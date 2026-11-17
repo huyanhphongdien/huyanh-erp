@@ -67,8 +67,17 @@ interface Props {
 
 export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onCancel }: Props) {
   const { user } = useAuthStore()
-  
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<LeaveRequestFormData>({
+
+  // Quyền chọn nhân viên: chỉ quản lý (TP/PP/BGĐ/admin) mới được tạo đơn cho người khác;
+  // nhân viên thường (position_level ≥ 6) chỉ tạo đơn cho chính mình (ô chỉ-đọc)
+  const canPickEmployee = !!user?.is_manager
+  const userLevel = user?.position_level || 7
+  // TP/PP (level 4-5) chỉ thấy nhân viên phòng mình, BGĐ thấy tất cả (như BusinessTripPage)
+  const deptFilterId = user?.department_id && userLevel > 3 ? user.department_id : null
+  const ownName = initialData?.employee?.full_name || user?.full_name || user?.email || ''
+  const ownCode = initialData?.employee?.code || user?.employee_code || ''
+
+  const { register, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm<LeaveRequestFormData>({
     defaultValues: initialData ? {
       employee_id: initialData.employee_id || '',
       leave_type_id: initialData.leave_type_id || '',
@@ -101,11 +110,16 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
     enabled: !viewOnly && !(initialData && initialData.status !== 'pending')
   })
 
-  // Query danh sách nhân viên
+  // Query danh sách nhân viên — CHỈ quản lý mới cần picker, nhân viên thường không tải 1000 NV
   const { data: employees, isLoading: isLoadingEmployees } = useQuery({
-    queryKey: ['employees-active'],
-    queryFn: () => employeeService.getAll({ page: 1, pageSize: 1000, status: 'active' }),
-    enabled: !viewOnly && !(initialData && initialData.status !== 'pending')
+    queryKey: ['employees-active', 'leave-form', deptFilterId],
+    queryFn: () => employeeService.getAll({
+      page: 1,
+      pageSize: 1000,
+      status: 'active',
+      ...(deptFilterId ? { department_id: deptFilterId } : {}),
+    }),
+    enabled: canPickEmployee && !viewOnly && !(initialData && initialData.status !== 'pending')
   })
 
   // ★ Detect loại "Công tác"
@@ -118,17 +132,24 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
   const startDate = watch('start_date')
   const endDate = watch('end_date')
   const isHalfDay = watch('is_half_day')
+  // Chuỗi YYYY-MM-DD của input date so sánh được trực tiếp
+  const dateRangeInvalid = !!(startDate && endDate && endDate < startDate)
 
   useEffect(() => {
     if (startDate && endDate) {
+      if (endDate < startDate) {
+        // Khoảng ngày không hợp lệ → số ngày = 0, nút gửi bị khoá
+        setValue('total_days', 0)
+        return
+      }
       const start = new Date(startDate)
       const end = new Date(endDate)
       let days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
-      
+
       if (isHalfDay) {
         days = 0.5
       }
-      
+
       if (days > 0) {
         setValue('total_days', days)
       }
@@ -307,25 +328,38 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
   return (
     <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4 sm:space-y-5">
       
-      {/* Employee select */}
+      {/* Employee: quản lý chọn trong danh sách, nhân viên thường chỉ-đọc chính mình */}
       <div className="space-y-2">
         <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
           <User className="w-4 h-4 text-gray-400" />
           Nhân viên <span className="text-red-500">*</span>
         </label>
-        <select
-          {...register('employee_id', { required: 'Vui lòng chọn nhân viên' })}
-          className={`w-full px-4 py-3.5 sm:py-3 border rounded-xl text-[15px] sm:text-sm
-            bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-            ${errors.employee_id ? 'border-red-300' : 'border-gray-300'}`}
-        >
-          <option value="">-- Chọn nhân viên --</option>
-          {(employees?.data || []).map(e => (
-            <option key={e.id} value={e.id}>
-              {e.code} - {e.full_name}
-            </option>
-          ))}
-        </select>
+        {canPickEmployee ? (
+          <select
+            {...register('employee_id', { required: 'Vui lòng chọn nhân viên' })}
+            className={`w-full px-4 py-3.5 sm:py-3 border rounded-xl text-[15px] sm:text-sm
+              bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+              ${errors.employee_id ? 'border-red-300' : 'border-gray-300'}`}
+          >
+            <option value="">-- Chọn nhân viên --</option>
+            {(employees?.data || []).map(e => (
+              <option key={e.id} value={e.id}>
+                {e.code} - {e.full_name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <>
+            <input
+              type="hidden"
+              {...register('employee_id', { required: 'Tài khoản chưa gắn hồ sơ nhân viên, liên hệ HCNS' })}
+            />
+            <div className="w-full px-4 py-3.5 sm:py-3 border border-gray-300 rounded-xl text-[15px] sm:text-sm
+              bg-gray-50 text-gray-700 font-medium">
+              {ownCode ? `${ownCode} - ${ownName}` : (ownName || 'Tài khoản chưa gắn hồ sơ nhân viên')}
+            </div>
+          </>
+        )}
         {errors.employee_id && (
           <p className="text-xs text-red-600 flex items-center gap-1">
             <AlertTriangle className="w-3 h-3" />
@@ -437,13 +471,20 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
           </label>
           <input
             type="date"
-            {...register('end_date', { required: 'Vui lòng chọn ngày kết thúc' })}
+            {...register('end_date', {
+              required: 'Vui lòng chọn ngày kết thúc',
+              validate: v => !v || !getValues('start_date') || v >= getValues('start_date')
+                || 'Ngày kết thúc phải sau ngày bắt đầu',
+            })}
+            min={startDate || undefined}
             className={`w-full px-4 py-3.5 sm:py-3 border rounded-xl text-[15px] sm:text-sm
               bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-              ${errors.end_date ? 'border-red-300' : 'border-gray-300'}`}
+              ${errors.end_date || dateRangeInvalid ? 'border-red-300' : 'border-gray-300'}`}
           />
-          {errors.end_date && (
-            <p className="text-xs text-red-600">{errors.end_date.message}</p>
+          {(errors.end_date || dateRangeInvalid) && (
+            <p className="text-xs text-red-600">
+              {errors.end_date?.message || 'Ngày kết thúc phải sau ngày bắt đầu'}
+            </p>
           )}
         </div>
       </div>
@@ -526,7 +567,7 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
         </button>
         <button
           type="submit"
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || dateRangeInvalid}
           className="w-full sm:flex-1 flex items-center justify-center gap-2 
             py-3.5 sm:py-2.5 px-5 bg-blue-600 rounded-xl
             text-[15px] sm:text-sm font-semibold text-white 

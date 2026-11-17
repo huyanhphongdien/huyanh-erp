@@ -45,6 +45,7 @@ import { taskParticipantService } from '../../services/taskParticipantService';
 import { ExtensionRequestModal } from '../../features/tasks/components/ExtensionRequestModal';
 import { isTaskOverdue as isOverdueUtil } from '../../utils/taskUtils';
 import QuickEvalModal from '../../components/tasks/QuickEvalModal';
+import { RATING_LABELS, calculateRating } from '../../types/evaluation.types';
 
 // ============================================================================
 // TYPES
@@ -133,11 +134,12 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string
   low: { label: 'Thấp', color: 'text-gray-600', bg: 'bg-gray-100', sortOrder: 4 },
 };
 
+// Nhãn xếp loại lấy MỘT nguồn từ RATING_LABELS (evaluation.types.ts) — màu chữ là của riêng trang
 const RATING_CONFIG: Record<string, { label: string; color: string }> = {
-  excellent: { label: 'Xuất sắc', color: 'text-emerald-600' },
-  good: { label: 'Tốt', color: 'text-blue-600' },
-  average: { label: 'Khá', color: 'text-yellow-600' },
-  below_average: { label: 'Trung bình', color: 'text-orange-600' },
+  excellent: { label: RATING_LABELS.excellent, color: 'text-emerald-600' },
+  good: { label: RATING_LABELS.good, color: 'text-blue-600' },
+  average: { label: RATING_LABELS.average, color: 'text-yellow-600' },
+  below_average: { label: RATING_LABELS.below_average, color: 'text-orange-600' },
 };
 
 const QUICK_FILTERS: { key: QuickFilter; label: string; icon: React.ReactNode }[] = [
@@ -153,13 +155,6 @@ const QUICK_PROGRESS_OPTIONS = [25, 50, 75, 100];
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
-
-function getRatingFromScore(score: number): string {
-  if (score >= 90) return 'excellent';
-  if (score >= 70) return 'good';
-  if (score >= 50) return 'average';
-  return 'below_average';
-}
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';
@@ -319,7 +314,7 @@ const StatsCard: React.FC<{
 
 const ScoreCard: React.FC<{ score: number; label: string }> = ({ score, label }) => {
   const hasData = score > 0;
-  const rating = hasData ? getRatingFromScore(score) : 'none';
+  const rating = hasData ? calculateRating(score) : 'none';
   const ratingConfig = RATING_CONFIG[rating];
   return (
     <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-3 sm:p-4 border border-purple-100">
@@ -495,7 +490,7 @@ const MyTasksPage: React.FC = () => {
     const qualityScore = totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : 0;
     // Không tính khối lượng ở đây — chỉ hiện chất lượng TB (khối lượng hiện ở dashboard hiệu suất)
     const avg = qualityScore;
-    return { averageScore: avg, rating: RATING_CONFIG[getRatingFromScore(avg)]?.label || '-' };
+    return { averageScore: avg, rating: RATING_CONFIG[calculateRating(avg)]?.label || '-' };
   }, [tasks]);
 
   const tabCounts: Record<TabKey, number> = {

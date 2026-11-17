@@ -23,6 +23,7 @@ import {
   Statistic,
   DatePicker,
   Empty,
+  Result,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -32,6 +33,7 @@ import {
   FilterOutlined,
   CarOutlined,
   CloseOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
 import weighbridgeService from '../../../services/wms/weighbridgeService'
 import { dealWmsService } from '../../../services/b2b/dealWmsService'
@@ -96,6 +98,7 @@ export default function WeighbridgeListPage() {
   // State
   const [data, setData] = useState<PaginatedResponse<WeighbridgeTicket> | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const pageSize = 15
 
@@ -161,6 +164,7 @@ export default function WeighbridgeListPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const result = await weighbridgeService.getAll({
         page,
@@ -174,8 +178,9 @@ export default function WeighbridgeListPage() {
         facility_id: facilityFilter || undefined,
       })
       setData(result)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Load weighbridge list error:', err)
+      setError(err?.message || 'Không tải được danh sách phiếu cân')
     } finally {
       setLoading(false)
     }
@@ -586,6 +591,23 @@ export default function WeighbridgeListPage() {
 
           {/* Table */}
           <Card size="small" style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
+            {error ? (
+              <Result
+                icon={<WarningOutlined style={{ color: '#ff4d4f' }} />}
+                title="Không tải được danh sách phiếu cân"
+                subTitle={error}
+                extra={
+                  <Button
+                    type="primary"
+                    icon={<ReloadOutlined />}
+                    onClick={() => { loadData(); loadStats() }}
+                    style={{ background: PRIMARY_COLOR, borderColor: PRIMARY_COLOR }}
+                  >
+                    Thử lại
+                  </Button>
+                }
+              />
+            ) : (
             <Table
               columns={columns}
               dataSource={filteredData || []}
@@ -634,6 +656,7 @@ export default function WeighbridgeListPage() {
                 style: { cursor: 'pointer' },
               })}
             />
+            )}
           </Card>
         </Space>
       </div>

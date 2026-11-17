@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { useAuthStore } from '../../stores/authStore'
 import {
@@ -48,7 +48,7 @@ import {
 import { salesContractWorkflowService } from '../../services/sales/salesContractWorkflowService'
 import { salesCustomerService } from '../../services/sales/salesCustomerService'
 import { salesOrderService, type CreateSalesOrderData } from '../../services/sales/salesOrderService'
-import { balesFromTons, containersFromBales } from '../../services/sales/baleMath'
+import { balesFromTons, containersFromBales, defaultBalesPerContainer } from '../../services/sales/baleMath'
 import { rubberGradeService } from '../../services/wms/rubberGradeService'
 import type { SalesCustomer } from '../../services/sales/salesTypes'
 import { SALES_CURRENCY_OPTIONS, isVnd, priceUnitLabel, fmtMoney, vndInputProps } from '../../services/sales/salesMoney'
@@ -75,6 +75,7 @@ const { TextArea } = Input
 
 function SalesOrderCreatePage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const user = useAuthStore(s => s.user)
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
@@ -102,11 +103,13 @@ function SalesOrderCreatePage() {
     payment_terms: string
   }
   const [orderItems, setOrderItems] = useState<OrderItem[]>([
-    { key: '1', grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bale_weights_kg: [35], bales_per_container: 576, packing_type: 'loose_bale', packing_note: '', payment_terms: '' },
+    { key: '1', grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bale_weights_kg: [35], bales_per_container: defaultBalesPerContainer(35, null), packing_type: 'loose_bale', packing_note: '', payment_terms: '' },
   ])
+  // Dòng sản phẩm DỞ DANG (thiếu Grade/Tấn/Giá) bị chặn khi lưu — tô viền đỏ theo key
+  const [invalidKeys, setInvalidKeys] = useState<string[]>([])
 
   const addItem = () => {
-    setOrderItems(prev => [...prev, { key: String(Date.now()), grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bale_weights_kg: [35], bales_per_container: 576, packing_type: 'loose_bale', packing_note: '', payment_terms: '' }])
+    setOrderItems(prev => [...prev, { key: String(Date.now()), grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bale_weights_kg: [35], bales_per_container: defaultBalesPerContainer(35, null), packing_type: 'loose_bale', packing_note: '', payment_terms: '' }])
   }
 
   const removeItem = (key: string) => {
@@ -151,8 +154,8 @@ function SalesOrderCreatePage() {
   const quantityTons = Form.useWatch('quantity_tons', form) || 0
   const unitPrice = Form.useWatch('unit_price', form) || 0
   const baleWeight = Form.useWatch('bale_weight_kg', form) || 35
-  const balesPerContInput = Form.useWatch('bales_per_container', form) || 576
   const containerType = Form.useWatch('container_type', form) || '20ft'
+  const balesPerContInput = Form.useWatch('bales_per_container', form) || defaultBalesPerContainer(baleWeight, containerType)
   const currency = Form.useWatch('currency', form) || 'USD'
   // Bán nội địa: giá nhập bằng VNĐ, cần tỷ giá để quy đổi USD cho công nợ/báo cáo (salesMoney.ts)
   const vnd = isVnd(currency)
@@ -350,7 +353,7 @@ function SalesOrderCreatePage() {
                   grade: last.grade || '',
                   bale_weight_kg: last.bale_weight_kg || 35,
                   bale_weights_kg: [last.bale_weight_kg || 35],
-                  bales_per_container: last.bales_per_container || 576,
+                  bales_per_container: last.bales_per_container || defaultBalesPerContainer(last.bale_weight_kg || 35, null),
                   packing_type: last.packing_type || 'loose_bale',
                   payment_terms: last.payment_terms || '',
                 }
@@ -366,6 +369,41 @@ function SalesOrderCreatePage() {
     [customers, form],
   )
 
+  // ── Mở từ trang khách hàng: /sales/orders/new?customer_id=... → chọn sẵn khách đó ──
+  useEffect(() => {
+    const preselectId = searchParams.get('customer_id')
+    if (!preselectId || customers.length === 0) return
+    if (form.getFieldValue('customer_id')) return // người dùng đã tự chọn — không ghi đè
+    if (!customers.some((c) => c.id === preselectId)) return
+    form.setFieldsValue({ customer_id: preselectId })
+    handleCustomerChange(preselectId)
+  }, [customers, searchParams, form, handleCustomerChange])
+
+  // ── Phân loại dòng sản phẩm khi lưu ──
+  // Đủ (giữ) / rỗng hoàn toàn (bỏ qua) / DỞ DANG (chặn — không âm thầm vứt bỏ)
+  const isCompleteItem = (i: OrderItem) => Boolean(i.grade && i.quantity_tons > 0 && i.unit_price > 0)
+  const isPartialItem = (i: OrderItem) =>
+    Boolean(i.grade || i.quantity_tons > 0 || i.unit_price > 0) && !isCompleteItem(i)
+
+  /** Chặn dòng dở dang: báo lỗi + tô viền đỏ dòng đó. Trả true nếu có dòng bị chặn. */
+  const blockPartialItems = (): boolean => {
+    const partialRows: number[] = []
+    const partialKeys: string[] = []
+    orderItems.forEach((i, idx) => {
+      if (isPartialItem(i)) {
+        partialRows.push(idx + 1)
+        partialKeys.push(i.key)
+      }
+    })
+    if (partialKeys.length === 0) {
+      setInvalidKeys([])
+      return false
+    }
+    setInvalidKeys(partialKeys)
+    message.error(`Dòng sản phẩm thứ ${partialRows.join(', ')} thiếu Grade/Tấn/Giá — điền đủ hoặc xoá dòng`)
+    return true
+  }
+
   // ── Submit ──
   const handleSubmit = async (
     asDraft: boolean,
@@ -375,8 +413,12 @@ function SalesOrderCreatePage() {
       const values = await form.validateFields()
       setLoading(true)
 
-      // Validate items
-      const validItems = orderItems.filter(i => i.grade && i.quantity_tons > 0 && i.unit_price > 0)
+      // Validate items — dòng DỞ DANG bị CHẶN, không âm thầm vứt bỏ khi lưu
+      if (blockPartialItems()) {
+        setLoading(false)
+        return null
+      }
+      const validItems = orderItems.filter(isCompleteItem)
       if (validItems.length === 0) {
         message.error('Vui lòng thêm ít nhất 1 sản phẩm')
         setLoading(false)
@@ -482,9 +524,12 @@ function SalesOrderCreatePage() {
         return
       }
 
-      const validItems = orderItems.filter(
-        (i) => i.grade && i.quantity_tons > 0 && i.unit_price > 0,
-      )
+      // Cùng luật với handleSubmit: dòng DỞ DANG bị CHẶN, không âm thầm vứt bỏ
+      if (blockPartialItems()) {
+        setSubmittingReview(false)
+        return
+      }
+      const validItems = orderItems.filter(isCompleteItem)
       if (validItems.length === 0) {
         message.error('Vui lòng thêm ít nhất 1 sản phẩm')
         setSubmittingReview(false)
@@ -628,7 +673,7 @@ function SalesOrderCreatePage() {
           </Row>
 
           {orderItems.map((item, idx) => (
-            <div key={item.key} style={{ background: idx % 2 === 0 ? '#fafafa' : '#fff', padding: '12px', borderRadius: 8, marginBottom: 8, border: '1px solid #f0f0f0' }}>
+            <div key={item.key} style={{ background: idx % 2 === 0 ? '#fafafa' : '#fff', padding: '12px', borderRadius: 8, marginBottom: 8, border: invalidKeys.includes(item.key) ? '1px solid #ff4d4f' : '1px solid #f0f0f0' }}>
               <Row gutter={[12, 8]} align="middle">
                 <Col xs={24} sm={6}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>
@@ -688,7 +733,7 @@ function SalesOrderCreatePage() {
                 <Col xs={12} sm={5}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Bành/cont</div>
                   <InputNumber value={item.bales_per_container} min={1} style={{ width: '100%' }}
-                    onChange={(v) => updateItem(item.key, 'bales_per_container', v || 576)} />
+                    onChange={(v) => updateItem(item.key, 'bales_per_container', v || defaultBalesPerContainer(item.bale_weight_kg || 35, null))} />
                 </Col>
                 <Col xs={24} sm={8}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2, marginTop: 4 }}>Đóng gói</div>
@@ -758,7 +803,7 @@ function SalesOrderCreatePage() {
                   ) : (
                     <>
                       {balesFromTons(item.quantity_tons, item.bale_weight_kg || 35).toLocaleString()} bành |
-                      {' '}{containersFromBales(balesFromTons(item.quantity_tons, item.bale_weight_kg || 35), item.bales_per_container || 576)} cont
+                      {' '}{containersFromBales(balesFromTons(item.quantity_tons, item.bale_weight_kg || 35), item.bales_per_container || defaultBalesPerContainer(item.bale_weight_kg || 35, null))} cont
                     </>
                   )}
                   {' | '}${(item.quantity_tons * item.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

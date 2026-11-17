@@ -38,6 +38,9 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
 - Tailwind utility classes preferred over inline styles (except legacy pages)
 - TanStack Query keys: `['entity-name', ...params]`; `staleTime: 5 * 60 * 1000` for heavy queries
 - Supabase joins: use `!fk_name` syntax for explicit FK references
+- **Màu trạng thái DÒNG TIỀN (mọi luồng duyệt–chi: quyết toán B2B, ĐNTT mủ, ĐNTT đội xe…):** vàng/cam = chờ duyệt ·
+  xanh **DƯƠNG** = đã duyệt CHỜ chi · xanh **LÁ** = đã chi/hoàn tất · đỏ = huỷ/từ chối. Đã đồng bộ 17/11/2026
+  (settlementService + StatusTag đổi theo fleet/PaymentRequest); màn mới đừng tự chế bảng màu khác.
 - **Điện thoại (≤ 640px)**: hook `src/hooks/useIsPhone.ts`. Sổ đơn hàng bán (`SalesOrderListPage`) trên điện thoại vẽ THẺ
   (`components/SalesOrderPhoneList.tsx`) thay cho bảng 20 cột và giấu Views/độ dày/Split/ẩn cột/Excel/chọn nhiều dòng
   (04/11/2026, đo bằng Chrome DevTools MCP). Thêm cột mới cho Sổ đơn → cân nhắc thêm vào thẻ; chi tiết đơn mở bằng

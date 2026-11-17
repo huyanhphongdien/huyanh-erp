@@ -140,6 +140,9 @@ const MaterialFormModal: React.FC<{
   const [saving, setSaving] = useState(false)
   const [categories, setCategories] = useState<LookupItem[]>([])
   const [units, setUnits] = useState<LookupItem[]>([])
+  // Đơn vị (symbol) đang lưu trong DB của vật liệu đang sửa — để map ngược về unit_id
+  // và GIỮ nguyên khi người dùng không chọn lại đơn vị
+  const [editingUnit, setEditingUnit] = useState<string | null>(null)
 
   // Load lookups
   useEffect(() => {
@@ -163,6 +166,7 @@ const MaterialFormModal: React.FC<{
   useEffect(() => {
     if (!isOpen) return
     if (isCreate) {
+      setEditingUnit(null)
       form.resetFields()
       return
     }
@@ -178,11 +182,12 @@ const MaterialFormModal: React.FC<{
 
         if (error) throw error
         if (data) {
+          setEditingUnit(data.unit || null)
           form.setFieldsValue({
             name: data.name || '',
             sku: data.sku || '',
             category_id: data.category_id || undefined,
-            unit_id: undefined,
+            unit_id: units.find(u => u.symbol === data.unit)?.id,
             weight_per_unit: data.weight_per_unit || null,
             min_stock: data.min_stock || 0,
             max_stock: data.max_stock || null,
@@ -200,6 +205,13 @@ const MaterialFormModal: React.FC<{
     loadMaterial()
   }, [materialId, isOpen, isCreate, form])
 
+  // Map đơn vị (symbol trong DB) ngược về unit_id sau khi danh sách đơn vị đã tải xong
+  useEffect(() => {
+    if (!isOpen || isCreate || !editingUnit || units.length === 0) return
+    const matched = units.find(u => u.symbol === editingUnit)
+    if (matched) form.setFieldValue('unit_id', matched.id)
+  }, [units, editingUnit, isOpen, isCreate, form])
+
   // Submit
   const handleSubmit = async () => {
     try {
@@ -211,7 +223,8 @@ const MaterialFormModal: React.FC<{
         sku: values.sku.trim().toUpperCase(),
         type: 'finished' as const,
         category_id: values.category_id || null,
-        unit: units.find(u => u.id === values.unit_id)?.symbol || 'banh',
+        // Không chọn đơn vị → GIỮ đơn vị cũ trong DB (sửa), chỉ phiếu tạo mới mới dùng mặc định
+        unit: units.find(u => u.id === values.unit_id)?.symbol || editingUnit || 'bành',
         weight_per_unit: values.weight_per_unit || null,
         min_stock: values.min_stock || 0,
         max_stock: values.max_stock || null,

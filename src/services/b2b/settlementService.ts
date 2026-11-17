@@ -196,12 +196,14 @@ export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
   rejected: 'Từ chối',
 }
 
+// Ngữ nghĩa màu dòng tiền dùng chung toàn ERP (xem CLAUDE.md): vàng = chờ duyệt,
+// xanh DƯƠNG = đã duyệt CHỜ chi, xanh LÁ = đã chi/hoàn tất, đỏ = huỷ/từ chối.
 export const SETTLEMENT_STATUS_COLORS: Record<SettlementStatus, string> = {
   draft: 'default',
   pending_approval: 'orange',
-  approved: 'green',
+  approved: 'blue',
   partial_paid: 'gold',
-  paid: 'blue',
+  paid: 'green',
   cancelled: 'red',
   rejected: 'red',
 }

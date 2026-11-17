@@ -8,7 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, RefreshCw, Loader2, ChevronRight, Receipt,
-  Calendar, Scale, Building2,
+  Calendar, Scale, Building2, AlertTriangle,
 } from 'lucide-react'
 import { paymentRequestService, type PaymentRequest, type PaymentRequestStatus } from '../../../services/wms/paymentRequestService'
 
@@ -34,18 +34,21 @@ const PaymentRequestListPage: React.FC = () => {
   const navigate = useNavigate()
   const [rows, setRows] = useState<PaymentRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterStatus>('all')
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const data = await paymentRequestService.list({
         status: filter === 'all' ? undefined : filter,
         limit: 200,
       })
       setRows(data)
-    } catch (e) {
+    } catch (e: any) {
       console.error('[PaymentRequestList] load error', e)
+      setError(e?.message || 'Không tải được danh sách')
     }
     setLoading(false)
   }, [filter])
@@ -110,6 +113,18 @@ const PaymentRequestListPage: React.FC = () => {
       <div className="px-4 space-y-2.5">
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 text-emerald-500 animate-spin" /></div>
+        ) : error ? (
+          <div className="text-center py-16">
+            <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-red-300" />
+            <p className="text-[14px] font-medium text-red-600">Không tải được danh sách đề nghị</p>
+            <p className="text-[12px] text-gray-400 mt-1">{error}</p>
+            <button
+              onClick={load}
+              className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 text-red-600 text-[13px] font-semibold active:bg-red-100"
+            >
+              <RefreshCw className="w-4 h-4" /> Thử lại
+            </button>
+          </div>
         ) : rows.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <Receipt className="w-12 h-12 mx-auto mb-3 opacity-30" />

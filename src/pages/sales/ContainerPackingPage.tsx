@@ -45,6 +45,7 @@ import {
 } from '@ant-design/icons'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { containerService } from '../../services/sales/containerService'
+import { defaultBalesPerContainer } from '../../services/sales/baleMath'
 import type { ContainerSummary } from '../../services/sales/containerService'
 import { dispatchService, type DeliveryState } from '../../services/logistics/dispatchService'
 import { LOT_STAGES, buildLotTrackRows, lotDeliveryStats } from '../../services/sales/lotTracking'
@@ -328,7 +329,7 @@ function ContainerPackingPage() {
   const handleCreateByLot = async () => {
     try {
       const vals = await createLotForm.validateFields()
-      const baleWeight = order?.bale_weight_kg || 35
+      const baleWeight = order?.bale_weight_kg || 33.33
       const ctype = (order?.container_type as any) || '20ft'
       const lots = (vals.lots || [])
         .filter((l: any) => l && l.count > 0)
@@ -1219,7 +1220,11 @@ function ContainerPackingPage() {
                     </Col>
                     <Col span={6}>
                       <Form.Item label={idx === 0 ? 'Số bành/cont' : undefined} name={[field.name, 'bales']}>
-                        <InputNumber min={0} style={{ width: '100%' }} placeholder="vd 576" />
+                        <InputNumber
+                          min={0}
+                          style={{ width: '100%' }}
+                          placeholder={`vd ${order?.bales_per_container || defaultBalesPerContainer(order?.bale_weight_kg, order?.container_type)}`}
+                        />
                       </Form.Item>
                     </Col>
                     <Col span={6}>

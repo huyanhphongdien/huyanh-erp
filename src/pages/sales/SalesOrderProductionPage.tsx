@@ -39,7 +39,7 @@ import {
   ToolOutlined,
 } from '@ant-design/icons'
 import { salesOrderService } from '../../services/sales/salesOrderService'
-import { salesProductionService } from '../../services/sales/salesProductionService'
+import { salesProductionService, canCreateProduction, CREATE_PRODUCTION_STATUSES } from '../../services/sales/salesProductionService'
 import type { NvlAvailability, ProductionProgress } from '../../services/sales/salesProductionService'
 import type { SalesOrder, SalesOrderStatus } from '../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, soDisplayCode } from '../../services/sales/salesTypes'
@@ -170,6 +170,8 @@ export default function SalesOrderProductionPage() {
       </div>
     )
   }
+
+  const canManage = salesRole === 'production' || salesRole === 'admin'
 
   // ══════════════════════════════════════════════════════════════
   // BODY — luồng đầy đủ (Case 1: đã có lệnh SX · Case 2: chưa có)
@@ -329,7 +331,9 @@ export default function SalesOrderProductionPage() {
     }
 
     // ── Case 2: No production order yet ──
-    const canCreate = ['confirmed', 'draft'].includes(order.status)
+    // Luật chung với tab Sản xuất: canCreateProduction (salesProductionService)
+    const canCreate = canCreateProduction(order.status, salesRole)
+    const statusAllowsCreate = (CREATE_PRODUCTION_STATUSES as readonly string[]).includes(order.status)
 
     const nvlBatchColumns: ColumnsType<NvlAvailability['suitable_batches'][0]> = [
       {
@@ -397,6 +401,18 @@ export default function SalesOrderProductionPage() {
 
     return (
       <Row gutter={[16, 16]}>
+        {/* Đơn 'producing' nhưng chưa gắn lệnh SX (vd revert từ Đóng gói) — chỉ dẫn tạo lại */}
+        {order.status === 'producing' && canManage && (
+          <Col xs={24}>
+            <Alert
+              type="warning"
+              showIcon
+              message="Đơn đang sản xuất nhưng chưa gắn lệnh sản xuất"
+              description="Bấm 'Kiểm tra NVL' để chọn lô nguyên liệu và tạo lại lệnh sản xuất cho đơn này."
+            />
+          </Col>
+        )}
+
         {/* NVL Check Card */}
         <Col xs={24}>
           <Card
@@ -408,6 +424,7 @@ export default function SalesOrderProductionPage() {
                 icon={<SearchOutlined />}
                 onClick={handleCheckNvl}
                 loading={nvlLoading}
+                disabled={!canManage}
                 style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
               >
                 Kiểm tra NVL
@@ -523,22 +540,24 @@ export default function SalesOrderProductionPage() {
           </Col>
         )}
 
-        {/* Info if not in correct status */}
+        {/* Info if not in correct status / role */}
         {!canCreate && !order.production_order_id && (
           <Col xs={24}>
             <Alert
               type="info"
               showIcon
               message="Chưa thể tạo lệnh sản xuất"
-              description={`Đơn hàng đang ở trạng thái "${ORDER_STATUS_LABELS[order.status as SalesOrderStatus]}". Cần xác nhận đơn hàng trước khi tạo lệnh sản xuất.`}
+              description={
+                statusAllowsCreate
+                  ? 'Chỉ Bộ phận Sản xuất hoặc Quản trị mới tạo được lệnh sản xuất.'
+                  : `Đơn hàng đang ở trạng thái "${ORDER_STATUS_LABELS[order.status as SalesOrderStatus]}". Cần xác nhận đơn hàng trước khi tạo lệnh sản xuất.`
+              }
             />
           </Col>
         )}
       </Row>
     )
   }
-
-  const canManage = salesRole === 'production' || salesRole === 'admin'
 
   return (
     <div style={{ padding: 24 }}>

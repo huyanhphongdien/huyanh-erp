@@ -189,9 +189,17 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
                 <Button type="primary">Đổi trạng thái <DownOutlined /></Button>
               </Dropdown>
             )}
-            <Popconfirm title="Xoá lệnh này?" onConfirm={onDelete} okText="Xoá" cancelText="Huỷ">
-              <Button danger icon={<DeleteOutlined />} />
-            </Popconfirm>
+            {/* Chỉ nháp / đã huỷ mới xoá hẳn được. Lệnh đã phát hành là mốc dispatch_date
+                cho giao hàng + tuổi nợ A/R → muốn bỏ thì "Đổi trạng thái → Đã huỷ". */}
+            {(order.status === 'draft' || order.status === 'cancelled') && (
+              <Popconfirm
+                title="Xoá hẳn lệnh này?"
+                description={`Xoá hẳn lệnh cùng ${lines.length} dòng hàng/container và chi phí chuyến đã nhập — không khôi phục được.`}
+                onConfirm={onDelete} okText="Xoá" cancelText="Huỷ"
+              >
+                <Button danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+            )}
           </Space>
         </div>
 

@@ -572,7 +572,7 @@ export default function DispatchCreatePage() {
                 <Form.Item name="tractor_vehicle_id" label={isPort ? <><TruckOutlined /> Đầu kéo</> : <><CarOutlined /> Xe (đầu kéo / xe con / khách)</>}>
                   <Select allowClear showSearch optionFilterProp="label"
                     placeholder={isPort ? 'Chọn đầu kéo' : 'Chọn xe'} onChange={onTractorChange}
-                    options={primaryVehicleOptions} />
+                    options={primaryVehicleOptions as any /* nhóm 🚛/🚗: antd Select nhận grouped options, type prop khai hẹp hơn thực tế */} />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={8}>

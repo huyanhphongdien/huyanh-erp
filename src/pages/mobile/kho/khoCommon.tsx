@@ -72,9 +72,11 @@ export function parseKhoScan(raw: string): { kind: 'batch_id' | 'mix_lot' | 'mix
   const up = v.toUpperCase()
   if (/^CH-[A-Z0-9]+-\d{6}-\d+$/.test(up)) return { kind: 'mix_lot', value: up }
   if (/^PC-[A-Z0-9]+-\d{6}-\d+$/.test(up)) return { kind: 'mix_issue', value: up }
-  // tem pallet hàng chèn (Sổ pallet p19): "HC7" hoặc "HC-PD-7" → chữ viết tắt HC7 của nhà máy đang chọn
-  if (/^HC\d{1,3}$/.test(up)) return { kind: 'mix_pallet', value: up }
-  const hc = /^HC-[A-Z0-9]+-(\d{1,3})$/.exec(up)
-  if (hc) return { kind: 'mix_pallet', value: `HC${hc[1]}` }
+  // tem pallet hàng chèn (Sổ pallet p19): "HC7" / "HC07" / "HC-PD-7" → chữ viết tắt HC7 của nhà máy
+  // đang chọn. Bỏ số 0 đệm (HC07 → HC7) vì sổ ghi không đệm; tem in cũng nên in không đệm.
+  const hc1 = /^HC0*(\d{1,3})$/.exec(up)
+  if (hc1) return { kind: 'mix_pallet', value: `HC${Number(hc1[1])}` }
+  const hc = /^HC-[A-Z0-9]+-0*(\d{1,3})$/.exec(up)
+  if (hc) return { kind: 'mix_pallet', value: `HC${Number(hc[1])}` }
   return up ? { kind: 'batch_no', value: up } : null
 }

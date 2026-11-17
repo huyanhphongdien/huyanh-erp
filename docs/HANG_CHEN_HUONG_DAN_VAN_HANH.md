@@ -1,5 +1,11 @@
 # Hàng chèn — hướng dẫn vận hành từ đầu tới cuối (30/10/2026)
 
+> **⚠ Cập nhật 10–17/11/2026 (p19 → p21 — SỔ PALLET HC):** flow cân bì trong tài liệu này là **đường cũ**, nay chỉ còn
+> cho phiếu KHÔNG pallet HC (băng tải, cân rời, phiếu lập trước 10/11). **Flow chuẩn hiện tại:** Sổ pallet `mix_pallets`
+> (HC1→HC30, **bì chuẩn 27,5 kg cho mọi pallet** — chủ DN 17/11, KHÔNG cân từng pallet); lúc lấy chạm pallet HC + gõ số
+> trên cân → kg lấy = cân − 27,5 **chốt ngay**; lúc trả **Dùng hết = 0 kg không cân, 1 ảnh toàn cảnh** / Còn dư = cân 1 lần − bì;
+> 1 pallet chỉ ở 1 phiếu đang mở; bàn giao ca sau kế thừa pallet + bì. Bản mô tả mới đầy đủ: `docs/HUONG_DAN_HANG_CHEN.html` (mục 4–5).
+
 Dành cho QS tại xưởng, QC, thủ kho và chủ doanh nghiệp. Điện thoại: `huyanhrubber.vn/m/kho` → tab **Chèn**. Máy tính: menu Kho nguyên liệu → **Hàng chèn**.
 
 ## 0. Chuẩn bị một lần
@@ -9,7 +15,7 @@ Dành cho QS tại xưởng, QC, thủ kho và chủ doanh nghiệp. Điện tho
 | Chạy SQL theo thứ tự p4 → … → p13 | Supabase SQL Editor | p4–p10 đã chạy 30/10. Còn lại, chạy đúng thứ tự: **p11** `wms_mix_p11_bi_chi_luc_tra.sql` (bỏ bì lúc lấy + sửa audit) → **p12** `wms_nvl_p12_ket_thuc_ma.sql` (số bành tính lại, thay thế mã, tổng kết + BGĐ) → **p13** `wms_nvl_p13_lenh_chay.sql` (lệnh chạy nhiều mã) → **p14** `wms_nvl_p14_sua_chuan_hoa_ma.sql` (sửa lỗi gõ TMHG-15 thành TMHG-1) → **p15** `wms_mix_p15_lo_chen_ngam.sql` (phương án B: lấy theo nguồn + số lô, không cần nhập kho chèn trước) → **p16** `wms_mix_p16_sua_rang_buoc_kg.sql` (nới ràng buộc kg_in ≥ 0 cho lô chèn ngầm) → **p17** `wms_mix_p17_chen_bang_tai.sql` (vị trí chèn băng tải). Mỗi file có dòng kiểm chứng cuối |
 | Phân công | Máy tính: Hàng chèn → tab **Phân công** | Bước 1 QS khai báo · Bước 2 QC duyệt (Lê Thành Nhân, Lê Thị Lệ Trinh, chủ DN) · Bước 3 Thủ kho nhận (tạm: chủ DN). Gõ tên → Thêm; Thu để bỏ. BGĐ level ≤ 3 làm được mọi bước |
 | Cỡ bành | Danh mục chủng loại (`weight_per_unit`) | mặc định 35 kg/bành; lô TP / hàng chuẩn lấy cỡ bành của chủng loại |
-| Bì pallet | Không cần cấu hình | **không hỏi lúc lấy**; chỉ khai ở lần trả: dùng hết thì cân pallet rỗng (số trên cân = bì), còn dư thì gõ bì |
+| Bì pallet | Sổ pallet (p19→p21): `/m/kho/chen/so-pallet` · `/wms/chen/pallet` | **Bì chuẩn 27,5 kg cho mọi pallet HC** — chạm pallet lúc lấy, máy trừ bì và chốt ngay. Phiếu KHÔNG pallet HC mới theo đường cũ: bì khai ở lần trả (ô điền sẵn 27,5) |
 
 Ai không có tên ở bước 1 sẽ thấy "chưa được phân công khai báo (QS)" và không lấy / nhập lô được.
 
@@ -50,17 +56,21 @@ Trang chính tab Chèn → nút **Lấy lần n** (máy đếm theo ca).
 1. **Nguồn và số lô (phương án B):** chạm nguồn *Hàng chuẩn* / *Hàng lỗi* / *DKL* / *SBR – mua ngoài*. Nguồn kho TP → chạm lô TP còn tồn (số lô tự điền, bành trừ thẳng lô TP). SBR hoặc hàng ghi số lô trên bao → gõ số lô (máy gợi ý số lô dùng gần đây, ví dụ 1502) → **Dùng**. DKL phải tick **"Đã rà kim loại"**. Máy tự tạo lô chèn nếu chưa có, nhập = lấy. Lô đã nhập trước vẫn chọn được ở "Quét tem CH / chọn lô đã nhập trước". Thẻ xám phía trên liệt kê các lần đã lấy của ca (L1, L2…) để đối chiếu sổ.
 2. **Ca:** tự nhận theo chấm công hoặc giờ, bấm Đổi ca nếu khác. Tổ trưởng: **Ca Vang** hoặc **Ca Hiền**. Dùng để: Chạy lại / Nâng chỉ số.
 3. **Chèn vào đâu:** Chèn bể Slap, Chèn máy Mix hoặc **Chèn băng tải** (bắt buộc, máy nhớ lần trước). Băng tải tính theo **bành × kg/bành của lô** (35 kg), không cân pallet, không bì: gõ số bành (máy ra kg) hoặc gõ kg; lúc trả bấm − + số bành còn hoặc gõ kg, có nút "Dùng hết · trả 0 bành".
-4. **Cân:** chỉ gõ số trên cân "Cân cả pallet". Không hỏi bì ở bước này; kg lấy tạm bằng số cân tổng, máy ước **số bành** (− + nếu đếm khác). Bì khai ở lần trả, khi đó kg lấy tính lại. Bấm "Gõ thẳng kg" nếu không cân cả pallet.
+4. **Cân (p19):** chạm **pallet HC** (hoặc Quét tem) + gõ số trên cân → máy trừ bì 27,5 từ Sổ pallet, **kg lấy chốt ngay** (ví dụ 612,0 − 27,5 = 584,5). Không pallet HC: bấm "Không pallet · gõ kg" hoặc cân tổng theo đường cũ (bì khai lúc trả, ước số bành bớt 27,5).
 5. **Chèn vào lệnh / mã:** đúng một lệnh đang chạy → chip tự sáng "theo lệnh" (hoặc theo phiếu ca). Nhiều lệnh song song → chạm chip lệnh pallet này chèn vào (ví dụ "KHMN-15 + KHMN-17" hay "TMHG-39"). Vẫn chạm được mã lẻ nếu không theo lệnh.
 6. **Chụp 2 ảnh** tại cân (toàn cảnh, màn hình cân) → Tiếp tục → xem lại → **Ghi lần n**.
 7. Pallet tiếp theo: **Lấy lần n+1**. Lần 1 chưa trả vẫn lấy lần 2, 3 bình thường.
 
 ## 4. Trả cuối ca (QS)
 
-Trang chính, dòng **L1 · Trả L1** (từng lần có nút riêng). Ba lần cân, máy hiện theo thứ tự:
+Trang chính, dòng **L1 · Trả L1** (từng lần có nút riêng).
+
+**Phiếu có pallet HC (chuẩn, p19):** hai nút — **Dùng hết** (trả 0 kg, KHÔNG cân, chụp 1 ảnh toàn cảnh pallet rỗng) hoặc **Còn dư** (cân hàng + pallet một lần, máy trừ bì 27,5 đã chốt). Không hỏi bì.
+
+**Phiếu KHÔNG pallet HC (đường cũ):** ba lần cân, máy hiện theo thứ tự:
 - **Cân 1** (đã có từ lúc lấy): cả hàng + pallet.
 - **Cân 2 · hàng trả + pallet:** gõ số trên cân nếu còn hàng. Dùng hết thì bấm **"Dùng hết · bỏ cân 2"**, máy nhảy sang cân 3.
-- **Cân 3 · pallet rỗng:** cân pallet rỗng rồi gõ (mặc định 15).
+- **Cân 3 · pallet rỗng:** cân pallet rỗng rồi gõ (ô điền sẵn 27,5 — bì chuẩn; chỉ cân lại khi nghi sai).
 Máy tính: hàng trả = cân 2 − cân 3; kg lấy = cân 1 − cân 3; tiêu hao = kg lấy − hàng trả. Chụp 2 ảnh (pallet rỗng nếu dùng hết) → **Ghi trả và ký khai báo** (một chạm = ghi trả + chữ ký bước 1).
 - Để phần dư lại dây chuyền cho ca sau: tick "Để lại dây chuyền cho ca sau" (máy tự mở phiếu lấy cho ca kế khi thủ kho nhận; ca kế phải chọn ca khi trả).
 
@@ -95,7 +105,7 @@ Khi lệnh chạy xong (hết NVL vào máy, phiếu chèn cuối đã trả):
 3. **Mail tự động** (31/10): bấm Kết thúc là máy tự gửi "Báo cáo chèn hàng theo mã sản xuất <Mã>" cho Ban Giám đốc, không hỏi gì thêm. Người nhận = nhân viên chức vụ level ≤ 3 có email trong Nhân sự **+ minhld@huyanhrubber.com** (danh sách cố định `MAIL_THEM` trong `supabase/functions/mix-lenh-report/index.ts` và `MAIL_THEM_TU_DONG` trong `maTongKetMail.ts`). Mail theo mẫu báo cáo thu mua mủ: logo, 4 ô số, từng lần chèn kèm ảnh lấy / trả, bảng theo ca, lưu ý. Hàm gửi: edge function **mix-lenh-report** (server dựng + gửi qua Microsoft Graph, deploy một lần: `npx supabase functions deploy mix-lenh-report --no-verify-jwt`); chưa deploy thì app tự dựng và gửi qua `send-email` (không có logo). Trang tổng kết chỉ báo "đã gửi cho …", có nút **Gửi lại** khi lỗi.
 4. Không còn nút Tổng kết riêng (chủ DN 31/10: chỉ cần Kết thúc + mail tự động). Trang tổng kết hiện ngay sau khi kết thúc; mở lại qua đường dẫn `/m/kho/chen/lenh/<id>/tong-ket` (điện thoại) hoặc cửa sổ sau khi kết thúc trên máy tính.
 
-**Số bành:** lúc lấy máy ước theo (cân − 15) / kg mỗi bành; lúc trả máy **tính lại** theo kg lấy thật (cân 1 − bì). Tổ đã bấm − / + lúc lấy thì giữ nguyên số tổ chỉnh.
+**Số bành:** phiếu pallet HC ước thẳng trên kg hàng thật (đã trừ bì). Đường cũ: lúc lấy ước theo (cân − 27,5) / kg mỗi bành; lúc trả máy **tính lại** theo kg lấy thật (cân 1 − bì). Tổ đã bấm − / + lúc lấy thì giữ nguyên số tổ chỉnh.
 
 ## 7. Sửa khi sai
 
@@ -111,11 +121,11 @@ Khi lệnh chạy xong (hết NVL vào máy, phiếu chèn cuối đã trả):
 
 ## 8. Quy ước nhanh
 
-- Một lệnh = một hay nhiều mã chạy chung; nhiều lệnh chạy song song được. **3 vị trí chèn**: bể Slap, máy Mix (cân cả pallet, bì khai lúc trả) và băng tải (theo bành, không pallet).
-- Mỗi phiếu = một pallet = một lần chèn; số lần đếm theo ca, gom theo lệnh / mã gốc.
+- Một lệnh = một hay nhiều mã chạy chung; nhiều lệnh chạy song song được. **3 vị trí chèn**: bể Slap và máy Mix (chạm pallet HC, máy trừ bì chuẩn 27,5 từ Sổ pallet, kg chốt ngay) và băng tải (theo bành, không pallet).
+- Mỗi phiếu = một pallet = một lần chèn; số lần đếm theo ca, gom theo lệnh / mã gốc. Một pallet chỉ ở một phiếu đang mở.
 - Bành 35 kg (hoặc cỡ bành của chủng loại), máy tự quy; chỉ chỉnh khi đếm khác.
-- Bì pallet: lúc lấy không hỏi, lúc trả khai; máy tự tính lại kg lấy = cân tổng − bì.
-- 2 ảnh lúc lấy và 2 ảnh lúc trả luôn bắt buộc, kể cả dùng hết (ảnh pallet rỗng trên cân là bằng chứng bì).
+- Bì pallet: pallet HC chốt ngay lúc lấy (Sổ pallet, chuẩn 27,5). Chỉ phiếu không pallet HC mới khai bì lúc trả và tính lại kg lấy = cân tổng − bì.
+- 2 ảnh lúc lấy luôn bắt buộc. Lúc trả: dùng hết với pallet HC chỉ cần 1 ảnh toàn cảnh; còn dư hoặc phiếu không pallet HC cần 2 ảnh (ảnh pallet rỗng trên cân là bằng chứng bì đường cũ).
 - Kho chèn, sổ ca, gom theo mã chỉ thay đổi ở bước thủ kho nhận.
 - Kho chèn **không chặn**: SBR / số lô gõ tay lấy quá tồn thì máy ghi nhập thêm (chỉ báo trên màn); chỉ hàng từ lô TP chặn theo bành còn lại của lô TP.
 - Chi tiết kiểm thử từng màn: `docs/HANG_CHEN_TEST_TU_DAU_TOI_CUOI.md` (mục 14–24).

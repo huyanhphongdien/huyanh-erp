@@ -6,7 +6,7 @@
 // ============================================================================
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { mixService, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue, type MixViTri } from '../../../services/wms/mixService'
+import { mixService, MIX_PALLET_BI_CHUAN, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue, type MixViTri } from '../../../services/wms/mixService'
 import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { rawLotService, type RawLotBalance } from '../../../services/wms/rawLotService'
@@ -39,7 +39,8 @@ export default function KhoMixIssue() {
   const [retSoBanh, setRetSoBanh] = useState('')
   const [dungHetChon, setDungHetChon] = useState(false)   // dùng hết → bỏ cân 2, chỉ cân 3 (pallet rỗng)
   const [retGross, setRetGross] = useState('')
-  const [retPallet, setRetPallet] = useState(() => { try { return localStorage.getItem('kmx_pallet_kg') || '15' } catch { return '15' } })
+  // bì đường cũ (phiếu không pallet HC): mặc định = bì chuẩn 27,5 (p20); chỉ gõ lại khi pallet khác chuẩn
+  const [retPallet, setRetPallet] = useState(() => { try { return localStorage.getItem('kmx_pallet_kg') || String(MIX_PALLET_BI_CHUAN) } catch { return String(MIX_PALLET_BI_CHUAN) } })
   // đổi mã nguyên liệu gốc của phiếu
   const [maList, setMaList] = useState<RawLotBalance[] | null>(null)
   const [maChon, setMaChon] = useState<string[]>([])
@@ -62,7 +63,7 @@ export default function KhoMixIssue() {
   const [shift, setShift] = useState<ShiftPick | null>(null)
   const [shifts, setShifts] = useState<OpsShiftOption[]>([])
   const [pickShift, setPickShift] = useState(false)
-  const [team, setTeam] = useState('')
+  const [team, setTeam] = useState(() => { try { return localStorage.getItem('kmx_team') || '' } catch { return '' } })   // nhớ tổ như màn Lấy
   const teams = ['Vang', 'Hiền']
   const [big, setBig] = useState<{ src: string; cap: string } | null>(null)
   const role = useMixRole(i?.facility_id ?? null)
@@ -87,7 +88,7 @@ export default function KhoMixIssue() {
     detectShift(user?.employee_id || null).then((d) => { if (alive) { setShifts(d.shifts); setShift((cur) => cur ?? d.pick) } }).catch(() => { /* bỏ qua */ })
     return () => { alive = false }
   }, [i?.id, i?.shift_id, i?.status]) // eslint-disable-line react-hooks/exhaustive-deps
-  // bì tạm lúc lấy → điền sẵn, QS khai lại cho đúng ở lần trả
+  // phiếu cũ đã có bì (khai lần trả trước / bì chốt) → điền sẵn số đó thay cho mặc định 27,5
   useEffect(() => { if (i && i.pallet_kg !== null) setRetPallet(String(i.pallet_kg)) }, [i?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const required = settings.anh_bat_buoc?.length ? settings.anh_bat_buoc : ['toan_canh', 'man_hinh_can']
@@ -106,8 +107,8 @@ export default function KhoMixIssue() {
   // lúc lấy có cân tổng → lúc trả bắt buộc cân cả pallet + khai bì (không gõ thẳng kg)
   const bangTai = i?.vi_tri === 'bang_tai'   // băng tải: trả theo số bành còn × kg/bành hoặc kg, không pallet
   const retModeEff: 'pallet' | 'kg' = i && i.gross_kg !== null ? 'pallet' : bangTai ? 'kg' : retMode
-  // bì khai ở lần trả: dùng hết → số trên cân chính là pallet rỗng
-  // lần trả nhập 2 số: bì pallet (cân pallet rỗng, mặc định 15) và số trên cân hàng trả + pallet; dùng hết = cân bằng bì
+  // bì khai ở lần trả (chỉ phiếu KHÔNG pallet HC): dùng hết → số trên cân chính là pallet rỗng
+  // lần trả nhập 2 số: bì pallet (mặc định bì chuẩn 27,5 — p20) và số trên cân hàng trả + pallet; dùng hết = cân bằng bì
   // p19: phiếu có pallet HC → bì đã chốt lúc lấy (Sổ pallet), không hỏi bì; dùng hết = 0 không cân; còn dư cân 1 lần
   const coPallet = !!i?.pallet_id
   const biN = coPallet ? (i?.pallet_kg ?? 0) : retPalletN
@@ -127,7 +128,7 @@ export default function KhoMixIssue() {
   const lGrossN = lGross === '' ? null : Number(lGross)
   const lKgN = lMode === 'pallet' ? (lGrossN !== null && Number.isFinite(lGrossN) ? (coPallet ? Math.round((lGrossN - biN) * 100) / 100 : lGrossN) : null) : lKg === '' ? null : Number(lKg)   // pallet HC: trừ bì sổ; đường cũ: cân tổng, bì khai lúc trả
   const lKgOk = lKgN !== null && Number.isFinite(lKgN) && lKgN > 0
-  const lBanhAuto = i && lKgOk ? Math.max(Math.round(Math.max(lKgN! - (lMode === 'pallet' && !coPallet ? 15 : 0), 0) / (i.lot_kg_per_banh || 35)), 1) : null
+  const lBanhAuto = i && lKgOk ? Math.max(Math.round(Math.max(lKgN! - (lMode === 'pallet' && !coPallet ? MIX_PALLET_BI_CHUAN : 0), 0) / (i.lot_kg_per_banh || 35)), 1) : null   // đường cũ: ước bớt bì chuẩn 27,5 (cùng số với fn_mix_sua_lay p20)
   const lBanhN = lBanh === '' ? lBanhAuto : Math.round(Number(lBanh))
   const moSuaLay = () => {
     if (!i) return
@@ -175,11 +176,14 @@ export default function KhoMixIssue() {
         </div>
         {lMode === 'pallet' ? (
           <>
-            <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Cân cả pallet (kg) · bì khai lúc trả</span><input className="kmx-text kmx-mono" style={{ fontWeight: 700, fontSize: 17 }} type="number" inputMode="decimal" value={lGross} onChange={(e) => { setLGross(e.target.value); setLBanh('') }} aria-label="Cân cả pallet" /></label>
-            <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>Cả pallet · bì sẽ trừ lúc trả</span><span className="kmx-num sm">{lKgN === null ? '—' : `${kgTxt(lKgN)} kg`}</span></div>
+            <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">{coPallet ? `Cân cả pallet (kg) · máy trừ bì ${i.pallet_code} ${kgTxt(biN)} kg đã chốt` : 'Cân cả pallet (kg) · bì khai lúc trả'}</span><input className="kmx-text kmx-mono" style={{ fontWeight: 700, fontSize: 17 }} type="number" inputMode="decimal" value={lGross} onChange={(e) => { setLGross(e.target.value); setLBanh('') }} aria-label="Cân cả pallet" /></label>
+            <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>{coPallet ? `${lGross || '…'} − bì ${kgTxt(biN)} = kg hàng` : 'Cả pallet · bì sẽ trừ lúc trả'}</span><span className="kmx-num sm">{lKgN === null ? '—' : `${kgTxt(lKgN)} kg`}</span></div>
           </>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" type="number" inputMode="decimal" value={lKg} onChange={(e) => { setLKg(e.target.value); setLBanh('') }} aria-label="Kg lấy" /><span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span></div>
+          <>
+            {coPallet && <span className="kmx-sm">Gõ thẳng <b>kg hàng thật</b> (không tính pallet) — phiếu vẫn giữ pallet {i.pallet_code}, bì đã chốt.</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input className="kmx-input" type="number" inputMode="decimal" value={lKg} onChange={(e) => { setLKg(e.target.value); setLBanh('') }} aria-label="Kg lấy" /><span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span></div>
+          </>
         )}
         <div className="kmx-row" style={{ alignItems: 'center' }}>
           <span className="kmx-col"><span className="kmx-lbl">Số bành</span><span className="kmx-sm">tự tính {i.lot_kg_per_banh} kg/bành</span></span>
@@ -277,7 +281,7 @@ export default function KhoMixIssue() {
                 <button type="button" className="kmx-pill sm" onClick={() => setPickShift((v) => !v)}>{pickShift ? 'Đóng' : 'Đổi ca'}</button>
               </div>
               {pickShift && <div className="kmx-seg">{shifts.map((s) => <button key={s.id} type="button" className={shift?.id === s.id ? 'on' : ''} onClick={() => { setShift({ id: s.id, name: s.name, code: s.code, start_time: s.start_time, end_time: s.end_time, nguon: 'tay' }); setPickShift(false) }}>{s.name}</button>)}</div>}
-              <div className="kmx-col" style={{ gap: 6 }}><span className="kmx-lbl">Tổ trưởng · ca của ai</span><div className="kmx-seg">{teams.map((t) => <button key={t} type="button" className={team === t ? 'on' : ''} onClick={() => setTeam(t)}>Ca {t}</button>)}</div></div>
+              <div className="kmx-col" style={{ gap: 6 }}><span className="kmx-lbl">Tổ trưởng · ca của ai</span><div className="kmx-seg">{teams.map((t) => <button key={t} type="button" className={team === t ? 'on' : ''} onClick={() => { setTeam(t); try { localStorage.setItem('kmx_team', t) } catch { /* bỏ qua */ } }}>Ca {t}</button>)}</div></div>
             </section>
           )}
           {coPallet && (
@@ -338,7 +342,7 @@ export default function KhoMixIssue() {
                     <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
                   </div>
                 ) : <span className="kmx-sm" style={{ color: '#15803D', fontWeight: 600 }}>Không còn hàng trả → sang cân 3.</span>}
-                <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl"><b>Cân 3</b> · pallet rỗng (bì) · mặc định 15, cân lại cho đúng</span><input id={dungHetChon ? 'kmx-ret' : 'kmx-ret-bi'} className="kmx-text kmx-mono" style={{ fontWeight: 700, fontSize: 17 }} type="number" inputMode="decimal" value={retPallet} onChange={(e) => { setRetPallet(e.target.value); setRetSoBanh('') }} aria-label="Cân pallet rỗng" /></label>
+                <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl"><b>Cân 3</b> · pallet rỗng (bì) · mặc định {kgTxt(MIX_PALLET_BI_CHUAN)} kg (bì chuẩn) · chỉ cân lại khi nghi sai</span><input id={dungHetChon ? 'kmx-ret' : 'kmx-ret-bi'} className="kmx-text kmx-mono" style={{ fontWeight: 700, fontSize: 17 }} type="number" inputMode="decimal" value={retPallet} onChange={(e) => { setRetPallet(e.target.value); setRetSoBanh('') }} aria-label="Cân pallet rỗng" /></label>
                 <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>Hàng trả = {dungHet ? '0 (dùng hết)' : `${retGross || '0'} − ${retPallet || '0'}`}</span><span className="kmx-num sm">{kgRetN === null ? '—' : `${kgTxt(kgRetN)} kg`}</span></div>
               </>
             ) : (

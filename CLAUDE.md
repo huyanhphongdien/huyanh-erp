@@ -257,12 +257,25 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
 - **Sổ pallet** = bảng `mix_pallets`, 3 cột như sổ giấy: `ten` (khai báo pallet) · `code` (chữ viết tắt HC1→HC30) · `bi_kg` (số kg =
   BÌ pallet rỗng). Khai 1 lần; cân lại / đổi chữ viết tắt / tắt-bật đều ghi `mix_pallet_logs`. Quyền ghi sổ = bước 3 nhận kho (thủ kho)
   hoặc BGĐ (`fn_mix_duoc_ky('nhan_kho')`). View `v_mix_pallets` (trạng thái trong | day_chuyen | chua_bi | tat + phiếu đang gắn) — UI chỉ đọc view.
-- PĐ seed HC1→HC20 với **bì TẠM theo nhóm** (HC1→10 = 15 kg, HC11→20 = 25 kg, note "chưa cân từng pallet"); HC21→30 tạo sẵn nhưng TẮT
-  ("chưa đưa vào dùng"). Cân thật từng pallet → Sổ pallet "Sửa · cân lại" (ghi chú bì tạm tự xoá). TL / Lào chưa có sổ → màn lấy tự quay về đường cũ.
+- **Bì CHUẨN = 27,5 kg cho MỌI pallet HC** (owner chốt 17/11/2026, migration `wms_mix_p20_bi_chuan_27_5.sql` đã áp 17/11 — thay bì tạm
+  15/25 của p19; BỎ kế hoạch cân từng pallet, "Sửa · cân lại" chỉ còn là ngoại lệ khi pallet lệch chuẩn; bỏ luôn nhắc "cân lại > 90 ngày").
+  HC21→30 vẫn TẮT ("chưa đưa vào dùng") nhưng ĐÃ có bì 27,5 sẵn — bật là dùng ngay (2 màn Sổ pallet có nút "Bật cả N"). Hằng dùng chung
+  `MIX_PALLET_BI_CHUAN` trong `mixService.ts` (form khai/tạo bộ điền sẵn, đừng gõ cứng 27.5 ở màn khác). TL / Lào chưa có sổ → màn lấy
+  tự quay về đường cũ (giờ có cảnh báo "Không đọc được Sổ pallet" khi là LỖI mạng chứ không phải sổ trống).
+- **p21 — vá theo audit 17/11/2026** (`wms_mix_p21_va_audit_pallet.sql`, đã áp + smoke test rollback): ① `fn_mix_sua_lay` KHÔNG còn
+  gỡ pallet âm thầm — phiếu có pallet mà "Gõ thẳng kg" thì GIỮ pallet + bì, `gross_kg`=NULL (trước đây pallet_id bị xoá → 2 phiếu có
+  thể cùng giữ 1 pallet); thêm check pallet cùng nhà máy. ② `fn_mix_tra`: bật "bàn giao" phải giữ được pallet (bịt kẽ hở trả-lại-lần-2
+  → vỡ unique index lúc nhận kho); `fn_mix_ky` receive có chốt chặn cuối báo tiếng Việt. ③ `fn_mix_pallet_tao_bo` DEFAULT 27.5;
+  `fn_mix_pallet_khai` tự dọn note chuẩn khi cân lệch, tự ghi "Bì chuẩn 27,5 kg" khi cân về đúng. ④ `dichLoiNhapKho` có đủ 8 mã lỗi
+  PALLET_*/TRUNG_MA/THIEU_MA/BI_KHONG_HOP_LE/SO_KHONG_HOP_LE. ⑤ Bỏ nhắc "cân lại > 90 ngày" (hằng `MIX_PALLET_BI_CU_NGAY` đã xoá) —
+  thay bằng badge "lệch chuẩn 27,5" (`palletLechChuan`). ⑥ Ước lệ đường cũ 15 kg → 27,5 ở CẢ DB (fn_mix_lay/sua_lay) lẫn UI
+  (KhoMixOut/KhoMixIssue/MixShiftPage) — sửa một bên thì sửa cả hai. ⑦ `parseKhoScan` đọc được tem đệm 0 (HC07→HC7); tem in KHÔNG đệm.
+  ⚠ Luật "pallet đang gắn" nằm ở `fn_mix_pallet_phieu_dang_gan` VÀ chép trong LATERAL của `v_mix_pallets` — sửa thì sửa cả hai.
 - **Lúc lấy** (bể Slap / máy Mix): chạm pallet HC (hoặc quét tem `HC7` / `HC-PD-7`, `parseKhoScan` kind `mix_pallet`) + gõ số trên cân →
   `fn_mix_lay(p_pallet_id)`: `kg_out = gross − bì` CHỐT NGAY, `mix_issues.pallet_kg` = bì chép từ sổ (cân lại sau KHÔNG đổi phiếu đang mở).
   Index partial `mix_issues_pallet_issued_uniq` + `fn_mix_pallet_phieu_dang_gan`: một pallet chỉ ở dây chuyền trong một phiếu (phiếu bàn giao
-  chưa nhận cũng tính). Băng tải không pallet (p17). Nút "Không pallet · gõ kg" giữ làm đường lùi. Số bành ước trên kg hàng thật, hết trừ 15 kg ước lệ.
+  chưa nhận cũng tính). Băng tải không pallet (p17). Nút "Không pallet · gõ kg" giữ làm đường lùi. Số bành ước trên kg hàng thật;
+  đường cũ cân tổng chưa bì ước bớt 27,5 kg (p20, trước là 15).
 - **Lúc trả** (phiếu có `pallet_id`): **Dùng hết** = 0 kg, không cân, ảnh trả chỉ cần `toan_canh` (`fn_mix_thieu_anh`); **Còn dư** = cân 1 lần
   (hàng + pallet) − bì. KHÔNG còn cân 3 pallet rỗng / ô gõ bì. Phiếu không pallet (băng tải, phiếu cũ) giữ đường v5 (bì khai lúc trả).
   Bàn giao ca sau: `fn_mix_ky` chép pallet_id + bì + vị trí + mã + lệnh sang phiếu mới.

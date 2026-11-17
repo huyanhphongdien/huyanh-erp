@@ -157,8 +157,13 @@ export interface NhanVienLite { id: string; full_name: string; email: string | n
 export type MixPalletTrangThai = 'trong' | 'day_chuyen' | 'chua_bi' | 'tat'
 export const MIX_PALLET_TRANG_THAI_LABELS: Record<MixPalletTrangThai, string> = { trong: 'Trống', day_chuyen: 'Ở dây chuyền', chua_bi: 'Chưa khai số kg', tat: 'Tắt' }
 export const MIX_PALLET_TRANG_THAI_COLORS: Record<MixPalletTrangThai, string> = { trong: 'green', day_chuyen: 'gold', chua_bi: 'red', tat: 'default' }
-/** bì khai quá số ngày này → nhắc "cân lại" (chữ vàng, không chặn) */
-export const MIX_PALLET_BI_CU_NGAY = 90
+/** Bì CHUẨN pallet hàng chèn = 27,5 kg (chủ DN chốt 17/11/2026, migration p20): mọi pallet HC dùng
+ *  chung số này, form khai / tạo bộ điền sẵn; "cân lại" chỉ còn là ngoại lệ khi pallet lệch chuẩn.
+ *  (Thay cho bì tạm 15/25 của p19 và nhắc "cân lại > 90 ngày" — kế hoạch cân từng pallet đã bỏ.) */
+export const MIX_PALLET_BI_CHUAN = 27.5
+/** Pallet lệch bì chuẩn (đã cân riêng vì ngoại lệ) → UI gắn badge "lệch chuẩn 27,5", không nhắc gì thêm. */
+export const palletLechChuan = (biKg: number | null | undefined): boolean =>
+  biKg !== null && biKg !== undefined && Math.abs(biKg - MIX_PALLET_BI_CHUAN) > 0.005
 export interface MixPallet {
   id: string; facility_id: string; facility_code: string | null
   code: string; so: number | null; ten: string | null
@@ -351,12 +356,14 @@ export const mixService = {
     return { kg_used: num(d.kg_used), kg_out: num(d.kg_out), kg_return: num(d.kg_return), bi: numOrNull(d.bi) }
   },
 
-  /** Sửa cân lúc lấy (bì, hàng + pallet hoặc kg, số bành) khi phiếu chưa qua bước QS ký; máy tính lại kg lấy, dây chuyền, tiêu hao */
-  async suaLay(issueId: string, input: { kg?: number | null; grossKg?: number | null; palletKg?: number | null; soBanh?: number | null; note?: string | null; /** p19: đổi pallet chạm nhầm (null = giữ pallet của phiếu) */ palletId?: string | null }): Promise<{ code: string; kg_truoc: number; kg_sau: number; so_banh: number }> {
+  /** Sửa cân lúc lấy (bì, hàng + pallet hoặc kg, số bành) khi phiếu chưa qua bước QS ký; máy tính lại kg lấy, dây chuyền, tiêu hao.
+   *  p21: phiếu có pallet HC thì pallet LUÔN được giữ — gõ thẳng `kg` = kg hàng thật (gross xoá), đổi pallet qua `palletId`;
+   *  không còn đường "gõ kg là pallet bị gỡ âm thầm" như trước. */
+  async suaLay(issueId: string, input: { kg?: number | null; grossKg?: number | null; palletKg?: number | null; soBanh?: number | null; note?: string | null; /** p19: đổi pallet chạm nhầm (null = giữ pallet của phiếu) */ palletId?: string | null }): Promise<{ code: string; kg_truoc: number; kg_sau: number; so_banh: number; pallet_id: string | null; bi: number | null }> {
     const { data, error } = await supabase.rpc('fn_mix_sua_lay', { p_issue_id: issueId, p_kg: input.kg ?? null, p_gross_kg: input.grossKg ?? null, p_pallet_kg: input.palletKg ?? null, p_so_banh: input.soBanh ?? null, p_note: input.note ?? null, p_pallet_id: input.palletId ?? null })
     if (error) throw new Error(dichLoiNhapKho(error))
     const d: any = data ?? {}
-    return { code: String(d.code ?? ''), kg_truoc: num(d.kg_truoc), kg_sau: num(d.kg_sau), so_banh: num(d.so_banh) }
+    return { code: String(d.code ?? ''), kg_truoc: num(d.kg_truoc), kg_sau: num(d.kg_sau), so_banh: num(d.so_banh), pallet_id: d.pallet_id ?? null, bi: numOrNull(d.bi) }
   },
 
   /** Đổi mã nguyên liệu gốc của phiếu chèn (một hay nhiều mã; rỗng = bỏ, máy lấy theo phiếu ca) — trước khi thủ kho nhận */
@@ -390,9 +397,10 @@ export const mixService = {
     const { error } = await supabase.rpc('fn_mix_pallet_tat', { p_id: id, p_tat: tat, p_ly_do: lyDo ?? null })
     if (error) throw new Error(dichLoiNhapKho(error))
   },
-  /** Tạo bộ pallet HC<tu>→HC<den> cho một nhà máy (bỏ qua mã đã có); trả về số dòng tạo mới */
+  /** Tạo bộ pallet HC<tu>→HC<den> cho một nhà máy (bỏ qua mã đã có); trả về số dòng tạo mới.
+   *  p21: bì mặc định = MIX_PALLET_BI_CHUAN (27,5) — bộ mới tạo ra là dùng được ngay, không phải khai từng cái. */
   async taoBoPallet(facilityId: string, tu: number, den: number, opts?: { prefix?: string; ten?: string | null; biKg?: number | null }): Promise<number> {
-    const { data, error } = await supabase.rpc('fn_mix_pallet_tao_bo', { p_facility_id: facilityId, p_tu: tu, p_den: den, p_prefix: opts?.prefix ?? 'HC', p_ten: opts?.ten ?? null, p_bi_kg: opts?.biKg ?? null })
+    const { data, error } = await supabase.rpc('fn_mix_pallet_tao_bo', { p_facility_id: facilityId, p_tu: tu, p_den: den, p_prefix: opts?.prefix ?? 'HC', p_ten: opts?.ten ?? 'Pallet hàng chèn', p_bi_kg: opts?.biKg ?? MIX_PALLET_BI_CHUAN })
     if (error) throw new Error(dichLoiNhapKho(error))
     return num(data)
   },
@@ -406,7 +414,7 @@ export const mixService = {
 
   async quyen(facilityId?: string | null): Promise<MixQuyen> {
     const { data, error } = await supabase.rpc('fn_mix_quyen', { p_facility_id: facilityId ?? null })
-    if (error) throw error
+    if (error) throw new Error(dichLoiNhapKho(error))
     const d: any = data ?? {}
     return { ...MIX_QUYEN_NONE, ...d, da_phan_cong: { ...MIX_QUYEN_NONE.da_phan_cong, ...(d.da_phan_cong ?? {}) } }
   },

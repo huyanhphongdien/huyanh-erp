@@ -6,7 +6,7 @@
 // ============================================================================
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { mixService, MIX_PALLET_BI_CU_NGAY, MIX_PALLET_LOG_LABELS, MIX_PALLET_TRANG_THAI_LABELS, type MixPallet, type MixPalletLog } from '../../../services/wms/mixService'
+import { mixService, MIX_PALLET_BI_CHUAN, palletLechChuan, MIX_PALLET_LOG_LABELS, MIX_PALLET_TRANG_THAI_LABELS, type MixPallet, type MixPalletLog } from '../../../services/wms/mixService'
 import { useMixRole } from '../../../hooks/useMixRole'
 import { firstName } from '../opsUtil'
 import { fmtD, fmtDt, useKhoFacility } from './khoCommon'
@@ -56,16 +56,18 @@ export default function KhoMixPallet() {
     taiLai().catch((e: any) => alive && setMsg({ ok: false, text: e?.message || 'Không tải được Sổ pallet (cần chạy SQL p19)' })).finally(() => alive && setLoading(false))
     return () => { alive = false }
   }, [taiLai])
-  // quét tem ?hc=HC7 → chọn pallet đó
+  // quét tem ?hc=HC7 → chọn pallet đó (một lần cho mỗi giá trị tem — thêm pallet làm rows đổi không chọn lại)
+  const [hcDaChon, setHcDaChon] = useState<string | null>(null)
   useEffect(() => {
     const hc = sp.get('hc')
-    if (!hc || !rows.length) return
+    if (!hc || !rows.length || hcDaChon === hc.toUpperCase()) return
     const p = rows.find((x) => x.code.toUpperCase() === hc.toUpperCase())
-    if (p) chon(p)
+    if (p) { chon(p); setHcDaChon(hc.toUpperCase()) }
   }, [sp, rows.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const sel = rows.find((x) => x.id === selId) ?? null
-  function chon(p: MixPallet) { setSelId(p.id); setTen(p.ten ?? ''); setCode(p.code); setBi(p.bi_kg === null ? '' : String(p.bi_kg)); setLyDo(''); setTatAsk(null); setMsg(null) }
+  // chưa có bì → điền sẵn bì chuẩn 27,5 (chủ DN 17/11/2026), chỉ sửa khi pallet lệch chuẩn
+  function chon(p: MixPallet) { setSelId(p.id); setTen(p.ten ?? ''); setCode(p.code); setBi(p.bi_kg === null ? String(MIX_PALLET_BI_CHUAN) : String(p.bi_kg)); setLyDo(''); setTatAsk(null); setMsg(null) }
   const dem = useMemo(() => ({
     trong: rows.filter((x) => x.trang_thai === 'trong').length, dc: rows.filter((x) => x.trang_thai === 'day_chuyen').length,
     chuaBi: rows.filter((x) => x.trang_thai === 'chua_bi').length, tat: rows.filter((x) => x.trang_thai === 'tat').length,
@@ -84,10 +86,10 @@ export default function KhoMixPallet() {
     try {
       const r = await mixService.khaiPallet(sel.id, { ten: ten.trim() || null, code: codeNorm, biKg: biN, lyDo: lyDo.trim() || null })
       const fresh = await taiLai()
-      // khai liên tiếp cả bộ: nhảy sang pallet đang dùng kế tiếp chưa có số kg
+      // khai liên tiếp: nhảy sang pallet chưa có số kg kế tiếp (hiếm từ p20/p21 — bộ mới sinh ra đã có bì chuẩn 27,5)
       const next = fresh.filter((x) => x.is_active && x.bi_kg === null && x.id !== sel.id).sort((a, b) => (a.so ?? 0) - (b.so ?? 0))[0]
       setMsg({ ok: true, text: `Đã ghi ${r.code} · ${kg1(r.bi_kg)} kg${next ? ` · tiếp theo: ${next.code}` : ''}` })
-      if (next) { setSelId(next.id); setTen(ten.trim() || (next.ten ?? '')); setCode(next.code); setBi(''); setLyDo('') } else { setSelId(null) }
+      if (next) { setSelId(next.id); setTen(next.ten ?? ten.trim()); setCode(next.code); setBi(String(MIX_PALLET_BI_CHUAN)); setLyDo('') } else { setSelId(null) }
     } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không ghi được' }) }
     finally { setBusy(null) }
   }
@@ -107,11 +109,23 @@ export default function KhoMixPallet() {
     if (!Number.isInteger(tu) || !Number.isInteger(den) || tu < 1 || den < tu) { setMsg({ ok: false, text: 'Gõ số từ / đến hợp lệ (ví dụ 31 → 40)' }); return }
     setBusy('them'); setMsg(null)
     try {
+      // p21: bộ mới vào sổ với bì chuẩn 27,5 sẵn (service tự truyền) → dùng được ngay, không phải khai từng cái
       const n = await mixService.taoBoPallet(facilityId, tu, den)
       await taiLai(); setThemMo(false)
-      setMsg({ ok: true, text: n ? `Đã thêm ${n} pallet HC${tu}→HC${den}, chưa có số kg` : 'Các mã này đã có trong sổ' })
+      setMsg({ ok: true, text: n ? `Đã thêm ${n} pallet HC${tu}→HC${den} · bì chuẩn ${kg1(MIX_PALLET_BI_CHUAN)} kg, dùng được ngay` : 'Các mã này đã có trong sổ' })
     } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không thêm được' }) }
     finally { setBusy(null) }
+  }
+  // Bật cả dải pallet đang tắt một lượt (vd đưa HC21→30 vào dùng) — bì 27,5 đã có sẵn từ p20
+  async function batCa() {
+    const tat = rows.filter((x) => !x.is_active)
+    if (!tat.length) return
+    setBusy('batca'); setMsg(null)
+    let ok = 0
+    for (const p of tat) { try { await mixService.tatPallet(p.id, false, null); ok++ } catch { /* pallet lỗi thì bỏ qua, đếm phần được */ } }
+    await taiLai()
+    setMsg({ ok: ok > 0, text: ok === tat.length ? `Đã bật cả ${ok} pallet — dùng được ngay (bì chuẩn ${kg1(MIX_PALLET_BI_CHUAN)} kg)` : `Bật được ${ok}/${tat.length} pallet` })
+    setBusy(null)
   }
   const moTa = (p: MixPallet) => {
     if (p.trang_thai === 'day_chuyen') return `${p.issue_code ?? ''}${p.issue_lot_so_lo ? ` · lô ${p.issue_lot_so_lo}` : ''}${p.issue_kg_out !== null ? ` · ${kg1(p.issue_kg_out)} kg` : ''}${p.issue_out_at ? ` · ${hm(p.issue_out_at)}` : ''}${p.issue_lenh_ma_gop ? ` · ${p.issue_lenh_ma_gop}` : ''}`
@@ -119,7 +133,8 @@ export default function KhoMixPallet() {
     if (p.trang_thai === 'chua_bi') return 'chưa khai số kg → chưa lấy được'
     return `khai ${p.bi_khai_at ? fmtD(p.bi_khai_at) : '—'}${p.bi_khai_name ? ` · ${firstName(p.bi_khai_name)}` : ''}${p.note ? ` · ${p.note}` : ''}${p.so_lan_can_lai ? ` · cân lại ${p.so_lan_can_lai} lần` : ''}`
   }
-  const cuBi = (p: MixPallet) => p.is_active && p.bi_kg !== null && (p.bi_cu_ngay ?? 0) > MIX_PALLET_BI_CU_NGAY
+  // p21: không nhắc "cân lại theo ngày" nữa (kế hoạch cân từng pallet đã bỏ) — chỉ đánh dấu pallet LỆCH bì chuẩn 27,5
+  const lech = (p: MixPallet) => p.is_active && palletLechChuan(p.bi_kg)
 
   return (
     <div className="kmx">
@@ -152,13 +167,13 @@ export default function KhoMixPallet() {
           <section className="kmx-card" aria-label="Khai báo pallet" style={{ gap: 8, borderColor: '#1B4D3E' }}>
             <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Khai báo pallet{sel ? ` · ${sel.code}` : ''}</span>{sel && <button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto' }} onClick={() => setSelId(null)}>Đóng</button>}</div>
             {!sel ? (
-              <span className="kmx-sm">Ba cột như sổ giấy: <b>Pallet</b> (tên, loại) · <b>Chữ viết tắt</b> (in trên pallet, tổ chạm lúc lấy) · <b>Số kg</b> (cân pallet rỗng). Chạm một pallet để khai hoặc cân lại; ghi xong máy nhảy sang pallet chưa có số kg kế tiếp.</span>
+              <span className="kmx-sm">Ba cột như sổ giấy: <b>Pallet</b> (tên, loại) · <b>Chữ viết tắt</b> (in trên pallet, tổ chạm lúc lấy) · <b>Số kg</b> (bì — <b>chuẩn {kg1(MIX_PALLET_BI_CHUAN)} kg</b> cho mọi pallet HC, chủ DN 17/11/2026). Bình thường không phải khai gì; chỉ pallet đặc biệt (sửa ván, loại khác) mới chạm vào <b>Sửa · cân lại</b> và ghi lý do.</span>
             ) : (
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 86px 86px', gap: 6 }}>
                   <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Pallet</span><input className="kmx-text" placeholder="Pallet gỗ 1,1 m" value={ten} onChange={(e) => setTen(e.target.value)} aria-label="Tên pallet" /></label>
-                  <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Viết tắt</span><input className="kmx-text kmx-mono" style={{ fontWeight: 800, textTransform: 'uppercase' }} value={code} onChange={(e) => setCode(e.target.value)} aria-label="Chữ viết tắt" /></label>
-                  <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Số kg</span><input className="kmx-text kmx-mono" style={{ fontWeight: 800 }} type="number" inputMode="decimal" placeholder="0" value={bi} onChange={(e) => setBi(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && biOk && daDoi) ghi() }} autoFocus aria-label="Số kg bì" /></label>
+                  <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Viết tắt</span><input className="kmx-text kmx-mono" style={{ fontWeight: 800, textTransform: 'uppercase' }} value={code} disabled={sel.trang_thai === 'day_chuyen'} onChange={(e) => setCode(e.target.value)} aria-label="Chữ viết tắt" /></label>
+                  <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Số kg</span><input className="kmx-text kmx-mono" style={{ fontWeight: 800 }} type="number" inputMode="decimal" placeholder={String(MIX_PALLET_BI_CHUAN)} value={bi} onChange={(e) => setBi(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && biOk && daDoi) ghi() }} autoFocus aria-label="Số kg bì" /></label>
                 </div>
                 {canLai && <input className="kmx-text" placeholder="Lý do cân lại (thay ván, sửa pallet, tới kỳ…)" value={lyDo} onChange={(e) => setLyDo(e.target.value)} aria-label="Lý do cân lại" />}
                 {sel.trang_thai === 'day_chuyen' && <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Đang ở dây chuyền ({sel.issue_code}): đổi được tên và số kg, phiếu đang mở vẫn giữ bì lúc lấy; chữ viết tắt đổi sau khi trả.</span>}
@@ -170,9 +185,12 @@ export default function KhoMixPallet() {
         ) : !role.loading && <div className="kmx-card muted" style={{ fontSize: 13 }}>Chỉ thủ kho (bước 3 nhận kho) và Ban Giám đốc ghi được Sổ pallet. Bạn xem được số kg và pallet nào đang ở dây chuyền.</div>}
 
         <section aria-label="Danh sách pallet" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div className="kmx-row" style={{ padding: '0 2px' }}>
+          <div className="kmx-row" style={{ padding: '0 2px', gap: 6, flexWrap: 'wrap' }}>
             <h2 className="kmx-h2">Sổ pallet · {hienThi.length}</h2>
-            {dem.tat > 0 && <button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto' }} onClick={() => setShowTat((v) => !v)}>{showTat ? 'Ẩn pallet tắt' : `Xem ${dem.tat} pallet tắt`}</button>}
+            <span style={{ display: 'flex', gap: 6, flex: '0 0 auto' }}>
+              {canEdit && showTat && dem.tat > 0 && <button type="button" className="kmx-pill sm" disabled={busy === 'batca'} onClick={batCa}>{busy === 'batca' ? 'Đang bật…' : `Bật cả ${dem.tat}`}</button>}
+              {dem.tat > 0 && <button type="button" className="kmx-pill sm" onClick={() => setShowTat((v) => !v)}>{showTat ? 'Ẩn pallet tắt' : `Xem ${dem.tat} pallet tắt`}</button>}
+            </span>
           </div>
           <div className="kmx-list">
             {hienThi.map((p) => (
@@ -183,9 +201,9 @@ export default function KhoMixPallet() {
                     <span className="kmx-num sm" style={{ whiteSpace: 'nowrap', color: p.bi_kg === null ? '#B91C1C' : undefined }}>{p.bi_kg === null ? '— kg' : `${kg1(p.bi_kg)} kg`}</span>
                     <span className="kmx-sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.ten || ''}</span>
                   </span>
-                  <span className={`kmx-chip ${cuBi(p) && p.trang_thai === 'trong' ? 'amb' : CHIP[p.trang_thai]}`}>{cuBi(p) && p.trang_thai === 'trong' ? 'cân lại' : MIX_PALLET_TRANG_THAI_LABELS[p.trang_thai]}</span>
+                  <span className={`kmx-chip ${CHIP[p.trang_thai]}`}>{MIX_PALLET_TRANG_THAI_LABELS[p.trang_thai]}</span>
                 </div>
-                <span className="kmx-sm">{moTa(p)}{cuBi(p) ? ` · bì khai ${p.bi_cu_ngay} ngày trước` : ''}</span>
+                <span className="kmx-sm">{moTa(p)}{lech(p) ? ` · lệch bì chuẩn ${kg1(MIX_PALLET_BI_CHUAN)} kg` : ''}</span>
                 {canEdit && (
                   <div className="kmx-row" style={{ gap: 6, justifyContent: 'flex-start' }}>
                     {p.is_active && <button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto' }} onClick={() => { chon(p); window.scrollTo({ top: 0 }) }}>{p.bi_kg === null ? 'Khai số kg' : 'Sửa · cân lại'}</button>}
@@ -218,7 +236,7 @@ export default function KhoMixPallet() {
                 <button type="button" className="kmx-pill" style={{ flex: '0 0 auto', height: 44 }} disabled={busy === 'them'} onClick={themBo}>{busy === 'them' ? '…' : 'Thêm'}</button>
               </div>
             )}
-            <span className="kmx-sm">Pallet mới chưa có số kg, khai ở trên rồi mới lấy được. Pallet hỏng thì Tắt, không xoá (lịch sử phiếu còn tham chiếu).</span>
+            <span className="kmx-sm">Pallet mới vào sổ với <b>bì chuẩn {kg1(MIX_PALLET_BI_CHUAN)} kg</b> — lấy được ngay, không phải khai gì. Pallet hỏng thì Tắt, không xoá (lịch sử phiếu còn tham chiếu).</span>
           </section>
         )}
 

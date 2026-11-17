@@ -201,7 +201,7 @@ export interface NhapKhoResult {
 /** Mã lỗi hàm DB → câu tiếng Việt cho người dùng */
 export function dichLoiNhapKho(err: unknown): string {
   const msg = String((err as any)?.message ?? err ?? '')
-  const m = msg.match(/(THIEU_NGUON|MA_DANG_CHAY_LENH_KHAC|THIEU_MA_LENH|KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|KHONG_CO_QUYEN|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO|LENH_TRONG|KHONG_TIM_THAY_LO|LO_KHAC_NHA_MAY|LO_DA_HET|VUOT_TON|KHONG_TIM_THAY_DONG|LENH_DA_GUI_KY|KHONG_TIM_THAY_LENH|SAI_TRANG_THAI|THIEU_KG_CAN|DA_TRU_SO|BUOC_KHONG_HOP_LE|CAN_LY_DO|DANG_CO_KIEM_KE_MO|KHO_TRONG|KHONG_TIM_THAY_KIEM_KE|CON_LO_CHUA_DEM|DA_DUYET|KY_DA_KHOA|DKL_CHUA_XU_LY|TRA_QUA_LAY|THIEU_ANH|THIEU_CA|CON_PHIEU_CAN_CHO_NHAP|PHIEU_CA_CHUA_MO|PHIEU_CA_DA_KY|THIEU_CO_BANH|DA_CHUYEN_HET|LO_NVL_CHI_SUA_QUA_SO_KHO|THIEU_MA_NVL|MA_KHONG_HOP_LE|THIEU_SO_LO|TRUNG_SO_LO|LO_TP_CHUA_QC|LO_TP_KHONG_DU)(?::([^\n"]*))?/)
+  const m = msg.match(/(THIEU_NGUON|MA_DANG_CHAY_LENH_KHAC|THIEU_MA_LENH|KHONG_TIM_THAY_PHIEU|PHIEU_CHUA_HOAN_TAT|PHIEU_KHONG_PHAI_NHAP|THIEU_NHA_MAY|DA_NHAP|KHONG_CO_QUYEN_NHAN|KHONG_CO_QUYEN_GHI_DRC|KHONG_CO_QUYEN|DRC_KHONG_HOP_LE|DA_GHI_SO|THIEU_KHO_NVL|LOAI_MU_LA|THIEU_KHOI_LUONG|THIEU_DRC|TRUOC_NGAY_MO_SO|LENH_TRONG|KHONG_TIM_THAY_LO|LO_KHAC_NHA_MAY|LO_DA_HET|VUOT_TON|KHONG_TIM_THAY_DONG|LENH_DA_GUI_KY|KHONG_TIM_THAY_LENH|SAI_TRANG_THAI|THIEU_KG_CAN|DA_TRU_SO|BUOC_KHONG_HOP_LE|CAN_LY_DO|DANG_CO_KIEM_KE_MO|KHO_TRONG|KHONG_TIM_THAY_KIEM_KE|CON_LO_CHUA_DEM|DA_DUYET|KY_DA_KHOA|DKL_CHUA_XU_LY|TRA_QUA_LAY|THIEU_ANH|THIEU_CA|CON_PHIEU_CAN_CHO_NHAP|PHIEU_CA_CHUA_MO|PHIEU_CA_DA_KY|THIEU_CO_BANH|DA_CHUYEN_HET|LO_NVL_CHI_SUA_QUA_SO_KHO|THIEU_MA_NVL|MA_KHONG_HOP_LE|THIEU_SO_LO|TRUNG_SO_LO|LO_TP_CHUA_QC|LO_TP_KHONG_DU|KHONG_TIM_THAY_PALLET|PALLET_DANG_O_DAY_CHUYEN|PALLET_TAT|PALLET_CHUA_BI|TRUNG_MA|BI_KHONG_HOP_LE|SO_KHONG_HOP_LE|THIEU_MA)(?::([^\n"]*))?/)
   if (!m) return msg || 'Lỗi không xác định'
   const chi_tiet = m[2] ? ` (${m[2]})` : ''
   switch (m[1]) {
@@ -223,12 +223,12 @@ export function dichLoiNhapKho(err: unknown): string {
     case 'LENH_TRONG': return 'Lệnh xuất chưa có lô nào'
     case 'KHONG_TIM_THAY_LO': return `Không tìm thấy lô${chi_tiet}`
     case 'LO_KHAC_NHA_MAY': return `Lô thuộc nhà máy khác${chi_tiet}`
-    case 'LO_DA_HET': return `Lô đã hết hàng${chi_tiet}`
+    case 'LO_DA_HET': return (m[2] || '').includes('hủy') ? `Lô đã hủy, không lấy được${chi_tiet}` : `Lô đã hết hàng${chi_tiet}`
     case 'VUOT_TON': return `Lấy nhiều hơn tồn của lô${chi_tiet}`
     case 'KHONG_TIM_THAY_DONG': return 'Không tìm thấy dòng lệnh xuất'
     case 'LENH_DA_GUI_KY': return `Lệnh đã gửi ký, không sửa kg cân nữa${chi_tiet}`
     case 'KHONG_TIM_THAY_LENH': return 'Không tìm thấy lệnh xuất'
-    case 'SAI_TRANG_THAI': return `Lệnh không ở trạng thái phù hợp cho bước này${chi_tiet}`
+    case 'SAI_TRANG_THAI': return `Trạng thái hiện tại không cho làm bước này${chi_tiet}`
     case 'THIEU_KG_CAN': return `Còn dòng chưa ghi kg cân thực${chi_tiet}`
     case 'DA_TRU_SO': return `Lệnh đã trừ sổ, không hủy được${chi_tiet}`
     case 'BUOC_KHONG_HOP_LE': return `Bước ký không hợp lệ${chi_tiet}`
@@ -253,6 +253,15 @@ export function dichLoiNhapKho(err: unknown): string {
     case 'TRUNG_SO_LO': return `Số lô đã có rồi${chi_tiet}`
     case 'LO_TP_CHUA_QC': return `Lô chưa bị QC đánh CXL / Loại, không chuyển chèn được${chi_tiet}`
     case 'LO_TP_KHONG_DU': return `Lô không đủ bành${chi_tiet}`
+    // ── Sổ pallet hàng chèn (p19/p21) ──
+    case 'KHONG_TIM_THAY_PALLET': return 'Không tìm thấy pallet trong Sổ pallet'
+    case 'PALLET_TAT': return `Pallet đang tắt, bật lại trong Sổ pallet${chi_tiet}`
+    case 'PALLET_CHUA_BI': return `Pallet chưa khai số kg trong Sổ pallet${chi_tiet}`
+    case 'PALLET_DANG_O_DAY_CHUYEN': return `Pallet đang ở dây chuyền${chi_tiet}`
+    case 'TRUNG_MA': return `Trùng chữ viết tắt${chi_tiet}`
+    case 'THIEU_MA': return `Thiếu chữ viết tắt${chi_tiet}`
+    case 'BI_KHONG_HOP_LE': return `Số kg bì không hợp lệ (phải lớn hơn 0 và dưới 200)${chi_tiet}`
+    case 'SO_KHONG_HOP_LE': return `Số từ / đến không hợp lệ${chi_tiet}`
     case 'LO_NVL_CHI_SUA_QUA_SO_KHO': return `Lô NVL chỉ sửa được qua sổ kho (cân lại / kiểm kê / lệnh xuất)${chi_tiet}`
     case 'THIEU_ANH': return `Thiếu ảnh bắt buộc, chụp đủ rồi mới ký${chi_tiet.replace('mix_issue_out', 'lúc lấy').replace('mix_issue_return', 'lúc trả').replace('toan_canh', 'toàn cảnh').replace('man_hinh_can', 'màn hình cân')}`
     case 'THIEU_NGUON': return `Chưa chọn nguồn hàng chèn${chi_tiet}`

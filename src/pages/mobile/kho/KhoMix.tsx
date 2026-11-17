@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../../stores/authStore'
-import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPallet } from '../../../services/wms/mixService'
+import { mixService, MIX_ISSUE_STATUS_LABELS, MIX_PALLET_BI_CHUAN, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPallet } from '../../../services/wms/mixService'
 import { useMixRole } from '../../../hooks/useMixRole'
 import { rawLotService, type LenhChay, type RawLotBalance, type RawLotChen } from '../../../services/wms/rawLotService'
 import { guiMailKetThuc } from '../../../services/wms/maTongKetMail'
@@ -88,17 +88,10 @@ export default function KhoMix() {
     return [...m.values()].sort((a, b) => b.lastAt.localeCompare(a.lastAt))
   }, [today, open])
   const cur = cas[0] ?? null
-  const curIssued = cur ? cur.items.filter((i) => i.status === 'issued') : []
   const otherIssued = open.filter((i) => i.status === 'issued' && (!cur || !cur.items.some((x) => x.id === i.id)))
   const choKy = useMemo(() => open.filter((i) => i.status !== 'issued'), [open])
   const lotsCoHang = lots.filter((l) => l.ton_kg > 0.005)
   const canTake = role.khaiBao
-  const tong = cur ? {
-    lay: cur.items.reduce((s, i) => s + i.kg_out, 0),
-    banh: cur.items.reduce((s, i) => s + (i.so_banh ?? 0), 0),
-    tieuHao: cur.items.reduce((s, i) => s + (i.kg_used ?? 0), 0),
-    dayChuyen: curIssued.reduce((s, i) => s + i.kg_out, 0),
-  } : null
   const lanKe = (cur?.items.length ?? 0) + 1
   const palDung = pallets.filter((p) => p.is_active)
   const palDem = { trong: palDung.filter((p) => p.trang_thai === 'trong').length, dc: palDung.filter((p) => p.trang_thai === 'day_chuyen').length, chuaBi: palDung.filter((p) => p.trang_thai === 'chua_bi').length, tat: pallets.length - palDung.length }
@@ -260,7 +253,7 @@ export default function KhoMix() {
             <Link to="/m/kho/chen/so-pallet" className="kmx-card press" aria-label="Sổ pallet" style={{ gap: 8 }}>
               <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Sổ pallet · {palDung.length} pallet HC</span><span style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, fontWeight: 700, color: '#1B4D3E' }}>Xem{I.chev}</span></div>
               <div className="kmx-pal mini">{palDung.map((p) => <span key={p.id} className={`cell${p.trang_thai === 'day_chuyen' ? ' line' : p.bi_kg === null ? ' nobi' : ''}`} title={`${p.code} · ${p.bi_kg === null ? 'chưa khai số kg' : `bì ${kg1(p.bi_kg)} kg`}`}>{p.code.replace(/^HC/, '')}</span>)}</div>
-              <span className="kmx-sm">{palDem.trong} trống · {palDem.dc} ở dây chuyền{palDem.chuaBi ? ` · ${palDem.chuaBi} chưa khai số kg` : ''}{palDem.tat ? ` · ${palDem.tat} tắt` : ''} · bì tạm 15 / 25 kg tới khi cân từng pallet</span>
+              <span className="kmx-sm">{palDem.trong} trống · {palDem.dc} ở dây chuyền{palDem.chuaBi ? ` · ${palDem.chuaBi} chưa khai số kg` : ''}{palDem.tat ? ` · ${palDem.tat} tắt` : ''} · bì chuẩn {kg1(MIX_PALLET_BI_CHUAN)} kg</span>
             </Link>
           )}
           <span className="kmx-sm kmx-center" style={{ color: '#9CA3AF' }}>Mỗi lần lấy = một pallet HC · cuối ca dùng hết 1 chạm, còn dư cân 1 lần · Kết thúc = đóng lệnh + mail BGĐ</span>

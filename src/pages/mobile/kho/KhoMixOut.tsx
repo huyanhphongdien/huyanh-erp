@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import OpsQrScanner from '../OpsQrScanner'
 import { useAuthStore } from '../../../stores/authStore'
-import { mixService, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue, type MixLot, type MixPallet, type MixPurpose, type MixSourceType, type MixViTri } from '../../../services/wms/mixService'
+import { mixService, MIX_PALLET_BI_CHUAN, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue, type MixLot, type MixPallet, type MixPurpose, type MixSourceType, type MixViTri } from '../../../services/wms/mixService'
 import { fgLotService, type FgLot } from '../../../services/wms/fgLotService'
 import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
@@ -53,7 +53,8 @@ export default function KhoMixOut() {
   const [shifts, setShifts] = useState<OpsShiftOption[]>([])
   const [pickShift, setPickShift] = useState(false)
   const teams = DEFAULT_TEAMS
-  const [team, setTeam] = useState('')
+  // tổ gần như không đổi giữa các lần lấy → nhớ như kmx_vi_tri / kmx_nguon (vẫn đổi 1 chạm)
+  const [team, setTeam] = useState(() => { try { return localStorage.getItem('kmx_team') || '' } catch { return '' } })
   const purpose: MixPurpose = 'chay_lai'   // 30/10: bỏ ô "Dùng để" (chủ DN: thừa) — mục đích luôn chạy lại
   const targetIndex = ''; const targetValue = ''
   const [note, setNote] = useState('')
@@ -70,6 +71,7 @@ export default function KhoMixOut() {
   const [taoBusy, setTaoBusy] = useState(false)
   const [khoCu, setKhoCu] = useState(false)   // mở phần quét tem / chọn lô đã nhập trước
   const [busy, setBusy] = useState(false)
+  const [palletLoi, setPalletLoi] = useState(false)   // đọc Sổ pallet LỖI (≠ sổ trống): báo rõ thay vì âm thầm rơi về đường cũ
   const [msg, setMsg] = useState<string | null>(null)
   const [codeDone, setCodeDone] = useState<string>('')
   const [doneAt, setDoneAt] = useState<string>('')
@@ -77,11 +79,11 @@ export default function KhoMixOut() {
   useEffect(() => {
     if (!facilityId) return
     let alive = true
-    Promise.all([mixService.listLots(facilityId), rawSettingsService.getForFacility(facilityId), detectShift(user?.employee_id || null), rawLotService.maDangChay(facilityId).catch(() => [] as RawLotBalance[]), mixService.listIssues({ facilityId, date: todayLocal(), limit: 100 }).catch(() => [] as MixIssue[]), mixService.listPallets(facilityId, false).catch(() => [] as MixPallet[])])
+    Promise.all([mixService.listLots(facilityId), rawSettingsService.getForFacility(facilityId), detectShift(user?.employee_id || null), rawLotService.maDangChay(facilityId).catch(() => [] as RawLotBalance[]), mixService.listIssues({ facilityId, date: todayLocal(), limit: 100 }).catch(() => [] as MixIssue[]), mixService.listPallets(facilityId, false).catch(() => null)])
       .then(([l, s, d, m, ci, pl]) => {
         if (!alive) return
         const ok = l.filter((x) => x.ton_kg > 0.005)
-        setLots(ok); setSettings(s); setShifts(d.shifts); setShift(d.pick); setMaList(m); setCaIssues(ci.filter((x) => x.status !== 'cancelled')); setPallets(pl)
+        setLots(ok); setSettings(s); setShifts(d.shifts); setShift(d.pick); setMaList(m); setCaIssues(ci.filter((x) => x.status !== 'cancelled')); setPallets(pl ?? []); setPalletLoi(pl === null)
         const pre = sp.get('lot'); const hit = pre ? ok.find((x) => x.id === pre) : null
         if (hit && !(hit.source_type === 'dkl' && !hit.metal_cleared)) { setLot(hit); setStep(2) }
       })
@@ -141,7 +143,7 @@ export default function KhoMixOut() {
     : mode === 'pallet' ? (grossN !== null && Number.isFinite(grossN) ? grossN : null) : kg === '' ? null : Number(kg)
   const kgTxt = (n: number | null) => (n === null ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }))
   // số bành tự tính theo cỡ bành của lô (35 kg); tổ chỉ chỉnh ± khi đếm khác
-  const soBanhAuto = kgN !== null && kgN > 0 && lot ? Math.max(Math.round(Math.max(kgN - (mode === 'pallet' && !bangTai && !dungPallet ? 15 : 0), 0) / (lot.kg_per_banh || 35)), 1) : null   // đường cũ cân tổng chưa bì: ước bớt ~15 kg pallet; pallet HC: kg hàng thật
+  const soBanhAuto = kgN !== null && kgN > 0 && lot ? Math.max(Math.round(Math.max(kgN - (mode === 'pallet' && !bangTai && !dungPallet ? MIX_PALLET_BI_CHUAN : 0), 0) / (lot.kg_per_banh || 35)), 1) : null   // đường cũ cân tổng chưa bì: ước bớt bì chuẩn 27,5 (p20, cùng số với fn_mix_lay); pallet HC: kg hàng thật
   const soBanhN = soBanh === '' ? soBanhAuto : Math.round(Number(soBanh))
   const chinhBanh = (d: number) => { setSoBanh(String(Math.max((soBanhN ?? 0) + d, 0))); if (bangTai) setKg('') }
   const maLabel = maChon.map((id) => maList.find((x) => x.raw_lot_id === id)?.ma || '?').join(' + ')
@@ -197,6 +199,13 @@ export default function KhoMixOut() {
     if (p.trang_thai === 'day_chuyen') { setMsg(`${p.code} đang ở dây chuyền (${p.issue_code ?? ''}${p.issue_lot_so_lo ? ` · lô ${p.issue_lot_so_lo}` : ''}). Trả phiếu đó trước hoặc chọn pallet khác.`); return }
     if (p.bi_kg === null) { setMsg(`${p.code} chưa khai số kg trong Sổ pallet. Báo thủ kho khai rồi mới lấy được.`); return }
     setPalletId(p.id); setMsg(null)
+    // chạm pallet xong → nhảy thẳng vào ô số cân (bớt 1 chạm)
+    setTimeout(() => (document.getElementById('kmx-kg') as HTMLInputElement | null)?.focus(), 60)
+  }
+  // đọc lại Sổ pallet sau lỗi mạng / thua cuộc đua pallet
+  function taiPallets() {
+    if (!facilityId) return
+    mixService.listPallets(facilityId, false).then((pl) => { setPallets(pl); setPalletLoi(false) }).catch(() => setPalletLoi(true))
   }
   function onScanPallet(raw: string) {
     setScanPallet(false)
@@ -214,7 +223,24 @@ export default function KhoMixOut() {
       await mixService.lay({ id: issueId, lotId: lot.id, kg: kgN!, shiftDate: todayLocal(), shiftId: shift?.id ?? null, team: teamFinal || null, purpose, targetIndex: purpose === 'nang_chi_so' ? targetIndex : null, targetValue: purpose === 'nang_chi_so' && targetValue !== '' ? Number(targetValue) : null, note: note.trim() || null, soLo: lot.so_lo ? null : soLo.trim().toUpperCase(), viTri, rawLotIds: maChon, soBanh: soBanh === '' ? null : soBanhN, grossKg: mode === 'pallet' && !bangTai ? grossN : null, palletKg: null, palletId: dungPallet ? palletId : null })
       const i = await mixService.getIssue(issueId)
       setCodeDone(i?.code || ''); setDoneAt(i?.out_at || new Date().toISOString()); setStep(4)
-    } catch (e: any) { setMsg(e?.message || 'Không ghi được') }
+    } catch (e: any) {
+      const m = String(e?.message || '')
+      // mạng chập sau khi server ĐÃ lưu (p_id idempotent) → bấm Ghi lần 2 dính "đã ghi rồi":
+      // phiếu có thật — lấy phiếu về rồi sang màn "đã ghi", không bắt tổ làm lại từ đầu
+      if (m.includes('đã ghi rồi')) {
+        try {
+          const i = await mixService.getIssue(issueId)
+          if (i) { setCodeDone(i.code); setDoneAt(i.out_at); setStep(4); setBusy(false); return }
+        } catch { /* rơi xuống báo lỗi thường */ }
+      }
+      // thua cuộc đua pallet (2 máy chạm cùng pallet): tải lại lưới + bỏ pallet đã chọn để chạm pallet khác ngay
+      if (m.includes('Pallet đang ở dây chuyền')) {
+        setPalletId(null)
+        if (facilityId) mixService.listPallets(facilityId, false).then((pl) => { setPallets(pl); setPalletLoi(false) }).catch(() => { /* bỏ qua */ })
+        setStep(2)
+      }
+      setMsg(m || 'Không ghi được')
+    }
     finally { setBusy(false) }
   }
 
@@ -262,7 +288,7 @@ export default function KhoMixOut() {
             {maChon.length > 0 && <span>{maChon.length ? <>Chèn vào mã <b className="kmx-mono" style={{ color: '#fff' }}>{maLabel}</b></> : 'Mã gốc theo phiếu ca'}</span>}
             <span>{caTo} · {photos.length} ảnh · {firstName(user?.full_name) || ''}</span>
           </div>
-          <div className="kmx-note gold" style={{ width: '100%', boxSizing: 'border-box', textAlign: 'left' }}>{I.clock}<span><b>Việc tiếp theo, cuối ca:</b> mở trang chính, bấm <b>Trả</b>. {pallet ? `Dùng hết thì bấm Dùng hết (không cân, 1 ảnh pallet rỗng); còn dư thì cân cả pallet một lần, bì ${pallet.code} đã có trong Sổ pallet.` : 'Dùng hết thì cân pallet rỗng (bì chính xác), còn dư thì cân hàng + pallet, chụp 2 ảnh.'}</span></div>
+          <div className="kmx-note gold" style={{ width: '100%', boxSizing: 'border-box', textAlign: 'left' }}>{I.clock}<span><b>Việc tiếp theo, cuối ca:</b> mở trang chính, bấm <b>Trả</b>. {pallet ? `Dùng hết thì bấm Dùng hết (không cân, 1 ảnh pallet rỗng); còn dư thì cân cả pallet một lần, bì ${pallet.code} đã có trong Sổ pallet.` : `Dùng hết thì cân pallet rỗng để khai bì (máy điền sẵn ${kgTxt(MIX_PALLET_BI_CHUAN)} kg chuẩn); còn dư thì cân hàng + pallet, chụp 2 ảnh.`}</span></div>
         </div>
         <div className="kmx-done-foot">
           <button type="button" className="kmx-btn white" onClick={() => nav('/m/kho/chen')}>Về trang chính</button>
@@ -316,7 +342,8 @@ export default function KhoMixOut() {
           {nguon && (
             <section className="kmx-card" aria-label="Số lô" style={{ gap: 8 }}>
               <span className="kmx-lbl">{tuKhoTp ? 'Hoặc gõ số lô trên bao' : 'Số lô trên bao'}</span>
-              {soLoGoiY.length > 0 && <div className="kmx-seg">{soLoGoiY.map((l) => <button key={l.id} type="button" className={soLoMoi.trim().toUpperCase() === l.so_lo ? 'on' : ''} onClick={() => setSoLoMoi(l.so_lo || '')}>{l.so_lo}{l.ton_kg > 0.005 ? ` · tồn ${fmtKg(l.ton_kg)}` : ''}</button>)}</div>}
+              {/* chạm chip = DÙNG luôn số lô đó (bớt 1 chạm so với điền ô rồi bấm Dùng) */}
+              {soLoGoiY.length > 0 && <div className="kmx-seg">{soLoGoiY.map((l) => <button key={l.id} type="button" className={soLoMoi.trim().toUpperCase() === l.so_lo ? 'on' : ''} disabled={taoBusy} onClick={() => { setSoLoMoi(l.so_lo || ''); dungLo({ soLo: l.so_lo || '' }) }}>{l.so_lo}{l.ton_kg > 0.005 ? ` · tồn ${fmtKg(l.ton_kg)}` : ''}</button>)}</div>}
               <div style={{ display: 'flex', gap: 8 }}>
                 <input className="kmx-text kmx-mono" style={{ flex: 1, fontWeight: 700, fontSize: 17, textTransform: 'uppercase' }} placeholder="1502, S2308AB…" value={soLoMoi} onChange={(e) => setSoLoMoi(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && soLoMoi.trim()) dungLo({ soLo: soLoMoi }) }} aria-label="Số lô trên bao" />
                 <button type="button" className="kmx-pill" disabled={!soLoMoi.trim() || taoBusy} onClick={() => dungLo({ soLo: soLoMoi })}>{taoBusy ? '…' : 'Dùng'}</button>
@@ -377,7 +404,7 @@ export default function KhoMixOut() {
             <div className="kmx-col" style={{ gap: 6 }}>
               <span className="kmx-lbl">Tổ trưởng · ca của ai</span>
               <div className="kmx-seg">
-                {teams.map((t) => <button key={t} type="button" className={team === t ? 'on' : ''} onClick={() => setTeam(t)}>Ca {t}</button>)}
+                {teams.map((t) => <button key={t} type="button" className={team === t ? 'on' : ''} onClick={() => { setTeam(t); try { localStorage.setItem('kmx_team', t) } catch { /* bỏ qua */ } }}>Ca {t}</button>)}
               </div>
             </div>
           </section>
@@ -420,6 +447,12 @@ export default function KhoMixOut() {
               <span className="kmx-strong" style={{ fontSize: 13 }}>{dungPallet ? 'Pallet HC và số đọc trên cân' : mode === 'pallet' ? 'Cân cả pallet (bì khai lúc trả)' : 'Đọc đúng số trên màn hình cân'}</span>
               <button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto' }} onClick={() => doiMode(mode === 'pallet' ? 'kg' : 'pallet')}>{mode === 'pallet' ? 'Không pallet · gõ kg' : coSoPallet ? 'Dùng pallet HC' : 'Cân cả pallet'}</button>
             </div>
+            {palletLoi && mode === 'pallet' && (
+              <div className="kmx-tint" style={{ background: '#FEF3C7', color: '#92400E' }}>
+                <span>Không đọc được Sổ pallet — đang tạm dùng đường cũ (bì khai lúc trả)</span>
+                <button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto' }} onClick={taiPallets}>Thử lại</button>
+              </div>
+            )}
             {dungPallet ? (
               <>
                 <div className="kmx-row"><span className="kmx-lbl">Pallet nào? · chạm chữ viết tắt trên pallet</span><button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto', gap: 4 }} onClick={() => setScanPallet(true)}>Quét tem</button></div>
@@ -434,7 +467,7 @@ export default function KhoMixOut() {
                 ) : <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Chạm pallet đang chở hàng chèn này. Vàng = đang ở dây chuyền, nét đứt = chưa khai số kg (báo thủ kho).</span>}
                 <label htmlFor="kmx-kg" className="kmx-lbl">Số đọc trên cân · cả pallet, không trừ gì</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input id="kmx-kg" className={`kmx-input${qua || (kgN !== null && kgN <= 0) ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={gross} onChange={(e) => { setGross(e.target.value); setSoBanh('') }} />
+                  <input id="kmx-kg" className={`kmx-input${qua || (kgN !== null && kgN <= 0) ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={gross} onChange={(e) => { setGross(e.target.value); setSoBanh('') }} autoFocus={!!palletId} />
                   <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
                 </div>
                 <div className="kmx-tint" style={kgN !== null && kgN <= 0 ? { background: '#FEE2E2', color: '#B91C1C' } : { background: '#E8F5F0', color: '#0D2E25' }}><span>{grossN !== null && pallet ? `${kgTxt(grossN)} − bì ${pallet.code} ${kgTxt(biN)} =` : pallet ? `− bì ${pallet.code} ${kgTxt(biN)} kg` : 'chọn pallet để máy trừ bì'}</span><span className="kmx-num sm" style={kgN !== null && kgN <= 0 ? { color: '#B91C1C' } : undefined}>{kgN === null ? '—' : `${kgTxt(kgN)} kg`}</span></div>

@@ -113,6 +113,7 @@ export default function DispatchListPage() {
                 key: 'dispatch-create',
                 title: 'Tạo lệnh điều động',
                 componentId: 'dispatch-create',
+                props: {},
                 path: '/logistics/dispatch/new',
               })}
             >Tạo lệnh</Button>

@@ -67,7 +67,9 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
     : today
   // tenor: null = chưa rõ (để trống), 0 = AT SIGHT, N = usance. KHÔNG default 90.
   const tenorDays = neg?.term_days ?? parseTenorDays(inv.payment_terms)
-  const issuingBank = neg?.issuing_bank || inv.consignee || ''
+  // NH: bảng thương lượng trước (giữ cả "(SWIFT …)" để tách mã), thiếu → bank_hint (phần sau 'TO THE ORDER OF' của
+  // Consignee). ĐỪNG dự phòng bằng inv.consignee: đơn D/P qua trung gian sẽ in tên NGƯỜI NHẬN làm ngân hàng nhờ thu.
+  const issuingBank = neg?.issuing_bank || inv.bank_hint || ''
   const lcNo = neg?.lc_number || inv.lc_number || ''
   const lcDate = neg?.lc_date ? new Date(neg.lc_date).toLocaleDateString('en-GB') : ''
   // Phương thức: L/C (drawn under NH phát hành + L/C, TO = NH phát hành) vs D/P·D/A (TO = người mua, không L/C)

@@ -3,8 +3,8 @@
 // gom theo NƠI nhập; mục thiếu có nút "Mở tab ↗" (mở đúng tab để điền).
 // File: src/pages/sales/components/DocReadinessPanel.tsx
 // ============================================================================
-import { Button, Tag } from 'antd'
-import { CheckOutlined, ExclamationOutlined, ArrowRightOutlined } from '@ant-design/icons'
+import { Button, Tag, theme } from 'antd'
+import { CheckOutlined, ExclamationOutlined, ArrowRightOutlined, InfoOutlined } from '@ant-design/icons'
 import { GROUP_LABEL, type ReadyResult, type ReadyGroup, type ReadyItem } from '../../../services/sales/docReadiness'
 
 const BRAND = '#1B4D3E'
@@ -13,6 +13,8 @@ export default function DocReadinessPanel(
   { result, onQuickFill, onGotoNegotiation }:
   { result: ReadyResult; onQuickFill: (g: ReadyGroup) => void; onGotoNegotiation?: () => void },
 ) {
+  // Mục 'note' (nhắc kiểm: C/O Form E, Notify theo 46A/47A…) vẽ bằng màu info của theme — không phải "thiếu"
+  const { token } = theme.useToken()
   if (result.status === 'idle') {
     return (
       <div style={panelStyle}>
@@ -57,7 +59,20 @@ export default function DocReadinessPanel(
                   </Button>
                 )}
               </div>
-              {items.map((it, i) => (
+              {items.map((it, i) => it.kind === 'note' ? (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '3px 0' }}>
+                  <span style={{
+                    width: 18, height: 18, borderRadius: '50%', flex: '0 0 auto', display: 'grid', placeItems: 'center',
+                    background: token.colorInfoBg, color: token.colorInfo,
+                  }}><InfoOutlined style={{ fontSize: 10 }} /></span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: token.colorText }}>
+                      {it.label}<span style={{ color: token.colorTextTertiary, fontSize: 11.5 }}> · nhắc kiểm</span>
+                    </div>
+                    {it.sub && <div style={{ fontSize: 11.5, color: token.colorTextSecondary }}>{it.sub}</div>}
+                  </div>
+                </div>
+              ) : (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '3px 0' }}>
                   <span style={{
                     width: 18, height: 18, borderRadius: '50%', flex: '0 0 auto', display: 'grid', placeItems: 'center',

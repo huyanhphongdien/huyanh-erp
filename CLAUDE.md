@@ -191,6 +191,33 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
 - ⚠ Migration chạy qua RPC `agent_sql` **không được có `BEGIN`/`COMMIT`** (lỗi 0A000) — đã nằm sẵn
   trong transaction.
 
+## Đơn mua tiếp theo HĐ đã ký + Các bên của đơn (owner duyệt 17/11/2026)
+- **Ba vai, mỗi vai một chỗ lưu**: NGƯỜI MUA = `customer_id` (đứng tên HĐ, công nợ, thanh toán, hoa hồng) · NGƯỜI NHẬN HÀNG =
+  `ship_to_customer_id` (theo TỪNG đơn; NULL = chính người mua) · CHỮ IN ô Consignee/Notify = 4 cột `consignee_name/address`,
+  `notify_party/address` (ghi đè khi in). Harmonytide = trung gian (mua), Qingdao Jintong = người nhận; một công ty đóng được cả hai vai.
+  ⚠ `ship_to_customer_id` CỐ Ý KHÔNG có FK (FK thứ 2 sang sales_customers làm embed `sales_customers(...)` không ghi khoá của app cân /
+  phiếu xuất / chat báo PGRST201 IM LẶNG) — kiểm bằng trigger `fn_so_ship_to_guard`; đọc tên người nhận bằng `salesOrderService.attachShipTo`.
+- **Đơn mua tiếp = ĐƠN MỚI móc đơn gốc** (không ký HĐ mới): `parent_order_id` (luôn trỏ GỐC) + `continuation_seq` (trigger
+  `trg_so_family_guard` cấp, bắt cùng người mua + cùng đồng tiền + gốc chưa huỷ và có số HĐ, chặn huỷ/đổi người mua của gốc còn đợt) +
+  `docs_cite_root`. Số đơn GỢI Ý `<số HĐ gốc>-D<n>` (`suggestContinuationNo`) — Sale xác nhận/sửa, DB không tự cấp số. Chứng từ: số
+  PKL/WL/BC theo `soDisplayCode` (không đổi); ô CONTRACT NO./ngày HĐ theo `contractNoForDocs/contractDateForDocs` (số gốc khi
+  `docs_cite_root`; đơn cũ nối vào họ đặt false để in lại y như đã phát). Cấm tự thêm "HĐ giả lập" để lách.
+- **MỘT hàm suy Consignee/Notify/bankHint**: `services/sales/orderParties.ts › resolveOrderParties` (chữ ghi đè → ngân hàng L/C →
+  người nhận [needsConfirm: XNK phải chốt] → hồ sơ người mua → trống). bankHint không bao giờ là tên người nhận. Hồ sơ người mua bật
+  `hide_receiver_on_invoice` thì Invoice/PKL không in khối người nhận (WL/NW vẫn in). Đơn mua thẳng in y như trước.
+- **Tiền/lô/công nợ KHÔNG đổi công thức**: mỗi đợt là một đơn (mẫu số công nợ `total_value_usd` riêng). `familyTotals` chỉ để xem
+  ("cộng các đơn — không phải mẫu số công nợ"). Khách cuối: view `v_sales_order_end_customer` (KHÔNG cột tiền) + `receiverOf` (TS) là
+  bản sao luật — sửa một nơi sửa cả hai. Đơn nhận qua trung gian không bao giờ cộng vào công nợ/hạn mức của người nhận.
+- Embed đơn gốc viết `parent:parent_order_id(...)` (KHÔNG `sales_orders!parent_order_id` — trả MẢNG). Code chạy được cả trước/sau
+  migration qua `salesOrderService.familyPartiesReady()`. Số HĐ duy nhất sau chuẩn hoá: index `ux_sales_orders_contract_no_norm_active`.
+- Component dùng chung 3 dạng xem: `OrderFamilyChip`, `OrderFamilyBlock`, `OrderPartiesCard`, `PartyFields`, `RootContractPickerModal`.
+  Mở tab mua tiếp: openTab key `sales-order-continue-<id>`, componentId `sales-order-continue`, props `{sourceOrderId}`, path
+  `/sales/orders/<id>/continue`. ⚠ `getActiveForShipping` (app cân): `code` nay = SỐ ĐƠN, mã SO ở `so_code` — phải deploy lại can/can-tl/can-lao.
+- Migration `sales_family_parties_p1.sql` + `p1b_sort_key.sql` + `p5_data.sql` (đã áp 17/11/2026: HA20260301 = đợt 2 của HA20260302, ATC LOT 4 =
+  đợt 2 của LOT 3, 8 đơn Harmonytide đi Qingdao → người nhận Jintong). Chờ Sale: HA20260307, HA20260303 (YOUPU), HA20260310, giá HA20260301.
+- Antd v6: `Form.useWatch` báo trễ một macrotask — chỗ cần khớp tức thời với store đọc `getFieldValue` trong `Form.Item shouldUpdate`;
+  `Descriptions` `column` object phải khai ĐỦ mọi breakpoint (thiếu md+ thì rơi về 3 cột).
+
 ## Sales Contract Workflow
 - Tab Hợp đồng bán: 3 actor
   - **Sale** lên HĐ (form Compose Studio, KHÔNG nhập bank)

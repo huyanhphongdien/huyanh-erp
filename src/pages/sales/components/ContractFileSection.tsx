@@ -8,6 +8,9 @@
 //  - BGĐ (admin + Mr. Trung) xem/tải mọi file + lịch sử truy cập
 //  - Chỉ BGĐ "Thay thế" 1 file cụ thể (file cũ giữ trong storage + log)
 //  - Chỉ admin (Minh, Thúy, Huy, Trung) "Xóa" file (hard delete row + storage)
+//  - readOnly (17/11/2026 — đơn mua tiếp): ẩn MỌI nút tải lên / thay / xoá, chỉ còn Xem · Tải · Lịch sử.
+//    Dùng ở tab Hợp đồng của ĐỢT CON để xem file HĐ đã ký của ĐƠN GỐC (nhật ký xem/tải ghi theo đơn gốc
+//    vì salesContractService.getSignedUrl log theo doc.sales_order_id).
 // ============================================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -82,9 +85,27 @@ interface Props {
   salesRole: SalesRole | null
   title?: string
   emptyHint?: string
+  /** Chỉ xem: ẩn tải lên / thay thế / xoá (vd file HĐ GỐC hiện ở tab Hợp đồng của đợt mua tiếp) */
+  readOnly?: boolean
+  /** Tiền tố id neo nhóm file (mặc định 'contract-group' — Files Widget cuộn tới neo này). Hai khối trên cùng
+   *  một trang phải khác tiền tố kẻo trùng id. */
+  anchorPrefix?: string
+  /** Chữ ở ô "Bấm để chọn file…" khi chưa có file */
+  uploadLabel?: string
+  /** Báo số file sau mỗi lần tải danh sách (vd nhắc "đợt này chưa có chứng cứ đặt hàng") */
+  onCountChange?: (count: number) => void
 }
 
-export default function ContractFileSection({ orderId, salesRole, title = 'File hợp đồng', emptyHint }: Props) {
+export default function ContractFileSection({
+  orderId,
+  salesRole,
+  title = 'File hợp đồng',
+  emptyHint,
+  readOnly = false,
+  anchorPrefix = 'contract-group',
+  uploadLabel,
+  onCountChange,
+}: Props) {
   const { user } = useAuthStore()
   const [docs, setDocs] = useState<SalesDocument[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,10 +125,10 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
 
   const userIsBOD = isBOD(user)
   const hasFile = docs.length > 0
-  const canUpload = canUploadContract(hasFile, salesRole, user)
-  const canReplace = canReplaceContract(salesRole, user)
+  const canUpload = !readOnly && canUploadContract(hasFile, salesRole, user)
+  const canReplace = !readOnly && canReplaceContract(salesRole, user)
   const canSeeLog = canViewAccessLog(user, salesRole)
-  const canDelete = canDeleteContract(salesRole, user)
+  const canDelete = !readOnly && canDeleteContract(salesRole, user)
 
   // ── Load contracts (multi) ─────────────────────────────────────────
   const load = useCallback(async () => {
@@ -118,6 +139,10 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
   }, [orderId])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!loading) onCountChange?.(docs.length)
+  }, [loading, docs.length, onCountChange])
 
   // ── Validate 1 file ────────────────────────────────────────────────
   const validateFile = (file: File): string | null => {
@@ -248,7 +273,7 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
     <div style={{ marginBottom: 16 }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 8,
+        marginBottom: 8, flexWrap: 'wrap', gap: 8,
       }}>
         <div style={{
           fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
@@ -261,6 +286,7 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
             </Tag>
           )}
           {userIsBOD && <Tag color="gold" style={{ marginLeft: 4, fontSize: 10 }}>BGĐ</Tag>}
+          {readOnly && <Tag style={{ marginLeft: 4, fontSize: 10 }}>chỉ xem</Tag>}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {hasFile && canUpload && (
@@ -335,6 +361,7 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
             <UploadArea
               uploading={uploading}
               onPick={() => uploadInputRef.current?.click()}
+              label={uploadLabel}
             />
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#999', padding: 8 }}>
@@ -363,8 +390,9 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
               return groups
             })().map((group) => (
               // id `contract-group-{key}` để Files Widget có thể scroll tới khi user
-              // click sub-folder (xem handleNavigateTab ở SalesOrderDetailPanel).
-              <div key={group.key} id={`contract-group-${group.key}`} style={{ scrollMarginTop: 12 }}>
+              // click sub-folder (xem handleNavigateTab ở SalesOrderDetailPanel). Khối file HĐ gốc (readOnly,
+              // tab Hợp đồng của đợt con) dùng tiền tố khác → không trùng id với file của chính đơn.
+              <div key={group.key} id={`${anchorPrefix}-${group.key}`} style={{ scrollMarginTop: 12 }}>
                 <div style={{
                   fontSize: 11, fontWeight: 700, color: group.color, letterSpacing: 0.5,
                   textTransform: 'uppercase', marginBottom: 6,
@@ -381,13 +409,13 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                 <div
                   key={doc.id}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
+                    display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                     padding: '8px 4px', borderBottom: '1px dashed #d9f7be',
                   }}
                 >
                   <FilePdfOutlined style={{ fontSize: 24, color: iconColor, flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: '#1B4D3E' }}>
+                  <div style={{ flex: 1, minWidth: 160 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: '#1B4D3E', wordBreak: 'break-word' }}>
                       {doc.file_name || 'contract'}
                       {isFinal && (
                         <Tag color="green" style={{ marginLeft: 6, fontSize: 10 }}>FINAL ký 2 bên</Tag>
@@ -403,7 +431,7 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                       )}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
                     {canView ? (
                       <>
                         <Tooltip title="Xem trước">
@@ -574,7 +602,7 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
 }
 
 // ── Drag-drop upload area ──────────────────────────────────────────────
-function UploadArea({ uploading, onPick }: { uploading: boolean; onPick: () => void }) {
+function UploadArea({ uploading, onPick, label }: { uploading: boolean; onPick: () => void; label?: string }) {
   return (
     <div
       onClick={onPick}
@@ -596,7 +624,7 @@ function UploadArea({ uploading, onPick }: { uploading: boolean; onPick: () => v
         <>
           <UploadOutlined style={{ fontSize: 32, color: '#1B4D3E' }} />
           <div style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color: '#1B4D3E' }}>
-            Bấm để chọn file hợp đồng (1–10 file)
+            {label || 'Bấm để chọn file hợp đồng (1–10 file)'}
           </div>
           <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
             PDF / DOC / DOCX / JPG / PNG — tối đa {MAX_FILE_SIZE_MB}MB/file

@@ -10,7 +10,8 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Tag, Button, Spin } from 'antd'
+import { Tag, Button, Spin, Switch, Typography } from 'antd'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Trophy,
   ShoppingCart, Activity, CreditCard, TrendingUp, Calendar,
@@ -23,11 +24,13 @@ import { salesLotService } from '../../services/sales/salesLotService'
 import { getSalesRole, SALES_ROLE_LABELS } from '../../services/sales/salesPermissionService'
 import { ORDER_STATUS_LABELS, countryFlag } from '../../services/sales/salesTypes'
 import { fmtMoney, isVnd } from '../../services/sales/salesMoney'
-import { fmtDate, fmtDateShort } from '../../utils/format'
+import { fmtDate, fmtDateShort, fmtNum } from '../../utils/format'
 import { toDateStrVN } from '../../utils/dateVN'
+import { palette } from '../../theme/palette'
 import PageState from '../../components/common/PageState'
 import SalesCommandPalette from './components/SalesCommandPalette'
-import type { TopCustomer, PipelineStage } from '../../services/sales/salesDashboardService'
+import { useFamilyPartiesReady } from './components/OrderFamilyChip'
+import type { TopCustomer, PipelineStage, TopEndCustomer } from '../../services/sales/salesDashboardService'
 
 const PRIMARY = '#1B4D3E'
 
@@ -165,6 +168,19 @@ export default function SalesDashboardPage() {
   }, [period])
 
   useEffect(() => { void loadData() }, [loadData])
+
+  // ── Công tắc "Sản lượng theo khách cuối (tấn)" cạnh Top khách (sales_family_parties_p1, 17/11/2026) ──
+  // Top khách theo DOANH THU giữ nguyên (người mua). Bật công tắc → đọc v_sales_order_end_customer (KHÔNG có cột tiền):
+  // khách cuối = người nhận hàng, không có thì người mua. Chưa migration → ẩn công tắc. Chỉ tải khi bật.
+  const familyReady = useFamilyPartiesReady()
+  const [endTons, setEndTons] = useState(false)
+  const showEndTons = familyReady && endTons
+  const endQ = useQuery({
+    queryKey: ['sales-dashboard-top-end-customers', period],
+    queryFn: () => salesDashboardService.getTopEndCustomers(5, period),
+    enabled: showEndTons,
+    staleTime: 5 * 60 * 1000,
+  })
 
   // Tự làm mới khi quay lại trang (đúng như dòng phụ ở đầu trang hứa) — tối đa 1 lần / phút
   useEffect(() => {
@@ -373,9 +389,20 @@ export default function SalesDashboardPage() {
             navigate(`/sales/orders?etd=${d}`)} />
         </Widget>
 
-        <Widget icon={<Trophy size={14} />} title={`Top KH ${periodLabel.toLowerCase()}`}
-                iconColor="green" sub="USD">
-          {data.topCustomers.length === 0 ? (
+        <Widget icon={<Trophy size={14} />}
+                title={showEndTons ? `Top khách cuối ${periodLabel.toLowerCase()}` : `Top KH ${periodLabel.toLowerCase()}`}
+                iconColor="green" sub={showEndTons ? 'tấn' : 'USD'}>
+          {familyReady && (
+            <label style={endSwitchRow}
+                   title="Khách cuối = người nhận hàng của đơn (không có thì chính người mua). Chỉ tính TẤN — doanh thu và công nợ vẫn theo người mua.">
+              <Switch size="small" checked={endTons} onChange={setEndTons} aria-label="Sản lượng theo khách cuối (tấn)" />
+              <span>Sản lượng theo khách cuối (tấn)</span>
+            </label>
+          )}
+          {showEndTons ? (
+            <EndCustomerTons rows={endQ.data || []} loading={endQ.isLoading} error={endQ.error}
+                             onRetry={() => { void endQ.refetch() }} />
+          ) : data.topCustomers.length === 0 ? (
             <div style={emptyStyle}>Chưa có đơn trong kỳ</div>
           ) : data.topCustomers.map((c) => {
             const max = data.topCustomers[0]?.total_revenue || 1
@@ -540,6 +567,53 @@ function Widget({ icon, title, sub, action, iconColor, children }: {
       </div>
       {children}
     </div>
+  )
+}
+
+// ─── Top KHÁCH CUỐI theo tấn (công tắc cạnh Top KH) ─────────────────
+// Một nguồn: salesDashboardService.getTopEndCustomers (view v_sales_order_end_customer — không có cột tiền).
+// Số chính = tấn ĐÃ GIAO (owner chốt câu 12), kèm tấn đặt. Thanh nhạt = tấn đặt (so với khách nhiều nhất), phần đậm = đã giao.
+function EndCustomerTons({ rows, loading, error, onRetry }: {
+  rows: TopEndCustomer[]; loading: boolean; error: unknown; onRetry: () => void
+}) {
+  const maxTons = Math.max(...rows.map((r) => r.tons), 1)
+  return (
+    <PageState loading={loading} error={error} onRetry={onRetry} empty={rows.length === 0}
+               emptyText="Chưa có đơn trong kỳ" minHeight={120}>
+      {rows.map((c) => {
+        const trackPct = (c.tons / maxTons) * 100
+        const fillPct = c.tons > 0 ? Math.min(100, (c.delivered_tons / c.tons) * 100) : 0
+        const tip = `${c.name}: đặt ${fmtNum(c.tons, 2)} t (${c.order_count} đơn), đã giao ${fmtNum(c.delivered_tons, 2)} t`
+          + (c.via_tons > 0 ? ` — trong đó nhận qua trung gian ${fmtNum(c.via_tons, 2)} t, mua thẳng ${fmtNum(c.direct_tons, 2)} t` : '')
+        return (
+          <div key={c.customer_id} style={custRow} title={tip}>
+            <span style={{ fontSize: 18 }}>{countryFlag(c.country) || '🌐'}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {c.short_name}
+              </div>
+              <div style={custBarWrap}>
+                <div style={{ height: '100%', width: `${trackPct}%`, background: palette.brandBg, borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${fillPct}%`, background: palette.brand }} />
+                </div>
+              </div>
+              {c.via_tons > 0 && (
+                <Typography.Text type="secondary" style={{ fontSize: 10.5 }}>
+                  qua trung gian {fmtNum(c.via_tons, 2)} t
+                </Typography.Text>
+              )}
+            </div>
+            <div style={{ minWidth: 76, textAlign: 'right' }}>
+              <div style={{ fontSize: 12, fontWeight: 700 }}>{fmtNum(c.delivered_tons, 1)} t</div>
+              <Typography.Text type="secondary" style={{ fontSize: 10.5 }}>đặt {fmtNum(c.tons, 1)} t</Typography.Text>
+            </div>
+          </div>
+        )
+      })}
+      <Typography.Text type="secondary" style={{ display: 'block', fontSize: 10.5, marginTop: 6 }}>
+        Số chính = tấn đã giao · thanh nhạt = tấn đặt. Doanh thu &amp; công nợ vẫn theo người mua.
+      </Typography.Text>
+    </PageState>
   )
 }
 
@@ -968,6 +1042,10 @@ const custBarWrap: React.CSSProperties = {
 }
 const custBar: React.CSSProperties = {
   height: '100%', background: 'linear-gradient(90deg, #1B4D3E, #2E7D5B)', borderRadius: 2,
+}
+const endSwitchRow: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 12,
+  marginBottom: 8, cursor: 'pointer', color: palette.brand,
 }
 const feedItem: React.CSSProperties = {
   display: 'flex', gap: 10, padding: '8px 0',

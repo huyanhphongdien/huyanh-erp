@@ -4,6 +4,8 @@
 // Primary color: #1B4D3E
 // ============================================================================
 
+import { palette } from '../../theme/palette'
+
 // ===== SHARED ENUMS & TYPES =====
 
 export type CustomerStatus = 'active' | 'inactive' | 'blacklisted'
@@ -245,6 +247,24 @@ export interface SalesOrder {
   stage_started_at?: string
   stage_sla_hours?: number
 
+  // ── Họ HĐ — đơn mua tiếp theo HĐ đã ký (sales_family_parties_p1.sql, 17/11/2026) ──
+  // Chưa chạy migration → các cột này VẮNG (undefined); đọc qua orderKind()/contractNoForDocs().
+  /** Đơn GỐC giữ HĐ đã ký (luôn trỏ gốc, trigger làm phẳng). NULL = HĐ mới. */
+  parent_order_id?: string | null
+  /** Số đợt: gốc NULL (= đợt 1), đợt con ≥ 2 — trigger trg_so_family_guard cấp, client CHỈ ĐỌC. */
+  continuation_seq?: number | null
+  /** true: ô CONTRACT NO. trên chứng từ in số HĐ GỐC (chỉ có nghĩa khi có parent_order_id). */
+  docs_cite_root?: boolean
+
+  // ── Các bên của đơn ──
+  /** NGƯỜI NHẬN HÀNG (khách cuối) của đơn này. NULL = chính người mua. KHÔNG có FK → tên đọc qua `ship_to`. */
+  ship_to_customer_id?: string | null
+  /** 4 cột CHỮ IN ghi đè ô Consignee/Notify (chỉ để in, không dùng thống kê/công nợ). NULL = tự suy. */
+  consignee_name?: string | null
+  consignee_address?: string | null
+  notify_party?: string | null
+  notify_address?: string | null
+
   // Joined
   customer?: Pick<SalesCustomer, 'id' | 'code' | 'name' | 'short_name' | 'country' | 'tier'>
   items?: SalesOrderItem[]
@@ -254,6 +274,33 @@ export interface SalesOrder {
     full_name: string
     email?: string
   } | null
+  /** Đơn gốc (embed `parent:parent_order_id(...)`) — null với HĐ mới; vắng khi chưa migration. */
+  parent?: SalesOrderParentRef | null
+  /** Người nhận hàng — gắn bằng salesOrderService.attachShipTo (truy vấn thứ hai, KHÔNG embed). */
+  ship_to?: SalesOrderShipTo | null
+}
+
+/** Đơn GỐC của một đợt mua tiếp — đúng các cột embed `parent:parent_order_id(...)` trả về. */
+export interface SalesOrderParentRef {
+  id: string
+  code: string
+  contract_no: string | null
+  contract_date: string | null
+  customer_id: string
+  currency: string | null
+  status: SalesOrderStatus
+}
+
+/** Người nhận hàng của đơn (một hồ sơ sales_customers) — salesOrderService.attachShipTo gắn vào `ship_to`. */
+export interface SalesOrderShipTo {
+  id: string
+  code: string | null
+  name: string
+  short_name: string | null
+  country: string | null
+  address: string | null
+  /** để cảnh báo "người nhận đang ngừng giao dịch" */
+  status?: CustomerStatus | null
 }
 
 // ===== SẢN PHẨM TRONG ĐƠN HÀNG (sales_order_items) =====
@@ -532,6 +579,134 @@ export const soDisplayCode = (
   o?: { contract_no?: string | null; code?: string | null } | null,
 ): string => (o?.contract_no || o?.code || '—')
 
+/**
+ * Chuẩn hoá SỐ HĐ y như index DB ux_sales_orders_contract_no_norm_active: bỏ khoảng trắng 2 đầu,
+ * gộp khoảng trắng liền nhau, chữ HOA. Hai số chuẩn hoá bằng nhau = TRÙNG (DB chặn với đơn chưa huỷ).
+ */
+export const normalizeContractNo = (s?: string | null): string =>
+  (s || '').trim().replace(/\s+/g, ' ').toUpperCase()
+
+// ===== HỌ HĐ (MUA TIẾP) + CÁC BÊN CỦA ĐƠN — sales_family_parties_p1.sql (17/11/2026) =====
+// BA SỐ, MỖI SỐ MỘT VIỆC: ① code = mã nội bộ SO-… · ② contract_no = SỐ ĐƠN (soDisplayCode, gốc số mọi
+// chứng từ PKL/WL/BC…) · ③ số HĐ KÝ = số đơn của ĐƠN GỐC (contractNoForDocs) — in ô CONTRACT NO., khai hải quan.
+
+/** Loại đơn: HĐ mới (đơn gốc / đơn thường) hay đợt MUA TIẾP theo HĐ đã ký. */
+export type OrderKind = 'new' | 'continuation'
+
+/** Một bên của đơn (người mua `customer` hoặc người nhận `ship_to`) — đủ để hiện tên. */
+export interface OrderPartyLike {
+  id?: string
+  code?: string | null
+  name?: string | null
+  short_name?: string | null
+  country?: string | null
+}
+
+/** Nhãn loại đơn (EnumTag / Excel / tooltip). Từ ngữ: "Đợt", cố ý KHÔNG dùng "LOT/Lô" (đã mang 4 nghĩa khác). */
+export const ORDER_KIND_LABELS: Record<OrderKind, string> = {
+  new: 'HĐ mới',
+  continuation: 'Mua tiếp',
+}
+
+/**
+ * Màu nhãn loại đơn. Mua tiếp = màu THƯƠNG HIỆU (palette.js), cố ý KHÔNG dùng gold/blue/green/red của trạng thái.
+ * ⚠ HĐ mới hiện CHỮ THƯỜNG, đừng vẽ Tag 'default' (dễ đọc nhầm là "Nháp").
+ */
+export const ORDER_KIND_COLORS: Record<OrderKind, string> = {
+  new: 'default',
+  continuation: palette.brand,
+}
+
+/** 'continuation' khi đơn có đơn gốc (parent_order_id), ngược lại 'new'. */
+export const orderKind = (o?: { parent_order_id?: string | null } | null): OrderKind =>
+  (o?.parent_order_id ? 'continuation' : 'new')
+
+type DocsCiteInput = {
+  contract_no?: string | null
+  code?: string | null
+  contract_date?: string | null
+  parent_order_id?: string | null
+  docs_cite_root?: boolean | null
+  parent?: { contract_no?: string | null; contract_date?: string | null } | null
+} | null | undefined
+
+/**
+ * SỐ HĐ KÝ in ô "CONTRACT NO." / "Số hợp đồng" trên chứng từ gửi khách & ngân hàng (cũng là số khai hải quan).
+ * Đợt mua tiếp có docs_cite_root = true → số HĐ GỐC (đọc qua liên kết `parent`, KHÔNG đoán theo đuôi '-D<n>');
+ * mọi đơn khác → soDisplayCode(o). Số CHỨNG TỪ (PKL/WL/BC…) vẫn theo soDisplayCode — đừng dùng hàm này cho số đó.
+ */
+export const contractNoForDocs = (o: DocsCiteInput): string =>
+  o?.parent_order_id && o.docs_cite_root && o.parent?.contract_no ? o.parent.contract_no : soDisplayCode(o)
+
+/** Ngày HĐ đi cùng contractNoForDocs ("DATED …"): đợt in số gốc → ngày HĐ GỐC; còn lại → contract_date của đơn. */
+export const contractDateForDocs = (o: DocsCiteInput): string | null =>
+  o?.parent_order_id && o.docs_cite_root && o.parent?.contract_no
+    ? (o.parent.contract_date ?? o.contract_date ?? null)
+    : (o?.contract_date ?? null)
+
+// Đuôi pháp nhân bỏ đi khi khách trống short_name (36/66 khách, có cả HARMONYTIDE và QINGDAO JINTONG).
+// Lặp tới khi hết khớp: 'QINGDAO JINTONG TRADING CO., LTD' → bỏ 'CO., LTD' → bỏ 'TRADING' → 'QINGDAO JINTONG'.
+const LEGAL_SUFFIXES: RegExp[] = [
+  /[\s,]+\(?\s*(PVT|PRIVATE)\s*\)?\.?\s*(LTD|LIMITED)\.?$/i,  // (PRIVATE) LIMITED · (PVT) LTD. · PVT LTD
+  /[\s,]+PTE\.?,?\s*(LTD|LIMITED)\.?$/i,                       // PTE. LTD. · PTE LTD · PTE., LTD
+  /[\s,]+(CO|COMPANY)\.?\s*,?\s*(LTD|LIMITED)\.?$/i,           // CO., LTD · Co Ltd · Co.,Ltd · COMPANY LIMITED
+  /[\s,]+SDN\.?\s*BHD\.?$/i,
+  /[\s,]+GMBH(\s*&\s*CO\.?\s*KG)?$/i,
+  /[\s,]+(L\.?L\.?C\.?(-FZ)?|FZ-?LLC|FZCO|FZE)$/i,
+  /[\s,]+(B\.?V\.?|S\.?L\.?|S\.?A\.?|AG|INC\.?|JSC|PLC)$/i,
+  /[\s,]+(CORPORATION|CORP\.?|LIMITED|LTD\.?|COMPANY|TRADING)$/i,
+]
+const VN_LEGAL_PREFIX = /^(CÔNG\s+TY|CTY)\s+(TNHH(\s+MTV)?|CỔ\s+PHẦN|CP)\s+/i
+
+/**
+ * Tên NGẮN của một bên (người mua / người nhận) cho thẻ Kanban, Sổ đơn, "A → B": short_name nếu có;
+ * trống thì tên đầy đủ bỏ đuôi pháp nhân ('PTE. LTD.', 'CO., LTD', 'LIMITED', 'TRADING', 'CORPORATION'…)
+ * và tiền tố 'CÔNG TY TNHH/CỔ PHẦN'. Không bao giờ rút về rỗng; không có tên → '—'.
+ */
+export function partyShortName(c?: { short_name?: string | null; name?: string | null } | null): string {
+  const s = (c?.short_name || '').replace(/\s+/g, ' ').trim()
+  if (s) return s
+  const full = (c?.name || '').replace(/\s+/g, ' ').trim().replace(/[\s,.;:–-]+$/, '')
+  if (!full) return '—'
+  const strip = (x: string): string => {
+    let n = x.replace(/[\s,.;:–-]+$/, '')
+    for (let guard = 0; guard < 6; guard++) {
+      const before = n
+      for (const re of LEGAL_SUFFIXES) n = n.replace(re, '').replace(/[\s,.;:–-]+$/, '')
+      if (n === before) break
+    }
+    return n
+  }
+  let n = strip(full.replace(VN_LEGAL_PREFIX, ''))
+  // Đuôi pháp nhân đứng TRƯỚC ngoặc địa danh: 'ASIMCO NVH TECHNOLOGIES CO., LTD. (ANHUI)' → 'ASIMCO NVH TECHNOLOGIES (ANHUI)'
+  const paren = /^(.*\S)\s*(\([^()]*\))$/.exec(n)
+  if (paren) {
+    const head = strip(paren[1])
+    if (head.length >= 2) n = `${head} ${paren[2]}`
+  }
+  return n.length >= 2 ? n : full
+}
+
+/**
+ * NGƯỜI NHẬN HÀNG (khách cuối) của một đơn. ⚠ BẢN SAO luật view v_sales_order_end_customer
+ * (docs/migrations/sales_family_parties_p1.sql): end_customer_id = COALESCE(ship_to_customer_id, customer_id),
+ * via_intermediary = (ship_to_customer_id IS NOT NULL). SỬA MỘT NƠI PHẢI SỬA CẢ HAI.
+ * `party` = hồ sơ đã nạp sẵn (o.ship_to hoặc o.customer); null nếu chưa nạp.
+ * Công nợ / thanh toán / hoa hồng LUÔN theo người mua (customer_id) — hàm này chỉ để xem & thống kê tấn.
+ */
+export function receiverOf(o?: {
+  customer_id?: string | null
+  ship_to_customer_id?: string | null
+  customer?: OrderPartyLike | null
+  ship_to?: OrderPartyLike | null
+} | null): { id: string | null; viaIntermediary: boolean; party: OrderPartyLike | null } {
+  if (!o) return { id: null, viaIntermediary: false, party: null }
+  if (o.ship_to_customer_id) {
+    return { id: o.ship_to_customer_id, viaIntermediary: true, party: o.ship_to ?? null }
+  }
+  return { id: o.customer_id ?? null, viaIntermediary: false, party: o.customer ?? null }
+}
+
 export const PACKING_TYPE_LABELS: Record<PackingType, string> = {
   loose_bale: 'Loose Bale',
   sw_plastic_pallet: 'Shrink Wrapped plastic pallets',
@@ -643,6 +818,15 @@ export const COUNTRY_OPTIONS = [
   { value: 'PK', label: 'Pakistan' },
   { value: 'BD', label: 'Bangladesh' },
   { value: 'EG', label: 'Ai Cập' },
+  // Thêm 17/11/2026 — nước của khách/người nhận đang có trong sales_customers (SG, LK, AE…) mà danh sách thiếu
+  { value: 'SG', label: 'Singapore' },
+  { value: 'LK', label: 'Sri Lanka' },
+  { value: 'AE', label: 'UAE' },
+  { value: 'PH', label: 'Philippines' },
+  { value: 'HK', label: 'Hồng Kông' },
+  { value: 'NL', label: 'Hà Lan' },
+  { value: 'GB', label: 'Anh' },
+  { value: 'VN', label: 'Việt Nam' },
   { value: 'OTHER', label: 'Khác' },
 ] as const
 

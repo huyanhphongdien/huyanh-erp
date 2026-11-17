@@ -19,7 +19,7 @@ import customerExportProfileService, {
   EXPORT_DOC_TYPES, type CompanyBank, type CustomerExportProfile,
 } from '../../../services/sales/customerExportProfileService'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
-import { soDisplayCode } from '../../../services/sales/salesTypes'
+import { soDisplayCode, contractNoForDocs } from '../../../services/sales/salesTypes'
 import { lcNegotiationDoc, collectionDiscountDoc, saveDocx } from '../../../services/sales/docxExport'
 import { generateDNCK } from '../../../services/sales/discountRequestService'
 import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
@@ -87,7 +87,9 @@ export default function LcNegotiationTab(
         form.setFieldsValue({
           method: defaultMethod,
           bank_id: n?.bank_id || p?.preferred_bank_id || null,
-          issuing_bank: n?.issuing_bank || p?.default_counterparty_bank || i?.consignee || '',
+          // Dự phòng cuối = bank_hint (phần sau 'TO THE ORDER OF' của Consignee) — KHÔNG phải inv.consignee:
+          // đơn qua trung gian thì Consignee có thể là tên NGƯỜI NHẬN, điền vào ô ngân hàng là sai.
+          issuing_bank: n?.issuing_bank || p?.default_counterparty_bank || i?.bank_hint || '',
           issuing_bank_address: n?.issuing_bank_address || '',
           issuing_bank_swift: n?.issuing_bank_swift || '',
           lc_number: n?.lc_number || i?.lc_number || '',
@@ -221,6 +223,8 @@ export default function LcNegotiationTab(
   // Số tiền đòi qua Hối phiếu = THE COST (đã trừ cước/BH), khớp bộ gốc D/P
   // Giá trị Hối phiếu (đòi tiền) của D/P = TỔNG CIF (trị giá Invoice), khớp BOE nhờ thu (không trừ cước/BH).
   const draftValue = inv?.total || 0
+  // "Số hợp đồng" = số HĐ KÝ (đợt mua tiếp in số HĐ gốc — cùng ô CONTRACT NO. của Invoice); số TLTT/CI-CK vẫn theo số đơn
+  const contractNoDoc = inv?.contract_no_doc || contractNoForDocs(order)
 
   return (
     <div>
@@ -344,7 +348,7 @@ export default function LcNegotiationTab(
                 <Col xs={24} md={16}><div style={{ fontSize: 12, color: '#666' }}>Số tiền đề nghị chiết khấu (bằng chữ)</div><Input size="small" value={dnckFields.discount_amount_words || ''} placeholder="trống → TỰ SINH tiếng Việt" onChange={(e) => setDf('discount_amount_words', e.target.value)} /></Col>
                 <Col xs={12} md={8}><div style={{ fontSize: 12, color: '#666' }}>Ngày lập đơn (trên tiêu đề)</div><Input size="small" value={dnckFields.request_date || ''} placeholder="trống → ngày sinh file" onChange={(e) => setDf('request_date', e.target.value)} /></Col>
                 <Col xs={12} md={8}><div style={{ fontSize: 12, color: '#666' }}>Loại hàng hóa</div><Input size="small" value={dnckFields.commodity || ''} placeholder="trống → NATURAL RUBBER + loại mủ" onChange={(e) => setDf('commodity', e.target.value)} /></Col>
-                <Col xs={12} md={4}><div style={{ fontSize: 12, color: '#666' }}>Số HĐ</div><Input size="small" value={dnckFields.contract_no || ''} placeholder="trống → mã đơn" onChange={(e) => setDf('contract_no', e.target.value)} /></Col>
+                <Col xs={12} md={4}><div style={{ fontSize: 12, color: '#666' }}>Số HĐ</div><Input size="small" value={dnckFields.contract_no || ''} placeholder={`trống → ${contractNoDoc}`} onChange={(e) => setDf('contract_no', e.target.value)} /></Col>
                 <Col xs={12} md={4}><div style={{ fontSize: 12, color: '#666' }}>Ngày HĐ</div><Input size="small" value={dnckFields.contract_date || ''} placeholder="YYYY-MM-DD" onChange={(e) => setDf('contract_date', e.target.value)} /></Col>
               </Row>
               <div style={{ marginTop: 12 }}>
@@ -399,7 +403,7 @@ export default function LcNegotiationTab(
               </>
             )}
             <tr><td style={{ padding: '4px 8px', color: '#444' }}>Loại hàng</td><td style={{ padding: '4px 8px' }}>: NATURAL RUBBER {order.grade?.replace(/_/g, ' ')}</td></tr>
-            <tr><td style={{ padding: '4px 8px', color: '#444' }}>Số hợp đồng</td><td style={{ padding: '4px 8px' }}>: {order.contract_no || soDisplayCode(order)}</td></tr>
+            <tr><td style={{ padding: '4px 8px', color: '#444' }}>Số hợp đồng</td><td style={{ padding: '4px 8px' }}>: {contractNoDoc}</td></tr>
             <tr><td style={{ padding: '4px 8px', color: '#444' }}>Trị giá hóa đơn</td><td style={{ padding: '4px 8px' }}>: USD {fmtUSD(inv?.total || 0)}</td></tr>
             {isDP && <tr><td style={{ padding: '4px 8px', color: '#444' }}>Giá trị Hối phiếu (đòi tiền)</td><td style={{ padding: '4px 8px', fontWeight: 600 }}>: USD {fmtUSD(draftValue)}</td></tr>}
           </tbody>
@@ -451,7 +455,7 @@ export default function LcNegotiationTab(
             await handleSave()   // lưu trước để Invoice/WL/Hối phiếu đọc cùng số L/C · bank · phương thức
             const cl = checklist.map((c) => ({ label: DOC_LABEL(c.doc), originals: c.originals || 0, copies: c.copies || 0 }))
             const common = {
-              orderCode: soDisplayCode(order), contractNo: order.contract_no || soDisplayCode(order),
+              orderCode: soDisplayCode(order), contractNo: contractNoDoc,
               grade: order.grade || '', invTotal: inv?.total || 0,
               bankName: bank?.bank_name || '', accountNo: bank?.account_no || '',
               negotiatePct: v.negotiate_pct ?? null, negotiateAmount: v.negotiate_amount ?? null,

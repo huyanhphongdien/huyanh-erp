@@ -1,7 +1,7 @@
 // ============================================================================
 // QUICK-FILL DRAWER — nhập nhanh TẠI CHỖ dữ liệu còn thiếu cho 1 chứng từ.
 // Mở từ panel "Dữ liệu cần" (nút "Nhập ngay"): chỉ mấy ô cần theo NƠI nhập
-// (Hồ sơ khách · Hợp đồng · Vận chuyển · Đóng gói) → Lưu → readiness tự cập nhật.
+// (Hồ sơ khách · Hợp đồng · Vận chuyển · Đóng gói · Các bên — chốt chữ in Consignee/Notify) → Lưu → readiness tự cập nhật.
 // Kèm link phụ "Mở tab đầy đủ ↗" cho trường hợp cần form đầy đủ.
 // File: src/pages/sales/components/QuickFillDrawer.tsx
 // ============================================================================
@@ -10,9 +10,13 @@ import { Drawer, Form, Input, InputNumber, Select, DatePicker, Button, Space, Ta
 import { ExportOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import type { ReadyGroup, ReadyCtx } from '../../../services/sales/docReadiness'
-import { GROUP_LABEL } from '../../../services/sales/docReadiness'
-import { INCOTERM_LABELS, PORT_OF_LOADING_OPTIONS, type SalesOrderContainer, type ContainerStatus } from '../../../services/sales/salesTypes'
+import { GROUP_LABEL, readyParties } from '../../../services/sales/docReadiness'
+import { INCOTERM_LABELS, PORT_OF_LOADING_OPTIONS, partyShortName, type SalesOrderContainer, type ContainerStatus } from '../../../services/sales/salesTypes'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
+import { CONSIGNEE_SOURCE_LABELS, NOTIFY_SOURCE_LABELS } from '../../../services/sales/orderParties'
+import { getSalesRole, isTabEditable, type SalesOrderStatus } from '../../../services/sales/salesPermissionService'
+import { useAuthStore } from '../../../stores/authStore'
+import { useIsPhone } from '../../../hooks/useIsPhone'
 import { isVnd, fmtMoney, vndInputProps } from '../../../services/sales/salesMoney'
 import { containerService } from '../../../services/sales/containerService'
 import { customerExportProfileService, type CompanyBank } from '../../../services/sales/customerExportProfileService'
@@ -46,10 +50,23 @@ export default function QuickFillDrawer(
   const order = ctx.order
   const conts = ctx.containers
 
+  // Các bên: CÙNG hàm suy với chứng từ (readyParties → resolveOrderParties). Quyền sửa = quyền tab Hợp đồng
+  // (Sale khi đơn nháp, Logistics/Admin mọi lúc) — y như thẻ Các bên của đơn.
+  const { user } = useAuthStore()
+  const isPhone = useIsPhone()   // ≤ 640px: drawer 100% (khỏi tràn ngang)
+  const parties = useMemo(() => (group === 'parties' ? readyParties(ctx) : null), [group, ctx])
+  const canEditParties = isTabEditable(getSalesRole(user), 'contract', order.status as SalesOrderStatus, !!order.is_locked)
+  const consigneeNow = Form.useWatch('consignee_name', form) as string | undefined
+
   // nạp giá trị hiện có mỗi lần mở
   useEffect(() => {
     if (!open || !group) return
-    if (group === 'profile') {
+    if (group === 'parties') {
+      form.setFieldsValue({
+        consignee_name: order.consignee_name || '', consignee_address: order.consignee_address || '',
+        notify_party: order.notify_party || '', notify_address: order.notify_address || '',
+      })
+    } else if (group === 'profile') {
       customerExportProfileService.listBanks().then(setBanks).catch(() => setBanks([]))
       form.setFieldsValue({
         buyer_legal_name: ctx.profile?.buyer_legal_name || '',
@@ -97,7 +114,15 @@ export default function QuickFillDrawer(
     if (!group) return
     setSaving(true)
     try {
-      if (group === 'profile') {
+      if (group === 'parties') {
+        if (!canEditParties) throw new Error('Tài khoản của bạn không có quyền sửa Các bên của đơn này')
+        const v = await form.validateFields()
+        // Chuỗi rỗng → NULL (= tự suy) do updateParties lo; audit tự ghi qua updateFields
+        await salesOrderService.updateParties(order.id, {
+          consignee_name: v.consignee_name ?? '', consignee_address: v.consignee_address ?? '',
+          notify_party: v.notify_party ?? '', notify_address: v.notify_address ?? '',
+        })
+      } else if (group === 'profile') {
         const v = await form.validateFields()
         if (!order.customer_id) throw new Error('Đơn chưa gắn khách hàng')
         await customerExportProfileService.upsert(order.customer_id, {
@@ -166,7 +191,7 @@ export default function QuickFillDrawer(
   return (
     <Drawer
       title={title}
-      width={group === 'packing' ? 760 : 480}
+      width={isPhone ? '100%' : (group === 'packing' ? 760 : 480)}
       open={open}
       onClose={onClose}
       destroyOnClose
@@ -178,13 +203,75 @@ export default function QuickFillDrawer(
           ) : <span />}
           <Space>
             <Button onClick={onClose}>Đóng</Button>
-            <Button type="primary" loading={saving} onClick={doSave} style={{ background: BRAND, borderColor: BRAND }}>
+            <Button type="primary" loading={saving} onClick={doSave}
+              disabled={group === 'parties' && !canEditParties}
+              style={group === 'parties' && !canEditParties ? undefined : { background: BRAND, borderColor: BRAND }}>
               Lưu
             </Button>
           </Space>
         </div>
       }
     >
+      {group === 'parties' && (
+        <Form form={form} layout="vertical" disabled={!canEditParties}>
+          <Alert type="info" showIcon style={{ marginBottom: 12 }}
+            message="Chữ in ô Consignee / Notify — RIÊNG đơn này"
+            description={
+              <span>
+                Người mua: <b>{partyShortName(order.customer)}</b>
+                {parties?.viaIntermediary && <> → Người nhận hàng: <b>{parties.receiverLabel || '—'}</b></>}.
+                {' '}Công nợ, thanh toán, hoa hồng luôn theo NGƯỜI MUA. Để trống = hệ thống tự suy.
+              </span>
+            } />
+          {!canEditParties && (
+            <Alert type="warning" showIcon style={{ marginBottom: 12 }}
+              message="Chỉ Logistics / Admin (hoặc Sale khi đơn còn nháp) được sửa ô này" />
+          )}
+          {parties && (
+            <div style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.6 }}>
+              <div>Đang in ô Consignee: <b>{parties.consignee.name || '—'}</b>{' '}
+                <Text type="secondary">({CONSIGNEE_SOURCE_LABELS[parties.consignee.source]})</Text></div>
+              <div>Đang in ô Notify: <b>{parties.notify.name || '—'}</b>{' '}
+                <Text type="secondary">({NOTIFY_SOURCE_LABELS[parties.notify.source]})</Text></div>
+            </div>
+          )}
+          {parties && parties.consigneePresets.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12.5, marginBottom: 6 }}>
+                Chốt nhanh ô Consignee{parties.suggestedConsignee && <> — đề xuất theo cách thanh toán: <b>{parties.suggestedConsignee.label}</b></>}
+              </div>
+              <Space wrap size={[6, 6]}>
+                {parties.consigneePresets.map((p) => (
+                  <Button key={p.kind} size="small"
+                    type={p.kind === parties.suggestedConsignee?.kind ? 'primary' : 'default'}
+                    style={{ whiteSpace: 'normal', height: 'auto', maxWidth: '100%', textAlign: 'left', ...(p.kind === parties.suggestedConsignee?.kind ? { background: BRAND, borderColor: BRAND } : {}) }}
+                    onClick={() => form.setFieldsValue({ consignee_name: p.name, consignee_address: p.address })}>
+                    {p.label}
+                  </Button>
+                ))}
+              </Space>
+              {/^\s*TO\s+ORDER\s*$/i.test(consigneeNow || '') && parties.viaIntermediary && (
+                <div style={{ fontSize: 12, marginTop: 6 }}>
+                  <Text type="secondary">TO ORDER: để trống ô Notify → in người nhận hàng ({parties.receiverLabel || '—'}).</Text>
+                </div>
+              )}
+            </div>
+          )}
+          <Form.Item name="consignee_name" label="Consignee (tên in trên chứng từ)">
+            <Input placeholder="Trống = tự suy (L/C → người nhận → hồ sơ người mua)" allowClear />
+          </Form.Item>
+          <Form.Item name="consignee_address" label="Consignee — địa chỉ">
+            <Input.TextArea autoSize={{ minRows: 1, maxRows: 4 }} />
+          </Form.Item>
+          <Form.Item name="notify_party" label="Notify party">
+            <Input placeholder="Trống = người nhận hàng / hồ sơ người mua" allowClear />
+          </Form.Item>
+          <Form.Item name="notify_address" label="Notify — địa chỉ">
+            <Input.TextArea autoSize={{ minRows: 1, maxRows: 4 }} />
+          </Form.Item>
+        </Form>
+      )}
+
       {group === 'profile' && (
         <Form form={form} layout="vertical">
           <Alert type="info" showIcon style={{ marginBottom: 14 }}

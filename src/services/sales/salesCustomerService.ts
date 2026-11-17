@@ -17,6 +17,41 @@ import type {
   CustomerStats,
   SalesOrder,
 } from './salesTypes'
+import { partyShortName } from './salesTypes'
+import { salesOrderService } from './salesOrderService'
+
+/** Một mục chọn khách gọn (ô Người nhận hàng, modal chọn) — gồm cả khách ngừng giao dịch để còn hiện/cảnh báo. */
+export interface SalesCustomerPickerOption {
+  id: string
+  code: string | null
+  name: string
+  short_name: string | null
+  country: string | null
+  address: string | null
+  status: CustomerStatus | null
+}
+
+/** Tấn đặt / tấn đã giao của một nhóm đơn (đọc từ v_sales_order_end_customer — KHÔNG có tiền). */
+export interface TonsBucket {
+  orders: number
+  tons: number
+  delivered_tons: number
+}
+
+/**
+ * "HÀNG VỀ TAY" một khách cuối = mua thẳng (khách đứng tên, không qua trung gian) + nhận qua trung gian
+ * (người mua khác đứng tên, khách này là người nhận). ⚠ Phần `via` KHÔNG BAO GIỜ thuộc công nợ / doanh thu /
+ * hạn mức của khách này — công nợ luôn theo người mua.
+ */
+export interface EndCustomerVolume {
+  direct: TonsBucket
+  via: TonsBucket
+  total: TonsBucket
+  /** phần `via` gom theo người mua trung gian, nhiều tấn trước */
+  byIntermediary: Array<TonsBucket & { buyer_id: string; name: string; short_name: string }>
+}
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000
 
 // ============================================================================
 // SERVICE
@@ -390,20 +425,107 @@ export const salesCustomerService = {
   // ==========================================================================
 
   /**
-   * Lấy lịch sử đơn hàng của khách hàng
+   * Đơn CHƯA HUỶ khách ĐỨNG TÊN MUA (customer_id), mới nhất trước — thống kê trang Khách (doanh thu, tấn) cộng từ
+   * đây, nên bỏ đơn huỷ (trước 17/11/2026 cộng cả đơn huỷ). Đã migration thì kèm `ship_to` (đơn khách này mua rồi
+   * giao thẳng cho người nhận khác — khối "Giao thẳng cho người nhận khác").
    */
   async getOrderHistory(customerId: string): Promise<SalesOrder[]> {
     const { data, error } = await supabase
       .from('sales_orders')
       .select('*')
       .eq('customer_id', customerId)
+      .neq('status', 'cancelled')
       .order('order_date', { ascending: false })
 
     if (error) {
       throw new Error(`Không thể tải lịch sử đơn hàng: ${error.message}`)
     }
 
+    const rows = (data || []) as SalesOrder[]
+    return (await salesOrderService.familyPartiesReady()) ? await salesOrderService.attachShipTo(rows) : rows
+  },
+
+  /**
+   * Đơn CHƯA HUỶ mà khách này là NGƯỜI NHẬN HÀNG qua trung gian (ship_to_customer_id = khách, người mua khác
+   * đứng tên) — bảng "Nhận hàng qua trung gian — không thuộc công nợ khách này". `customer` = NGƯỜI MUA.
+   * Chưa migration → [].
+   */
+  async getReceivedOrders(customerId: string): Promise<SalesOrder[]> {
+    if (!(await salesOrderService.familyPartiesReady())) return []
+    const { data, error } = await supabase
+      .from('sales_orders')
+      .select('*, customer:sales_customers!customer_id(id,code,name,short_name,country,tier)')
+      .eq('ship_to_customer_id', customerId)
+      .neq('status', 'cancelled')
+      .order('order_date', { ascending: false })
+    if (error) throw new Error(`Không tải được đơn nhận hàng qua trung gian: ${error.message}`)
     return (data || []) as SalesOrder[]
+  },
+
+  /**
+   * "Hàng về tay" khách cuối (tấn đặt + tấn đã giao), tách mua thẳng / nhận qua trung gian — MỘT nguồn
+   * v_sales_order_end_customer ("đã giao" theo v_sales_order_container_delivery). KHÔNG có cột tiền: công nợ /
+   * doanh thu luôn theo người mua. Chưa migration → null.
+   */
+  async getEndCustomerVolume(customerId: string): Promise<EndCustomerVolume | null> {
+    if (!(await salesOrderService.familyPartiesReady())) return null
+    const { data, error } = await supabase
+      .from('v_sales_order_end_customer')
+      .select('sales_order_id, buyer_id, via_intermediary, quantity_tons, delivered_tons')
+      .eq('end_customer_id', customerId)
+    if (error) throw new Error(`Không tải được sản lượng khách cuối: ${error.message}`)
+
+    const empty = (): TonsBucket => ({ orders: 0, tons: 0, delivered_tons: 0 })
+    const add = (b: TonsBucket, r: { quantity_tons: number | null; delivered_tons: number | null }) => {
+      b.orders += 1
+      b.tons += Number(r.quantity_tons) || 0
+      b.delivered_tons += Number(r.delivered_tons) || 0
+    }
+    const direct = empty()
+    const via = empty()
+    const byBuyer = new Map<string, TonsBucket>()
+    for (const r of (data || []) as Array<{ buyer_id: string; via_intermediary: boolean; quantity_tons: number | null; delivered_tons: number | null }>) {
+      if (r.via_intermediary) {
+        add(via, r)
+        const b = byBuyer.get(r.buyer_id) || empty()
+        add(b, r)
+        byBuyer.set(r.buyer_id, b)
+      } else {
+        add(direct, r)
+      }
+    }
+    const names = new Map<string, { name: string; short_name: string | null }>()
+    const buyerIds = [...byBuyer.keys()]
+    if (buyerIds.length) {
+      const { data: custs, error: cErr } = await supabase.from('sales_customers').select('id, name, short_name').in('id', buyerIds)
+      if (cErr) throw new Error(`Không tải được tên người mua trung gian: ${cErr.message}`)
+      for (const c of (custs || []) as Array<{ id: string; name: string; short_name: string | null }>) names.set(c.id, c)
+    }
+    const fix = (b: TonsBucket): TonsBucket => ({ orders: b.orders, tons: round3(b.tons), delivered_tons: round3(b.delivered_tons) })
+    return {
+      direct: fix(direct),
+      via: fix(via),
+      total: fix({ orders: direct.orders + via.orders, tons: direct.tons + via.tons, delivered_tons: direct.delivered_tons + via.delivered_tons }),
+      byIntermediary: buyerIds
+        .map((id) => {
+          const c = names.get(id)
+          return { buyer_id: id, name: c?.name || '—', short_name: partyShortName(c), ...fix(byBuyer.get(id) as TonsBucket) }
+        })
+        .sort((a, b) => b.tons - a.tons),
+    }
+  },
+
+  /**
+   * Danh sách khách GỌN cho ô chọn Người nhận hàng / modal chọn (mọi trạng thái — khách ngừng giao dịch vẫn hiện
+   * để còn cảnh báo), sắp theo tên.
+   */
+  async getPickerOptions(): Promise<SalesCustomerPickerOption[]> {
+    const { data, error } = await supabase
+      .from('sales_customers')
+      .select('id, code, name, short_name, country, address, status')
+      .order('name')
+    if (error) throw new Error(`Không tải được danh sách khách hàng: ${error.message}`)
+    return (data || []) as SalesCustomerPickerOption[]
   },
 
   // ==========================================================================

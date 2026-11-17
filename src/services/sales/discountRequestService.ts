@@ -105,13 +105,18 @@ export async function buildDnckData(orderId: string, lotNo = 0) {
   const drawAmount = (inv.freight > 0 || inv.insurance > 0) ? inv.the_cost : inv.total
   const pct = neg?.negotiate_pct ?? null
   const negAmount = neg?.negotiate_amount ?? (pct != null ? (drawAmount * pct) / 100 : null)
-  const bank = parseBankSwift(neg?.issuing_bank || inv.consignee || '')
+  // NH phát hành: bảng thương lượng trước (giữ "(SWIFT …)" để tách mã), thiếu → bank_hint. KHÔNG dự phòng bằng
+  // inv.consignee (đơn qua trung gian: Consignee có thể là tên NGƯỜI NHẬN, không phải ngân hàng).
+  const bank = parseBankSwift(neg?.issuing_bank || inv.bank_hint || '')
   const parsed = df.request_date ? new Date(df.request_date) : null
   const reqDate = parsed && !isNaN(parsed.getTime()) ? parsed : new Date()
   const p = (n: number) => String(n).padStart(2, '0')
   const gradeCompact = (inv.grade || '').replace(/_/g, ' ')   // SVR_10 → "SVR 10" (khớp Invoice)
   const addrLines = (inv.buyer_address || '').split(/\n|,\s*/).map((x) => x.trim()).filter(Boolean)
-  const base = inv.order_code.split(' — ')[0]
+  const base = inv.order_code   // số đơn (của đợt)
+  // "Số hợp đồng" + ngày = HĐ KÝ (đợt mua tiếp in số/ngày HĐ gốc); ô ghi đè dnck_fields theo lô vẫn thắng
+  const contractNo = inv.contract_no_doc || base
+  const contractDate = inv.contract_date_doc ?? (inv as { contract_date?: string }).contract_date ?? ''
 
   // Checklist mục 3 (động theo 46A của đơn) → loop {#docs} trong template
   const docs = (neg?.doc_checklist || [])
@@ -123,6 +128,7 @@ export async function buildDnckData(orderId: string, lotNo = 0) {
     }))
 
   return {
+    doc_no: base,   // số đơn của đợt — chỉ để đặt tên file (template không có thẻ này)
     docs,
     form_seq: df.form_seq || '',
     form_year: df.form_year || String(reqDate.getFullYear()),
@@ -136,8 +142,8 @@ export async function buildDnckData(orderId: string, lotNo = 0) {
     amount: money(drawAmount),
     invoice_no: inv.invoice_code,
     invoice_date: ddmmyyyy(inv.invoice_date),
-    contract_no: df.contract_no || base,
-    contract_date: ddmmyyyy(df.contract_date || (inv as { contract_date?: string }).contract_date || ''),
+    contract_no: df.contract_no || contractNo,
+    contract_date: ddmmyyyy(df.contract_date || contractDate),
     lc_remaining: df.lc_remaining || money(drawAmount),
     recv_swift: df.recv_swift || neg?.issuing_bank_swift || bank.swift,
     recv_bank_name: df.recv_bank_name || bank.name,
@@ -163,16 +169,20 @@ export async function buildDnckDataDP(orderId: string, lotNo = 0) {
   const drawAmount = inv.total
   const pct = neg?.negotiate_pct ?? null
   const negAmount = neg?.negotiate_amount ?? (pct != null ? (drawAmount * pct) / 100 : null)
-  // D/P: issuing_bank = NH nhờ thu (NH người mua) → tách tên + swift
-  const bank = parseBankSwift(df.recv_bank_name || neg?.issuing_bank || '')
+  // D/P: issuing_bank = NH nhờ thu (NH người mua) → tách tên + swift. Thiếu → bank_hint (KHÔNG BAO GIỜ là tên
+  // người nhận: đơn D/P Harmonytide→Jintong từng có nguy cơ in 'QINGDAO JINTONG' làm NH nhờ thu)
+  const bank = parseBankSwift(df.recv_bank_name || neg?.issuing_bank || inv.bank_hint || '')
   const parsed = df.request_date ? new Date(df.request_date) : null
   const reqDate = parsed && !isNaN(parsed.getTime()) ? parsed : new Date()
   const p = (n: number) => String(n).padStart(2, '0')
   const gradeCompact = (inv.grade || '').replace(/_/g, ' ')   // SVR_10 → "SVR 10" (khớp Invoice)
-  const base = inv.order_code.split(' — ')[0]
+  const base = inv.order_code   // số đơn (của đợt)
+  const contractNo = inv.contract_no_doc || base
+  const contractDate = inv.contract_date_doc ?? (inv as { contract_date?: string }).contract_date ?? ''
   const buyerAddr = (inv.buyer_address || '').replace(/\n/g, ', ').trim()
 
   return {
+    doc_no: base,   // số đơn của đợt — chỉ để đặt tên file (template không có thẻ này)
     ...dpGridFields(neg?.doc_checklist),
     form_seq: df.form_seq || '',
     form_year: df.form_year || String(reqDate.getFullYear()),
@@ -183,8 +193,8 @@ export async function buildDnckDataDP(orderId: string, lotNo = 0) {
     amount: money(drawAmount),
     invoice_no: inv.invoice_code,
     invoice_date: ddmmyyyy(inv.invoice_date),
-    contract_no: df.contract_no || base,
-    contract_date: ddmmyyyy(df.contract_date || (inv as { contract_date?: string }).contract_date || ''),
+    contract_no: df.contract_no || contractNo,
+    contract_date: ddmmyyyy(df.contract_date || contractDate),
     negotiate_date: ddmmyyyy(df.negotiate_date || ''),
     // NH nhờ thu (người mua) — strip SWIFT khỏi tên nếu người dùng gộp chung;
     // địa chỉ + SWIFT ưu tiên field riêng của đơn (issuing_bank_address/swift) → nhập 1 chỗ, lên cả BOE + ĐNCK
@@ -231,7 +241,8 @@ export async function generateDNCK(orderId: string, lotNo = 0): Promise<void> {
     type: 'blob',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   })
-  saveAs(blob, `DNCK_${isDP ? 'DP_' : ''}${data.contract_no}${lotNo ? `_L${lotNo}` : ''}.docx`)
+  // Tên file theo SỐ ĐƠN của đợt (ô "Số hợp đồng" có thể là số HĐ gốc — trùng tên file giữa các đợt)
+  saveAs(blob, `DNCK_${isDP ? 'DP_' : ''}${data.doc_no || data.contract_no}${lotNo ? `_L${lotNo}` : ''}.docx`)
 }
 
 export const discountRequestService = { buildDnckData, buildDnckDataDP, generateDNCK }

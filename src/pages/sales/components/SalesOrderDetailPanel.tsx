@@ -28,12 +28,14 @@ import {
   ShareAltOutlined,
   SolutionOutlined,
   ExperimentOutlined,
+  BranchesOutlined,
 } from '@ant-design/icons'
+import { useQueryClient } from '@tanstack/react-query'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import { salesContractWorkflowService } from '../../../services/sales/salesContractWorkflowService'
 import { supabase } from '../../../lib/supabase'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode, countryFlag } from '../../../services/sales/salesTypes'
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode, countryFlag, partyShortName } from '../../../services/sales/salesTypes'
 import { fmtMoney, orderTotalInCurrency } from '../../../services/sales/salesMoney'
 import { fmtDate } from '../../../utils/format'
 import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
@@ -59,6 +61,8 @@ import HandoffTimeline from './HandoffTimeline'
 import OrderProgressDashboard from './OrderProgressDashboard'
 import SalesOrderChat from './SalesOrderChat'
 import StatusHistoryTab from './StatusHistoryTab'
+import OrderFamilyChip from './OrderFamilyChip'
+import { useContinueOrderAction, useOrderFamily } from './OrderFamilyBlock'
 import StagePill from '../../../components/common/StagePill'
 import {
   SALES_STAGES,
@@ -128,6 +132,11 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
   const [hasWorkflow, setHasWorkflow] = useState<boolean>(false)
   const [cancelling, setCancelling] = useState(false)
 
+  // ── Họ HĐ (mua tiếp) — chip header, lối vào "Tạo đơn mua tiếp", kiểm trước khi huỷ đơn gốc ──
+  const qc = useQueryClient()
+  const fam = useOrderFamily(order)
+  const continueAction = useContinueOrderAction(order, salesRole)
+
   // ── Load order ──
   // silent = làm mới do REALTIME (người khác sửa đơn): không bật vòng tải → bộ tab không bị gỡ
   // ra gắn lại, form đang sửa dở (Vận chuyển, Tài chính…) không mất. Lưu của chính mình
@@ -140,6 +149,9 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     try {
       const data = await salesOrderService.getById(orderId)
       setOrder(data)
+      // Họ HĐ (chip / khối "Các đợt cùng HĐ" / tab Hợp đồng) đọc cache ['sales-order-family', gốc] → làm mới mỗi lần
+      // tải lại đơn (kể cả realtime: người khác vừa huỷ / tạo đợt)
+      void qc.invalidateQueries({ queryKey: ['sales-order-family'] })
       // Detect workflow: ẩn Khóa HĐ nếu đơn đã dùng workflow mới
       try {
         const rows = await salesContractWorkflowService.listBySalesOrder(orderId)
@@ -155,7 +167,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [orderId])
+  }, [orderId, qc])
 
   useEffect(() => {
     if (open && orderId) {
@@ -255,7 +267,11 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     const lines = [
       `Đơn hàng: ${order.code}`,
       order.contract_no ? `Số HĐ: ${order.contract_no}` : null,
-      order.customer ? `Khách hàng: ${order.customer.name}` : null,
+      fam.ready && order.parent_order_id
+        ? `Mua tiếp theo HĐ: ${fam.rootNo}${order.continuation_seq ? ` (đợt ${order.continuation_seq})` : ''}`
+        : null,
+      order.customer ? `Người mua: ${order.customer.name}` : null,
+      fam.ready && order.ship_to_customer_id && order.ship_to ? `Người nhận hàng: ${order.ship_to.name}` : null,
       order.grade ? `Grade: ${order.grade}` : null,
       order.quantity_tons ? `Số lượng: ${order.quantity_tons} MT` : null,
       order.unit_price ? `Đơn giá: ${fmtMoney(order.unit_price, order.currency)}/MT` : null,
@@ -320,6 +336,24 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
    *  Update status='cancelled'. */
   const handleCancelOrder = () => {
     if (!order) return
+    // HĐ GỐC còn đợt mua tiếp chưa huỷ → nói rõ lý do NGAY, không mở hộp nhập lý do
+    // (trigger trg_so_family_guard vẫn là chốt cuối — lỡ danh sách đợt chưa tải xong thì câu lỗi của DB hiện ra)
+    if (fam.ready && !order.parent_order_id && fam.liveChildren.length > 0) {
+      Modal.warning({
+        title: 'Chưa huỷ được HĐ gốc',
+        content: (
+          <div>
+            <p style={{ marginBottom: 6 }}>
+              HĐ gốc <strong>{soDisplayCode(order)}</strong> còn {fam.liveChildren.length} đơn mua tiếp chưa huỷ:{' '}
+              {fam.liveChildren.map((k) => `Đợt ${k.seq} · ${soDisplayCode(k)}`).join(' · ')}.
+            </p>
+            <p style={{ margin: 0 }}>Huỷ các đợt đó trước rồi mới huỷ được HĐ gốc.</p>
+          </div>
+        ),
+        okText: 'Đã hiểu',
+      })
+      return
+    }
     let reason = ''
     Modal.confirm({
       title: '🚫 Hủy đơn hàng',
@@ -329,6 +363,12 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
             Đơn <strong>{soDisplayCode(order)}</strong> sẽ chuyển sang{' '}
             <Tag color="default">Đã hủy</Tag>. Hành động này không undo được.
           </p>
+          {fam.ready && order.parent_order_id ? (
+            <p style={{ marginBottom: 12, fontSize: 13 }}>
+              Đây là {order.continuation_seq ? `đợt ${order.continuation_seq}` : 'đợt mua tiếp'} của HĐ {fam.rootNo} — huỷ đợt
+              không ảnh hưởng HĐ gốc và các đợt khác; số đợt không cấp lại.
+            </p>
+          ) : null}
           <Input.TextArea
             rows={3}
             placeholder="Lý do hủy (bắt buộc) — VD: KH cancel, sai thông tin, đổi sang đơn khác..."
@@ -365,6 +405,32 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
 
   /** Menu items cho dropdown "Hành động". */
   const actionMenuItems: MenuProps['items'] = order ? [
+    // "Tạo đơn mua tiếp" — khách mua thêm theo HĐ này (ẩn khi đơn huỷ / không quyền / chưa migration;
+    // gốc chưa có số HĐ → mờ + tooltip). Drawer đóng trước khi mở tab form (như "Mở rộng").
+    ...(continueAction.show
+      ? [
+          {
+            key: 'continue-order',
+            icon: <BranchesOutlined />,
+            label: continueAction.disabledReason
+              ? (
+                  <Tooltip title={continueAction.disabledReason} placement="left">
+                    <span>
+                      Tạo đơn mua tiếp{' '}
+                      <span style={{ fontSize: 11, opacity: 0.75 }}>· {continueAction.disabledShort}</span>
+                    </span>
+                  </Tooltip>
+                )
+              : 'Tạo đơn mua tiếp',
+            disabled: !!continueAction.disabledReason,
+            onClick: () => {
+              if (!inline) onClose?.()
+              continueAction.open()
+            },
+          },
+          { type: 'divider' as const },
+        ]
+      : []),
     {
       key: 'copy-info',
       icon: <CopyOutlined />,
@@ -420,12 +486,14 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
   const isLocked = !!order?.is_locked
   const canLock = salesRole === 'sale' || salesRole === 'admin'
   const canUnlock = salesRole === 'admin'
+  /** Người nhận hàng (khác người mua) — chỉ khi đã migration; công nợ vẫn theo người mua */
+  const receiver = fam.ready && order?.ship_to_customer_id ? order.ship_to ?? null : null
 
   // Tab Thông tin — đầu tiên (trước đây panel KHÔNG có, phải mở trang riêng).
   const infoTabItem = order ? [{
     key: 'info',
     label: <span>📄 Thông tin</span>,
-    children: <OrderInfoTab order={order} />,
+    children: <OrderInfoTab order={order} salesRole={salesRole} onSaved={handleSaved} />,
   }] : []
 
   // Tab Tiến độ — GỘP 3 cái cũ: tổng quan tiến độ + Bộ phận/SLA + Lịch sử giao nhận.
@@ -637,6 +705,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
                 <Tag color={ORDER_STATUS_COLORS[order.status] || 'default'}>
                   {ORDER_STATUS_LABELS[order.status] || order.status}
                 </Tag>
+                {/* Họ HĐ — cùng chip với trang đầy đủ + drawer */}
+                <OrderFamilyChip order={order} />
                 {order.current_stage && (
                   <StagePill
                     stage={order.current_stage as SalesStage}
@@ -711,6 +781,12 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
                     ) : (
                       <b style={{ color: '#262626', fontWeight: 600 }}>{order.customer.name}</b>
                     )}
+                    {/* Người nhận hàng (riêng đơn này) — "NGƯỜI MUA → NGƯỜI NHẬN" như thẻ Kanban */}
+                    {receiver ? (
+                      <span title={`Người nhận hàng: ${receiver.name}`}>
+                        → <b style={{ color: '#262626', fontWeight: 600 }}>{partyShortName(receiver)}</b>
+                      </span>
+                    ) : null}
                   </span>
                 )}
                 {order.grade && (
@@ -807,6 +883,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
             <Tag color={ORDER_STATUS_COLORS[order.status] || 'default'}>
               {ORDER_STATUS_LABELS[order.status] || order.status}
             </Tag>
+            {/* Họ HĐ — cùng chip với trang đầy đủ + Split */}
+            <OrderFamilyChip order={order} />
             {order.current_stage && (
               <StagePill
                 stage={order.current_stage as SalesStage}
@@ -818,6 +896,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
             {order.customer && (
               <span style={{ color: '#666', fontSize: 13 }}>
                 {order.customer.name}
+                {receiver ? <span title={`Người nhận hàng: ${receiver.name}`}> → <b>{partyShortName(receiver)}</b></span> : null}
               </span>
             )}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

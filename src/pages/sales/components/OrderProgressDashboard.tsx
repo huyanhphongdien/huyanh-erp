@@ -9,11 +9,15 @@
 //   - Activity timeline (gần đây)
 //   - Items table
 //   - Grid 3 card: Tài chính · Vận chuyển · Liên kết
+// Họ HĐ (17/11/2026): thẻ "Quy trình HĐ" của ĐỢT CON ghi "Mua tiếp theo HĐ … — dùng HĐ gốc, không ký mới";
+// thẻ "Liên kết" thêm "HĐ gốc" + "Các đợt (n)"; Files Widget ghi "HĐ gốc: n file". Điện thoại: các thẻ xếp dọc.
 // ============================================================================
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Tag, Spin, Modal, message } from 'antd'
+import { useIsPhone } from '../../../hooks/useIsPhone'
+import { useOpenSalesOrder, useOrderFamily } from './OrderFamilyBlock'
 import type { SalesOrder, PackingType } from '../../../services/sales/salesTypes'
 import {
   soDisplayCode, polLabel, PACKING_TYPE_LABELS, PAYMENT_TERMS_LABELS, PAYMENT_TERMS_EXTENDED_LABELS,
@@ -31,6 +35,7 @@ import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import OrderFilesWidget from './OrderFilesWidget'
 import { CONTRACT_STATUS_LABELS } from './ContractWorkflowSection'
 import LotProgressTable from '../../../components/sales/LotProgressTable'
+import { palette } from '../../../theme/palette'
 
 const PRIMARY = '#1B4D3E'
 
@@ -53,9 +58,19 @@ interface Props {
 
 export default function OrderProgressDashboard({ order, onChanged, onNavigateTab }: Props) {
   const navigate = useNavigate()
+  const isPhone = useIsPhone()
   const [contracts, setContracts] = useState<SalesOrderContract[]>([])
   const [loadingContracts, setLoadingContracts] = useState(true)
   const [creatingContract, setCreatingContract] = useState(false)
+
+  // Họ HĐ (chỉ khi đã migration — fam.ready)
+  const fam = useOrderFamily(order)
+  const openOrder = useOpenSalesOrder()
+  const isChild = fam.ready && fam.isChild
+  const openRoot = () => { if (order.parent_order_id) openOrder(order.parent_order_id, fam.rootNo || 'gốc') }
+  // Điện thoại: lưới 2/3 cột → 1 cột (minmax(0,…) để nội dung dài không đẩy tràn ngang)
+  const twoColsR: React.CSSProperties = { ...twoCols, gridTemplateColumns: isPhone ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))' }
+  const threeColsR: React.CSSProperties = { ...threeCols, gridTemplateColumns: isPhone ? 'minmax(0, 1fr)' : 'repeat(3, minmax(0, 1fr))' }
 
   useEffect(() => {
     setLoadingContracts(true)
@@ -191,8 +206,14 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
   return (
     <div style={{ padding: '12px 4px' }}>
 
-      {/* ═══ 0. FILES WIDGET (6 folder dùng chung — nổi bật trên cùng) ═══ */}
-      <OrderFilesWidget salesOrderId={order.id} onNavigateTab={onNavigateTab} />
+      {/* ═══ 0. FILES WIDGET (6 folder dùng chung — nổi bật trên cùng) ═══
+          Đợt mua tiếp: thư mục Hợp đồng ghi thêm "HĐ gốc: n file" (HĐ đã ký nằm ở đơn gốc) */}
+      <OrderFilesWidget
+        salesOrderId={order.id}
+        onNavigateTab={onNavigateTab}
+        rootOrderId={isChild ? order.parent_order_id : null}
+        rootLabel={isChild ? fam.rootNo : undefined}
+      />
 
       {/* ═══ 0b. TIẾN ĐỘ TỪNG LÔ ═══
           Đây là tab DUY NHẤT có nhiệm vụ trả lời "đơn này tới đâu rồi", nhưng trước
@@ -221,7 +242,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
       )}
 
       {/* ═══ 2. WORKFLOW CARD + ACTIVITY TIMELINE (2 cols) ═══ */}
-      <div style={twoCols}>
+      <div style={twoColsR}>
 
         {/* Workflow */}
         <div style={{
@@ -230,9 +251,17 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
           border: '1px solid #d9f4e3',
         }}>
           <div style={cardTitle}>📋 Quy trình HĐ</div>
+          {/* Đợt mua tiếp: không ký HĐ mới — dùng HĐ gốc */}
+          {isChild && (
+            <div style={{ fontSize: 12, padding: 8, background: palette.brandBg, borderRadius: 6, marginBottom: latest ? 8 : 0, color: palette.brand }}>
+              ⧉ <strong>Mua tiếp theo HĐ {fam.rootNo || 'gốc'}</strong>
+              {order.parent?.contract_date ? ` (ký ${fmtDate(order.parent.contract_date)})` : ''} — dùng HĐ gốc, không ký mới.
+              {' '}<a onClick={openRoot} style={{ color: palette.brand, textDecoration: 'underline' }}>Mở HĐ gốc</a>
+            </div>
+          )}
           {loadingContracts ? (
             <Spin size="small" />
-          ) : !latest ? (
+          ) : !latest ? (isChild ? null : (
             <div style={empty}>
               {/* Bỏ hẳn quy trình duyệt/ký (2026-08-05) — HĐ quản lý trực tiếp ở tab "Hợp đồng" */}
               <div style={{ fontSize: 12, color: '#8c8c8c', padding: 8, background: '#fafafa',
@@ -242,7 +271,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
                 <span style={{ color: '#bfbfbf' }}>Không còn bước trình duyệt/ký qua queue.</span>
               </div>
             </div>
-          ) : (
+          )) : (
             <>
               <ActorRow
                 icon={latest.created_by ? '✓' : '·'}
@@ -341,7 +370,8 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
       {orderItems && orderItems.length > 0 && (
         <>
           <div style={sectionH}>📦 Chi tiết hàng</div>
-          <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+          {/* overflowX auto: bảng 7 cột cuộn trong thẻ trên điện thoại (trước là hidden → cắt mất cột) */}
+          <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
             <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
               <thead style={{ background: '#fafafa' }}>
                 <tr>
@@ -383,7 +413,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
 
       {/* ═══ 4. FINANCIAL + SHIPPING + LINKS (3 cols) ═══ */}
       <div style={sectionH}>📊 Tổng quan</div>
-      <div style={threeCols}>
+      <div style={threeColsR}>
 
         <div style={card}>
           <div style={cardTitle}>💰 Tài chính</div>
@@ -434,8 +464,19 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
 
         <div style={card}>
           <div style={cardTitle}>🔗 Liên kết</div>
+          {/* Họ HĐ: HĐ gốc (đợt con) + Các đợt (khối "Các đợt cùng HĐ" cuối tab Thông tin) */}
+          {isChild && (
+            <LinkRow icon="⧉" label="HĐ gốc"
+                     value={`${fam.rootNo || 'gốc'}${order.continuation_seq ? ` · đợt ${order.continuation_seq}` : ''}`}
+                     onClick={openRoot} />
+          )}
+          {fam.showBlock && (
+            <LinkRow icon="🗂" label={`Các đợt (${fam.live.length})`}
+                     value="Xem ở tab Thông tin"
+                     onClick={onNavigateTab ? () => onNavigateTab('info') : undefined} />
+          )}
           <LinkRow icon="📋" label={`HĐ${latest ? ` rev #${latest.revision_no}` : ''}`}
-                   value={latest ? `Trạng thái: ${CONTRACT_STATUS_LABELS[latest.status] || latest.status}` : 'Chưa có'}
+                   value={latest ? `Trạng thái: ${CONTRACT_STATUS_LABELS[latest.status] || latest.status}` : (isChild ? 'Dùng HĐ gốc' : 'Chưa có')}
                    onClick={latest ? () => navigate('/sales/contracts/review') : undefined} />
           {/* 3 dòng dưới trước đây in chữ CỐ ĐỊNH sai sự thật: Lệnh SX đọc cột không tồn tại (luôn
               "chưa lập"), "COA + PL — chưa lập" gõ cứng, "Phiếu cân: Đã cân" suy từ số booking.

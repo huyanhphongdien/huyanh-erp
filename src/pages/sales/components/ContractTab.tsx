@@ -1,9 +1,16 @@
 // ============================================================================
 // CONTRACT TAB — Tab Hợp đồng trong Detail Panel v4
 // File: src/pages/sales/components/ContractTab.tsx
+//
+// Họ HĐ (sales_family_parties_p1, 17/11/2026):
+//   · ĐỢT CON (mua tiếp): Alert "Mua tiếp theo HĐ X — không cần ký HĐ mới"; file HĐ của GỐC chỉ xem
+//     (<ContractFileSection readOnly>) + khối file "Xác nhận đặt hàng đợt này" của chính đơn; ẩn DraftContractPreview;
+//     Ngày HĐ khoá theo gốc (không ghi đè); Số đơn chỉ Admin/XNK sửa; công tắc docs_cite_root (ô CONTRACT NO.).
+//   · ĐƠN GỐC: dòng "Các đợt mua tiếp" (link); đổi số HĐ gốc phải xác nhận (ô CONTRACT NO. của các đợt đổi theo).
+//   · Kiểm số HĐ: checkContractNo — trùng nguyên văn CHẶN, cùng gốc số HỎI LẠI (bỏ qua đơn cùng họ).
 // ============================================================================
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import {
   Descriptions,
   Tag,
@@ -19,9 +26,13 @@ import {
   AutoComplete,
   Modal,
   Alert,
+  Radio,
+  Tooltip,
+  Typography,
 } from 'antd'
 import { EditOutlined, SaveOutlined, CloseOutlined, LockOutlined, PlusOutlined, DeleteOutlined, FileWordOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { useQueryClient } from '@tanstack/react-query'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import { balesFromTons, containersFromBales, defaultBalesPerContainer } from '../../../services/sales/baleMath'
 import { supabase } from '../../../lib/supabase'
@@ -39,6 +50,10 @@ import {
   type PackingType,
   soDisplayCode,
   polLabel,
+  contractNoForDocs,
+  contractDateForDocs,
+  normalizeContractNo,
+  partyShortName,
 } from '../../../services/sales/salesTypes'
 import { fmtDate, usdInputProps } from '../../../utils/format'
 import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
@@ -47,10 +62,31 @@ import OrderActionButtons from './OrderActionButtons'
 import ContractFileSection from './ContractFileSection'
 import ContractWorkflowSection from './ContractWorkflowSection'
 import DraftContractPreview from './DraftContractPreview'
-import { salesContractWorkflowService } from '../../../services/sales/salesContractWorkflowService'
+import { salesContractWorkflowService, describeContractNoHit } from '../../../services/sales/salesContractWorkflowService'
 import {
   generateAnnexDocx, downloadAnnex, formatAnnexDate, ANNEX_TYPE_LABELS, type AnnexType,
 } from '../../../services/sales/contractAnnexService'
+import { ContinueOrderButton, useOpenSalesOrder, useOrderFamily } from './OrderFamilyBlock'
+import { salesOrderFamilyQueryKey } from './OrderFamilyChip'
+import { palette } from '../../../theme/palette'
+
+const { Text } = Typography
+
+/** Modal.confirm dạng Promise — true = đồng ý. */
+function confirmAsync(opts: { title: string; content: ReactNode; okText: string; cancelText?: string; danger?: boolean }): Promise<boolean> {
+  return new Promise((resolve) => {
+    Modal.confirm({
+      title: opts.title,
+      content: opts.content,
+      okText: opts.okText,
+      cancelText: opts.cancelText || 'Xem lại',
+      okButtonProps: opts.danger ? { danger: true } : undefined,
+      width: 520,
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false),
+    })
+  })
+}
 
 type EditItem = {
   id?: string
@@ -94,6 +130,21 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
   const [editItems, setEditItems] = useState<EditItem[]>([])
   const [form] = Form.useForm()
 
+  // ── Họ HĐ (mua tiếp) — chỉ khi đã migration (fam.ready) ──
+  const qc = useQueryClient()
+  const fam = useOrderFamily(order)
+  const openOrder = useOpenSalesOrder()
+  const isChild = fam.ready && fam.isChild
+  const rootNo = fam.rootNo
+  // Ngày HĐ GỐC (đợt con khoá theo gốc; đọc qua liên kết `parent`)
+  const rootDate = isChild ? (order.parent?.contract_date ?? null) : (order.contract_date ?? null)
+  // Số đơn của ĐỢT: chỉ Admin/XNK sửa (có kiểm trùng). Đơn thường / gốc: như cũ (ai sửa được tab này).
+  const canEditNo = !isChild || salesRole === 'admin' || salesRole === 'logistics'
+  const [savingCite, setSavingCite] = useState(false)
+  /** số file "xác nhận đặt hàng" của chính đợt con (null = đang tải) — nhắc nên có trước khi Xác nhận */
+  const [ownFileCount, setOwnFileCount] = useState<number | null>(null)
+  useEffect(() => { setOwnFileCount(null) }, [order.id])
+
   // ── Nấc 2: Tạo phụ lục (Annex) ──
   const [annexOpen, setAnnexOpen] = useState(false)
   const [annexGenerating, setAnnexGenerating] = useState(false)
@@ -103,13 +154,14 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
     d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : ''
 
   const openAnnex = () => {
-    const origNo = order.contract_no || order.code
+    // Phụ lục sửa HĐ ĐÃ KÝ: đợt mua tiếp in số/ngày HĐ gốc (contractNoForDocs) — đơn thường y như cũ (contract_no || code)
+    const origNo = contractNoForDocs(order)
     annexForm.setFieldsValue({
       type: 'contract_no' as AnnexType,
       annex_date: formatAnnexDate(),
       seq: 1,
       orig_contract_no: origNo,
-      orig_contract_date: fmtEnDate(order.contract_date),
+      orig_contract_date: fmtEnDate(contractDateForDocs(order)),
       buyer_name: order.customer?.name || '',
       buyer_address: (order.customer as { address?: string } | undefined)?.address || '',
       buyer_registration: '',
@@ -207,7 +259,8 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       port_of_loading: order.port_of_loading,
       port_of_destination: order.port_of_destination,
       delivery_date: order.delivery_date ? dayjs(order.delivery_date) : null,
-      contract_date: order.contract_date ? dayjs(order.contract_date) : null,
+      // Đợt con: hiện ngày HĐ GỐC (ô khoá, không ghi lại — xem handleSave)
+      contract_date: (isChild ? rootDate : order.contract_date) ? dayjs((isChild ? rootDate : order.contract_date) as string) : null,
       bale_weight_kg: order.bale_weight_kg,
       bales_per_container: order.bales_per_container,
       packing_type: order.packing_type,
@@ -238,15 +291,76 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         return
       }
 
-      // Validate contract_no không trùng GỐC với đơn active khác (chặn cả 'HA20260053 PH')
-      if (vals.contract_no && vals.contract_no.trim()) {
-        const conflict = await salesContractWorkflowService.findContractNoConflict(
-          vals.contract_no, order.id,
-        )
-        if (conflict) {
-          message.error(`Số HĐ "${vals.contract_no}" TRÙNG gốc với đơn ${conflict.code} (HĐ "${conflict.contract_no}"). Số HĐ không được trùng — dùng số khác.`)
-          setSaving(false)
+      // ── Số HĐ / Số đơn — chỉ kiểm khi ĐỔI (so sau chuẩn hoá như index DB) ──
+      // checkContractNo: trùng NGUYÊN VĂN với đơn chưa huỷ khác → CHẶN; chỉ cùng gốc số → HỎI LẠI;
+      // đơn cùng họ HĐ (gốc + các đợt) không cảnh báo. (Trước 17/11/2026 cùng token đầu là chặn → chặn nhầm
+      // 'HA20260053' / 'HA20260053 PH' và '…/OCT' / '…/OCT - LOT 4'.)
+      const newNo = String(vals.contract_no || '').trim()
+      const noChanged = canEditNo && normalizeContractNo(newNo) !== normalizeContractNo(order.contract_no)
+      // Ngày HĐ của ĐƠN GỐC cũng in ở dòng DATED của các đợt trích số gốc → đổi cũng phải hỏi
+      const newDate: string | null = isChild ? null : (vals.contract_date?.format('YYYY-MM-DD') || null)
+      const dateChanged = !isChild && newDate !== (order.contract_date || null)
+      if (noChanged || dateChanged) {
+        // Họ HĐ hiện có — dùng cache nếu còn mới, không thì tải (lỗi → dừng lưu, báo lỗi ở catch dưới)
+        const family = fam.ready
+          ? await qc.fetchQuery({
+              queryKey: salesOrderFamilyQueryKey(fam.rootId),
+              queryFn: () => salesOrderService.getFamily(fam.rootId),
+              staleTime: 60 * 1000,
+            })
+          : []
+        const liveKids = family.filter((m) => !m.is_root && m.status !== 'cancelled')
+        if (noChanged && !newNo && (isChild || liveKids.length > 0)) {
+          message.error(isChild
+            ? 'Đợt mua tiếp phải có Số đơn — không bỏ trống được'
+            : `HĐ gốc đang có ${liveKids.length} đơn mua tiếp — không bỏ trống Số HĐ được`)
           return
+        }
+        if (noChanged && newNo) {
+          const chk = await salesContractWorkflowService.checkContractNo(newNo, {
+            excludeSalesOrderId: order.id,
+            buyerId: order.customer_id,
+            familyRootId: fam.ready ? fam.rootId : null,
+          })
+          if (chk.block) {
+            message.error(describeContractNoHit(chk.block))
+            return
+          }
+          if (chk.warnings.length > 0) {
+            const ok = await confirmAsync({
+              title: `Số HĐ "${newNo}" giống HĐ đã có`,
+              content: (
+                <ul style={{ paddingLeft: 18, margin: 0 }}>
+                  {chk.warnings.slice(0, 5).map((w) => <li key={w.id}>{describeContractNoHit(w)}</li>)}
+                  {chk.warnings.length > 5 ? <li>… và {chk.warnings.length - 5} đơn khác</li> : null}
+                </ul>
+              ),
+              okText: 'Vẫn lưu số này',
+            })
+            if (!ok) return
+          }
+        }
+        // Đổi số / ngày HĐ GỐC: ô CONTRACT NO. + DATED của các đợt (docs_cite_root) đọc qua liên kết → đổi theo
+        // (KHÔNG tự đổi số đơn của các đợt — giấy đã phát giữ số cũ)
+        if (!isChild && liveKids.length > 0 && ((noChanged && newNo) || dateChanged)) {
+          const citing = liveKids.filter((k) => k.docs_cite_root !== false).length
+          const ok = await confirmAsync({
+            title: noChanged ? 'Đổi số HĐ gốc?' : 'Đổi ngày HĐ gốc?',
+            content: (
+              <div>
+                <p style={{ marginBottom: 6 }}>
+                  HĐ gốc đang có {liveKids.length} đợt mua tiếp ({liveKids.map((k) => soDisplayCode(k)).join(' · ')}).
+                </p>
+                <p style={{ margin: 0 }}>
+                  <b>{citing} đợt</b> sẽ in theo HĐ gốc mới
+                  {noChanged && newNo ? <> — CONTRACT NO. "{newNo}"</> : null}
+                  {dateChanged ? <> — DATED {fmtDate(newDate)}</> : null}; số đơn của từng đợt giữ nguyên.
+                </p>
+              </div>
+            ),
+            okText: noChanged ? 'Đổi số HĐ gốc' : 'Đổi ngày HĐ gốc',
+          })
+          if (!ok) return
         }
       }
 
@@ -264,6 +378,10 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         contract_no: vals.contract_no || null,
         notes: vals.notes || null,
       }
+      // Đợt con: Ngày HĐ theo GỐC — KHÔNG ghi lại (đợt cũ nối vào họ như HA20260301 giữ ngày đã in trên chứng từ).
+      if (isChild) delete updateData.contract_date
+      // Số đơn của đợt chỉ Admin/XNK sửa — người khác lưu thì giữ nguyên số
+      if (!canEditNo) delete updateData.contract_no
 
       // ── Replace sales_order_items với giá trị mới (multi-item path luôn) ──
       const { error: delErr } = await supabase
@@ -334,6 +452,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       await salesOrderService.updateFields(order.id, updateData)
       message.success('Đã cập nhật hợp đồng')
       setEditing(false)
+      // (họ HĐ ở chip / khối "Các đợt cùng HĐ" được làm mới khi nơi gọi tải lại đơn — loadOrder của 2 dạng xem)
       onSaved()
     } catch (e: any) {
       if (e?.errorFields) return // validation error
@@ -341,6 +460,43 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
     } finally {
       setSaving(false)
     }
+  }
+
+  // ── Công tắc ô CONTRACT NO. của đợt con (docs_cite_root) ──
+  const handleCiteChange = (v: 'root' | 'own') => {
+    const next = v === 'root'
+    if ((order.docs_cite_root !== false) === next) return
+    const no = next ? (rootNo || '—') : soDisplayCode(order)
+    const dated = next ? rootDate : order.contract_date
+    Modal.confirm({
+      title: 'Đổi số in ở ô CONTRACT NO.?',
+      width: 520,
+      content: (
+        <div>
+          <p style={{ marginBottom: 6 }}>
+            Chứng từ của đơn này (Invoice, Packing List, Hối phiếu, Đơn chiết khấu…) sẽ in{' '}
+            <b>CONTRACT NO.: {no}</b>{dated ? ` · DATED ${fmtDate(dated)}` : ''}.
+          </p>
+          <p style={{ margin: 0, color: palette.warning }}>
+            Bộ chứng từ đã phát cho khách / ngân hàng thì nên giữ như cũ. Số chứng từ PKL / WL… không đổi.
+          </p>
+        </div>
+      ),
+      okText: 'Đổi',
+      cancelText: 'Giữ nguyên',
+      onOk: async () => {
+        setSavingCite(true)
+        try {
+          await salesOrderService.updateFields(order.id, { docs_cite_root: next })
+          message.success(`Ô CONTRACT NO. sẽ in ${no}`)
+          onSaved()
+        } catch (e: unknown) {
+          message.error(dichLoiHeThong(e, 'Không đổi được ô CONTRACT NO.'))
+        } finally {
+          setSavingCite(false)
+        }
+      },
+    })
   }
 
   // ── Computed ──
@@ -377,12 +533,30 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
 
         {/* Section: Hợp đồng */}
         <SectionHeader title="Hợp đồng" color="#1B4D3E" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
-          <Form.Item label="Số hợp đồng" name="contract_no">
-            <Input placeholder="LTC2024/PD-ATC" />
+        {isChild && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 8 }}
+            title={`Đợt mua tiếp theo HĐ ${rootNo} — Ngày HĐ theo HĐ gốc (khoá); Số đơn của đợt chỉ Admin / XNK sửa.`}
+          />
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0 16px' }}>
+          <Form.Item
+            label={isChild ? `Số đơn (đợt ${order.continuation_seq ?? ''})` : 'Số hợp đồng'}
+            name="contract_no"
+            tooltip={isChild
+              ? `Số của đợt này (gốc số chứng từ PKL/WL…). Ô CONTRACT NO. in theo công tắc ở chế độ xem — mặc định số HĐ gốc ${rootNo}.`
+              : undefined}
+          >
+            <Input placeholder={isChild ? `${rootNo}-D${order.continuation_seq ?? ''}` : 'LTC2024/PD-ATC'} disabled={!canEditNo} />
           </Form.Item>
-          <Form.Item label="Ngày HĐ" name="contract_date">
-            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+          <Form.Item
+            label={isChild ? 'Ngày HĐ (theo HĐ gốc)' : 'Ngày HĐ'}
+            name="contract_date"
+            tooltip={isChild ? `Ngày ký HĐ gốc ${rootNo} — đợt mua tiếp không ký HĐ mới` : undefined}
+          >
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" disabled={isChild} />
           </Form.Item>
           <Form.Item label="PO# Khách hàng" name="customer_po">
             <Input />
@@ -611,9 +785,11 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
   return (
     <div style={{ padding: '8px 0' }}>
       {/* Action bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
         <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="contract" size="small" />
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>
+          {/* Khách mua thêm theo HĐ này → đơn mới gắn HĐ gốc (ẩn khi huỷ / chưa migration; mờ khi gốc chưa có số HĐ) */}
+          <ContinueOrderButton order={order} salesRole={salesRole} size="small" />
           <Button size="small" icon={<FileWordOutlined />} onClick={openAnnex}>
             Tạo phụ lục
           </Button>
@@ -708,8 +884,57 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
             (Sale up tài liệu bổ sung: PI khách ký, bản scan, docs...). Sale add OK,
             không xóa (canDeleteContract loại role=sale).
           - Đơn cũ → ContractFileSection legacy (upload PDF scan của HĐ chính)
-          Khi hasWorkflow=null (đang load) chưa render gì để tránh flash giữa 2 UI. */}
-      {hasWorkflow === true && (
+          Khi hasWorkflow=null (đang load) chưa render gì để tránh flash giữa 2 UI.
+          - ĐỢT MUA TIẾP (17/11/2026): không ký HĐ mới → file HĐ của GỐC (chỉ xem) + file xác nhận đặt hàng
+            của chính đợt; KHÔNG vẽ bản nháp HĐ (DraftContractPreview). */}
+      {isChild && (
+        <>
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12 }}
+            title={`Mua tiếp theo HĐ ${rootNo}${rootDate ? ` (ký ${fmtDate(rootDate)})` : ''} — không cần ký HĐ mới`}
+            description={
+              <span>
+                File HĐ đã ký nằm ở đơn gốc (xem bên dưới).{' '}
+                {order.parent_order_id ? (
+                  <a onClick={() => openOrder(order.parent_order_id as string, rootNo || 'gốc')}>Mở HĐ gốc {rootNo}</a>
+                ) : null}
+              </span>
+            }
+          />
+          {/* Owner câu 9: chứng cứ đặt hàng của đợt CHỈ KHUYẾN NGHỊ — nhắc vàng, không chặn */}
+          {order.status === 'draft' && ownFileCount === 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 12 }}
+              title="Đợt này chưa có chứng cứ đặt hàng (PI khách ký / phụ lục / email)"
+              description="Không bắt buộc — nhưng nên đính trước khi bấm Xác nhận đơn, để có căn cứ tấn / giá / ETD riêng của đợt."
+            />
+          )}
+          {hasWorkflow === true && <ContractWorkflowSection salesOrderId={order.id} />}
+          {order.parent_order_id && (
+            <ContractFileSection
+              orderId={order.parent_order_id}
+              salesRole={salesRole}
+              readOnly
+              anchorPrefix="contract-root-group"
+              title={`File HĐ gốc (${rootNo})`}
+              emptyHint="HĐ gốc chưa có file HĐ đã ký — mở HĐ gốc để đính file."
+            />
+          )}
+          <ContractFileSection
+            orderId={order.id}
+            salesRole={salesRole}
+            title="Xác nhận đặt hàng đợt này — PI khách ký / phụ lục / email (nên có)"
+            emptyHint="Chưa có file xác nhận đặt hàng của đợt này."
+            uploadLabel="Bấm để chọn file xác nhận đặt hàng (PI khách ký / phụ lục / email — 1–10 file)"
+            onCountChange={setOwnFileCount}
+          />
+        </>
+      )}
+      {!isChild && hasWorkflow === true && (
         <>
           <ContractWorkflowSection salesOrderId={order.id} />
           <ContractFileSection
@@ -720,7 +945,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
           />
         </>
       )}
-      {hasWorkflow === false && (
+      {!isChild && hasWorkflow === false && (
         <>
           {/* Sale lưu nháp chưa trình → vẫn xem được preview SC/PI + tải mock .docx
               ngay từ Detail (không phải bấm "Sửa" để mở lại Compose Studio) */}
@@ -731,17 +956,67 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
 
       {/* Section: Hợp đồng */}
       <SectionHeader title="Hợp đồng" color="#1B4D3E" />
-      <Descriptions column={2} size="small" bordered>
-        <Descriptions.Item label="Số HĐ (Contract No.)">
-          <strong>{soDisplayCode(order)}</strong>
-        </Descriptions.Item>
-        <Descriptions.Item label="Ngày HĐ">{fmtDate(order.contract_date || order.order_date)}</Descriptions.Item>
-        <Descriptions.Item label="Khách hàng" span={2}>
+      <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered>
+        {isChild ? (
+          <>
+            <Descriptions.Item label={`Số đơn · Đợt ${order.continuation_seq ?? ''}`}>
+              <strong style={{ fontFamily: 'monospace' }}>{soDisplayCode(order)}</strong>
+            </Descriptions.Item>
+            <Descriptions.Item label="HĐ gốc">
+              {order.parent_order_id ? (
+                <a onClick={() => openOrder(order.parent_order_id as string, rootNo || 'gốc')} style={{ fontWeight: 600 }}>{rootNo || '—'}</a>
+              ) : '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Ô CONTRACT NO. trên chứng từ" span={2}>
+              {/* Công tắc docs_cite_root: in số HĐ GỐC (mặc định đợt mới) hay số của chính đơn (đợt cũ đã phát chứng từ) */}
+              <Radio.Group
+                value={order.docs_cite_root !== false ? 'root' : 'own'}
+                disabled={!canEdit || savingCite}
+                onChange={(e) => handleCiteChange(e.target.value as 'root' | 'own')}
+                style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}
+              >
+                <Radio value="root">Số HĐ gốc ({rootNo || '—'})</Radio>
+                <Radio value="own">Số của đơn này ({soDisplayCode(order)})</Radio>
+              </Radio.Group>
+              <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 2 }}>
+                Đang in: <b>{contractNoForDocs(order)}</b>{contractDateForDocs(order) ? ` · DATED ${fmtDate(contractDateForDocs(order))}` : ''}
+                {' '}— cũng là số khai hải quan. Số chứng từ PKL / WL… vẫn theo số đơn của đợt.
+              </Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Ngày HĐ (theo HĐ gốc)" span={2}>
+              {fmtDate(rootDate || order.contract_date || order.order_date)}
+            </Descriptions.Item>
+          </>
+        ) : (
+          <>
+            <Descriptions.Item label="Số HĐ (Contract No.)">
+              <strong>{soDisplayCode(order)}</strong>
+            </Descriptions.Item>
+            <Descriptions.Item label="Ngày HĐ">{fmtDate(order.contract_date || order.order_date)}</Descriptions.Item>
+            {fam.children.length > 0 && (
+              <Descriptions.Item label="Các đợt mua tiếp" span={2}>
+                <Space size={[4, 2]} wrap separator={<Text type="secondary">·</Text>}>
+                  {fam.children.map((m) => (
+                    <Tooltip key={m.id} title={m.status === 'cancelled' ? 'Đợt đã huỷ' : 'Mở đơn của đợt này'}>
+                      <a onClick={() => openOrder(m.id, soDisplayCode(m))} style={{ whiteSpace: 'nowrap' }}>
+                        <Text delete={m.status === 'cancelled'} style={{ color: 'inherit' }}>Đợt {m.seq} · {soDisplayCode(m)}</Text>
+                      </a>
+                    </Tooltip>
+                  ))}
+                </Space>
+              </Descriptions.Item>
+            )}
+          </>
+        )}
+        <Descriptions.Item label="Người mua" span={2}>
           {order.customer ? (
-            <Space>
+            <Space wrap size={[6, 2]}>
               <Tag color="blue">{order.customer.code}</Tag>
               {order.customer.name}
               {order.customer.country && <Tag>{order.customer.country}</Tag>}
+              {fam.ready && order.ship_to_customer_id && order.ship_to ? (
+                <Text strong>→ {partyShortName(order.ship_to)} <Text type="secondary" style={{ fontWeight: 400, fontSize: 12 }}>(người nhận)</Text></Text>
+              ) : null}
             </Space>
           ) : '—'}
         </Descriptions.Item>

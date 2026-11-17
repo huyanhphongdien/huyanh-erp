@@ -6,18 +6,23 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Input, Select, message, Spin, Button, Modal, Empty } from 'antd'
-import { Search, RefreshCw, Plus, List } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { Input, Select, message, Spin, Button, Modal, Empty, Dropdown, Space, Tooltip } from 'antd'
+import { Search, RefreshCw, Plus, List, ChevronDown } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { getTabComponent } from '../../stores/tabStore'
 import { salesStageService } from '../../services/sales/salesStageService'
-import { getSalesRole } from '../../services/sales/salesPermissionService'
+import { getSalesRole, salesPermissions } from '../../services/sales/salesPermissionService'
 import QuickPayModal, { type QuickPayTarget } from './components/QuickPayModal'
 import { salesOrderPaymentService, type OrderLotMoney } from '../../services/sales/salesOrderPaymentService'
-import { fmtMoney } from '../../services/sales/salesMoney'
+import { salesOrderService, familyTotals, type RootContractOption } from '../../services/sales/salesOrderService'
+import { fmtMoney, isVnd } from '../../services/sales/salesMoney'
 import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
+import { fmtNum } from '../../utils/format'
+import { palette } from '../../theme/palette'
 import PageState from '../../components/common/PageState'
 import { useOpenTab } from '../../hooks/useOpenTab'
+import RootContractPickerModal from './components/RootContractPickerModal'
+import { useFamilyPartiesReady } from './components/OrderFamilyChip'
 import {
   SALES_STAGES,
   SALES_STAGE_LABELS,
@@ -43,10 +48,47 @@ const STAGE_RANK: Record<SalesStage, number> = {
 }
 import KanbanCard, { type KanbanOrder } from './components/KanbanCard'
 import { dispatchService, type LotProgress } from '../../services/logistics/dispatchService'
-import { soDisplayCode } from '../../services/sales/salesTypes'
+import { soDisplayCode, partyShortName } from '../../services/sales/salesTypes'
 
 /** Thẻ Kanban + id người phụ trách — lọc "Của tôi" so theo ID, không so chuỗi tên. */
 type KanbanRow = KanbanOrder & { current_owner_id: string | null }
+
+/** Một họ HĐ trên bảng (gốc + các đợt mua tiếp đang chạy) — CHỈ gồm các đơn đã nạp (đơn chưa huỷ). */
+interface BoardFamily {
+  rootId: string
+  /** Số HĐ gốc (số đơn của đơn gốc) */
+  rootNo: string
+  rootDate: string | null
+  /** Tên ngắn người mua (cả họ cùng một người mua — trigger bắt) */
+  buyer: string
+  members: KanbanRow[]
+}
+
+/**
+ * Gom các thẻ theo HĐ gốc (gốc = parent_order_id ?? id). Đếm trên MỌI đơn đã nạp, không trên danh sách đã lọc:
+ * cỡ họ là thuộc tính của HĐ, không đổi khi bật bộ lọc. listForKanban chỉ nạp đơn chưa huỷ → cỡ họ = 1 + số đợt
+ * đang chạy, khớp salesOrderService.getFamilyCounts.
+ */
+function buildFamilies(rows: KanbanRow[]): Map<string, BoardFamily> {
+  const m = new Map<string, BoardFamily>()
+  for (const o of rows) {
+    const rootId = o.parent_order_id || o.id
+    let f = m.get(rootId)
+    if (!f) {
+      f = { rootId, rootNo: '', rootDate: null, buyer: o.customer_short, members: [] }
+      m.set(rootId, f)
+    }
+    f.members.push(o)
+    if (o.id === rootId) {
+      f.rootNo = soDisplayCode(o)
+      f.buyer = o.customer_short
+    } else {
+      if (!f.rootNo && o.parent_contract_no) f.rootNo = o.parent_contract_no
+      if (!f.rootDate && o.parent_contract_date) f.rootDate = o.parent_contract_date
+    }
+  }
+  return m
+}
 
 // ============================================================================
 // MAIN PAGE
@@ -56,7 +98,11 @@ export default function SalesKanbanPage() {
   const user = useAuthStore(s => s.user)
   const navigate = useNavigate()
   const openTab = useOpenTab()
-  const canCollect = ['accounting', 'admin'].includes(getSalesRole(user) || '')
+  const salesRole = getSalesRole(user)
+  const canCollect = ['accounting', 'admin'].includes(salesRole || '')
+  // Họ HĐ / người nhận: chỉ bật khi migration sales_family_parties_p1 đã áp (đang tải / lỗi → ẩn, an toàn)
+  const familyReady = useFamilyPartiesReady()
+  const canContinue = familyReady && !!salesRole && salesPermissions.canCreateOrder(salesRole)
   const [orders, setOrders] = useState<KanbanRow[]>([])
   const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})
   const [lotPay, setLotPay] = useState<Record<string, OrderLotMoney>>({})
@@ -68,6 +114,10 @@ export default function SalesKanbanPage() {
   const [showOnlyMine, setShowOnlyMine] = useState(false)
   const [showOnlyOverdue, setShowOnlyOverdue] = useState(false)
   const [showOnlyUnpaid, setShowOnlyUnpaid] = useState(false)   // Chỉ đơn chưa thu tiền
+  const [showOnlyFamily, setShowOnlyFamily] = useState(false)   // ⧉ Mua tiếp: chỉ thẻ thuộc HĐ có đợt mua tiếp
+  // SOI HĐ: id ĐƠN GỐC đang soi — thẻ cùng họ ở mọi cột có vành thương hiệu, thẻ khác mờ
+  const [familyFocus, setFamilyFocus] = useState<string | null>(null)
+  const [rootPickerOpen, setRootPickerOpen] = useState(false)
   const [dragOverSettled, setDragOverSettled] = useState(false) // kéo card vào cột "Đã tất toán"
   const [payTarget, setPayTarget] = useState<QuickPayTarget | null>(null)
   const [dragOverStage, setDragOverStage] = useState<SalesStage | null>(null)
@@ -79,67 +129,66 @@ export default function SalesKanbanPage() {
   } | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  // ── Fetch ──
+  // ── Fetch ── (truy vấn ở salesOrderService.listForKanban — trước đây trang gọi supabase thẳng)
   const fetchOrders = async () => {
     setLoading(true)
     setLoadError(null)
-    const { data, error } = await supabase
-      .from('sales_orders')
-      .select(`
-        id, code, contract_no, grade, quantity_tons, status, total_value_usd,
-        currency, total_value_vnd,
-        payment_status, actual_payment_amount,
-        delivery_date, etd, current_stage, current_owner_id,
-        stage_started_at, stage_sla_hours,
-        customer:sales_customers!sales_orders_customer_id_fkey(id, short_name, name),
-        owner:employees!sales_orders_current_owner_id_fkey(id, full_name)
-      `)
-      .neq('status', 'cancelled')
-      .order('created_at', { ascending: false })
-
-    setLoading(false)
-    if (error) {
+    let data: Awaited<ReturnType<typeof salesOrderService.listForKanban>>
+    try {
+      data = await salesOrderService.listForKanban()
+    } catch (error) {
+      setLoading(false)
       // Lỗi token của Supabase trả về chuỗi tiếng Anh khó hiểu ("JWT expired",
       // "JWT issued at future"). Người dùng ở nhà máy không biết phải làm gì với nó, nên dịch
       // sang việc họ CẦN LÀM. Riêng PGRST303 là bug hạ tầng Supabase, src/lib/supabase.ts đã
       // tự thử lại 3 lần — tới được đây nghĩa là cả 4 lần đều trượt.
-      const isJwt = /jwt|token/i.test(error.message) || ['PGRST301', 'PGRST303'].includes((error as { code?: string }).code || '')
+      // listForKanban ném NGUYÊN lỗi PostgREST nên vẫn đọc được code PGRST301/303.
+      const e = error as { code?: string; message?: string } | null
+      const isJwt = /jwt|token/i.test(e?.message || '') || ['PGRST301', 'PGRST303'].includes(e?.code || '')
       message.error(
         isJwt
           ? 'Phiên đăng nhập có vấn đề — bấm Làm mới, nếu vẫn lỗi thì đăng xuất rồi đăng nhập lại.'
           : dichLoiHeThong(error, 'Lỗi tải đơn'),
         6,
       )
-      setLoadError(error)
+      setLoadError(error || new Error('Lỗi tải đơn'))
       return
     }
+    setLoading(false)
 
-    const mapped: KanbanRow[] = (data || []).map((o: any) => {
-      const customer = Array.isArray(o.customer) ? o.customer[0] : o.customer
-      const owner = Array.isArray(o.owner) ? o.owner[0] : o.owner
-      return {
-        id: o.id,
-        code: o.code,
-        contract_no: o.contract_no,
-        customer_short: customer?.short_name || customer?.name || '—',
-        grade: o.grade,
-        quantity_tons: o.quantity_tons,
-        status: o.status,
-        total_value_usd: o.total_value_usd,
-        // Đồng tiền của đơn — thẻ (KanbanCard) vẽ tiền theo đúng ký hiệu $/₫ (đơn VNĐ không hiện "$")
-        currency: o.currency ?? null,
-        total_value_vnd: o.total_value_vnd ?? null,
-        payment_status: o.payment_status || null,
-        actual_payment_amount: o.actual_payment_amount ?? null,
-        delivery_date: o.delivery_date,
-        etd: o.etd,
-        current_stage: (o.current_stage as SalesStage) || 'sales',
-        stage_started_at: o.stage_started_at,
-        stage_sla_hours: o.stage_sla_hours,
-        current_owner_name: owner?.full_name || null,
-        current_owner_id: o.current_owner_id ?? null,   // đã có trong select — trước đây bị bỏ khi map
-      }
-    })
+    const mapped: KanbanRow[] = data.map((o) => ({
+      id: o.id,
+      code: o.code,
+      contract_no: o.contract_no,
+      // Tên NGẮN (36/66 khách trống short_name — có cả HARMONYTIDE, QINGDAO JINTONG): bỏ đuôi pháp nhân
+      customer_short: partyShortName(o.customer),
+      customer_name: o.customer?.name || null,
+      grade: o.grade,
+      quantity_tons: o.quantity_tons,
+      status: o.status,
+      total_value_usd: o.total_value_usd,
+      // Đồng tiền của đơn — thẻ (KanbanCard) vẽ tiền theo đúng ký hiệu $/₫ (đơn VNĐ không hiện "$")
+      currency: o.currency ?? null,
+      total_value_vnd: o.total_value_vnd ?? null,
+      payment_status: o.payment_status || null,
+      actual_payment_amount: o.actual_payment_amount ?? null,
+      delivery_date: o.delivery_date,
+      etd: o.etd,
+      current_stage: (o.current_stage as SalesStage) || 'sales',
+      stage_started_at: o.stage_started_at,
+      stage_sla_hours: o.stage_sla_hours,
+      current_owner_name: o.owner?.full_name || null,
+      current_owner_id: o.current_owner_id ?? null,   // đã có trong select — trước đây bị bỏ khi map
+      // Người nhận hàng riêng (ship_to gắn bằng attachShipTo). Có id mà mất hồ sơ → vẫn báo có người nhận.
+      receiver_short: o.ship_to_customer_id
+        ? (o.ship_to ? partyShortName(o.ship_to) : 'không rõ người nhận')
+        : null,
+      receiver_name: o.ship_to?.name || null,
+      parent_order_id: o.parent_order_id,
+      parent_contract_no: o.parent ? (o.parent.contract_no || o.parent.code) : null,
+      parent_contract_date: o.parent?.contract_date ?? null,
+      continuation_seq: o.continuation_seq,
+    }))
     setOrders(mapped)
     const ids = mapped.map((o) => o.id)
     // Tiến độ lô cho card kanban (best-effort)
@@ -156,18 +205,46 @@ export default function SalesKanbanPage() {
 
   useEffect(() => { fetchOrders() }, [])
 
+  // ── Họ HĐ: đếm client trên MỌI đơn đã nạp (như byStage) rồi gắn family_size / ngày ký HĐ gốc vào thẻ ──
+  const families = useMemo(() => buildFamilies(orders), [orders])
+  const boardRows = useMemo<KanbanRow[]>(() => orders.map((o) => {
+    const f = families.get(o.parent_order_id || o.id)
+    if (!f || f.members.length < 2) return o
+    return { ...o, family_size: f.members.length, family_contract_date: f.rootDate }
+  }), [orders, families])
+
+  // Họ đang soi đã biến mất (đợt bị huỷ, làm mới) → tự bỏ soi, khỏi kẹt băng soi rỗng
+  useEffect(() => {
+    if (familyFocus && (families.get(familyFocus)?.members.length ?? 0) < 2) setFamilyFocus(null)
+  }, [families, familyFocus])
+  // Esc = Bỏ soi
+  useEffect(() => {
+    if (!familyFocus) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFamilyFocus(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [familyFocus])
+
   // ── Filter ──
   const filtered = useMemo(() => {
-    return orders.filter(o => {
+    return boardRows.filter(o => {
       if (search) {
         const s = search.toLowerCase()
+        // Khớp thêm SỐ HĐ GỐC (gõ 'HA20260302' ra cả họ, kể cả đợt mang số riêng HA20260301) và TÊN NGƯỜI NHẬN
+        // (gõ 'jintong' ra đơn Jintong mua thẳng lẫn đơn Harmonytide giao Jintong).
         const match =
           o.code.toLowerCase().includes(s) ||
           (o.contract_no || '').toLowerCase().includes(s) ||
           o.customer_short.toLowerCase().includes(s) ||
+          (o.customer_name || '').toLowerCase().includes(s) ||
+          (o.parent_contract_no || '').toLowerCase().includes(s) ||
+          (o.receiver_short || '').toLowerCase().includes(s) ||
+          (o.receiver_name || '').toLowerCase().includes(s) ||
           (o.grade || '').toLowerCase().includes(s)
         if (!match) return false
       }
+      // ⧉ Mua tiếp: đúng những thẻ có dòng ⧉ (gốc có đợt + các đợt)
+      if (showOnlyFamily && !o.parent_order_id && (o.family_size ?? 1) < 2) return false
       if (filterEtd !== 'all' && o.etd) {
         const days = (new Date(o.etd).getTime() - Date.now()) / (1000 * 3600 * 24)
         const cutoff = filterEtd === '7d' ? 7 : filterEtd === '14d' ? 14 : 30
@@ -185,7 +262,32 @@ export default function SalesKanbanPage() {
       if (showOnlyUnpaid && !isUnpaid(o)) return false   // chỉ đơn đã tới khâu thu mà chưa thu đủ
       return true
     })
-  }, [orders, search, filterEtd, showOnlyMine, showOnlyOverdue, showOnlyUnpaid, user])
+  }, [boardRows, search, filterEtd, showOnlyMine, showOnlyOverdue, showOnlyUnpaid, showOnlyFamily, user])
+
+  /** Số thẻ đang có dòng ⧉ — nhãn nút lọc "⧉ Mua tiếp" */
+  const familyCardCount = useMemo(
+    () => boardRows.filter((o) => !!o.parent_order_id || (o.family_size ?? 1) >= 2).length,
+    [boardRows],
+  )
+
+  // ── SOI HĐ: chỉ là phép CỘNG trên các đơn đã nạp (mỗi đơn một khoản phải thu riêng — không phải mẫu số công nợ) ──
+  const focus = useMemo(() => {
+    if (!familyFocus) return null
+    const f = families.get(familyFocus)
+    if (!f || f.members.length < 2) return null
+    const visible = new Set(filtered.map((o) => o.id))
+    return {
+      ...f,
+      totals: familyTotals(f.members),
+      hidden: f.members.filter((m) => !visible.has(m.id)).length,
+      vnd: f.members.some((m) => isVnd(m.currency)),
+    }
+  }, [familyFocus, families, filtered])
+
+  /** Thẻ thuộc họ đang soi → 'focus' (vành), thẻ khác → 'dim' (mờ). Không soi → không đổi gì. */
+  const highlightOf = (o: KanbanRow): 'focus' | 'dim' | null =>
+    !focus ? null : (o.parent_order_id || o.id) === focus.rootId ? 'focus' : 'dim'
+  const toggleFamilyFocus = (rootId: string) => setFamilyFocus((cur) => (cur === rootId ? null : rootId))
 
   // ── Group by stage ──
   const byStage = useMemo(() => {
@@ -303,6 +405,37 @@ export default function SalesKanbanPage() {
     path: '/sales/orders/new',
   })
 
+  const openOrderTab = (id: string, label: string) => openTab({
+    key: `sales-order-${id}`,
+    title: `Đơn ${label}`,
+    componentId: 'sales-order-detail',
+    props: { orderId: id },
+    path: `/sales/orders/${id}`,
+  })
+
+  /**
+   * Chọn HĐ gốc xong → mở tab tạo đợt mua tiếp. Đơn NGUỒN = đợt mới nhất của họ (quy cách mới nhất), form tự quy
+   * về gốc thật. TabbedWorkspace chọn tab theo path, bỏ qua query → route riêng '/sales/orders/:id/continue'.
+   */
+  const openContinueTab = (root: RootContractOption) => {
+    const sourceId = root.latest_member_id || root.id
+    // Màn tạo đợt đăng ký ở tabRegistry ('sales-order-continue'); thiếu thì báo rõ, đừng mở tab hỏng.
+    // (Điện thoại < 768px: useOpenTab điều hướng thẳng theo path, không qua registry.)
+    if (window.innerWidth >= 768 && !getTabComponent('sales-order-continue')) {
+      message.warning('Màn tạo đơn mua tiếp chưa sẵn sàng trên bản này — tải lại trang, nếu vẫn vậy báo IT.')
+      return
+    }
+    openTab({
+      key: `sales-order-continue-${sourceId}`,
+      title: `Mua tiếp HĐ ${root.contract_no}`,
+      componentId: 'sales-order-continue',
+      props: { sourceOrderId: sourceId },
+      path: `/sales/orders/${sourceId}/continue`,
+    })
+  }
+
+  const brandBtn = { backgroundColor: palette.brand, borderColor: palette.brand }
+
   return (
     <div style={{ padding: 16, maxWidth: '100%', overflow: 'hidden' }}>
       {/* Header */}
@@ -317,10 +450,31 @@ export default function SalesKanbanPage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Button icon={<List size={14} />} onClick={() => navigate('/sales/orders')}>Sổ đơn hàng</Button>
           <Button icon={<RefreshCw size={14} />} onClick={fetchOrders}>Làm mới</Button>
-          <Button type="primary" icon={<Plus size={14} />} onClick={openCreateTab}
-            style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}>
-            Tạo đơn hàng
-          </Button>
+          {/* Nút TÁCH: bấm chính = HĐ mới · ▾ "Mua tiếp theo HĐ đã ký…" → chọn HĐ gốc → mở tab tạo đợt.
+              (antd 6: Dropdown.Button đã bỏ → Space.Compact + Dropdown + Button.) */}
+          {canContinue ? (
+            <Space.Compact>
+              <Button type="primary" icon={<Plus size={14} />} onClick={openCreateTab} style={brandBtn}>
+                Tạo đơn hàng
+              </Button>
+              <Dropdown
+                trigger={['click']}
+                placement="bottomRight"
+                menu={{
+                  items: [
+                    { key: 'new', label: 'HĐ mới', onClick: openCreateTab },
+                    { key: 'continue', label: 'Mua tiếp theo HĐ đã ký…', onClick: () => setRootPickerOpen(true) },
+                  ],
+                }}
+              >
+                <Button type="primary" icon={<ChevronDown size={14} />} aria-label="Chọn kiểu tạo đơn" style={brandBtn} />
+              </Dropdown>
+            </Space.Compact>
+          ) : (
+            <Button type="primary" icon={<Plus size={14} />} onClick={openCreateTab} style={brandBtn}>
+              Tạo đơn hàng
+            </Button>
+          )}
         </div>
       </div>
 
@@ -328,10 +482,11 @@ export default function SalesKanbanPage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <Input
           prefix={<Search size={14} />}
-          placeholder="Tìm SO/contract/khách/grade..."
+          placeholder={familyReady ? 'Tìm số đơn/HĐ gốc, người mua/nhận, grade…' : 'Tìm SO/contract/khách/grade...'}
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ width: 280 }}
+          allowClear
+          style={{ width: 300, maxWidth: '100%' }}
         />
         <Select
           value={filterEtd}
@@ -365,7 +520,48 @@ export default function SalesKanbanPage() {
         >
           💰 Chỉ chưa thu tiền
         </Button>
+        {familyReady && (
+          <Tooltip title="Chỉ hiện các thẻ thuộc HĐ có đơn mua tiếp: HĐ gốc + từng đợt (mỗi đợt vẫn là một thẻ riêng)">
+            <Button
+              type={showOnlyFamily ? 'primary' : 'default'}
+              onClick={() => setShowOnlyFamily(!showOnlyFamily)}
+              style={showOnlyFamily ? brandBtn : { color: palette.brand, borderColor: palette.brand }}
+            >
+              ⧉ HĐ có mua tiếp{familyCardCount > 0 ? ` (${familyCardCount})` : ''}
+            </Button>
+          </Tooltip>
+        )}
       </div>
+
+      {/* Băng SOI HĐ — chỉ CỘNG các đơn đã nạp trên bảng; mỗi đợt là một khoản phải thu riêng */}
+      {focus && (
+        <div
+          role="status"
+          style={{
+            display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px',
+            padding: '8px 12px', marginBottom: 12, borderRadius: 8, fontSize: 13,
+            background: palette.brandBg, border: `1px solid ${palette.brand}`, color: '#111',
+          }}
+        >
+          <span style={{ fontWeight: 700, color: palette.brand }}>
+            ⧉ Đang soi HĐ <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{focus.rootNo || '—'}</span>
+          </span>
+          <span>· <b>{focus.buyer}</b> — {focus.totals.orders} đợt</span>
+          <span>· {fmtNum(focus.totals.tons, 2)} t</span>
+          <span>· trị giá {fmtMoney(focus.totals.valueUsd, 'USD', { decimals: 0 })}{focus.vnd ? ' (USD quy đổi)' : ''}</span>
+          <span>· đã thu {fmtMoney(focus.totals.paidUsd, 'USD', { decimals: 0 })}</span>
+          <span style={{ fontSize: 12, color: '#6b7280' }}>
+            (cộng các đơn — mỗi đơn một khoản phải thu riêng, không phải mẫu số công nợ)
+          </span>
+          {focus.hidden > 0 && (
+            <span style={{ fontWeight: 600, color: '#b45309' }}>· {focus.hidden} thẻ đang bị lọc ẩn</span>
+          )}
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, flexWrap: 'wrap' }}>
+            <Button size="small" onClick={() => openOrderTab(focus.rootId, focus.rootNo || 'gốc')}>Mở HĐ gốc</Button>
+            <Button size="small" onClick={() => setFamilyFocus(null)}>Bỏ soi</Button>
+          </span>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
@@ -481,6 +677,8 @@ export default function SalesKanbanPage() {
                         order={o}
                         lp={lotProgress[o.id]}
                         lotPay={lotPay[o.id]}
+                        familyHighlight={highlightOf(o)}
+                        onFamilyClick={toggleFamilyFocus}
                         onDragStart={() => {}}
                         onDragEnd={() => {}}
                       />
@@ -549,6 +747,8 @@ export default function SalesKanbanPage() {
                         order={o}
                         lp={lotProgress[o.id]}
                         lotPay={lotPay[o.id]}
+                        familyHighlight={highlightOf(o)}
+                        onFamilyClick={toggleFamilyFocus}
                         onDragStart={() => {}}
                         onDragEnd={() => {}}
                       />
@@ -563,6 +763,15 @@ export default function SalesKanbanPage() {
 
       {filtered.length === 0 && !loading && !loadError && (
         <Empty description="Không có đơn nào khớp bộ lọc" style={{ marginTop: 40 }} />
+      )}
+
+      {/* "Mua tiếp theo HĐ đã ký…" — chọn HĐ gốc (ẩn đơn huỷ / chưa có số HĐ) rồi mở tab tạo đợt */}
+      {canContinue && (
+        <RootContractPickerModal
+          open={rootPickerOpen}
+          onClose={() => setRootPickerOpen(false)}
+          onPick={openContinueTab}
+        />
       )}
 
       {/* Modal ghi nhận đã thu (kéo card vào cột "Đã tất toán") — dùng chung với Công nợ khách */}

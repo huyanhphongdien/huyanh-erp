@@ -35,6 +35,7 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { getSalesRole, salesPermissions, getVisibleTabs, isTabEditable } from '../../services/sales/salesPermissionService'
@@ -53,6 +54,8 @@ import HandoffTimeline from './components/HandoffTimeline'
 import ContractTab from './components/ContractTab'
 import SalesOrderChat from './components/SalesOrderChat'
 import OrderProgressDashboard from './components/OrderProgressDashboard'
+import OrderFamilyChip from './components/OrderFamilyChip'
+import { ContinueOrderButton } from './components/OrderFamilyBlock'
 import { useAuthStore } from '../../stores/authStore'
 import type {
   SalesOrder,
@@ -64,9 +67,10 @@ import {
   SVR_GRADE_OPTIONS,
   COUNTRY_OPTIONS,
   soDisplayCode,
+  partyShortName,
 } from '../../services/sales/salesTypes'
 import { fmtMoney, isVnd, orderTotalInCurrency } from '../../services/sales/salesMoney'
-import { fmtDate } from '../../utils/format'
+import { fmtDate, fmtNum } from '../../utils/format'
 import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import PageState from '../../components/common/PageState'
 
@@ -122,6 +126,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<unknown>(null)
+  const qc = useQueryClient()
 
   // (Production + Packing tab: chuyển sang component gọn + trang riêng.
   //  Container/lot quản lý ở <PackingTabPanel /> → /sales/orders/:id/packing,
@@ -135,6 +140,9 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
       setLoadError(null)
       const o = await salesOrderService.getById(orderId)
       setOrder(o)
+      // Họ HĐ (chip, khối "Các đợt cùng HĐ", tab Hợp đồng) đọc cache ['sales-order-family', gốc] — mỗi lần tải lại
+      // đơn (mở, lưu, đổi trạng thái…) thì làm mới để số đợt / trạng thái các đợt không cũ
+      void qc.invalidateQueries({ queryKey: ['sales-order-family'] })
     } catch (err) {
       // Lỗi tải ≠ "Không tìm thấy đơn hàng" — chưa có đơn thì hiện khối lỗi + Thử lại; nạp lại (sau khi
       // lưu) mà hỏng thì toast để người dùng biết đang xem bản cũ.
@@ -144,7 +152,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
     } finally {
       setLoading(false)
     }
-  }, [orderId])
+  }, [orderId, qc])
 
   useEffect(() => {
     loadOrder()
@@ -247,7 +255,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
           gap: 12,
         }}
       >
-        <Space>
+        <Space wrap>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/sales/orders')} />
           <Title level={4} style={{ margin: 0 }}>
             {soDisplayCode(order)}
@@ -263,8 +271,14 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
           >
             {ORDER_STATUS_LABELS[order.status]}
           </Tag>
+          {/* Họ HĐ: 'Mua tiếp · Đợt n · HĐ X' (đợt con) / '⧉ HĐ gốc · n đợt' (gốc) — dùng chung 3 dạng xem */}
+          <OrderFamilyChip order={order} />
         </Space>
-        <Space wrap>{renderExtraEditButton()}</Space>
+        <Space wrap>
+          {renderExtraEditButton()}
+          {/* Mọi trạng thái trừ huỷ (đơn gốc thường đã giao) · quyền canCreateOrder · gốc chưa có số HĐ → mờ + tooltip */}
+          <ContinueOrderButton order={order} salesRole={salesRole} />
+        </Space>
       </div>
 
       {/* Info row */}
@@ -273,11 +287,11 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
           <Card size="small">
             {order.customer_id ? (
               <>
-                <div style={{ fontSize: 13, color: 'rgba(0,0,0,0.45)', marginBottom: 4 }}>Khách hàng</div>
+                <div style={{ fontSize: 13, color: 'rgba(0,0,0,0.45)', marginBottom: 4 }}>Người mua</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <a
                     onClick={() => navigate(`/sales/customers/${order.customer_id}`)}
-                    style={{ fontSize: 14, fontWeight: 600, color: '#1B4D3E' }}
+                    style={{ fontSize: 14, fontWeight: 600, color: '#1B4D3E', wordBreak: 'break-word' }}
                   >
                     {customerName}{customerCountry ? ` (${customerCountry})` : ''}
                   </a>
@@ -292,10 +306,24 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                     Hồ sơ CT
                   </Button>
                 </div>
+                {/* Người nhận hàng (riêng đơn này) — chỉ khi khác người mua; công nợ vẫn theo người mua */}
+                {order.ship_to_customer_id && order.ship_to ? (
+                  <div style={{ fontSize: 12, marginTop: 2 }}>
+                    <Text type="secondary">→ </Text>
+                    <a
+                      onClick={() => navigate(`/sales/customers/${order.ship_to!.id}`)}
+                      title={`Người nhận hàng: ${order.ship_to.name}`}
+                      style={{ fontWeight: 600, wordBreak: 'break-word' }}
+                    >
+                      {partyShortName(order.ship_to)}
+                    </a>
+                    <Text type="secondary"> (người nhận)</Text>
+                  </div>
+                ) : null}
               </>
             ) : (
               <Statistic
-                title="Khách hàng"
+                title="Người mua"
                 value={customerName}
                 suffix={customerCountry ? `(${customerCountry})` : undefined}
                 valueStyle={{ fontSize: 14 }}
@@ -314,7 +342,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
         </Col>
         <Col xs={12} sm={4}>
           <Card size="small">
-            <Statistic title="Số lượng" value={order.quantity_tons} suffix="tấn" />
+            <Statistic title="Số lượng" formatter={() => fmtNum(order.quantity_tons, 3)} suffix="tấn" />
           </Card>
         </Col>
         <Col xs={12} sm={5}>
@@ -359,7 +387,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                 <FileTextOutlined /> Thông tin
               </span>
             ),
-            children: <OrderInfoTab order={order} />,
+            children: <OrderInfoTab order={order} salesRole={salesRole} onSaved={loadOrder} />,
           },
           ...(visibleTabs.includes('contract') ? [{
             key: 'contract',

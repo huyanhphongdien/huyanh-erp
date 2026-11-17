@@ -36,9 +36,18 @@ export function laLoiMang(e: unknown): boolean {
  * message gốc rút gọn trong ngoặc để còn lần ra khi báo lỗi.
  */
 export function dichLoiHeThong(e: unknown, fallback = 'Thao tác thất bại'): string {
-  const { code, message } = rut(e)
+  const { code, message, details } = rut(e)
   const m = message || ''
   const ml = m.toLowerCase()
+
+  // Số HĐ trùng (index chuẩn hoá ux_sales_orders_contract_no_norm_active — sales_family_parties_p1.sql) → nói rõ
+  // là SỐ HĐ, kèm số khi Postgres trả trong details. Xét TRƯỚC câu "Dữ liệu bị trùng" chung chung bên dưới.
+  if ((code === '23505' || ml.includes('duplicate key')) && ml.includes('ux_sales_orders_contract_no_norm_active')) {
+    const so = /\)=\((.+)\) already exists/i.exec(details || m)?.[1]
+    return so
+      ? `Số HĐ "${so}" đã có ở đơn khác — đổi số khác rồi lưu lại`
+      : 'Số HĐ này đã có ở đơn khác — đổi số khác rồi lưu lại'
+  }
 
   if (laLoiMang(e)) return 'Mất kết nối mạng — kiểm tra Internet/WiFi rồi thử lại'
   if (ml.includes('jwt') || ml.includes('token') && ml.includes('expired') || code === 'PGRST301' && ml.includes('jwt'))

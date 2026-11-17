@@ -7,8 +7,9 @@
 
 import { supabase } from '../../lib/supabase'
 import type { SalesOrderStatus } from './salesTypes'
-import { ORDER_STATUS_LABELS } from './salesTypes'
+import { ORDER_STATUS_LABELS, partyShortName } from './salesTypes'
 import { toDateStrVN } from '../../utils/dateVN'
+import { salesOrderService } from './salesOrderService'
 
 export type DashboardPeriod = 'month' | 'quarter' | 'year'
 
@@ -75,6 +76,23 @@ export interface PipelineStage {
   label: string
   count: number
   value_usd: number
+}
+
+/** Sản lượng theo KHÁCH CUỐI (người nhận hàng, không có thì người mua) — chỉ TẤN, KHÔNG có tiền. */
+export interface TopEndCustomer {
+  customer_id: string
+  name: string
+  short_name: string
+  country: string | null
+  order_count: number
+  /** tấn đặt */
+  tons: number
+  /** tấn đã giao (container đã giao — v_sales_order_container_delivery) */
+  delivered_tons: number
+  /** phần tấn đặt khách đứng tên mua thẳng */
+  direct_tons: number
+  /** phần tấn đặt nhận qua trung gian (người mua khác đứng tên) */
+  via_tons: number
 }
 
 // ============================================================================
@@ -200,6 +218,78 @@ export const salesDashboardService = {
       .map(([customer_id, stats]) => ({ customer_id, ...stats }))
       .sort((a, b) => b.total_revenue - a.total_revenue)
       .slice(0, limit)
+  },
+
+  /**
+   * Top KHÁCH CUỐI theo SẢN LƯỢNG (tấn) — công tắc "Sản lượng theo khách cuối" cạnh Top khách theo doanh thu.
+   * Một nguồn: view v_sales_order_end_customer (end_customer = người nhận, không có thì người mua; đơn chưa huỷ;
+   * KHÔNG có cột tiền → không đếm đôi doanh thu). `dateRange` lọc theo ngày đặt (cùng mốc getKPIs).
+   * Sắp theo tấn ĐÃ GIAO (owner chốt câu 12: số chính là tấn đã giao) rồi tấn đặt; `sortBy='ordered'` để sắp theo
+   * tấn đặt. Chưa migration → [].
+   */
+  async getTopEndCustomers(
+    limit: number = 5,
+    dateRange?: DashboardPeriod,
+    sortBy: 'delivered' | 'ordered' = 'delivered',
+  ): Promise<TopEndCustomer[]> {
+    if (!(await salesOrderService.familyPartiesReady())) return []
+    const PAGE = 1000
+    const rows: Array<{ end_customer_id: string; via_intermediary: boolean; quantity_tons: number | null; delivered_tons: number | null }> = []
+    for (let from = 0; from < 20000; from += PAGE) {
+      let q = supabase
+        .from('v_sales_order_end_customer')
+        .select('end_customer_id, via_intermediary, quantity_tons, delivered_tons')
+      if (dateRange) q = q.gte('order_date', periodRange(dateRange).start)
+      // Phân trang theo khoá ổn định — PostgREST cắt âm thầm ở max_rows
+      const { data, error } = await q.order('sales_order_id').range(from, from + PAGE - 1)
+      if (error) throw new Error(`Không tải được sản lượng theo khách cuối: ${error.message}`)
+      const batch = (data || []) as typeof rows
+      rows.push(...batch)
+      if (batch.length < PAGE) break
+    }
+    if (rows.length === 0) return []
+
+    const agg = new Map<string, { order_count: number; tons: number; delivered_tons: number; direct_tons: number; via_tons: number }>()
+    for (const r of rows) {
+      if (!r.end_customer_id) continue
+      const a = agg.get(r.end_customer_id) || { order_count: 0, tons: 0, delivered_tons: 0, direct_tons: 0, via_tons: 0 }
+      const t = Number(r.quantity_tons) || 0
+      a.order_count += 1
+      a.tons += t
+      a.delivered_tons += Number(r.delivered_tons) || 0
+      if (r.via_intermediary) a.via_tons += t
+      else a.direct_tons += t
+      agg.set(r.end_customer_id, a)
+    }
+    const r3 = (n: number) => Math.round(n * 1000) / 1000
+    const ranked = [...agg.entries()]
+      .sort((a, b) => sortBy === 'ordered'
+        ? (b[1].tons - a[1].tons) || (b[1].delivered_tons - a[1].delivered_tons)
+        : (b[1].delivered_tons - a[1].delivered_tons) || (b[1].tons - a[1].tons))
+      .slice(0, limit)
+
+    const ids = ranked.map(([id]) => id)
+    const { data: custs, error: cErr } = await supabase
+      .from('sales_customers')
+      .select('id, name, short_name, country')
+      .in('id', ids)
+    if (cErr) throw new Error(`Không tải được tên khách cuối: ${cErr.message}`)
+    const byId = new Map(((custs || []) as Array<{ id: string; name: string; short_name: string | null; country: string | null }>).map((c) => [c.id, c]))
+
+    return ranked.map(([customer_id, a]) => {
+      const c = byId.get(customer_id)
+      return {
+        customer_id,
+        name: c?.name || 'N/A',
+        short_name: partyShortName(c),
+        country: c?.country || null,
+        order_count: a.order_count,
+        tons: r3(a.tons),
+        delivered_tons: r3(a.delivered_tons),
+        direct_tons: r3(a.direct_tons),
+        via_tons: r3(a.via_tons),
+      }
+    })
   },
 
   // ==========================================================================

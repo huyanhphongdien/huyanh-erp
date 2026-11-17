@@ -40,6 +40,29 @@ export interface SalesOrderExportOpts {
   filterDesc: string
   /** Nhãn nguồn dữ liệu: "Đơn đã chọn" hoặc "Tất cả theo bộ lọc". */
   scopeLabel: string
+  /**
+   * Số đơn CẢ HỌ của các đơn GỐC (salesOrderService.getFamilyCounts). Không truyền thì dòng GỐC để trống 2 cột
+   * "Số HĐ gốc"/"Đợt" (đợt mua tiếp vẫn đủ — đọc thẳng parent/continuation_seq trên dòng).
+   */
+  familyCounts?: Record<string, number>
+}
+
+/**
+ * Ba cột HỌ HĐ / NGƯỜI NHẬN của một đơn (đặt CUỐI file — xem cảnh báo chỉ số cột ở headers):
+ *   Người nhận hàng = tên người nhận khi KHÁC người mua (trống = giao thẳng cho người mua)
+ *   Số HĐ gốc       = đợt mua tiếp: số của đơn gốc · đơn gốc có đợt: chính số của nó · đơn thường: trống
+ *   Đợt             = đợt: continuation_seq · gốc có đợt: 1 · đơn thường: trống
+ * Cột "Số HĐ" (cột 2) GIỮ nghĩa cũ = số của từng đơn, để file cũ/mới không đổi nghĩa.
+ */
+function familyCells(o: SalesOrder, familyCounts?: Record<string, number>): [string, string, number | null] {
+  const receiver = o.ship_to_customer_id
+    ? (o.ship_to?.name || '(không tìm thấy hồ sơ người nhận)')
+    : ''
+  if (o.parent_order_id) {
+    return [receiver, o.parent?.contract_no || o.parent?.code || '', o.continuation_seq ?? null]
+  }
+  if ((familyCounts?.[o.id] ?? 1) >= 2) return [receiver, soDisplayCode(o), 1]
+  return [receiver, '', null]
 }
 
 const thin = (): Partial<ExcelJSType.Borders> => ({
@@ -56,7 +79,7 @@ const toDate = (v: any): Date | null => {
 }
 
 export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promise<void> {
-  const { orders, lotProgress, lotPay, filterDesc, scopeLabel } = opts
+  const { orders, lotProgress, lotPay, filterDesc, scopeLabel, familyCounts } = opts
   const ExcelJS = (await import('exceljs')).default
   const { saveAs } = await import('file-saver')
 
@@ -64,7 +87,9 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
   wb.creator = 'Huy Anh ERP'
   wb.created = new Date()
 
-  const COLS = 23
+  const COLS = 26
+  /** Cột "Đợt" (số) — cột cuối */
+  const COL_SEQ = 26
   const ws = wb.addWorksheet('Đơn hàng bán', {
     pageSetup: {
       paperSize: 8 as ExcelJSType.PaperSize, // A3
@@ -101,7 +126,9 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
   // ── Header ──
   const HDR = 5
   const headers = [
-    'STT', 'Số HĐ', 'Khách hàng', 'Loại hàng', 'Số LOT',
+    // 'Người mua' (trước ghi 'Khách hàng') và 'PO khách' (trước 'Số LOT' — thật ra là customer_po): CHỈ đổi
+    // nhãn, nội dung cột giữ nguyên. Cần rõ vai vì file nay có thêm cột 'Người nhận hàng'.
+    'STT', 'Số HĐ', 'Người mua', 'Loại hàng', 'PO khách',
     'SL (tấn)', 'Đã giao (T)', 'Còn thiếu (T)',
     'Đơn giá USD', 'Thành tiền USD', 'Đặt cọc', 'CK', 'NH CK', 'Còn lại (USD)',
     'Hạn giao', 'Sẵn hàng', 'Incoterm', 'Số BKG', 'ETD', 'Tiền về', 'Trạng thái',
@@ -109,6 +136,8 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
     // ([6,7,8] số, [9,10,11,12,14] tiền, [15,16,19,20] ngày) và khoá tổng theo 6/7/8/10 —
     // chèn một cột vào giữa là lệch TOÀN BỘ mà không có gì báo lỗi.
     'Giao (lô)', 'Thu (lô)',
+    // Họ HĐ + người nhận (17/11/2026) — cũng ĐẶT CUỐI vì cùng lý do trên.
+    'Người nhận hàng', 'Số HĐ gốc', 'Đợt',
   ]
   headers.forEach((h, i) => {
     const c = ws.getRow(HDR).getCell(i + 1)
@@ -120,7 +149,7 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
   })
   ws.getRow(HDR).height = 26
 
-  const widths = [5, 14, 30, 12, 12, 10, 11, 12, 11, 14, 12, 10, 12, 14, 11, 11, 15, 14, 11, 11, 13, 11, 11]
+  const widths = [5, 14, 30, 12, 12, 10, 11, 12, 11, 14, 12, 10, 12, 14, 11, 11, 15, 14, 11, 11, 13, 11, 11, 30, 16, 7]
   widths.forEach((w, i) => { ws.getColumn(i + 1).width = w })
 
   // ── Dòng dữ liệu ──
@@ -169,6 +198,8 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
         ? `${p.lotsDelivered}/${p.lotsTotal}${p.contsNoLot > 0 ? ` +${p.contsNoLot} cont` : ''}`
         : '',
       money && money.lotsTotal > 0 ? `${money.lotsPaid}/${money.lotsTotal}` : '',
+      // Người nhận hàng · Số HĐ gốc · Đợt
+      ...familyCells(o, familyCounts),
     ]
     vals.forEach((v, i) => {
       const c = row.getCell(i + 1)
@@ -182,6 +213,9 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
     ;[6, 7, 8].forEach((i) => { row.getCell(i).numFmt = NUM; row.getCell(i).alignment = { horizontal: 'right', vertical: 'middle' } })
     ;[9, 10, 11, 12, 14].forEach((i) => { row.getCell(i).numFmt = MONEY; row.getCell(i).alignment = { horizontal: 'right', vertical: 'middle' } })
     ;[15, 16, 19, 20].forEach((i) => { row.getCell(i).numFmt = DATE; row.getCell(i).alignment = { horizontal: 'center', vertical: 'middle' } })
+    // Đợt: số nguyên, căn giữa (để Excel sắp/lọc được theo đợt)
+    row.getCell(COL_SEQ).numFmt = '0'
+    row.getCell(COL_SEQ).alignment = { horizontal: 'center', vertical: 'middle' }
     // Còn thiếu > 0 → đỏ đậm (đây là số khách nhìn); = 0 → xanh
     const cRem = row.getCell(8)
     cRem.font = { name: 'Arial', size: 10, bold: true, color: { argb: rem > 0 ? RED : GREEN } }
@@ -232,6 +266,12 @@ export async function exportSalesOrdersExcel(opts: SalesOrderExportOpts): Promis
   wsN.getColumn(2).width = 95
   const notes: [string, string][] = [
     ['Mục', 'Ý nghĩa'],
+    ['Số HĐ', 'Số của TỪNG đơn (gốc số mọi chứng từ PKL/WL/BC…) — giữ nghĩa như các file trước. Đợt mua tiếp có số riêng (vd HA20260302-D3); số HĐ ký in ô CONTRACT NO. xem cột "Số HĐ gốc".'],
+    ['Người mua', 'Bên đứng tên HĐ, trả tiền, chịu công nợ (file cũ ghi "Khách hàng" — cùng nội dung).'],
+    ['PO khách', 'Số PO/tham chiếu của người mua cho đơn/đợt này (vd ATC 5200006321) — file cũ ghi "Số LOT", cùng nội dung.'],
+    ['Người nhận hàng', 'Công ty nhận hàng (khách cuối) khi KHÁC người mua — vd HARMONYTIDE mua, QINGDAO JINTONG nhận. Trống = giao thẳng cho người mua. Công nợ, thanh toán, hoa hồng LUÔN theo người mua.'],
+    ['Số HĐ gốc', 'HĐ đã ký mà đơn mua tiếp theo (không ký HĐ mới). Đợt mua tiếp: số của đơn gốc · đơn gốc có đợt: chính số của nó · đơn thường: trống. Lọc/gộp theo cột này để xem cả một HĐ.'],
+    ['Đợt', 'Thứ tự đợt trong HĐ: gốc = 1, đợt mua tiếp = 2, 3… (có thể có lỗ khi một đợt bị huỷ/xoá — cố ý không đánh lại). Mỗi đợt là MỘT đơn riêng: tiền, lô, công nợ riêng; cộng các đợt KHÔNG phải mẫu số công nợ.'],
     ['Đã giao (T)', 'KL hàng trong container đã giao (net). KHÔNG phải số cân xe — số cân gồm cả pallet/bao bì.'],
     ['Còn thiếu (T)', 'SL hợp đồng − Đã giao. Đơn đã giao xong (delivered/shipped/invoiced/paid) hoặc đã giao hết container → 0.'],
     ['Đơn đã hủy', 'Vẫn liệt kê nhưng KHÔNG tính vào dòng TỔNG (hủy không phải nợ hàng).'],

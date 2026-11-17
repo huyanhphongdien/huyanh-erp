@@ -43,8 +43,9 @@ import {
   DownloadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { salesOrderService, SORTABLE_ORDER_COLUMNS, nextOrderStatuses } from '../../services/sales/salesOrderService'
+import { salesOrderService, SORTABLE_ORDER_COLUMNS, nextOrderStatuses, familyTotals } from '../../services/sales/salesOrderService'
 import type { SalesOrderStats, SalesOrderListParams, SortableOrderColumn } from '../../services/sales/salesOrderService'
 import { isVnd, fmtMoney } from '../../services/sales/salesMoney'
 import { dispatchService, deliveredTons, remainingTons, type LotProgress } from '../../services/logistics/dispatchService'
@@ -53,7 +54,7 @@ import LotChipStrip, { mergeLotAxes } from '../../components/sales/LotChipStrip'
 import { salesOrderPaymentService, type OrderLotMoney } from '../../services/sales/salesOrderPaymentService'
 import StagePill from '../../components/common/StagePill'
 import type { SalesStage } from '../../services/sales/salesStages'
-import { getSLAStatus } from '../../services/sales/salesStages'
+import { getSLAStatus, SALES_STAGE_LABELS } from '../../services/sales/salesStages'
 import { salesCustomerService } from '../../services/sales/salesCustomerService'
 import {
   type SalesOrder,
@@ -61,16 +62,21 @@ import {
   type SalesCustomer,
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
+  ORDER_KIND_LABELS,
   SVR_GRADE_OPTIONS,
   PACKING_TYPE_LABELS,
   type PackingType,
   soDisplayCode,
   countryFlag,
+  partyShortName,
 } from '../../services/sales/salesTypes'
 import { exportSalesOrdersExcel } from '../../services/sales/salesOrderExcel'
-import { fmtDate } from '../../utils/format'
+import { fmtDate, fmtNum } from '../../utils/format'
 import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import PageState from '../../components/common/PageState'
+import { EnumTag } from '../../components/common/EnumTag'
+import { palette } from '../../theme/palette'
+import { useFamilyPartiesReady, salesOrderFamilyQueryKey } from './components/OrderFamilyChip'
 import GradeBadge from '../../components/wms/GradeBadge'
 import { useAuthStore } from '../../stores/authStore'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
@@ -101,7 +107,7 @@ const SORT_FIELD_LABELS: Record<string, string> = {
   contract_no_sort_key: 'Số HĐ (theo số đơn)',
   customer_id: 'Khách hàng',
   grade: 'Grade',
-  customer_po: 'Số LOT',
+  customer_po: 'PO khách',
   quantity_tons: 'Số lượng (tấn)',
   delivered_tons: 'Đã giao (tấn)',
   shortage: 'Còn thiếu (tấn)',
@@ -166,8 +172,13 @@ const SORT_FIELD_BY_COLUMN: Record<string, SortableOrderColumn> = {
 // ============================================
 // Cột có thể ẩn/hiện qua dropdown "Tùy chỉnh cột". Default hide 4 cột chi
 // tiết ít dùng — finance review mới enable lại. Persist qua localStorage.
-const HIDEABLE_COLUMNS: { key: string; label: string }[] = [
-  { key: 'lot',           label: 'Số LOT' },
+// ⚠ Cột 'lot' nay mang nhãn "PO khách" (là customer_po) nhưng GIỮ key 'lot' — đổi key là mọi máy mất cấu hình
+// ẩn/hiện đã nhớ. `family: true` = cột họ HĐ / người nhận, chỉ hiện khi đã migration sales_family_parties_p1.
+const HIDEABLE_COLUMNS: { key: string; label: string; family?: boolean }[] = [
+  { key: 'lot',           label: 'PO khách' },
+  { key: 'ship_to',       label: 'Người nhận hàng', family: true },
+  { key: 'family_root',   label: 'HĐ gốc', family: true },
+  { key: 'family_seq',    label: 'Đợt', family: true },
   { key: 'ready_date',    label: 'Sẵn hàng' },
   { key: 'incoterm',      label: 'Incoterm' },
   { key: 'bkg',           label: 'Số BKG' },
@@ -179,8 +190,133 @@ const HIDEABLE_COLUMNS: { key: string; label: string }[] = [
   { key: 'progress',      label: 'T.độ' },
   { key: 'status',        label: 'Trạng thái' },
 ]
-const DEFAULT_HIDDEN_COLS = new Set(['lot', 'ready_date', 'discount_bank', 'payment_date'])
+const DEFAULT_HIDDEN_COLS = new Set(['lot', 'ready_date', 'discount_bank', 'payment_date', 'ship_to', 'family_root', 'family_seq'])
 const COL_VISIBILITY_KEY = 'sales-order-hidden-cols-v1'
+/** Danh sách cột đã biết lúc người dùng lưu cấu hình — để cột MỚI vẫn theo mặc định (ẩn) thay vì tự hiện ra. */
+const COL_KNOWN_KEY = 'sales-order-known-cols-v1'
+/** Cột đã có trước 17/11/2026 (cấu hình cũ không ghi danh sách cột đã biết → coi như biết đúng các cột này). */
+const LEGACY_KNOWN_COLS = ['lot', 'ready_date', 'incoterm', 'bkg', 'deposit', 'discount', 'discount_bank', 'payment_date', 'current_stage', 'progress', 'status']
+
+/**
+ * Cấu hình ẩn cột đã lưu (máy này hoặc Bộ lọc đã lưu) + cột MỚI chưa có lúc lưu → cột mới theo mặc định.
+ * Không có bước này thì ai từng bấm ẩn/hiện một cột sẽ thấy 3 cột họ HĐ tự bật lên.
+ */
+function withNewColumnDefaults(hidden: Iterable<string>, known?: unknown): Set<string> {
+  const k = new Set<string>(Array.isArray(known) && known.length > 0 ? known.map(String) : LEGACY_KNOWN_COLS)
+  const out = new Set<string>(hidden)
+  for (const c of HIDEABLE_COLUMNS) if (!k.has(c.key) && DEFAULT_HIDDEN_COLS.has(c.key)) out.add(c.key)
+  return out
+}
+const allColumnKeys = () => HIDEABLE_COLUMNS.map((c) => c.key)
+/** Key các cột họ HĐ / người nhận — bỏ khỏi bảng khi chưa migration */
+const FAMILY_COL_KEYS: ReadonlySet<string> = new Set(HIDEABLE_COLUMNS.filter((c) => c.family).map((c) => c.key))
+
+/** Lọc theo HĐ gốc (chip "HĐ gốc: …"): id đơn gốc + số HĐ để hiện chip / lưu trong Bộ lọc đã lưu. */
+type FamilyRootFilter = { id: string; label: string }
+type CustomerRole = 'buyer' | 'receiver' | 'both'
+type OrderKindFilter = 'all' | 'new' | 'continuation'
+const CUSTOMER_ROLE_LABELS: Record<CustomerRole, string> = { buyer: 'Người mua', receiver: 'Người nhận', both: 'Cả hai' }
+
+// Chữ phụ xám trong ô (cùng sắc xám bảng đang dùng)
+const SUB_GRAY = '#8c8c8c'
+
+/**
+ * Khối "Các đợt cùng HĐ" trong dòng mở rộng — nạp khi MỞ dòng (getFamily, cùng khoá query với chip họ HĐ ở
+ * chi tiết đơn). Không làm bảng cây: rc-table bỏ qua children khi có expandedRowRender, và bảng phân trang ở
+ * server nên các đợt có thể nằm ở trang khác. Dòng cộng chỉ CỘNG các đơn — không phải mẫu số công nợ.
+ */
+function FamilyRowsBlock({ rootId, currentId, onOpen }: {
+  rootId: string
+  currentId: string
+  onOpen: (id: string, label: string) => void
+}) {
+  const q = useQuery({
+    queryKey: salesOrderFamilyQueryKey(rootId),
+    queryFn: () => salesOrderService.getFamily(rootId),
+    staleTime: 60 * 1000,
+  })
+  const members = q.data || []
+  const totals = familyTotals(members)
+  const root = members.find((m) => m.is_root)
+  const rootNo = root ? soDisplayCode(root) : ''
+  const cancelledN = members.length - totals.orders
+  const vnd = members.some((m) => isVnd(m.currency))
+  const th = (t: string, align: 'left' | 'right' = 'left') => (
+    <th style={{ padding: '6px 10px', textAlign: align, fontWeight: 600, color: '#666', whiteSpace: 'nowrap' }}>{t}</th>
+  )
+  const td: React.CSSProperties = { padding: '5px 10px', whiteSpace: 'nowrap' }
+  const tdNum: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'monospace' }
+  return (
+    <div style={{ padding: '6px 0 2px' }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: palette.brand, marginBottom: 4 }}>
+        ⧉ Các đợt cùng HĐ {rootNo} ({q.isSuccess ? totals.orders : '…'})
+        {cancelledN > 0 && <span style={{ fontWeight: 400, color: SUB_GRAY }}> · {cancelledN} đợt đã huỷ</span>}
+        <span style={{ fontWeight: 400, color: SUB_GRAY }}> — mỗi đợt là một đơn riêng: tiền, lô, công nợ riêng</span>
+      </div>
+      <PageState
+        loading={q.isLoading}
+        error={q.error}
+        onRetry={() => q.refetch()}
+        empty={q.isSuccess && members.length === 0}
+        emptyText="Không còn đợt nào trong HĐ này"
+        minHeight={60}
+      >
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: palette.brandBg, borderBottom: '1px solid #f0f0f0' }}>
+                {th('Đợt')}{th('Số đơn')}{th('Trạng thái')}{th('Bộ phận')}{th('Người nhận')}
+                {th('Tấn', 'right')}{th('Đơn giá', 'right')}{th('ETD')}{th('Đã thu', 'right')}
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((m) => {
+                const isSelf = m.id === currentId
+                const cancelled = m.status === 'cancelled'
+                const lbl = soDisplayCode(m)
+                return (
+                  <tr key={m.id} style={{
+                    borderBottom: '1px solid #f5f5f5', opacity: cancelled ? 0.55 : 1,
+                    background: isSelf ? palette.brandBg : undefined,
+                  }}>
+                    <td style={td}><b>{m.seq}</b>{m.is_root && <span style={{ color: SUB_GRAY }}> · gốc</span>}</td>
+                    <td style={td}>
+                      {isSelf ? (
+                        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{lbl} <span style={{ color: SUB_GRAY, fontWeight: 400 }}>(đang xem)</span></span>
+                      ) : (
+                        <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontFamily: 'monospace' }}
+                          onClick={(e) => { e.stopPropagation(); onOpen(m.id, lbl) }}>
+                          {cancelled ? <s>{lbl}</s> : lbl}
+                        </Button>
+                      )}
+                    </td>
+                    <td style={td}><EnumTag value={m.status} labels={ORDER_STATUS_LABELS} colors={ORDER_STATUS_COLORS} style={{ margin: 0, fontSize: 11 }} /></td>
+                    <td style={td}>{cancelled ? '—' : (SALES_STAGE_LABELS[(m.current_stage || 'sales') as SalesStage] ?? '—')}</td>
+                    <td style={td}>
+                      {m.ship_to_customer_id
+                        ? (m.ship_to ? <Tooltip title={m.ship_to.name}><span>{partyShortName(m.ship_to)}</span></Tooltip> : <span style={{ color: '#cf1322' }}>không rõ</span>)
+                        : <span style={{ color: SUB_GRAY }}>= người mua</span>}
+                    </td>
+                    <td style={tdNum}>{fmtNum(m.quantity_tons, 2)}</td>
+                    <td style={tdNum}>{m.unit_price != null ? fmtUnitPrice(m.unit_price, m.currency) : '—'}</td>
+                    <td style={td}>{fmtDate(m.etd)}</td>
+                    <td style={tdNum}>{fmtMoney(m.actual_payment_amount, 'USD', { decimals: 0 })}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ fontSize: 12, color: '#374151', marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: '2px 12px' }}>
+          <span><b>Cộng {totals.orders} đơn chưa huỷ:</b> {fmtNum(totals.tons, 2)} t</span>
+          <span>trị giá {fmtMoney(totals.valueUsd, 'USD', { decimals: 0 })}{vnd ? ' (USD quy đổi)' : ''}</span>
+          <span>đã thu {fmtMoney(totals.paidUsd, 'USD', { decimals: 0 })}</span>
+          <span style={{ color: SUB_GRAY }}>(cộng các đơn — mỗi đơn một khoản phải thu riêng, không phải mẫu số công nợ)</span>
+        </div>
+      </PageState>
+    </div>
+  )
+}
 
 // ============================================
 // TABS CONFIG
@@ -203,6 +339,28 @@ const STATUS_TABS: { key: string; label: string }[] = [
 // MAIN COMPONENT
 // ============================================
 
+/**
+ * Ô tìm kiếm Sổ đơn: giữ chữ đang gõ trong CHÍNH nó. Để chữ gõ ở state của cả trang thì mỗi phím vẽ lại bảng 25 cột
+ * (gõ bị giật); trang chỉ nhận giá trị khi bấm Enter / xoá. `applied` kéo chữ về khi trang đổi (xoá bộ lọc, chọn chip HĐ gốc…).
+ */
+function OrderSearchBox({ applied, onSearch }: { applied: string; onSearch: (v: string) => void }) {
+  const [text, setText] = useState(applied)
+  useEffect(() => { setText(applied) }, [applied])
+  return (
+    <Input.Search
+      placeholder="Tìm số HĐ, booking, B/L, grade..."
+      allowClear
+      value={text}
+      onSearch={onSearch}
+      onChange={(e) => {
+        setText(e.target.value)
+        if (!e.target.value) onSearch('')
+      }}
+      prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+    />
+  )
+}
+
 const SalesOrderListPage = () => {
   const navigate = useNavigate()
   const openTab = useOpenTab()
@@ -223,6 +381,18 @@ const SalesOrderListPage = () => {
     })
   }
 
+  const openOrderTabById = (id: string, label: string) => openTab({
+    key: `sales-order-${id}`,
+    title: `Đơn ${label}`,
+    componentId: 'sales-order-detail',
+    props: { orderId: id },
+    path: `/sales/orders/${id}`,
+  })
+
+  // Họ HĐ (mua tiếp) + người nhận: chỉ hiện khi migration sales_family_parties_p1 đã áp (đang tải / lỗi → ẩn)
+  const familyReady = useFamilyPartiesReady()
+  const queryClient = useQueryClient()
+
   // ĐIỆN THOẠI (≤ 640px): bảng 20 cột không dùng được → vẽ thẻ (SalesOrderPhoneList),
   // giấu Views/độ dày/Split/ẩn cột/Excel/chọn nhiều dòng. Dữ liệu + bộ lọc dùng chung.
   const isPhone = useIsPhone()
@@ -239,6 +409,8 @@ const SalesOrderListPage = () => {
   const [orders, setOrders] = useState<SalesOrder[]>([])
   const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})  // trục GIAO theo lô
   const [lotPay, setLotPay] = useState<Record<string, OrderLotMoney>>({})          // trục TIỀN theo lô
+  // Số đơn CẢ HỌ của các dòng GỐC trên trang (getFamilyCounts — 1 truy vấn, không nhúng ngược); ≥ 2 → "⧉ n đợt"
+  const [familyCounts, setFamilyCounts] = useState<Record<string, number>>({})
   // DÒNG TỔNG — tính trên TOÀN BỘ đơn khớp bộ lọc (KHÔNG chỉ trang hiện tại).
   // Khách lọc Grade=RSS rồi hỏi "còn thiếu bao nhiêu tấn" ⇒ tổng của 10 dòng là vô nghĩa.
   const [summary, setSummary] = useState<{ orders: number; qty: number; delivered: number; shortage: number; estimated: boolean; truncated: boolean } | null>(null)
@@ -264,6 +436,13 @@ const SalesOrderListPage = () => {
 
   // Filters
   const [searchText, setSearchText] = useState('')
+  // Chữ đang gõ trong ô tìm — ô có `value` để gỡ chip "Tìm: …" / Xoá tất cả / áp Bộ lọc đã lưu thì ô cũng trống
+  // theo (trước đây ô không điều khiển: gỡ chip rồi mà chữ cũ vẫn nằm trong ô).
+  const [searchBoxKey, setSearchBoxKey] = useState(0)   // tăng để ô tìm kiếm bỏ chữ gõ dở (xoá bộ lọc)
+  // Họ HĐ + Các bên (service bỏ qua khi chưa migration → truyền thẳng, khỏi nạp 2 lần lúc cờ "ready" đổi)
+  const [orderKind, setOrderKind] = useState<OrderKindFilter>('all')
+  const [customerRole, setCustomerRole] = useState<CustomerRole>('buyer')
+  const [familyRoot, setFamilyRoot] = useState<FamilyRootFilter | null>(null)
   const [statusTab, setStatusTab] = useState<string>(() => {
     try { return localStorage.getItem('sales-orders-status-tab') || 'all' } catch { return 'all' }
   })
@@ -328,22 +507,37 @@ const SalesOrderListPage = () => {
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem(COL_VISIBILITY_KEY)
-      if (saved) return new Set(JSON.parse(saved))
+      if (saved) {
+        const knownRaw = localStorage.getItem(COL_KNOWN_KEY)
+        return withNewColumnDefaults(JSON.parse(saved), knownRaw ? JSON.parse(knownRaw) : null)
+      }
     } catch {}
     return new Set(DEFAULT_HIDDEN_COLS)
   })
+  const persistHiddenCols = (next: Set<string>) => {
+    try {
+      localStorage.setItem(COL_VISIBILITY_KEY, JSON.stringify([...next]))
+      localStorage.setItem(COL_KNOWN_KEY, JSON.stringify(allColumnKeys()))
+    } catch { /* trình duyệt chặn lưu → chỉ mất phần "nhớ theo máy" */ }
+  }
   const toggleColumn = (key: string) => {
     setHiddenCols(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key); else next.add(key)
-      localStorage.setItem(COL_VISIBILITY_KEY, JSON.stringify([...next]))
+      persistHiddenCols(next)
       return next
     })
   }
   const resetColumns = () => {
     setHiddenCols(new Set(DEFAULT_HIDDEN_COLS))
-    localStorage.setItem(COL_VISIBILITY_KEY, JSON.stringify([...DEFAULT_HIDDEN_COLS]))
+    persistHiddenCols(new Set(DEFAULT_HIDDEN_COLS))
   }
+  // Cột họ HĐ / người nhận chỉ có nghĩa khi đã migration
+  const hideableCols = useMemo(
+    () => HIDEABLE_COLUMNS.filter((c) => familyReady || !c.family),
+    [familyReady],
+  )
+  const shownHideableCount = hideableCols.filter((c) => !hiddenCols.has(c.key)).length
 
   // M4-A: Active filter chips — build list từ state hiện tại
   const activeFilters = useMemo(() => {
@@ -357,7 +551,15 @@ const SalesOrderListPage = () => {
     }
     if (customerFilter) {
       const c = customers.find(x => x.id === customerFilter)
-      chips.push({ key: 'customer', label: `KH: ${c?.short_name || c?.name || ''}`, onRemove: () => setCustomerFilter(undefined) })
+      // Vai khác "Người mua" thì chip nói rõ — dòng tổng đang KHÁC tổng theo người mua
+      const role = familyReady && customerRole !== 'buyer' ? ` (${CUSTOMER_ROLE_LABELS[customerRole].toLowerCase()})` : ''
+      chips.push({ key: 'customer', label: `KH${role}: ${c ? partyShortName(c) : ''}`, onRemove: () => setCustomerFilter(undefined) })
+    }
+    if (familyReady && orderKind !== 'all') {
+      chips.push({ key: 'order_kind', label: `Loại đơn: ${ORDER_KIND_LABELS[orderKind]}`, onRemove: () => setOrderKind('all') })
+    }
+    if (familyReady && familyRoot) {
+      chips.push({ key: 'family_root', label: `⧉ HĐ gốc: ${familyRoot.label}`, onRemove: () => setFamilyRoot(null) })
     }
     if (gradeFilter) {
       chips.push({ key: 'grade', label: `Grade: ${gradeFilter}`, onRemove: () => setGradeFilter(undefined) })
@@ -376,18 +578,51 @@ const SalesOrderListPage = () => {
       chips.push({ key: 'etd', label: `ETD: ${fmtDate(etdDay)}`, onRemove: () => { setEtdDay(null); setSearchParams({}) } })
     }
     return chips
-  }, [searchText, statusTab, customerFilter, gradeFilter, dateRange, overdueEtdOnly, etdDay, customers, setSearchParams])
+  }, [searchText, statusTab, customerFilter, gradeFilter, dateRange, overdueEtdOnly, etdDay, customers, setSearchParams,
+    familyReady, customerRole, orderKind, familyRoot])
 
   const clearAllFilters = () => {
     setSearchText('')
+    setSearchBoxKey((k) => k + 1)
     setStatusTab('all')
     setCustomerFilter(undefined)
+    setCustomerRole('buyer')
+    setOrderKind('all')
+    setFamilyRoot(null)
     setGradeFilter(undefined)
     setDateRange(null)
     setOverdueEtdOnly(false)
     setEtdDay(null)
     setSearchParams({})
     setPagination(p => ({ ...p, current: 1 }))
+  }
+
+  /**
+   * Bấm "⧉ n đợt" (gốc) hoặc "Đợt n · HĐ X" (đợt) → chip "HĐ gốc: X" = hiện ĐỦ cả họ (gốc + các đợt).
+   * Bỏ các bộ lọc có thể giấu bớt đợt (tìm chữ, tab trạng thái, grade, ngày, ETD) — gõ 'HA20260302' rồi bấm
+   * "⧉ 2 đợt" mà vẫn giữ ô tìm thì đợt mang số riêng HA20260301 bị giấu, đúng thứ người dùng muốn thấy.
+   */
+  const applyFamilyRoot = (id: string, label: string) => {
+    // Lọc khách theo vai NGƯỜI MUA không giấu đợt nào (trigger bắt cả họ cùng người mua) → giữ; vai khác thì bỏ.
+    const dropCustomer = !!customerFilter && customerRole !== 'buyer'
+    const hadOthers = !!searchText || statusTab !== 'all' || !!gradeFilter || !!dateRange || overdueEtdOnly
+      || !!etdDay || orderKind !== 'all' || dropCustomer
+    setFamilyRoot({ id, label })
+    setSearchText('')
+    setSearchBoxKey((k) => k + 1)
+    setStatusTab('all')
+    if (dropCustomer) {
+      setCustomerFilter(undefined)
+      setCustomerRole('buyer')
+    }
+    setOrderKind('all')
+    setGradeFilter(undefined)
+    setDateRange(null)
+    setOverdueEtdOnly(false)
+    setEtdDay(null)
+    if (searchParams.toString()) setSearchParams({})
+    setPagination(p => ({ ...p, current: 1 }))
+    message.info(`Đang lọc theo HĐ gốc ${label} — gốc + các đợt mua tiếp${hadOthers ? ' (đã bỏ các bộ lọc khác để hiện đủ)' : ''}`)
   }
 
   // M4-B: Saved views per user
@@ -455,8 +690,15 @@ const SalesOrderListPage = () => {
     setDateRange(f.dateRange ? [dayjs(f.dateRange[0]), dayjs(f.dateRange[1])] : null)
     setOverdueEtdOnly(!!f.overdueEtdOnly)
     setEtdDay(null)
+    // Họ HĐ + vai khách (bộ lọc lưu trước 17/11/2026 không có → về mặc định)
+    setOrderKind(f.orderKind === 'new' || f.orderKind === 'continuation' ? f.orderKind : 'all')
+    setCustomerRole(f.customerRole === 'receiver' || f.customerRole === 'both' ? f.customerRole : 'buyer')
+    setFamilyRoot(f.familyRoot && typeof f.familyRoot.id === 'string'
+      ? { id: f.familyRoot.id, label: String(f.familyRoot.label || '') }
+      : null)
     if (v.columns?.hiddenCols) {
-      setHiddenCols(new Set(v.columns.hiddenCols))
+      // Bộ lọc lưu trước khi có cột mới → cột mới vẫn ẩn theo mặc định
+      setHiddenCols(withNewColumnDefaults(v.columns.hiddenCols, v.columns.knownCols))
     }
     if (v.sort?.sortBy) {
       // v.sort là JSONB tự do trong user_saved_views — không có gì bảo đảm nó còn là cột
@@ -492,8 +734,9 @@ const SalesOrderListPage = () => {
           searchText, statusTab, customerFilter, gradeFilter,
           dateRange: dateRange ? [dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD')] : null,
           overdueEtdOnly,
+          orderKind, customerRole, familyRoot,
         },
-        columns: { hiddenCols: [...hiddenCols] },
+        columns: { hiddenCols: [...hiddenCols], knownCols: allColumnKeys() },
         sort: { sortBy, sortOrder },
         density,
       })
@@ -537,13 +780,41 @@ const SalesOrderListPage = () => {
     const p: string[] = []
     if (statusTab && statusTab !== 'all') p.push(`Trạng thái: ${ORDER_STATUS_LABELS[statusTab as SalesOrderStatus] || statusTab}`)
     if (gradeFilter) p.push(`Grade: ${gradeFilter}`)
-    if (customerFilter) p.push(`Khách: ${customers.find((c) => c.id === customerFilter)?.name || customerFilter}`)
+    if (customerFilter) {
+      const role = familyReady && customerRole !== 'buyer' ? ` (vai ${CUSTOMER_ROLE_LABELS[customerRole].toLowerCase()})` : ''
+      p.push(`Khách${role}: ${customers.find((c) => c.id === customerFilter)?.name || customerFilter}`)
+    }
+    if (familyReady && orderKind !== 'all') p.push(`Loại đơn: ${ORDER_KIND_LABELS[orderKind]}`)
+    if (familyReady && familyRoot) p.push(`HĐ gốc: ${familyRoot.label} (gốc + các đợt)`)
     if (dateRange?.[0] && dateRange?.[1]) p.push(`Ngày đặt: ${dateRange[0].format('DD/MM/YYYY')} → ${dateRange[1].format('DD/MM/YYYY')}`)
     if (searchText) p.push(`Tìm: "${searchText}"`)
     if (overdueEtdOnly) p.push('Chỉ đơn quá ETD')
     if (etdDay) p.push(`ETD: ${fmtDate(etdDay)}`)
     return p.join(' · ')
-  }, [statusTab, gradeFilter, customerFilter, dateRange, searchText, overdueEtdOnly, etdDay, customers])
+  }, [statusTab, gradeFilter, customerFilter, dateRange, searchText, overdueEtdOnly, etdDay, customers,
+    familyReady, customerRole, orderKind, familyRoot])
+
+  /**
+   * Tham số lọc DÙNG CHUNG cho nạp trang, xuất Excel "theo bộ lọc" và DÒNG TỔNG (getAllForSummary) — một chỗ,
+   * kẻo file Excel / dòng tổng lọc khác danh sách. Họ HĐ + vai khách: service tự bỏ qua khi chưa migration.
+   */
+  const baseParams = useMemo<SalesOrderListParams>(() => ({
+    search: searchText || undefined,
+    status: statusTab !== 'all' ? (statusTab as SalesOrderStatus) : undefined,
+    customer_id: customerFilter || undefined,
+    customer_role: customerFilter ? customerRole : undefined,
+    grade: gradeFilter || undefined,
+    date_from: dateRange?.[0]?.format('YYYY-MM-DD') || undefined,
+    date_to: dateRange?.[1]?.format('YYYY-MM-DD') || undefined,
+    sort_by: sortBy,
+    sort_order: sortOrder,
+    overdue_etd_only: overdueEtdOnly || undefined,
+    etd_from: etdDay || undefined,
+    etd_to: etdDay || undefined,
+    order_kind: orderKind !== 'all' ? orderKind : undefined,
+    family_root: familyRoot?.id || undefined,
+  }), [searchText, statusTab, customerFilter, customerRole, gradeFilter, dateRange, sortBy, sortOrder,
+    overdueEtdOnly, etdDay, orderKind, familyRoot])
 
   const handleExportSelected = async () => {
     if (selectedOrders.length === 0) return
@@ -558,6 +829,8 @@ const SalesOrderListPage = () => {
       ])
       await exportSalesOrdersExcel({
         orders: selectedOrders, lotProgress: prog, lotPay: pay, filterDesc, scopeLabel: 'Đơn đã chọn',
+        // Đơn đã chọn nằm trên trang đang xem → số đợt của các dòng gốc đã có sẵn
+        familyCounts,
       })
       message.success(`Đã xuất ${selectedOrders.length} đơn`)
     } catch (e: any) {
@@ -577,19 +850,7 @@ const SalesOrderListPage = () => {
       const all: SalesOrder[] = []
       let grand = 0
       for (let page = 1; (page - 1) * PAGE < CAP; page++) {
-        const res = await salesOrderService.getList({
-          page, pageSize: PAGE,
-          search: searchText || undefined,
-          status: statusTab !== 'all' ? (statusTab as SalesOrderStatus) : undefined,
-          customer_id: customerFilter || undefined,
-          grade: gradeFilter || undefined,
-          date_from: dateRange?.[0]?.format('YYYY-MM-DD') || undefined,
-          date_to: dateRange?.[1]?.format('YYYY-MM-DD') || undefined,
-          sort_by: sortBy, sort_order: sortOrder,
-          overdue_etd_only: overdueEtdOnly || undefined,
-          etd_from: etdDay || undefined,
-          etd_to: etdDay || undefined,
-        })
+        const res = await salesOrderService.getList({ ...baseParams, page, pageSize: PAGE })
         grand = res.total
         all.push(...res.data)
         if (all.length >= res.total || res.data.length < PAGE) break
@@ -601,12 +862,15 @@ const SalesOrderListPage = () => {
       }
       // Cả hai trục, giống chỗ xuất đơn đã chọn — hai chỗ phải sửa cùng lúc.
       const allIds = all.map((o) => o.id)
-      const [prog, pay] = await Promise.all([
+      const [prog, pay, fam] = await Promise.all([
         dispatchService.getLotProgressForOrders(allIds),
         salesOrderPaymentService.getLotPaymentForOrders(allIds).catch(() => ({})),   // mất 1 cột còn hơn mất cả file
+        // Số đợt cho các đơn GỐC (cột "Số HĐ gốc"/"Đợt" của dòng gốc) — hỏng thì 2 cột đó trống ở dòng gốc
+        salesOrderService.getFamilyCounts(all.filter((o) => !o.parent_order_id).map((o) => o.id))
+          .catch((e) => { console.error('[sales] Không đếm được các đợt mua tiếp khi xuất Excel:', e); return {} as Record<string, number> }),
       ])
       await exportSalesOrdersExcel({
-        orders: all, lotProgress: prog, lotPay: pay, filterDesc, scopeLabel: 'Tất cả theo bộ lọc',
+        orders: all, lotProgress: prog, lotPay: pay, filterDesc, scopeLabel: 'Tất cả theo bộ lọc', familyCounts: fam,
       })
       message.success(`Đã xuất ${all.length} đơn`)
     } catch (e: any) {
@@ -626,25 +890,23 @@ const SalesOrderListPage = () => {
       setLoading(true)
       setLoadError(null)
       const params: SalesOrderListParams = {
+        ...baseParams,
         page: pagination.current,
         pageSize: pagination.pageSize,
-        search: searchText || undefined,
-        status: statusTab !== 'all' ? (statusTab as SalesOrderStatus) : undefined,
-        customer_id: customerFilter || undefined,
-        grade: gradeFilter || undefined,
-        date_from: dateRange?.[0]?.format('YYYY-MM-DD') || undefined,
-        date_to: dateRange?.[1]?.format('YYYY-MM-DD') || undefined,
-        sort_by: sortBy,
-        sort_order: sortOrder,
-        overdue_etd_only: overdueEtdOnly || undefined,
-        etd_from: etdDay || undefined,
-        etd_to: etdDay || undefined,
       }
       const response = await salesOrderService.getList(params)
       setOrders(response.data)
       setTotal(response.total)
+      // Khối "Các đợt cùng HĐ" đang mở (dòng mở rộng) nạp lại theo dữ liệu mới — đổi trạng thái / realtime / huỷ đợt
+      queryClient.invalidateQueries({ queryKey: ['sales-order-family'] })
       // Tiến độ lô cho 3 view (best-effort, không chặn list)
       const ids = response.data.map((o) => o.id)
+
+      // Số đợt cho các dòng GỐC trên trang ("⧉ n đợt") — best-effort như tiến độ lô; hỏng thì xoá trắng + log,
+      // dòng gốc chỉ mất chữ "⧉ n đợt" (đợt con vẫn có "Đợt n · HĐ X" vì đọc ngay từ dòng).
+      salesOrderService.getFamilyCounts(response.data.filter((o) => !o.parent_order_id).map((o) => o.id))
+        .then(setFamilyCounts)
+        .catch((e) => { console.error('[sales] Không đếm được các đợt mua tiếp:', e); setFamilyCounts({}) })
       dispatchService.getLotProgressForOrders(ids)
         .then(setLotProgress)
         // Hỏng thì XOÁ TRẮNG tiến độ lô, đừng giữ số của lần tải trước — số cũ đứng cạnh
@@ -682,7 +944,7 @@ const SalesOrderListPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [pagination, searchText, statusTab, customerFilter, gradeFilter, dateRange, sortBy, sortOrder, overdueEtdOnly, etdDay])
+  }, [pagination, baseParams, queryClient])
 
   const fetchStats = useCallback(async () => {
     try {
@@ -965,9 +1227,15 @@ const SalesOrderListPage = () => {
   // ── Header style ──
   // Q5 UX: nếu là viết tắt → wrap Tooltip cho rõ nghĩa
   const HDR_TOOLTIPS: Record<string, string> = {
-    'Số HĐ': 'Số hợp đồng (HA20YYYYNNNN)',
+    'Số HĐ': familyReady
+      ? 'Số đơn (HA20YYYYNNNN). Đợt mua tiếp có thêm dòng "Đợt n · HĐ gốc"; HĐ gốc có đợt hiện "⧉ n đợt" — bấm để lọc cả HĐ'
+      : 'Số hợp đồng (HA20YYYYNNNN)',
+    'Người mua': 'Người mua — đứng tên HĐ, trả tiền, chịu công nợ. "→ …" = người nhận hàng khi khác người mua',
+    'Người nhận hàng': 'Người nhận hàng (khách cuối) khi KHÁC người mua — trống = giao thẳng cho người mua. Công nợ vẫn theo người mua',
+    'HĐ gốc': 'HĐ đã ký mà đơn mua tiếp theo (đơn gốc có đợt: chính nó)',
+    'Đợt': 'Thứ tự đợt trong HĐ: gốc = 1, đợt mua tiếp = 2, 3…',
     'SL (tấn)': 'Số lượng (tấn)',
-    'Số LOT': 'Số LOT của khách hàng (Customer PO)',
+    'PO khách': 'Số PO/tham chiếu của người mua (vd ATC 5200006321) — trước gọi là Số LOT',
     'Số BKG': 'Số booking vận tải (đặt tàu)',
     'ETD': 'Estimated Time of Departure — Ngày tàu chạy dự kiến',
     'Đ.giá': 'Đơn giá /tấn theo đồng tiền của đơn ($ xuất khẩu, ₫ nội địa)',
@@ -1162,6 +1430,58 @@ const SalesOrderListPage = () => {
   // Filter values — đồng bộ với toolbar
   const gradeFilteredValue = gradeFilter ? [gradeFilter] : null
 
+  // ── Họ HĐ: dòng phụ dưới số đơn ──
+  /** Số đơn CẢ HỌ của một dòng GỐC (1 = đơn thường). Đợt con luôn thuộc họ ≥ 2. */
+  const familySizeOf = (r: SalesOrder): number => (r.parent_order_id ? 2 : (familyCounts[r.id] ?? 1))
+  const isFamilyMember = (r: SalesOrder): boolean => familyReady && (!!r.parent_order_id || familySizeOf(r) >= 2)
+  const rootNoOf = (r: SalesOrder): string =>
+    r.parent_order_id ? (r.parent?.contract_no || r.parent?.code || '') : soDisplayCode(r)
+
+  /** Chữ phụ bấm được → chip "HĐ gốc: …" (stopPropagation: bấm dòng là mở panel chi tiết). */
+  const familyLink = (text: string, tip: string, onClick: () => void, color: string, fontSize = 10) => (
+    <Tooltip title={tip}>
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={(e) => { e.stopPropagation(); onClick() }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onClick() } }}
+        style={{
+          display: 'block', fontSize, color, cursor: 'pointer', lineHeight: 1.3, marginTop: 1,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'inherit',
+        }}
+      >
+        {text}
+      </span>
+    </Tooltip>
+  )
+
+  /** Dòng phụ cột Số HĐ: đợt "Đợt n · HĐ X" (chỗ DUY NHẤT trên bảng thấy quan hệ của đợt mang số riêng) / gốc "⧉ n đợt". */
+  const familySubLine = (r: SalesOrder) => {
+    if (!familyReady) return null
+    if (r.parent_order_id) {
+      const rootNo = rootNoOf(r)
+      return familyLink(
+        `Đợt ${r.continuation_seq ?? '?'}${rootNo ? ` · HĐ ${rootNo}` : ''}`,
+        `Mua tiếp theo HĐ ${rootNo || 'gốc'} — không ký HĐ mới. Bấm để lọc cả HĐ (gốc + các đợt).`,
+        () => applyFamilyRoot(r.parent_order_id as string, rootNo || 'gốc'),
+        SUB_GRAY,
+      )
+    }
+    const n = familySizeOf(r)
+    if (n < 2) return null
+    return familyLink(
+      `⧉ ${n} đợt`,
+      `HĐ gốc có ${n} đợt đang chạy (kể cả HĐ này). Bấm để lọc cả HĐ; mở dòng (▸) để xem các đợt.`,
+      () => applyFamilyRoot(r.id, soDisplayCode(r)),
+      palette.brand,
+    )
+  }
+
+  /** Một dòng chữ trong ô hẹp: cắt "…" riêng từng dòng (ô ellipsis của antd chỉ cắt được một dòng). */
+  const clip = (content: React.ReactNode, style?: React.CSSProperties) => (
+    <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...style }}>{content}</span>
+  )
+
   const columns: ColumnsType<SalesOrder> = [
     // ═══ CỘT THEO YÊU CẦU — sorter + filter ═══
     {
@@ -1181,7 +1501,13 @@ const SalesOrderListPage = () => {
       fixed: 'left',
       sorter: true,
       sortOrder: sortedColumn('contract_no'),
-      render: (_: string, r: SalesOrder) => mono(<strong>{soDisplayCode(r)}</strong>),
+      // Không tô nền / viền dòng cho họ HĐ — hai thứ đó đang mã hoá "đã TT" / "quá hạn"
+      render: (_: string, r: SalesOrder) => (
+        <div style={{ minWidth: 0 }}>
+          {mono(<strong>{soDisplayCode(r)}</strong>)}
+          {familySubLine(r)}
+        </div>
+      ),
     },
     {
       title: hdr('Người mua'),
@@ -1196,7 +1522,65 @@ const SalesOrderListPage = () => {
         const c = r.customer
         if (!c) return gray(null)
         const f = countryFlag(c.country)
-        return <span style={{ fontSize: 12 }}>{f ? f + ' ' : ''}{c.short_name || c.name}</span>
+        const buyer = <span style={{ fontSize: 12 }}>{f ? f + ' ' : ''}{partyShortName(c)}</span>
+        // "→ người nhận" chỉ khi đơn có người nhận riêng; tooltip ghi đủ tên hai bên
+        if (!familyReady || !r.ship_to_customer_id) {
+          return <Tooltip title={c.name} mouseEnterDelay={0.4}>{clip(buyer)}</Tooltip>
+        }
+        const rec = r.ship_to
+        const tip = `Người mua (đứng tên HĐ, trả tiền, công nợ): ${c.name} → Người nhận hàng: ${rec?.name || '(không tìm thấy hồ sơ)'}`
+        return (
+          <Tooltip title={tip}>
+            <div style={{ minWidth: 0 }}>
+              {clip(buyer)}
+              {clip(<>→ {rec ? partyShortName(rec) : 'không rõ người nhận'}</>, { fontSize: 11, color: SUB_GRAY, lineHeight: 1.3 })}
+            </div>
+          </Tooltip>
+        )
+      },
+    },
+    // ── 3 cột họ HĐ / người nhận: ẩn mặc định (ẩn-hiện + Excel), KHÔNG sorter ──
+    {
+      title: hdr('Người nhận hàng'),
+      key: 'ship_to',
+      width: 150,
+      ellipsis: true,
+      render: (_: unknown, r: SalesOrder) => {
+        if (!r.ship_to_customer_id) return gray(null)
+        const s = r.ship_to
+        if (!s) return <span style={{ fontSize: 11, color: '#cf1322' }}>Không tìm thấy hồ sơ</span>
+        const f = countryFlag(s.country)
+        return <Tooltip title={s.name}>{clip(<span style={{ fontSize: 12 }}>{f ? f + ' ' : ''}{partyShortName(s)}</span>)}</Tooltip>
+      },
+    },
+    {
+      title: hdr('HĐ gốc'),
+      key: 'family_root',
+      width: 130,
+      ellipsis: true,
+      render: (_: unknown, r: SalesOrder) => {
+        if (!isFamilyMember(r)) return gray(null)
+        const rootNo = rootNoOf(r)
+        const rootId = r.parent_order_id || r.id
+        return familyLink(
+          r.parent_order_id ? rootNo : `${rootNo} · gốc`,
+          `Bấm để lọc cả HĐ ${rootNo} (gốc + các đợt)`,
+          () => applyFamilyRoot(rootId, rootNo || 'gốc'),
+          r.parent_order_id ? '#262626' : SUB_GRAY,
+          12,
+        )
+      },
+    },
+    {
+      title: hdr('Đợt'),
+      key: 'family_seq',
+      width: 60,
+      align: 'center',
+      render: (_: unknown, r: SalesOrder) => {
+        if (!isFamilyMember(r)) return gray(null)
+        return r.parent_order_id
+          ? <span style={{ fontSize: 12, fontFamily: 'monospace' }}>{r.continuation_seq ?? '?'}</span>
+          : <Tooltip title="Đơn gốc (đợt 1)"><span style={{ fontSize: 12, fontFamily: 'monospace', color: SUB_GRAY }}>1</span></Tooltip>
       },
     },
     {
@@ -1216,7 +1600,8 @@ const SalesOrderListPage = () => {
       render: (g: string) => g ? <span style={{ fontSize: 12, fontWeight: 500, color: '#262626' }}>{g}</span> : gray(null),
     },
     {
-      title: hdr('Số LOT'),
+      // Nhãn "PO khách" (là customer_po — chữ "LOT" đang mang 4 nghĩa); GIỮ key 'lot' cho cấu hình ẩn/hiện đã nhớ
+      title: hdr('PO khách'),
       dataIndex: 'customer_po',
       key: 'lot',
       width: 100,
@@ -1716,7 +2101,7 @@ const SalesOrderListPage = () => {
               key={f.key}
               closable
               onClose={(e) => { e.preventDefault(); f.onRemove() }}
-              style={{ margin: 0, padding: '2px 8px', fontSize: 12, background: '#fff', border: '1px solid #d0cec9' }}
+              style={{ margin: 0, padding: '2px 8px', fontSize: 12, background: '#fff', border: '1px solid #d0cec9', maxWidth: '100%', whiteSpace: 'normal', overflowWrap: 'anywhere' }}
             >
               {f.label}
             </Tag>
@@ -1789,7 +2174,7 @@ const SalesOrderListPage = () => {
           trigger={['click']}
           menu={{
             items: [
-              ...HIDEABLE_COLUMNS.map(c => ({
+              ...hideableCols.map(c => ({
                 key: c.key,
                 label: (
                   <Checkbox
@@ -1811,7 +2196,7 @@ const SalesOrderListPage = () => {
           }}
         >
           <Button icon={<SettingOutlined />}>
-            Tùy chỉnh cột ({HIDEABLE_COLUMNS.length - hiddenCols.size}/{HIDEABLE_COLUMNS.length})
+            Tùy chỉnh cột ({shownHideableCount}/{hideableCols.length})
           </Button>
         </Dropdown>
         {/* Xuất TẤT CẢ theo bộ lọc — không phải tick từng đơn như trước. */}
@@ -1833,16 +2218,8 @@ const SalesOrderListPage = () => {
       {/* Filter Bar */}
       <Card size="small" style={{ marginBottom: 16, borderRadius: 8 }}>
         <Row gutter={[12, 12]} align="middle">
-          <Col xs={24} sm={8} md={7}>
-            <Input.Search
-              placeholder="Tìm số HĐ, booking, B/L, grade..."
-              allowClear
-              onSearch={handleSearch}
-              onChange={(e) => {
-                if (!e.target.value) handleSearch('')
-              }}
-              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-            />
+          <Col xs={24} sm={familyReady ? 12 : 8} md={familyReady ? 6 : 7}>
+            <OrderSearchBox key={searchBoxKey} applied={searchText} onSearch={handleSearch} />
           </Col>
           {isPhone && (
             <Col xs={24} style={{ paddingTop: 0 }}>
@@ -1852,30 +2229,57 @@ const SalesOrderListPage = () => {
                 style={{ padding: 0, height: 'auto', fontWeight: 600 }}
                 onClick={() => setPhoneFiltersOpen((v) => !v)}
               >
-                {phoneFiltersOpen || customerFilter || gradeFilter || dateRange ? '▴ Thu gọn bộ lọc' : '▾ Bộ lọc thêm (khách, grade, ngày)'}
+                {phoneFiltersOpen || customerFilter || gradeFilter || dateRange || orderKind !== 'all'
+                  ? '▴ Thu gọn bộ lọc'
+                  : familyReady ? '▾ Bộ lọc thêm (khách, grade, loại đơn, ngày)' : '▾ Bộ lọc thêm (khách, grade, ngày)'}
               </Button>
             </Col>
           )}
-          {(!isPhone || phoneFiltersOpen || !!customerFilter || !!gradeFilter || !!dateRange) && (<>
-          <Col xs={12} sm={5} md={5}>
-            <Select
-              value={customerFilter}
-              onChange={(val) => {
-                setCustomerFilter(val)
-                setPagination((prev) => ({ ...prev, current: 1 }))
-              }}
-              allowClear
-              placeholder="Khách hàng"
-              style={{ width: '100%' }}
-              showSearch
-              optionFilterProp="label"
-              options={customers.map((c) => ({
-                label: [countryFlag(c.country), c.name].filter(Boolean).join(' '),
-                value: c.id,
-              }))}
-            />
+          {(!isPhone || phoneFiltersOpen || !!customerFilter || !!gradeFilter || !!dateRange || orderKind !== 'all') && (<>
+          <Col xs={familyReady ? 24 : 12} sm={familyReady ? 12 : 5} md={familyReady ? 7 : 5}>
+            {(() => {
+              const customerSelect = (
+                <Select
+                  value={customerFilter}
+                  onChange={(val) => {
+                    setCustomerFilter(val)
+                    setPagination((prev) => ({ ...prev, current: 1 }))
+                  }}
+                  allowClear
+                  placeholder="Khách hàng"
+                  style={familyReady ? { flex: 1, minWidth: 0 } : { width: '100%' }}
+                  showSearch
+                  optionFilterProp="label"
+                  options={customers.map((c) => ({
+                    label: [countryFlag(c.country), c.name].filter(Boolean).join(' '),
+                    value: c.id,
+                  }))}
+                />
+              )
+              if (!familyReady) return customerSelect
+              // Vai của khách trong lọc: Người mua (mặc định — tổng như cũ) | Người nhận (hàng giao tới khách qua
+              // trung gian) | Cả hai. Công nợ/doanh thu vẫn luôn theo người mua.
+              return (
+                <Space.Compact block>
+                  <Tooltip title="Lọc khách theo vai: Người mua = đứng tên HĐ, công nợ (mặc định) · Người nhận = hàng giao tới khách này qua người mua khác · Cả hai">
+                    <Select
+                      value={customerRole}
+                      onChange={(v: CustomerRole) => {
+                        setCustomerRole(v)
+                        setPagination((prev) => ({ ...prev, current: 1 }))
+                      }}
+                      aria-label="Vai của khách trong bộ lọc"
+                      style={{ width: 116, flex: 'none' }}
+                      popupMatchSelectWidth={false}
+                      options={(Object.keys(CUSTOMER_ROLE_LABELS) as CustomerRole[]).map((k) => ({ value: k, label: CUSTOMER_ROLE_LABELS[k] }))}
+                    />
+                  </Tooltip>
+                  {customerSelect}
+                </Space.Compact>
+              )
+            })()}
           </Col>
-          <Col xs={12} sm={5} md={4}>
+          <Col xs={12} sm={familyReady ? 6 : 5} md={familyReady ? 3 : 4}>
             <Select
               value={gradeFilter}
               onChange={(val) => {
@@ -1891,7 +2295,26 @@ const SalesOrderListPage = () => {
               }))}
             />
           </Col>
-          <Col xs={24} sm={6} md={8}>
+          {familyReady && (
+            <Col xs={12} sm={6} md={3}>
+              <Select
+                value={orderKind}
+                onChange={(v: OrderKindFilter) => {
+                  setOrderKind(v)
+                  setPagination((prev) => ({ ...prev, current: 1 }))
+                }}
+                aria-label="Loại đơn"
+                style={{ width: '100%' }}
+                popupMatchSelectWidth={false}
+                options={[
+                  { value: 'all', label: 'Mọi loại đơn' },
+                  { value: 'new', label: ORDER_KIND_LABELS.new },
+                  { value: 'continuation', label: `⧉ ${ORDER_KIND_LABELS.continuation}` },
+                ]}
+              />
+            </Col>
+          )}
+          <Col xs={24} sm={familyReady ? 12 : 6} md={familyReady ? 5 : 8}>
             <RangePicker
               value={dateRange}
               onChange={(dates) => {
@@ -2000,6 +2423,9 @@ const SalesOrderListPage = () => {
           }}
           onOpen={(o) => { setPanelOrderId(o.id); setPanelOpen(true) }}
           empty={emptyState}
+          familyReady={familyReady}
+          familyCounts={familyCounts}
+          onFamilyFilter={applyFamilyRoot}
         />
       ) : viewMode === 'split' ? (
         <SalesOrderSplitView
@@ -2012,15 +2438,21 @@ const SalesOrderListPage = () => {
       <Card style={{ borderRadius: 8 }}>
         <Table<SalesOrder>
           rowKey="id"
-          columns={columns.filter(c => !hiddenCols.has(c.key as string))}
+          columns={columns.filter(c =>
+            !hiddenCols.has(c.key as string) && (familyReady || !FAMILY_COL_KEYS.has(c.key as string)))}
           dataSource={orders}
           rowSelection={rowSelection}
           loading={loading}
           expandable={{
+            // Dòng mở rộng: bảng mặt hàng (đơn nhiều mặt hàng) + khối "Các đợt cùng HĐ" (nạp khi mở dòng)
             expandedRowRender: (record) => {
               const items = (record as any).items as any[] || []
-              if (items.length <= 1) return null
+              const family = isFamilyMember(record)
+                ? <FamilyRowsBlock rootId={record.parent_order_id || record.id} currentId={record.id} onOpen={openOrderTabById} />
+                : null
+              if (items.length <= 1) return family
               return (
+                <>
                 <div style={{ padding: '4px 0' }}>
                   <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                     <thead>
@@ -2057,9 +2489,11 @@ const SalesOrderListPage = () => {
                     </tbody>
                   </table>
                 </div>
+                {family}
+                </>
               )
             },
-            rowExpandable: (record) => ((record as any).items?.length || 0) > 1,
+            rowExpandable: (record) => ((record as any).items?.length || 0) > 1 || isFamilyMember(record),
           }}
           pagination={{
             current: pagination.current,
@@ -2166,7 +2600,7 @@ const SalesOrderListPage = () => {
           onPressEnter={handleSaveView}
         />
         <div style={{ marginTop: 12, fontSize: 12, color: '#999' }}>
-          {activeFilters.length} bộ lọc đang bật · {HIDEABLE_COLUMNS.length - hiddenCols.size}/{HIDEABLE_COLUMNS.length} cột hiện · Độ dày dòng: {{ compact: 'Gọn', normal: 'Vừa', comfortable: 'Thoáng' }[density]}
+          {activeFilters.length} bộ lọc đang bật · {shownHideableCount}/{hideableCols.length} cột hiện · Độ dày dòng: {{ compact: 'Gọn', normal: 'Vừa', comfortable: 'Thoáng' }[density]}
         </div>
       </Modal>
 

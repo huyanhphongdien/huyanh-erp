@@ -13,8 +13,9 @@
 import { Pagination, Skeleton, Tag } from 'antd'
 import dayjs from 'dayjs'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
-import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, soDisplayCode, countryFlag } from '../../../services/sales/salesTypes'
+import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, soDisplayCode, countryFlag, partyShortName } from '../../../services/sales/salesTypes'
 import { fmtNum, fmtDateShort } from '../../../utils/format'
+import { palette } from '../../../theme/palette'
 import { fmtMoney, isVnd } from '../../../services/sales/salesMoney'
 import { deliveredTons, remainingTons, type LotProgress } from '../../../services/logistics/dispatchService'
 import type { OrderLotMoney } from '../../../services/sales/salesOrderPaymentService'
@@ -32,12 +33,18 @@ interface Props {
   /** Chạm thẻ → mở chi tiết (panel trượt, full màn hình trên điện thoại). */
   onOpen: (order: SalesOrder) => void
   empty: React.ReactNode
+  // ── Họ HĐ + người nhận (sales_family_parties_p1) — vắng/false khi chưa migration: thẻ y như cũ ──
+  familyReady?: boolean
+  /** Số đơn CẢ HỌ của các đơn GỐC trên trang (getFamilyCounts) — ≥ 2 mới vẽ "⧉ HĐ gốc · n đợt" */
+  familyCounts?: Record<string, number>
+  /** Chạm dòng ⧉ → lọc cả HĐ (chip "HĐ gốc: …"). id = đơn GỐC. */
+  onFamilyFilter?: (rootId: string, rootLabel: string) => void
 }
 
 const MONO = "'JetBrains Mono', Consolas, monospace"
 const INK = '#111827'
 const SUB = '#6b7280'
-const BRAND = '#1B4D3E'
+const BRAND = palette.brand
 
 // Định dạng dùng chung (utils/format) — tấn vi-VN tối đa 2 số lẻ; ngày 'DD/MM' cho thẻ hẹp
 const tons = (n: number) => fmtNum(n, 2)
@@ -63,9 +70,31 @@ function Stat({ label, value, tone }: { label: string; value: React.ReactNode; t
   )
 }
 
-function OrderCard({ o, p, money, onOpen }: { o: SalesOrder; p?: LotProgress; money?: OrderLotMoney; onOpen: () => void }) {
+/** Dòng họ HĐ dưới số đơn: đợt "⧉ Đợt 3 · HĐ HA20260302" / gốc có đợt "⧉ HĐ gốc · 3 đợt" / còn lại null. */
+function familyLineOf(o: SalesOrder, familyCounts?: Record<string, number>): { rootId: string; rootNo: string; text: string } | null {
+  if (o.parent_order_id) {
+    const rootNo = o.parent?.contract_no || o.parent?.code || ''
+    return {
+      rootId: o.parent_order_id,
+      rootNo,
+      text: `⧉ Đợt ${o.continuation_seq ?? '?'}${rootNo ? ` · HĐ ${rootNo}` : ''}`,
+    }
+  }
+  const n = familyCounts?.[o.id] ?? 1
+  return n >= 2 ? { rootId: o.id, rootNo: soDisplayCode(o), text: `⧉ HĐ gốc · ${n} đợt` } : null
+}
+
+function OrderCard({ o, p, money, onOpen, familyReady, familyCounts, onFamilyFilter }: {
+  o: SalesOrder; p?: LotProgress; money?: OrderLotMoney; onOpen: () => void
+  familyReady?: boolean; familyCounts?: Record<string, number>; onFamilyFilter?: (rootId: string, rootLabel: string) => void
+}) {
   const c = o.customer
   const cancelled = o.status === 'cancelled'
+  const fam = familyReady ? familyLineOf(o, familyCounts) : null
+  // Người nhận RIÊNG (khác người mua) — chỉ khi có; đơn mua thẳng giữ y như cũ
+  const receiver = familyReady && o.ship_to_customer_id
+    ? (o.ship_to ? partyShortName(o.ship_to) : 'không rõ người nhận')
+    : null
   const d = cancelled ? null : deliveredTons(o.quantity_tons, p, o.status)
   const rem = cancelled ? 0 : remainingTons(o.quantity_tons, p, o.status)
   const chips = p && p.contsTotal > 0 ? mergeLotAxes(p.deliveryByLot, money?.moneyByLot) : []
@@ -90,9 +119,32 @@ function OrderCard({ o, p, money, onOpen }: { o: SalesOrder; p?: LotProgress; mo
       {/* Dòng 1: số HĐ + trạng thái */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 15, color: BRAND, lineHeight: 1.2 }}>{soDisplayCode(o)}</div>
+          <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 15, color: BRAND, lineHeight: 1.2, overflowWrap: 'anywhere' }}>{soDisplayCode(o)}</div>
+          {/* Dòng họ HĐ — chạm: lọc cả HĐ (gốc + các đợt), không mở thẻ */}
+          {fam && (
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label={`${fam.text} — lọc cả HĐ`}
+              onClick={(e) => { e.stopPropagation(); onFamilyFilter?.(fam.rootId, fam.rootNo || 'gốc') }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onFamilyFilter?.(fam.rootId, fam.rootNo || 'gốc') }
+              }}
+              style={{
+                fontSize: 12.5, fontWeight: 600, color: BRAND, lineHeight: 1.3, marginTop: 2,
+                padding: '2px 0', overflowWrap: 'anywhere', cursor: onFamilyFilter ? 'pointer' : 'default',
+              }}
+            >
+              {fam.text}
+            </div>
+          )}
           <div style={{ fontSize: 14, fontWeight: 600, color: INK, lineHeight: 1.3, marginTop: 3, overflowWrap: 'anywhere' }}>
-            {c ? `${flag(c.country)} ${c.short_name || c.name}`.trim() : <span style={{ color: SUB, fontWeight: 400 }}>Chưa có khách</span>}
+            {c
+              ? <>
+                  {`${flag(c.country)} ${partyShortName(c)}`.trim()}
+                  {receiver && <span style={{ color: SUB, fontWeight: 500 }}> → {receiver}</span>}
+                </>
+              : <span style={{ color: SUB, fontWeight: 400 }}>Chưa có khách</span>}
           </div>
         </div>
         <Tag color={ORDER_STATUS_COLORS[o.status]} style={{ margin: 0, fontSize: 12, lineHeight: '22px', flexShrink: 0 }}>
@@ -160,7 +212,9 @@ function OrderCard({ o, p, money, onOpen }: { o: SalesOrder; p?: LotProgress; mo
   )
 }
 
-export default function SalesOrderPhoneList({ orders, loading, lotProgress, lotPay, page, onOpen, empty }: Props) {
+export default function SalesOrderPhoneList({
+  orders, loading, lotProgress, lotPay, page, onOpen, empty, familyReady, familyCounts, onFamilyFilter,
+}: Props) {
   if (loading && orders.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -179,7 +233,10 @@ export default function SalesOrderPhoneList({ orders, loading, lotProgress, lotP
     <div style={{ opacity: loading ? 0.6 : 1, transition: 'opacity .15s' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {orders.map((o) => (
-          <OrderCard key={o.id} o={o} p={lotProgress[o.id]} money={lotPay[o.id]} onOpen={() => onOpen(o)} />
+          <OrderCard
+            key={o.id} o={o} p={lotProgress[o.id]} money={lotPay[o.id]} onOpen={() => onOpen(o)}
+            familyReady={familyReady} familyCounts={familyCounts} onFamilyFilter={onFamilyFilter}
+          />
         ))}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 14, padding: '0 2px' }}>

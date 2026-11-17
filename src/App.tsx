@@ -595,6 +595,9 @@ function App() {
               <Route path="sales/contracts/review" element={<Suspense fallback={<LoadingSpinner />}><ContractReviewPage /></Suspense>} />
               <Route path="sales/contracts/sign" element={<Suspense fallback={<LoadingSpinner />}><ContractSignPage /></Suspense>} />
               <Route path="sales/orders/:orderId" element={<Suspense fallback={<LoadingSpinner />}><SalesOrderDetailPage /></Suspense>} />
+              {/* Đơn MUA TIẾP theo HĐ đã ký (form tạo đơn, chế độ mua tiếp) — đơn nguồn = :orderId. Tab dùng
+                  'sales-order-continue-<id>' + props {sourceOrderId}; route này cho điện thoại / mở thẳng URL. */}
+              <Route path="sales/orders/:orderId/continue" element={<Suspense fallback={<LoadingSpinner />}><SalesOrderCreatePage continueFromRoute /></Suspense>} />
               <Route path="sales/orders/:orderId/packing" element={<Suspense fallback={<LoadingSpinner />}><ContainerPackingPage /></Suspense>} />
               <Route path="sales/orders/:orderId/production" element={<Suspense fallback={<LoadingSpinner />}><SalesOrderProductionPage /></Suspense>} />
               <Route path="sales/orders/:orderId/documents" element={<Suspense fallback={<LoadingSpinner />}><ExportDocumentsPage /></Suspense>} />

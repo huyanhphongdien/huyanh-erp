@@ -35,6 +35,8 @@ import {
   salesContractEmailService,
   type ContractEmailContext,
 } from './salesContractEmailService'
+import { normalizeContractNo, partyShortName } from './salesTypes'
+import { salesOrderService } from './salesOrderService'
 
 export type ContractStatus =
   | 'drafting'
@@ -408,30 +410,104 @@ function _notifyContractEvent(params: {
 }
 
 // ----------------------------------------------------------------------------
-// Chống TRÙNG SỐ HỢP ĐỒNG — so theo GỐC (token đầu) để bắt cả near-dup
-// ('HA20260053' vs 'HA20260053 PH' vs 'HA20260053 ' vs 'ha20260053').
+// Chống TRÙNG SỐ HỢP ĐỒNG (17/11/2026 — sales_family_parties_p1.sql)
+// · TRÙNG NGUYÊN VĂN sau chuẩn hoá (hoa/thường, khoảng trắng — y như index DB
+//   ux_sales_orders_contract_no_norm_active) với đơn CHƯA HUỶ khác → CHẶN.
+// · Chỉ CÙNG GỐC SỐ (token đầu, bỏ đuôi đợt '-D<n>'/'-<n>') → CẢNH BÁO, vẫn cho lưu:
+//   khác người mua → 'Đã có HĐ HA20260053 của Yoong Do — đúng là HĐ khác?'; cùng người mua mà không cùng họ →
+//   gợi ý dùng "Tạo đơn mua tiếp". Đơn CÙNG HỌ HĐ (gốc + các đợt) không cảnh báo.
+// Trước đây cùng token đầu là CHẶN → chặn nhầm 2 cặp hợp lệ (HA20260053 / 'HA20260053 PH', '…/OCT' /
+// '…/OCT - LOT 4') mà lại để lọt 'HA20260302-2'.
 // ----------------------------------------------------------------------------
 function contractBase(s: string | null | undefined): string {
-  return (s || '').trim().toUpperCase().split(/\s+/)[0] || ''
+  const token = normalizeContractNo(s).split(' ')[0] || ''
+  return token.replace(/-D?\d{1,3}$/, '') || token   // 'HA20260302-D3' / 'HA20260302-2' → 'HA20260302'
 }
 
-/** Tìm đơn ACTIVE khác đang dùng CÙNG GỐC số HĐ. Trả về đơn trùng (hoặc null). */
+/** Một đơn đụng số HĐ đang kiểm. */
+export interface ContractNoHit {
+  id: string
+  code: string
+  contract_no: string
+  customer_id: string | null
+  /** tên ngắn người mua (partyShortName) */
+  customer_name: string | null
+  /** exact = trùng nguyên văn sau chuẩn hoá (CHẶN) · other_buyer = cùng gốc số, khác người mua (CẢNH BÁO) ·
+   *  same_buyer = cùng gốc số, cùng người mua nhưng không cùng họ HĐ (gợi ý "Tạo đơn mua tiếp") */
+  kind: 'exact' | 'other_buyer' | 'same_buyer'
+}
+
+/** Kết quả kiểm số HĐ: `block` ≠ null → KHÔNG cho lưu; `warnings` → hỏi lại rồi cho lưu. */
+export interface ContractNoCheck {
+  block: ContractNoHit | null
+  warnings: ContractNoHit[]
+}
+
+/** Tuỳ chọn kiểm số HĐ (checkContractNo). */
+export interface ContractNoCheckOptions {
+  /** bỏ chính đơn đang sửa */
+  excludeSalesOrderId?: string
+  /** người mua của đơn đang lưu — để phân biệt other_buyer / same_buyer */
+  buyerId?: string | null
+  /** id GỐC của họ HĐ mà đơn đang lưu thuộc về (đơn gốc → chính nó; đợt → parent_order_id) — đơn cùng họ không cảnh báo */
+  familyRootId?: string | null
+}
+
+/** Câu tiếng Việt cho một lần đụng số (dùng chung cho modal/alert, đừng gõ lại ở từng màn). */
+export function describeContractNoHit(hit: ContractNoHit): string {
+  const who = hit.customer_name ? ` của ${hit.customer_name}` : ''
+  if (hit.kind === 'exact') return `Số HĐ "${hit.contract_no}" đã có ở đơn ${hit.code}${who} — số HĐ không được trùng, dùng số khác`
+  if (hit.kind === 'same_buyer') {
+    return `Đã có HĐ ${hit.contract_no}${who} (${hit.code}) — nếu là mua tiếp theo HĐ đó, dùng "Tạo đơn mua tiếp" thay vì tạo HĐ mới`
+  }
+  return `Đã có HĐ ${hit.contract_no}${who} (${hit.code}) — đúng là HĐ khác?`
+}
+
+/** Kiểm số HĐ với các đơn CHƯA HUỶ khác: trùng nguyên văn → block; cùng gốc số → warnings (bỏ đơn cùng họ). */
 async function findContractConflictCore(
   contractNo: string,
-  excludeSalesOrderId?: string,
-): Promise<{ code: string; contract_no: string } | null> {
+  opts: ContractNoCheckOptions = {},
+): Promise<ContractNoCheck> {
+  const norm = normalizeContractNo(contractNo)
   const base = contractBase(contractNo)
-  if (!base) return null
+  if (!norm || !base) return { block: null, warnings: [] }
+  const ready = await salesOrderService.familyPartiesReady()
   const { data, error } = await supabase
     .from('sales_orders')
-    .select('id, code, contract_no, status')
+    .select(`id, code, contract_no, status, customer_id${ready ? ', parent_order_id' : ''}, customer:sales_customers!customer_id(name, short_name)`)
     .neq('status', 'cancelled')
-    .ilike('contract_no', `${base}%`)   // bắt cả 'HA20260053 PH', lọc gốc ở dưới
-  if (error) { console.error('findContractConflict error:', error); return null }
-  const hit = (data || []).find(
-    (r: any) => r.id !== excludeSalesOrderId && contractBase(r.contract_no) === base,
-  )
-  return hit ? { code: hit.code, contract_no: hit.contract_no } : null
+    // bắt cả 'HA20260053 PH', ' ha20260053', 'HA20260302-D3' — lọc chính xác ở dưới; ký tự đại diện LIKE → '_'
+    .ilike('contract_no', `%${base.replace(/[\\%_*]/g, '_')}%`)
+    .limit(200)
+  if (error) throw new Error(`Không kiểm được trùng số HĐ: ${error.message}`)
+
+  const rows = (data || []) as unknown as Array<{
+    id: string; code: string; contract_no: string | null; customer_id: string | null; parent_order_id?: string | null
+    customer: { name?: string | null; short_name?: string | null } | Array<{ name?: string | null; short_name?: string | null }> | null
+  }>
+  let block: ContractNoHit | null = null
+  const warnings: ContractNoHit[] = []
+  for (const r of rows) {
+    if (!r.contract_no || r.id === opts.excludeSalesOrderId) continue
+    const cust = Array.isArray(r.customer) ? r.customer[0] : r.customer
+    const hit = (kind: ContractNoHit['kind']): ContractNoHit => ({
+      id: r.id,
+      code: r.code,
+      contract_no: r.contract_no as string,
+      customer_id: r.customer_id,
+      customer_name: cust ? partyShortName(cust) : null,
+      kind,
+    })
+    if (normalizeContractNo(r.contract_no) === norm) {
+      if (!block) block = hit('exact')   // DB cũng chặn (index chuẩn hoá) — báo trước cho rõ đơn nào
+      continue
+    }
+    if (contractBase(r.contract_no) !== base) continue
+    const root = opts.familyRootId || null
+    if (root && (r.id === root || r.parent_order_id === root)) continue   // cùng họ HĐ → không cảnh báo
+    warnings.push(hit(opts.buyerId && r.customer_id === opts.buyerId ? 'same_buyer' : 'other_buyer'))
+  }
+  return { block, warnings }
 }
 
 // ----------------------------------------------------------------------------
@@ -447,21 +523,31 @@ export const salesContractWorkflowService = {
   getCurrentEmployeeId,
   getEmployeeIdByEmail,
 
-  /** Check số HĐ đã tồn tại chưa (bỏ qua sales_order_id hiện tại nếu đang edit).
-   *  Trả về true nếu trùng → caller hiển thị error. */
-  /** Đơn active khác đang dùng CÙNG GỐC số HĐ (để báo trùng rõ đơn nào). */
+  /** Đơn CHƯA HUỶ khác đang dùng số HĐ TRÙNG NGUYÊN VĂN (sau chuẩn hoá hoa/thường + khoảng trắng) → caller
+   *  CHẶN lưu, báo rõ đơn nào. Chỉ cùng gốc số thì KHÔNG còn trả ở đây (xem checkContractNo → warnings). */
   async findContractNoConflict(
     contractNo: string,
     excludeSalesOrderId?: string,
   ): Promise<{ code: string; contract_no: string } | null> {
-    return findContractConflictCore(contractNo, excludeSalesOrderId)
+    const { block } = await findContractConflictCore(contractNo, { excludeSalesOrderId })
+    return block ? { code: block.code, contract_no: block.contract_no } : null
   },
 
+  /** true nếu số HĐ đã có ở đơn chưa huỷ khác (trùng nguyên văn sau chuẩn hoá). */
   async isContractNoTaken(
     contractNo: string,
     excludeSalesOrderId?: string,
   ): Promise<boolean> {
-    return (await findContractConflictCore(contractNo, excludeSalesOrderId)) != null
+    return (await findContractConflictCore(contractNo, { excludeSalesOrderId })).block != null
+  },
+
+  /**
+   * Kiểm số HĐ đủ 2 mức cho MỌI đường ghi (tạo đơn, tab Hợp đồng, sửa nhanh, đợt mua tiếp):
+   * `block` = trùng nguyên văn → chặn; `warnings` = cùng gốc số, khác người mua / cùng người mua khác họ → hỏi lại.
+   * Đơn cùng họ HĐ (opts.familyRootId) không cảnh báo. Câu hiển thị: describeContractNoHit(hit).
+   */
+  async checkContractNo(contractNo: string, opts: ContractNoCheckOptions = {}): Promise<ContractNoCheck> {
+    return findContractConflictCore(contractNo, opts)
   },
 
   /** Sale tạo HĐ draft + submit thẳng cho Phú LV review.

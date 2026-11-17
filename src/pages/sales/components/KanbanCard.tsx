@@ -19,11 +19,14 @@ import LotChipStrip, { mergeLotAxes } from '../../../components/sales/LotChipStr
 import type { OrderLotMoney } from '../../../services/sales/salesOrderPaymentService'
 import { soDisplayCode, PAYMENT_STATUS_LABELS } from '../../../services/sales/salesTypes'
 import { fmtMoney, isVnd } from '../../../services/sales/salesMoney'
+import { fmtDate, fmtNum } from '../../../utils/format'
+import { palette } from '../../../theme/palette'
 
 export interface KanbanOrder {
   id: string
   code: string
   contract_no: string | null
+  /** Tên NGẮN người mua (partyShortName) */
   customer_short: string
   grade: string
   quantity_tons: number | null
@@ -40,6 +43,24 @@ export interface KanbanOrder {
   stage_started_at: string | null
   stage_sla_hours: number | null
   current_owner_name: string | null
+
+  // ── Các bên của đơn + họ HĐ (sales_family_parties_p1, 17/11/2026) — vắng khi chưa migration ──
+  /** Tên đầy đủ người mua — tooltip "Người mua … → Người nhận hàng …" */
+  customer_name?: string | null
+  /** Người nhận hàng RIÊNG (khác người mua), tên ngắn qua partyShortName. Vắng/null = giao thẳng cho người mua. */
+  receiver_short?: string | null
+  receiver_name?: string | null
+  /** Đơn GỐC (đợt mua tiếp) — null với HĐ mới */
+  parent_order_id?: string | null
+  /** Số HĐ của đơn gốc (chỉ đợt con) */
+  parent_contract_no?: string | null
+  parent_contract_date?: string | null
+  /** Số đợt (trigger cấp; gốc = null ≙ đợt 1) */
+  continuation_seq?: number | null
+  /** Số đơn CẢ HỌ đang có trên bảng (gốc tính đợt 1) — trang đếm bằng useMemo; gốc ≥ 2 mới vẽ dòng ⧉ */
+  family_size?: number
+  /** Ngày ký HĐ gốc — tooltip dòng ⧉ */
+  family_contract_date?: string | null
 }
 
 interface KanbanCardProps {
@@ -48,10 +69,44 @@ interface KanbanCardProps {
   onDragEnd: () => void
   lp?: LotProgress
   lotPay?: OrderLotMoney   // thu tiền theo lô
+  /** "Soi HĐ": 'focus' = thẻ thuộc họ đang soi (vành thương hiệu) · 'dim' = thẻ khác (mờ) */
+  familyHighlight?: 'focus' | 'dim' | null
+  /** Bấm dòng ⧉ → soi cả HĐ (truyền id ĐƠN GỐC) */
+  onFamilyClick?: (rootId: string) => void
 }
 
-export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }: KanbanCardProps) {
+// Bóng thẻ thường / khi rê chuột. Soi HĐ thêm vành 2px màu thương hiệu bằng box-shadow — KHÔNG đụng viền
+// trái (viền trái là màu SLA).
+const SHADOW = '0 1px 2px rgba(0,0,0,0.04)'
+const SHADOW_HOVER = '0 2px 6px rgba(0,0,0,0.1)'
+/** Khoảng trắng KHÔNG ngắt dòng (U+00A0) — giữ "·" dính với grade */
+const NBSP = String.fromCharCode(0xa0)
+
+export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay, familyHighlight, onFamilyClick }: KanbanCardProps) {
   const navigate = useNavigate()
+
+  // ── Họ HĐ: đợt con LUÔN thuộc họ ≥ 2 đơn (nó + gốc); gốc chỉ vẽ khi có đợt đang chạy ──
+  const isChild = !!order.parent_order_id
+  const familyRootId = order.parent_order_id || order.id
+  const familySize = Math.max(order.family_size ?? 1, isChild ? 2 : 1)
+  const family = (() => {
+    if (!isChild && familySize < 2) return null
+    const rootNo = isChild ? (order.parent_contract_no || '') : soDisplayCode(order)
+    const signed = order.family_contract_date ?? order.parent_contract_date ?? null
+    const who = [order.customer_short !== '—' ? order.customer_short : '', signed ? `ký ${fmtDate(signed)}` : '']
+      .filter(Boolean).join(', ')
+    const label = isChild
+      ? `⧉ Đợt ${order.continuation_seq ?? '?'}${rootNo ? ` · HĐ ${rootNo}` : ''}`
+      : `⧉ HĐ gốc · ${familySize} đợt`
+    const tip = isChild
+      ? `Mua tiếp theo HĐ ${rootNo || 'gốc'}${who ? ` (${who})` : ''} — không ký HĐ mới. HĐ có ${familySize} đợt đang chạy. Bấm để soi cả HĐ.`
+      : `HĐ gốc ${rootNo}${who ? ` (${who})` : ''} — có ${familySize} đợt đang chạy, kể cả HĐ này. Mỗi đợt là một đơn riêng (tiền, lô, công nợ riêng). Bấm để soi cả HĐ.`
+    return { label, tip }
+  })()
+  const ring = familyHighlight === 'focus' ? `0 0 0 2px ${palette.brand}, ` : ''
+  const partiesTip = order.receiver_short
+    ? `Người mua (đứng tên HĐ, trả tiền, công nợ): ${order.customer_name || order.customer_short} → Người nhận hàng: ${order.receiver_name || order.receiver_short}`
+    : null
 
   // Ghép hai trục theo số lô. Đơn chưa chia lô → mảng rỗng → rơi về badge cũ theo container.
   const chipLots = useMemo(
@@ -98,10 +153,11 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }
         cursor: 'grab',
         userSelect: 'none',
         transition: 'all 0.15s',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+        boxShadow: ring + SHADOW,
+        opacity: familyHighlight === 'dim' ? 0.35 : 1,
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = ring + SHADOW_HOVER }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = ring + SHADOW }}
     >
       {/* Top row: code + value */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
@@ -117,11 +173,48 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }
         )}
       </div>
 
-      {/* Customer + grade */}
-      <div style={{ fontSize: 12, color: '#374151', marginBottom: 4 }}>
-        <strong>{order.customer_short}</strong>
-        {order.grade && <span style={{ marginLeft: 6, color: '#6b7280' }}>· {order.grade}</span>}
-      </div>
+      {/* Dòng 2: NGƯỜI MUA → người nhận · grade. "→ người nhận" chỉ khi đơn có người nhận riêng (4 đơn
+          Jintong mua thẳng vẫn y như cũ); chữ xám, tối đa ~90px rồi cắt "…", tooltip ghi đủ tên hai bên. */}
+      {(() => {
+        const line = (
+          <div style={{ fontSize: 12, color: '#374151', marginBottom: 4, lineHeight: 1.35 }}>
+            <strong>{order.customer_short}</strong>
+            {/* Khoảng trắng thường (không dùng margin): xuống dòng thì không thụt đầu dòng */}
+            {order.receiver_short && <>{' '}<span style={{
+              color: '#6b7280', display: 'inline-block', maxWidth: 90,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom',
+            }}>
+              → {order.receiver_short}
+            </span></>}
+            {/* "·" dính với grade (khoảng trắng không ngắt) — cột hẹp xuống dòng thì không để "·" mồ côi */}
+            {order.grade && <span style={{ marginLeft: 6, color: '#6b7280' }}>{`·${NBSP}${order.grade}`}</span>}
+          </div>
+        )
+        return partiesTip ? <Tooltip title={partiesTip}>{line}</Tooltip> : line
+      })()}
+
+      {/* Dòng 3 (họ HĐ ≥ 2 đơn): "⧉ Đợt 3 · HĐ HA20260302" / "⧉ HĐ gốc · 3 đợt". Màu thương hiệu (không dùng
+          màu trạng thái), 1 dòng cắt "…". Bấm được theo mẫu chấm tiền: Tooltip hover+click + stopPropagation
+          (cả thẻ là vùng kéo/bấm mở đơn; điện thoại không có hover). */}
+      {family && (
+        <Tooltip title={family.tip} trigger={['hover', 'click']}>
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={`${family.label} — soi cả HĐ`}
+            onClick={(e) => { e.stopPropagation(); onFamilyClick?.(familyRootId) }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onFamilyClick?.(familyRootId) }
+            }}
+            style={{
+              fontSize: 10.5, fontWeight: 600, color: palette.brand, marginBottom: 4, lineHeight: 1.4,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer',
+            }}
+          >
+            {family.label}
+          </div>
+        </Tooltip>
+      )}
 
       {/* Owner */}
       {order.current_owner_name && (
@@ -162,7 +255,7 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }
         {(() => {
           const rem = remainingTons(order.quantity_tons, lp, order.status)
           return rem > 0
-            ? <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', flex: 'none' }}>còn thiếu {rem.toFixed(2)}T</span>
+            ? <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', flex: 'none' }}>còn thiếu {fmtNum(rem, 2)}T</span>
             : <span style={{ fontSize: 10, fontWeight: 600, color: '#15803d', flex: 'none' }}>đủ hàng</span>
         })()}
 

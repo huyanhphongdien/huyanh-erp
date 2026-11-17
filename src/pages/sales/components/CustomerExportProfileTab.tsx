@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react'
 import {
-  Card, Form, Input, Select, Button, Table, InputNumber, message, Spin, Row, Col,
+  Card, Form, Input, Select, Button, Table, InputNumber, message, Spin, Row, Col, Switch, Typography,
 } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import customerExportProfileService, {
@@ -17,6 +17,7 @@ import customerExportProfileService, {
 } from '../../../services/sales/customerExportProfileService'
 import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import PageState from '../../../components/common/PageState'
+import { useFamilyPartiesReady } from './OrderFamilyChip'
 
 const { TextArea } = Input
 
@@ -24,6 +25,8 @@ type CellMap = Record<string, { originals: number; copies: number }>
 
 export default function CustomerExportProfileTab({ customerId }: { customerId: string }) {
   const [form] = Form.useForm()
+  // Cột hide_receiver_on_invoice chỉ có sau migration sales_family_parties_p1 → chưa có thì ẨN công tắc và KHÔNG gửi
+  const partiesReady = useFamilyPartiesReady()
   const [banks, setBanks] = useState<CompanyBank[]>([])
   const [checklist, setChecklist] = useState<CellMap>({})
   const [loading, setLoading] = useState(true)
@@ -66,6 +69,7 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
             default_negotiate_pct: profile.default_negotiate_pct,
             default_interest_rate: profile.default_interest_rate,
             default_term_days: profile.default_term_days,
+            hide_receiver_on_invoice: !!profile.hide_receiver_on_invoice,
           })
           const cl: CellMap = {}
           for (const it of profile.doc_checklist || []) {
@@ -109,7 +113,11 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
           copies: checklist[d.key]?.copies || 0,
         }))
         .filter((x) => x.originals > 0 || x.copies > 0)
-      await customerExportProfileService.upsert(customerId, { ...vals, doc_checklist })
+      const patch = { ...vals, doc_checklist }
+      // Chưa migration (hoặc công tắc chưa hiện) → bỏ hẳn cột, kẻo PGRST204; hiện rồi thì gửi đúng true/false
+      if (!partiesReady || patch.hide_receiver_on_invoice === undefined) delete patch.hide_receiver_on_invoice
+      else patch.hide_receiver_on_invoice = !!patch.hide_receiver_on_invoice
+      await customerExportProfileService.upsert(customerId, patch)
       message.success('Đã lưu hồ sơ chứng từ')
     } catch (e: unknown) {
       message.error(dichLoiHeThong(e, 'Lỗi lưu hồ sơ'))
@@ -153,6 +161,13 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
 
       <Form form={form} layout="vertical" size="small">
         <Card size="small" title="Người mua (Buyer) & Nhận hàng (Consignee)" style={{ marginBottom: 12 }}>
+          {partiesReady && (
+            <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 10, lineHeight: 1.55 }}>
+              • 2 ô <b>Buyer</b> cũng là tên pháp lý + địa chỉ in ô Consignee/Notify khi khách này là <b>NGƯỜI NHẬN HÀNG</b> qua bên trung gian.
+              <br />• Ô Consignee / Notify dưới đây là mặc định cho đơn <b>mua thẳng</b>. Đơn có Người nhận hàng riêng thì ô Consignee
+              theo người nhận và XNK chốt ở thẻ <b>Các bên</b> của từng đơn.
+            </Typography.Paragraph>
+          )}
           <Row gutter={16}>
             <Col xs={24} md={12}><Form.Item label="Buyer (tên pháp lý)" name="buyer_legal_name"><Input /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item label="Buyer — địa chỉ" name="buyer_address"><TextArea autoSize={{ minRows: 1, maxRows: 3 }} /></Form.Item></Col>
@@ -160,6 +175,19 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
             <Col xs={24} md={12}><Form.Item label="Consignee — địa chỉ" name="consignee_address"><TextArea autoSize={{ minRows: 1, maxRows: 3 }} /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item label="Notify party" name="notify_party"><Input /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item label="Notify — địa chỉ" name="notify_address"><TextArea autoSize={{ minRows: 1, maxRows: 3 }} /></Form.Item></Col>
+            {partiesReady && (
+              <Col xs={24}>
+                <Form.Item label="Chứng từ trung tính" style={{ marginBottom: 4 }}
+                  extra="Bật: Invoice / Packing List của người mua này KHÔNG in khối Consignee/Notify — cho bên trung gian không muốn lộ người nhận hàng. Weight List và Non-Wood vẫn in ô Consignee của đơn.">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Form.Item name="hide_receiver_on_invoice" valuePropName="checked" noStyle>
+                      <Switch />
+                    </Form.Item>
+                    <span style={{ fontSize: 12.5 }}>Không in khối người nhận trên Invoice / Packing List</span>
+                  </div>
+                </Form.Item>
+              </Col>
+            )}
           </Row>
         </Card>
 

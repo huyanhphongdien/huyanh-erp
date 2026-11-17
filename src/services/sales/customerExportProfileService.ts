@@ -50,6 +50,9 @@ export interface CustomerExportProfile {
   default_item_no?: string | null              // ITEM NO. mặc định
   default_packing_desc?: string | null         // kiểu đóng gói mặc định (PACKING)
   default_invoice_extra_lines?: string | null  // dòng mô tả riêng mặc định
+  /** "Chứng từ trung tính" — Invoice/PKL của NGƯỜI MUA này không in khối Consignee/Notify (bên trung gian không muốn
+   *  lộ người nhận). sales_family_parties_p1.sql; vắng (undefined) khi chưa migration → ĐỪNG gửi lên khi chưa có cột. */
+  hide_receiver_on_invoice?: boolean | null
 }
 
 // Danh mục chứng từ chuẩn (dựng checklist). Khớp bộ thật + sheet "kHÁCH YÊU CẦU".

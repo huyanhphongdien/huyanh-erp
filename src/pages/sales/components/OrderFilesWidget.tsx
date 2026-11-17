@@ -8,11 +8,16 @@
 //   ✅ HĐ FINAL         (final_signed)     — KH ký lại 2 bên (PHÁP LÝ)
 //
 // 5 folder còn lại (Vận chuyển, Chứng từ, Tài chính, Phiếu cân, Khác) giữ flat.
+//
+// Đợt mua tiếp (17/11/2026): thư mục Hợp đồng ghi thêm "HĐ gốc <số>: n file" — file HĐ đã ký nằm ở ĐƠN GỐC
+// (đọc CÙNG một truy vấn với file của đơn, theo sales_order_id IN (đơn, gốc)). Điện thoại: thư mục xếp dọc.
 // ============================================================================
 
 import { useEffect, useState } from 'react'
-import { Spin } from 'antd'
+import { Spin, theme } from 'antd'
 import { supabase } from '../../../lib/supabase'
+import { useIsPhone } from '../../../hooks/useIsPhone'
+import { palette } from '../../../theme/palette'
 
 const PRIMARY = '#1B4D3E'
 
@@ -57,15 +62,24 @@ interface Props {
   salesOrderId: string
   /** Khi user click folder → switch tab. subType (tuỳ chọn) để scroll tới đúng nhóm trong tab Hợp đồng. */
   onNavigateTab?: (tabKey: string, subType?: ContractSubType) => void
+  /** Đơn GỐC khi đơn đang xem là đợt mua tiếp — đếm thêm file HĐ đã ký của gốc ("HĐ gốc: n file") */
+  rootOrderId?: string | null
+  /** số HĐ gốc để ghi nhãn */
+  rootLabel?: string
 }
 
-export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props) {
+export default function OrderFilesWidget({ salesOrderId, onNavigateTab, rootOrderId, rootLabel }: Props) {
+  const isPhone = useIsPhone()
+  const { token } = theme.useToken()
   const [stats, setStats] = useState<Record<string, FolderStat>>({})
   const [contractSub, setContractSub] = useState<Record<string, SubFolderStat>>({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [totalSize, setTotalSize] = useState(0)
+  /** số file HĐ (doc_type 'contract') của đơn GỐC — null khi đơn không phải đợt mua tiếp */
+  const [rootContractCount, setRootContractCount] = useState<number | null>(null)
+  const rootId = rootOrderId && rootOrderId !== salesOrderId ? rootOrderId : null
 
   useEffect(() => {
     let mounted = true
@@ -73,10 +87,12 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
       setLoading(true)
       setLoadError(false)
       try {
+        // Một truy vấn cho cả đơn lẫn GỐC (đợt mua tiếp) — tách theo sales_order_id ở dưới
+        const ids = rootId ? [salesOrderId, rootId] : [salesOrderId]
         const { data, error } = await supabase
           .from('sales_order_documents')
-          .select('doc_type, doc_sub_type, file_name, file_size')
-          .eq('sales_order_id', salesOrderId)
+          .select('sales_order_id, doc_type, doc_sub_type, file_name, file_size')
+          .in('sales_order_id', ids)
           .not('file_url', 'is', null)
         if (!mounted) return
         // Lỗi tải ≠ "0 file": báo lỗi thay vì hiện các thư mục rỗng giả
@@ -84,13 +100,20 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
         const map: Record<string, FolderStat> = {}
         const subMap: Record<string, SubFolderStat> = {}
         let total = 0
+        let rootCount = 0
         type Row = {
+          sales_order_id: string
           doc_type: string
           doc_sub_type: string | null
           file_name: string | null
           file_size: number | null
         }
         for (const row of (data || []) as Row[]) {
+          if (row.sales_order_id !== salesOrderId) {
+            // File của ĐƠN GỐC: chỉ đếm file HĐ, không cộng vào thư mục / dung lượng của đợt này
+            if (row.doc_type === 'contract') rootCount++
+            continue
+          }
           const t = row.doc_type || 'other'
           if (!map[t]) map[t] = { doc_type: t, count: 0, sample_names: [] }
           map[t].count++
@@ -113,6 +136,7 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
         setStats(map)
         setContractSub(subMap)
         setTotalSize(total)
+        setRootContractCount(rootId ? rootCount : null)
       } catch {
         if (mounted) setLoadError(true)
       } finally {
@@ -121,7 +145,7 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
     }
     void load()
     return () => { mounted = false }
-  }, [salesOrderId, reloadKey])
+  }, [salesOrderId, rootId, reloadKey])
 
   const totalCount = Object.values(stats).reduce((s, f) => s + f.count, 0)
   const fmtSize = (b: number) => {
@@ -148,7 +172,8 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
         )}
       </div>
 
-      <div style={folderGrid}>
+      {/* Điện thoại: 1 cột (lưới 3 cột + thư mục HĐ span 2 tràn ngang ở 390px) */}
+      <div style={{ ...folderGrid, gridTemplateColumns: isPhone ? 'minmax(0, 1fr)' : 'repeat(3, minmax(0, 1fr))' }}>
         {FOLDERS.map((f) => {
           const stat = stats[f.doc_type]
           const count = stat?.count || 0
@@ -161,7 +186,8 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
                 ...folder,
                 opacity: loading ? 0.6 : 1,
                 // HĐ folder spans 2 columns vì có 2 sub-folder bên dưới
-                gridColumn: isContract ? 'span 2' : 'span 1',
+                gridColumn: isContract && !isPhone ? 'span 2' : 'span 1',
+                minWidth: 0,
               }}
               onClick={() => onNavigateTab?.(f.tabKey)}
               onMouseEnter={(e) => {
@@ -185,7 +211,8 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
 
               {/* HĐ folder: 3 sub-folders theo workflow ký */}
               {isContract ? (
-                <div style={subFolderRow}>
+                <>
+                <div style={{ ...subFolderRow, gridTemplateColumns: isPhone ? 'minmax(0, 1fr)' : 'repeat(3, minmax(0, 1fr))' }}>
                   <ContractSubFolder
                     icon="📤"
                     name="HĐ gửi KH"
@@ -214,6 +241,28 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
                     onClick={() => onNavigateTab?.('contract', 'final_signed')}
                   />
                 </div>
+                {/* Đợt mua tiếp: HĐ đã ký nằm ở đơn GỐC (tab Hợp đồng hiện khối "File HĐ gốc" chỉ xem) */}
+                {rootContractCount !== null && (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    style={{
+                      ...rootLine,
+                      ...(rootContractCount === 0
+                        ? { color: token.colorWarningText, background: token.colorWarningBg, border: `1px solid ${token.colorWarningBorder}` }
+                        : null),
+                    }}
+                    onClick={(e) => { e.stopPropagation(); onNavigateTab?.('contract') }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onNavigateTab?.('contract') }
+                    }}
+                    title="File HĐ đã ký của đơn gốc — xem ở tab Hợp đồng"
+                  >
+                    ⧉ HĐ gốc{rootLabel ? ` ${rootLabel}` : ''}: {rootContractCount} file
+                    {rootContractCount === 0 ? ' — chưa có file HĐ đã ký' : ''}
+                  </div>
+                )}
+                </>
               ) : (
                 <div style={folderFiles}>
                   {samples.length === 0 ? (
@@ -353,7 +402,14 @@ const subFolderRow: React.CSSProperties = {
 
 const subFolder: React.CSSProperties = {
   background: '#fff', border: '1px dashed #d9d9d9', borderRadius: 8,
-  padding: '8px 10px',
+  padding: '8px 10px', minWidth: 0,
+}
+
+// Dòng "HĐ gốc: n file" của đợt mua tiếp — màu thương hiệu (palette.brand / brandBg); 0 file → vàng nhắc (token antd)
+const rootLine: React.CSSProperties = {
+  marginTop: 8, padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+  color: palette.brand, background: palette.brandBg, border: `1px solid ${palette.brand}33`,
+  cursor: 'pointer', wordBreak: 'break-word',
 }
 
 const subFolderHead: React.CSSProperties = {

@@ -21,6 +21,7 @@ import {
   type DispatchLineInput, type SalesOrderOption,
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
+import { palette } from '../../../theme/palette'
 import { useAuthStore } from '../../../stores/authStore'
 import { useUnsavedWarning } from '../../../hooks/useUnsavedWarning'
 import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
@@ -780,8 +781,26 @@ export default function DispatchCreatePage() {
             <LimitNotice shown={soOptions.length} limit={SALES_ORDER_OPTION_LIMIT} what="đơn" />
             <Table rowKey="id" size="small" loading={soLoading} dataSource={soOptions} pagination={{ pageSize: 8 }}
               columns={[
-                { title: 'Mã đơn', dataIndex: 'code', render: (_v: string, r: SalesOrderOption) => <span><b>{soDisplayCode(r)}</b>{r.contract_no && r.code && <Tag style={{ marginLeft: 6 }}>{r.code}</Tag>}</span> },
-                { title: 'Khách', dataIndex: 'customer_name', render: (v: string) => v || DASH },
+                // Nhãn chọn đơn '<số đơn> · NGƯỜI MUA → NGƯỜI NHẬN' (dispatchService.listSalesOrderOptions) — đợt mua tiếp
+                // thêm dòng 'Đợt n · HĐ <số gốc>' (số đợt do trigger cấp, đọc continuation_seq — không đoán từ chuỗi số).
+                { title: 'Mã đơn', dataIndex: 'code', render: (_v: string, r: SalesOrderOption) => (
+                  <div>
+                    <b>{soDisplayCode(r)}</b>{r.contract_no && r.code && <Tag style={{ marginLeft: 6 }}>{r.code}</Tag>}
+                    {r.parent_order_id && (
+                      <div style={{ fontSize: 11, color: palette.brand, lineHeight: 1.3 }}
+                        title="Mua tiếp theo HĐ đã ký — không ký HĐ mới. 'Căn cứ HĐ' của lệnh = số đơn này (kèm số HĐ gốc khi chứng từ in số gốc)">
+                        ⧉ Đợt {r.continuation_seq ?? '?'}{r.root_contract_no ? ` · HĐ ${r.root_contract_no}` : ''}
+                      </div>
+                    )}
+                  </div>
+                ) },
+                { title: 'Khách', dataIndex: 'customer_name', render: (v: string, r: SalesOrderOption) => (
+                  <span style={{ overflowWrap: 'anywhere' }}
+                    title={r.ship_to_short ? 'Người mua (đứng tên HĐ, trả tiền, công nợ) → Người nhận hàng' : undefined}>
+                    {r.buyer_short || v || DASH}
+                    {r.ship_to_short && <Typography.Text type="secondary"> → {r.ship_to_short}</Typography.Text>}
+                  </span>
+                ) },
                 { title: 'Loại hàng', dataIndex: 'grade', width: 100, render: (v: string) => v || DASH },
                 { title: 'Cảng đến', dataIndex: 'port_of_destination', render: (v: string) => v || DASH },
                 { title: 'Cont', dataIndex: 'container_count', width: 60, align: 'center' as const },
@@ -792,7 +811,8 @@ export default function DispatchCreatePage() {
           <>
             <div style={{ marginBottom: 10, fontSize: 13, color: '#555' }}>
               Tích chọn <b>container đi chuyến này</b> của <b>{soDisplayCode(pickerSo)}</b>
-              {pickerSo.customer_name ? ` — ${pickerSo.customer_name}` : ''}. Chỉ hiện container <b>chưa điều động</b>.
+              {(pickerSo.buyer_short || pickerSo.customer_name) ? ` — ${pickerSo.buyer_short || pickerSo.customer_name}` : ''}
+              {pickerSo.ship_to_short ? ` → ${pickerSo.ship_to_short}` : ''}. Chỉ hiện container <b>chưa điều động</b>.
             </div>
             {/* Quick-select theo lô: 1 cú chọn cả Lot, vẫn chỉnh tay được bằng checkbox */}
             <Space size={[8, 8]} wrap style={{ marginBottom: 10 }}>

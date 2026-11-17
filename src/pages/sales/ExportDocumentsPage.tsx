@@ -113,6 +113,28 @@ function buildInvoiceDescNodes(d: DescLike): React.ReactNode[] {
   return out
 }
 
+// Khối CONSIGNEE / NOTIFY PARTY dưới BUYER — bản HTML của partiesBlock (docxExport) cho Invoice + Packing List.
+// CHỈ vẽ khi show_parties_block (đơn có người nhận riêng / chữ ghi đè, người mua không bật "chứng từ trung tính")
+// → đơn mua thẳng: null = y mẫu cũ. Dòng in lấy từ documentService (resolveOrderParties).
+function DocPartiesLines({ d }: { d: { show_parties_block?: boolean; consignee?: string; consignee_address?: string; notify_party?: string; notify_address?: string } }) {
+  if (!d.show_parties_block) return null
+  const rows = ([
+    ['CONSIGNEE: ', d.consignee, d.consignee_address],
+    ['NOTIFY PARTY: ', d.notify_party, d.notify_address],
+  ] as const).filter(([, name]) => (name || '').trim())
+  if (rows.length === 0) return null
+  return (
+    <>
+      {rows.map(([label, name, addr]) => (
+        <div key={label} style={{ marginTop: 4 }}>
+          <div><b>{label}</b>{name}</div>
+          {(addr || '').trim() && <div>ADDRESS: {addr}</div>}
+        </div>
+      ))}
+    </>
+  )
+}
+
 // COA: ĐÍNH KÈM từ phòng LAB (không sinh ở trang này). Component COATab + generateCOA cũ đã xoá
 // 17/11/2026 — không còn được render/gọi (grep: chỉ có định nghĩa).
 
@@ -167,6 +189,7 @@ const PackingListTab = ({ data, loading, onGenerate }: PackingListTabProps) => {
         <div>ADDRESS: KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM</div>
         <div style={{ marginTop: 4 }}><b>THE BUYER/THE APPLICANT: </b>{data.buyer_name || data.customer_name}</div>
         <div>ADDRESS: {data.buyer_address || data.customer_address}</div>
+        <DocPartiesLines d={data} />
       </div>
 
       {/* Ref invoice 5 cột */}
@@ -422,6 +445,7 @@ const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
         <div>ADDRESS: KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM</div>
         <div style={{ marginTop: 4 }}><b>THE BUYER/THE APPLICANT: </b>{data.buyer_name || data.customer.name}</div>
         <div>ADDRESS: {data.buyer_address || data.customer.address}</div>
+        <DocPartiesLines d={data} />
       </div>
 
       {/* Bảng shipment 6 cột */}
@@ -432,7 +456,8 @@ const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
           ))}
         </tr></thead>
         <tbody><tr style={{ textAlign: 'center' }}>
-          <td style={cell}>{data.order_code}</td>
+          {/* Số HĐ KÝ (contractNoForDocs) — đợt mua tiếp in số HĐ gốc; khớp invoiceDoc */}
+          <td style={cell}>{data.contract_no_doc || data.order_code}</td>
           <td style={cell}>{fmtd(data.shipment_date) || '—'}</td>
           <td style={cell}>{`${data.vessel_name || ''}${data.voyage_number ? ' ' + data.voyage_number : ''}`.trim() || '—'}</td>
           <td style={cell}>{data.port_of_loading || '—'}</td>
@@ -544,6 +569,8 @@ const ExportDocumentsPage = () => {
   // Dữ liệu để KIỂM TRA SẴN SÀNG (readiness): container + hồ sơ khách + đơn chiết khấu
   const [rdContainers, setRdContainers] = useState<SalesOrderContainer[]>([])
   const [rdProfile, setRdProfile] = useState<CustomerExportProfile | null>(null)
+  // Hồ sơ chứng từ của NGƯỜI NHẬN (đơn qua trung gian) — để bảng kiểm ô Consignee đọc đúng tên pháp lý sẽ in
+  const [rdShipToProfile, setRdShipToProfile] = useState<CustomerExportProfile | null>(null)
   const [rdNeg, setRdNeg] = useState<LcNegotiation | null>(null)
   const [rdBookings, setRdBookings] = useState<SalesBooking[]>([])
   const [readyVersion, setReadyVersion] = useState(0)       // bump sau khi nhập nhanh → nạp lại ctx
@@ -582,9 +609,12 @@ const ExportDocumentsPage = () => {
     if (!order?.id) return
     containerService.getContainers(order.id).then(setRdContainers).catch(() => setRdContainers([]))
     if (order.customer_id) customerExportProfileService.getByCustomer(order.customer_id).then(setRdProfile).catch(() => setRdProfile(null))
+    if (order.ship_to_customer_id) {
+      customerExportProfileService.getByCustomer(order.ship_to_customer_id).then(setRdShipToProfile).catch(() => setRdShipToProfile(null))
+    } else setRdShipToProfile(null)
     lcNegotiationService.getByOrder(order.id, lotNo).then(setRdNeg).catch(() => setRdNeg(null))
     salesBookingService.list(order.id).then(setRdBookings).catch(() => setRdBookings([]))
-  }, [order?.id, order?.customer_id, lotNo, negVersion, readyVersion])
+  }, [order?.id, order?.customer_id, order?.ship_to_customer_id, lotNo, negVersion, readyVersion])
 
   // Sau khi nhập nhanh trong drawer: nạp lại order (field vận chuyển/hợp đồng) + container/hồ sơ/ĐNCK
   const reloadReadiness = useCallback(() => {
@@ -597,6 +627,7 @@ const ExportDocumentsPage = () => {
     if (!order) return
     let url = ''
     if (g === 'profile' && order.customer_id) url = `/sales/customers/${order.customer_id}?tab=export`
+    else if (g === 'parties') url = `/sales/orders/${order.id}?tab=info`   // thẻ Các bên nằm ở tab Thông tin
     else if (g === 'contract') url = `/sales/orders/${order.id}?tab=contract`
     else if (g === 'shipping') url = `/sales/orders/${order.id}?tab=shipping`
     else if (g === 'packing') url = `/sales/orders/${order.id}?tab=packing`
@@ -713,6 +744,7 @@ const ExportDocumentsPage = () => {
     negotiation: rdNeg,
     booking: lotNo ? (rdBookings.find((b) => b.lot_no === lotNo) ?? null) : null,
     lotNo,
+    shipToProfile: rdShipToProfile,
   }
   const readyDot = (key: string) => {
     const r = checkReadiness(key, readyCtx)
@@ -1018,7 +1050,7 @@ const ExportDocumentsPage = () => {
                   {readyDot('beneficiary')}<SafetyCertificateOutlined /> Beneficiary Cert
                 </span>
               ),
-              children: <BeneficiaryCertTab orderId={orderId!} lotNo={lotNo} />,
+              children: <BeneficiaryCertTab key={`bc-${negVersion}`} orderId={orderId!} lotNo={lotNo} />,
             },
             {
               key: 'nonwood',
@@ -1027,7 +1059,8 @@ const ExportDocumentsPage = () => {
                   {readyDot('nonwood')}<SafetyCertificateOutlined /> Non-Wood Cert
                 </span>
               ),
-              children: <NonWoodCertTab orderId={orderId!} lotNo={lotNo} />,
+              // key theo negVersion: đổi Consignee (dòng THE BUYER) / lưu ĐNCK → nạp lại bản Non-Wood
+              children: <NonWoodCertTab key={`nw-${negVersion}`} orderId={orderId!} lotNo={lotNo} />,
             },
           ]}
         />
@@ -1038,7 +1071,15 @@ const ExportDocumentsPage = () => {
         group={quickGroup}
         ctx={quickGroup === 'packing' ? drawerCtx : readyCtx}
         onClose={() => setQuickGroup(null)}
-        onSaved={() => { setQuickGroup(null); reloadReadiness() }}
+        onSaved={() => {
+          // Vừa đổi chữ in Consignee/Notify → bản Invoice/PKL/WL đã sinh không còn đúng: xoá để sinh lại;
+          // negVersion bump → Hối phiếu / Non-Wood / BC nạp lại.
+          if (quickGroup === 'parties') {
+            setPackingData(null); setWeightData(null); setInvoiceData(null)
+            setNegVersion((v) => v + 1)
+          }
+          setQuickGroup(null); reloadReadiness()
+        }}
         onOpenFullTab={(g) => { setQuickGroup(null); openFullTab(g) }}
       />
     </div>

@@ -786,14 +786,17 @@ export const stockOutService = {
     let containerType: string | null = null
     let baleCount: number | null = null
     if (ticket.sales_order_id) {
-      const { data: so } = await supabase
+      // Ghi khoá !customer_id + kiểm lỗi (17/11/2026): embed không ghi khoá mà sales_orders có thêm quan hệ sang
+      // sales_customers là PGRST201 — trước đây lỗi bị nuốt, phiếu xuất mất tên khách / mã SO / loại cont IM LẶNG.
+      const { data: so, error: soErr } = await supabase
         .from('sales_orders')
         .select(`
           code, container_type,
-          customer:sales_customers(name, short_name)
+          customer:sales_customers!customer_id(name, short_name)
         `)
         .eq('id', ticket.sales_order_id)
-        .single()
+        .maybeSingle()
+      if (soErr) throw new Error(`Không đọc được đơn hàng bán của phiếu cân: ${soErr.message}`)
       if (so) {
         const customer: any = Array.isArray((so as any).customer) ? (so as any).customer[0] : (so as any).customer
         customerName = customer?.short_name || customer?.name || null

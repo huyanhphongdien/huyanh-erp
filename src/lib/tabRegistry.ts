@@ -138,6 +138,10 @@ registerTabComponent('sales-order-detail', SalesOrderDetailPage)
 
 const SalesOrderCreatePage = lazy(() => import('../pages/sales/SalesOrderCreatePage'))
 registerTabComponent('sales-order-create', SalesOrderCreatePage)
+// Đơn MUA TIẾP theo HĐ đã ký — CÙNG form tạo đơn, bật chế độ mua tiếp qua props { sourceOrderId }.
+// openTab: key 'sales-order-continue-<sourceId>', path '/sales/orders/<sourceId>/continue' (TabbedWorkspace khớp
+// tab theo pathname, bỏ qua query → KHÔNG dùng '?from=').
+registerTabComponent('sales-order-continue', SalesOrderCreatePage)
 
 const ContainerPackingPage = lazy(() => import('../pages/sales/ContainerPackingPage'))
 registerTabComponent('sales-container-packing', ContainerPackingPage)

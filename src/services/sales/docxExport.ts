@@ -119,6 +119,27 @@ function buildDescLines(d: DescData): Paragraph[] {
   if (d.attn_contacts) { dl('Attn:'); d.attn_contacts.split('\n').forEach((l) => l.trim() && dl(l.trim())) }
   return out
 }
+// Khối CONSIGNEE / NOTIFY PARTY ngay dưới BUYER — Invoice + Packing List DÙNG CHUNG. CHỈ in khi show_parties_block
+// (đơn có người nhận riêng hoặc chữ ghi đè, người mua không bật "chứng từ trung tính") → đơn mua thẳng: [] = y mẫu cũ.
+// Dòng in lấy từ resolveOrderParties (documentService) — không tự suy ở đây.
+type PartiesBlockData = {
+  show_parties_block?: boolean
+  consignee?: string; consignee_address?: string
+  notify_party?: string; notify_address?: string
+}
+function partiesBlock(d: PartiesBlockData): Paragraph[] {
+  if (!d.show_parties_block) return []
+  const rows: Array<[string, string, string]> = []
+  if ((d.consignee || '').trim()) rows.push(['CONSIGNEE: ', d.consignee!.trim(), (d.consignee_address || '').trim()])
+  if ((d.notify_party || '').trim()) rows.push(['NOTIFY PARTY: ', d.notify_party!.trim(), (d.notify_address || '').trim()])
+  const out: Paragraph[] = []
+  rows.forEach(([label, name, addr], i) => {
+    const gap = i === rows.length - 1 ? 80 : 40   // dòng cuối cách bảng 80 như khối BUYER
+    out.push(P([R(label, { bold: true }), R(name)], { after: addr ? 0 : gap }))
+    if (addr) out.push(P(`ADDRESS: ${addr}`, { after: gap }))
+  })
+  return out
+}
 // Logo HUYANH Natural Rubber (khớp mẫu chứng từ thật) — nhúng từ src/assets/logo.png
 function logoImage(width = 168): ImageRun {
   const height = Math.round((width * LOGO_H) / LOGO_W)   // giữ tỉ lệ 300×96
@@ -226,6 +247,7 @@ export function invoiceDoc(d: InvoiceData): Document {
     ],
   })
 
+  const parties = partiesBlock(d)
   const kids: (Paragraph | Table)[] = [
     ...letterhead(),
     P('COMMERCIAL INVOICE', { align: CENTER, bold: true, size: 15, after: 20 }),
@@ -234,10 +256,12 @@ export function invoiceDoc(d: InvoiceData): Document {
     P([R('THE SELLER/THE BENEFICIARY: ', { bold: true }), R('HUY ANH RUBBER COMPANY LIMITED')], { after: 0 }),
     P('ADDRESS: KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM', { after: 40 }),
     P([R('THE BUYER/THE APPLICANT: ', { bold: true }), R(d.buyer_name || d.customer.name)], { after: 0 }),
-    P(`ADDRESS: ${d.buyer_address || d.customer.address}`, { after: 80 }),
+    P(`ADDRESS: ${d.buyer_address || d.customer.address}`, { after: parties.length ? 40 : 80 }),
+    ...parties,
     gridTable(
       ['CONTRACT NO', 'SHIPMENT DATE', 'VESSEL', 'PORT OF LOADING', 'BILL OF LADING NUMBER', 'PORT OF DISCHARGE'],
-      [[d.order_code, fmtD(d.shipment_date) || '—', `${d.vessel_name || ''}${d.voyage_number ? ' ' + d.voyage_number : ''}`.trim() || '—', d.port_of_loading || '—', d.bl_number || '—', pod || '—']],
+      // Số HĐ KÝ (contractNoForDocs): đợt mua tiếp in số HĐ gốc; số Invoice ("No:") vẫn riêng từng đơn/lô
+      [[d.contract_no_doc || d.order_code, fmtD(d.shipment_date) || '—', `${d.vessel_name || ''}${d.voyage_number ? ' ' + d.voyage_number : ''}`.trim() || '—', d.port_of_loading || '—', d.bl_number || '—', pod || '—']],
       [15, 14, 19, 18, 18, 16],
     ),
     P('', { after: 20 }),
@@ -298,6 +322,7 @@ export function packingListDoc(d: PackingListData): Document {
     ],
   })
 
+  const parties = partiesBlock(d)
   const kids: (Paragraph | Table)[] = [
     ...letterhead(),
     P('PACKING LIST', { align: CENTER, bold: true, size: 15, after: 20 }),
@@ -306,7 +331,8 @@ export function packingListDoc(d: PackingListData): Document {
     P([R('THE SELLER/THE BENEFICIARY: ', { bold: true }), R('HUY ANH RUBBER COMPANY LIMITED')], { after: 0 }),
     P('ADDRESS: KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM', { after: 40 }),
     P([R('THE BUYER/THE APPLICANT: ', { bold: true }), R(d.buyer_name || d.customer_name)], { after: 0 }),
-    P(`ADDRESS: ${d.buyer_address || d.customer_address}`, { after: 80 }),
+    P(`ADDRESS: ${d.buyer_address || d.customer_address}`, { after: parties.length ? 40 : 80 }),
+    ...parties,
     gridTable(
       ['COMMERCIAL INVOICE', 'BILL OF LADING NUMBER', 'VESSEL', 'PORT OF LOADING', 'PORT OF DISCHARGE'],
       [[d.invoice_code, d.bl_number || '—', vessel, d.port_of_loading || '—', d.port_of_destination || '—']],

@@ -191,7 +191,10 @@ async function handleTool(name: string, input: any): Promise<string> {
           return JSON.stringify({ month: `${month}/${year}`, order_count: data?.length || 0, total_revenue_usd: Math.round(total), total_revenue_vnd: Math.round(total * 25000) })
         }
         if (input.query_type === 'top_customers') {
-          const { data } = await sb.from('sales_orders').select('customer:sales_customers(name), total_value_usd').gte('order_date', monthStart).lt('order_date', monthEnd).not('status', 'eq', 'cancelled')
+          // Ghi khoá !customer_id + kiểm lỗi: embed không ghi khoá sẽ PGRST201 nếu sales_orders có thêm quan hệ sang
+          // sales_customers — trước đây lỗi bị nuốt và chat trả "top khách" rỗng.
+          const { data, error } = await sb.from('sales_orders').select('customer:sales_customers!customer_id(name), total_value_usd').gte('order_date', monthStart).lt('order_date', monthEnd).not('status', 'eq', 'cancelled')
+          if (error) return JSON.stringify({ error: `Không đọc được đơn hàng bán: ${error.message}` })
           const custMap: Record<string, number> = {}
           ;(data || []).forEach((o: any) => {
             const name = Array.isArray(o.customer) ? o.customer[0]?.name : o.customer?.name

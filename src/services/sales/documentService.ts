@@ -2,10 +2,20 @@
 // DOCUMENT SERVICE — Generate export documents: COA, Packing List, Invoice
 // File: src/services/sales/documentService.ts
 // Module Ban hang quoc te — Huy Anh Rubber ERP
+//
+// Đơn mua tiếp + Các bên (sales_family_parties_p1, 17/11/2026):
+//   • BUYER luôn là người mua · CONSIGNEE/NOTIFY + tên NH dự phòng (bank_hint) theo MỘT hàm resolveOrderParties
+//   • Ô "CONTRACT NO." = contractNoForDocs (đợt mua tiếp in số HĐ gốc); SỐ CHỨNG TỪ (PKL/WL/BC/NW/PI) vẫn theo số đơn
+//   • Đơn mua thẳng không có người nhận / chữ ghi đè → in y như trước
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
-import { soDisplayCode } from './salesTypes'
+import { soDisplayCode, contractNoForDocs, contractDateForDocs } from './salesTypes'
+import { salesOrderService } from './salesOrderService'
+import {
+  resolveOrderParties, isToOrder,
+  type ResolvedOrderParties, type ConsigneeSource, type NotifySource, type PartyNegotiationInput,
+} from './orderParties'
 
 // ============================================================================
 // INTERFACES
@@ -50,6 +60,13 @@ export interface PackingListData {
   buyer_name: string
   buyer_address: string
   consignee: string
+  // Khối CONSIGNEE/NOTIFY (resolveOrderParties) — chỉ in khi show_parties_block (đơn có người nhận / chữ ghi đè)
+  consignee_address?: string
+  notify_party?: string
+  notify_address?: string
+  consignee_source?: ConsigneeSource
+  notify_source?: NotifySource
+  show_parties_block?: boolean
   shipping_marks: string
   grade: string
   containers: Array<{
@@ -106,8 +123,9 @@ export interface WeightListData {
   date: string
   order_code: string
   buyer_name: string
-  consignee: string
+  consignee: string          // ô CONSIGNEE — resolveOrderParties (ghi đè → L/C → người nhận → hồ sơ người mua)
   consignee_address: string
+  consignee_source?: ConsigneeSource
   grade: string
   packing_desc: string
   total_packing: string
@@ -138,7 +156,20 @@ export interface WeightListData {
 
 export interface InvoiceData {
   invoice_code: string
+  /** SỐ ĐƠN (soDisplayCode) — gốc số các chứng từ BC/NW/ĐNCK. KHÔNG kèm chữ ' — Lô n' (từng lọt lên ô CONTRACT NO). */
   order_code: string
+  /** Ô "CONTRACT NO." / "Số hợp đồng" (contractNoForDocs): đợt mua tiếp in số HĐ GỐC khi docs_cite_root; còn lại = số đơn. */
+  contract_no_doc?: string
+  /** Ngày HĐ đi cùng contract_no_doc (contractDateForDocs) — ĐNCK "ngày HĐ". */
+  contract_date_doc?: string
+  /** Tên NH cho Hối phiếu / ĐNCK / Đơn thương lượng khi bảng thương lượng chưa ghi NH: phần sau 'TO THE ORDER OF'
+   *  của Consignee → ''. KHÔNG BAO GIỜ là tên người nhận/người mua (thay cho vế dự phòng inv.consignee cũ). */
+  bank_hint?: string
+  consignee_source?: ConsigneeSource
+  notify_source?: NotifySource
+  /** Invoice/PKL in khối CONSIGNEE/NOTIFY: chỉ khi đơn có người nhận hoặc chữ ghi đè, và người mua không bật
+   *  "chứng từ trung tính" (hide_receiver_on_invoice). Đơn mua thẳng → false → in y như trước. */
+  show_parties_block?: boolean
   customer: { name: string; address: string; country: string }
   grade: string
   quantity_tons: number
@@ -156,7 +187,7 @@ export interface InvoiceData {
   bl_number: string | null
   invoice_date: string
   bank_info: { account_name: string; name: string; account: string; address: string; swift: string }
-  // GĐ2 — từ hồ sơ chứng từ khách (sales_customer_export_profiles)
+  // GĐ2 — BUYER từ hồ sơ chứng từ người mua (sales_customer_export_profiles); CONSIGNEE/NOTIFY từ resolveOrderParties
   buyer_name: string
   buyer_address: string
   consignee: string
@@ -232,6 +263,8 @@ export interface NonWoodCertData {
 // ============================================================================
 
 const PORT_LABELS: Record<string, string> = {
+  // 26 đơn chọn "Any port, Viet Nam" (PORT_OF_LOADING_OPTIONS) từng in thô mã 'ANY_PORT_VN' lên chứng từ
+  ANY_PORT_VN: 'Any port, Viet Nam',
   HCM_CAT_LAI: 'Cat Lai Port, Ho Chi Minh City, Vietnam',
   HCM_HIEP_PHUOC: 'Hiep Phuoc Port, Ho Chi Minh City, Vietnam',
   VUNG_TAU: 'Cai Mep Port, Vung Tau, Vietnam',
@@ -250,21 +283,55 @@ const PAYMENT_TERMS_EN: Record<string, string> = {
   DP: 'Documents against Payment',
 }
 
-// GĐ2 — nạp hồ sơ chứng từ khách + ngân hàng thụ hưởng đã chọn
-async function loadExportProfile(customerId: string | null | undefined): Promise<{ profile: any; bank: any }> {
-  if (!customerId) return { profile: null, bank: null }
-  const { data: profile } = await supabase
+// Embed ĐƠN GỐC (đợt mua tiếp) — ghi theo TÊN CỘT. ⚠ Đừng viết `sales_orders!parent_order_id(...)`: khoá ngoại tự
+// tham chiếu nên PostgREST hiểu ngược thành "các đơn con" và trả MẢNG (cùng chuỗi với salesOrderService).
+const PARENT_EMBED = 'parent:parent_order_id(id,code,contract_no,contract_date,customer_id,currency,status)'
+const ORDER_DOC_SELECT = '*, customer:sales_customers!customer_id(id,name,country,address)'
+
+/**
+ * Đơn + người mua cho chứng từ. Đã chạy migration sales_family_parties_p1 → kèm `parent` (embed đơn gốc, cho ô
+ * CONTRACT NO.) + `ship_to` (người nhận — truy vấn thứ hai theo id vì ship_to_customer_id KHÔNG có FK).
+ * Chưa migration → select y như cũ (không thêm cột/embed nào).
+ */
+async function loadDocOrder(orderId: string): Promise<any> {
+  const ready = await salesOrderService.familyPartiesReady()
+  const sel = (ready ? `${ORDER_DOC_SELECT}, ${PARENT_EMBED}` : ORDER_DOC_SELECT) as typeof ORDER_DOC_SELECT
+  const { data: order, error } = await supabase
+    .from('sales_orders')
+    .select(sel)
+    .eq('id', orderId)
+    .single()
+  if (error || !order) throw new Error('Không thể tải thông tin đơn hàng')
+  if (!ready) return order
+  const [withShipTo] = await salesOrderService.attachShipTo([order as { ship_to_customer_id?: string | null }])
+  return withShipTo
+}
+
+// Hồ sơ chứng từ của 1 khách (người mua hoặc người nhận). Lỗi tải → NÉM: nuốt lỗi thì chứng từ in sai bên
+// (mất Consignee hồ sơ, hoặc lộ người nhận của người mua đã bật "chứng từ trung tính").
+async function loadProfileOnly(customerId: string | null | undefined): Promise<any> {
+  if (!customerId) return null
+  const { data, error } = await supabase
     .from('sales_customer_export_profiles')
     .select('*')
     .eq('customer_id', customerId)
     .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+// GĐ2 — nạp hồ sơ chứng từ khách + ngân hàng thụ hưởng đã chọn
+async function loadExportProfile(customerId: string | null | undefined): Promise<{ profile: any; bank: any }> {
+  if (!customerId) return { profile: null, bank: null }
+  const profile = await loadProfileOnly(customerId)
   let bank: any = null
   if (profile?.preferred_bank_id) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('company_banks')
       .select('*')
       .eq('id', profile.preferred_bank_id)
       .maybeSingle()
+    if (error) throw error
     bank = data
   }
   return { profile, bank }
@@ -283,32 +350,48 @@ async function loadLotBooking(orderId: string, lotNo?: number): Promise<any> {
   return data
 }
 
-// Consignee theo TỪNG ĐƠN/LÔ: L/C → "THE ORDER OF {NH phát hành}" (đổi theo mỗi L/C),
-// còn lại (D/P/D/A/T-T) → consignee mặc định ở hồ sơ khách.
-async function resolveConsignee(orderId: string, profile: any, lotNo?: number): Promise<string> {
-  const { data: neg } = await supabase
+// Dòng bảng thương lượng của đơn/lô (lot_no = lotNo || 0) — MỘT lần đọc cho cả L/C số/ngày lẫn NH phát hành / nhờ thu.
+type DocNegotiation = PartyNegotiationInput & { lc_number?: string | null; lc_date?: string | null }
+async function loadNegotiation(orderId: string, lotNo?: number): Promise<DocNegotiation | null> {
+  const { data, error } = await supabase
     .from('sales_order_lc_negotiations')
-    .select('method, issuing_bank')
+    .select('method, issuing_bank, issuing_bank_address, lc_number, lc_date')
     .eq('sales_order_id', orderId)
     .eq('lot_no', lotNo || 0)
     .maybeSingle()
-  const clean = (s: string) => (s || '').replace(/\s*\(SWIFT[^)]*\)\s*/i, '').trim()
-  if ((neg?.method || 'lc') === 'lc' && neg?.issuing_bank) {
-    const b = clean(neg.issuing_bank)
-    return /^(THE|TO)\s+ORDER/i.test(b) ? b : `THE ORDER OF ${b}`
-  }
-  return profile?.consignee_name || ''
+  if (error) throw error
+  return (data as DocNegotiation | null) ?? null
 }
 
 // L/C số + ngày của đơn/lô (CÙNG nguồn = bảng thương lượng) — cho dòng "LC NO ... DATE:"
-async function loadLcInfo(orderId: string, lotNo?: number): Promise<{ lc_number: string | null; lc_date: string | null; method: 'lc' | 'dp' | 'da' }> {
-  const { data } = await supabase
-    .from('sales_order_lc_negotiations')
-    .select('lc_number, lc_date, method')
-    .eq('sales_order_id', orderId)
-    .eq('lot_no', lotNo || 0)
-    .maybeSingle()
-  return { lc_number: data?.lc_number || null, lc_date: data?.lc_date || null, method: (data?.method as 'lc' | 'dp' | 'da') || 'lc' }
+function lcInfoOf(neg: DocNegotiation | null): { lc_number: string | null; lc_date: string | null; method: 'lc' | 'dp' | 'da' } {
+  return { lc_number: neg?.lc_number || null, lc_date: neg?.lc_date || null, method: (neg?.method as 'lc' | 'dp' | 'da') || 'lc' }
+}
+
+/**
+ * CÁC BÊN của chứng từ — MỘT hàm suy resolveOrderParties (thay resolveConsignee cũ, regex cũ biến
+ * 'TO THE ORDER OF X' thành 'THE ORDER OF TO THE ORDER OF X'). Có người nhận → nạp thêm hồ sơ chứng từ của người
+ * nhận (tên pháp lý + địa chỉ). Đơn mua thẳng không có chữ ghi đè → Consignee/Notify y như code cũ.
+ */
+async function loadDocParties(order: any, buyerProfile: any, neg: DocNegotiation | null, lotNo: number): Promise<ResolvedOrderParties> {
+  const via = !!order?.ship_to_customer_id && order.ship_to_customer_id !== order.customer_id
+  const shipToProfile = via ? await loadProfileOnly(order.ship_to_customer_id) : null
+  return resolveOrderParties({
+    order,
+    buyer: order?.customer ?? null,
+    buyerProfile,
+    shipTo: order?.ship_to ?? null,
+    shipToProfile,
+    negotiation: neg,
+    lotNo,
+  })
+}
+
+// Địa chỉ ô CONSIGNEE. Đơn mua thẳng chưa có Consignee (nguồn 'none'): code cũ vẫn in consignee_address của hồ sơ
+// người mua dù tên trống → giữ y như hôm nay.
+function consigneeAddressOf(p: ResolvedOrderParties, buyerProfile: any): string {
+  if (p.consignee.address) return p.consignee.address
+  return p.consignee.source === 'none' && !p.viaIntermediary ? (buyerProfile?.consignee_address || '') : ''
 }
 
 // ── Helper thuần (khớp mẫu) — dùng chung getInvoiceData / getPackingListData / getWeightListData ──
@@ -484,16 +567,8 @@ export const documentService = {
   // ==========================================================================
 
   async getPackingListData(orderId: string, lotNo = 0): Promise<PackingListData> {
-    // Fetch order with customer
-    const { data: order, error: orderErr } = await supabase
-      .from('sales_orders')
-      .select('*, customer:sales_customers!customer_id(id,name,country,address)')
-      .eq('id', orderId)
-      .single()
-
-    if (orderErr || !order) {
-      throw new Error('Không thể tải thông tin đơn hàng')
-    }
+    // Đơn + người mua (+ đơn gốc + người nhận khi đã migration)
+    const order = await loadDocOrder(orderId)
 
     const booking = await loadLotBooking(orderId, lotNo)
     // Fetch containers with items — lọc theo LÔ nếu chọn
@@ -543,7 +618,9 @@ export const documentService = {
 
     const customer = order.customer as { name?: string; address?: string } | null
     const { profile } = await loadExportProfile(order.customer_id)
-    const lcInfo = await loadLcInfo(orderId, lotNo)
+    const neg = await loadNegotiation(orderId, lotNo)
+    const lcInfo = lcInfoOf(neg)
+    const parties = await loadDocParties(order, profile, neg, lotNo)
     // Nạp hóa đơn (cùng nguồn getInvoiceData) → invoice_code/bl/ngày KHỚP giữa các chứng từ 1 bộ
     const { data: invoice } = await supabase
       .from('sales_invoices')
@@ -562,7 +639,13 @@ export const documentService = {
       customer_address: customer?.address || '',
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
       buyer_address: profile?.buyer_address || customer?.address || '',
-      consignee: await resolveConsignee(orderId, profile, lotNo),
+      consignee: parties.consignee.name,
+      consignee_address: consigneeAddressOf(parties, profile),
+      notify_party: parties.notify.name,
+      notify_address: parties.notify.address,
+      consignee_source: parties.consignee.source,
+      notify_source: parties.notify.source,
+      show_parties_block: parties.showPartiesBlock,
       shipping_marks: order.shipping_marks || profile?.shipping_marks || '',
       grade: order.grade,
       containers,
@@ -604,15 +687,11 @@ export const documentService = {
   // ==========================================================================
 
   async getWeightListData(orderId: string, lotNo = 0): Promise<WeightListData> {
-    const { data: order, error } = await supabase
-      .from('sales_orders')
-      .select('*, customer:sales_customers!customer_id(id,name,address)')
-      .eq('id', orderId)
-      .single()
-    if (error || !order) throw new Error('Không thể tải thông tin đơn hàng')
+    const order = await loadDocOrder(orderId)
 
     const booking = await loadLotBooking(orderId, lotNo)
-    const lcInfo = await loadLcInfo(orderId, lotNo)
+    const neg = await loadNegotiation(orderId, lotNo)
+    const lcInfo = lcInfoOf(neg)
     let wlQ = supabase
       .from('sales_order_containers')
       .select('container_no,seal_no,bale_count,pallet_count,container_type,lot_no,net_weight_kg,tare_weight_kg,gross_weight_kg, items:sales_order_container_items(weight_kg)')
@@ -622,6 +701,7 @@ export const documentService = {
     const { data: rawContainers } = await wlQ.order('lot_no', { ascending: true, nullsFirst: true }).order('created_at')
 
     const { profile } = await loadExportProfile(order.customer_id)
+    const parties = await loadDocParties(order, profile, neg, lotNo)
     const { data: invoice } = await supabase
       .from('sales_invoices')
       .select('code,bl_number,invoice_date')
@@ -659,8 +739,10 @@ export const documentService = {
       date: order.invoice_date || invoice?.invoice_date || new Date().toLocaleDateString('sv-SE'),
       order_code: soDisplayCode(order) + (lotNo ? ` — Lô ${lotNo}` : ''),
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
-      consignee: await resolveConsignee(orderId, profile, lotNo),
-      consignee_address: profile?.consignee_address || '',
+      // Ô CONSIGNEE/ADDRESS theo resolveOrderParties (trước đây chỉ hồ sơ người mua) — đơn mua thẳng in y như cũ
+      consignee: parties.consignee.name,
+      consignee_address: consigneeAddressOf(parties, profile),
+      consignee_source: parties.consignee.source,
       grade: order.grade,
       packing_desc: packingLineFrom(packingStyle, rawArr),
       total_packing: totalPackingFrom(rawArr),
@@ -689,16 +771,8 @@ export const documentService = {
   // ==========================================================================
 
   async getInvoiceData(orderId: string, lotNo = 0): Promise<InvoiceData> {
-    // Fetch order with customer
-    const { data: order, error: orderErr } = await supabase
-      .from('sales_orders')
-      .select('*, customer:sales_customers!customer_id(id,name,country,address)')
-      .eq('id', orderId)
-      .single()
-
-    if (orderErr || !order) {
-      throw new Error('Không thể tải thông tin đơn hàng')
-    }
+    // Đơn + người mua (+ đơn gốc cho ô CONTRACT NO. + người nhận khi đã migration)
+    const order = await loadDocOrder(orderId)
 
     // Check if there is an invoice
     const { data: invoice } = await supabase
@@ -712,7 +786,9 @@ export const documentService = {
     const customer = order.customer as { name?: string; address?: string; country?: string } | null
     const { profile, bank } = await loadExportProfile(order.customer_id)
     const booking = await loadLotBooking(orderId, lotNo)
-    const lcInfo = await loadLcInfo(orderId, lotNo)
+    const neg = await loadNegotiation(orderId, lotNo)
+    const lcInfo = lcInfoOf(neg)
+    const parties = await loadDocParties(order, profile, neg, lotNo)
 
     // Khối lượng theo LÔ (lot_no) nếu chọn lô; không thì cả đơn
     let contQ = supabase.from('sales_order_containers').select('net_weight_kg,gross_weight_kg,bale_count,container_type').eq('sales_order_id', orderId)
@@ -756,7 +832,14 @@ export const documentService = {
 
     return {
       invoice_code: (order.invoice_no || invoice?.code || `INV-${order.code}`) + lotSuffix,
-      order_code: soDisplayCode(order) + (lotNo ? ` — Lô ${lotNo}` : ''),
+      // Số đơn trần — chữ tiếng Việt ' — Lô n' cũ lọt lên ô CONTRACT NO của hoá đơn xuất khẩu theo lô (lô đã có ở số Invoice /Ln)
+      order_code: soDisplayCode(order),
+      contract_no_doc: contractNoForDocs(order),
+      contract_date_doc: contractDateForDocs(order) || '',
+      bank_hint: parties.bankHint,
+      consignee_source: parties.consignee.source,
+      notify_source: parties.notify.source,
+      show_parties_block: parties.showPartiesBlock,
       customer: {
         name: customer?.name || '',
         address: customer?.address || '',
@@ -782,13 +865,13 @@ export const documentService = {
       bank_info: bank
         ? { account_name: bank.account_name || 'HUY ANH RUBBER COMPANY LIMITED', name: bank.bank_name, account: bank.account_no, address: bank.bank_address || '', swift: bank.swift_code || '' }
         : { account_name: 'HUY ANH RUBBER COMPANY LIMITED', name: '', account: '', address: '', swift: '' },
-      // GĐ2 — hồ sơ chứng từ khách
+      // GĐ2 — BUYER LUÔN là người mua (hồ sơ chứng từ người mua); CONSIGNEE/NOTIFY theo resolveOrderParties
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
       buyer_address: profile?.buyer_address || customer?.address || '',
-      consignee: await resolveConsignee(orderId, profile, lotNo),
-      consignee_address: profile?.consignee_address || '',
-      notify_party: profile?.notify_party || profile?.buyer_legal_name || customer?.name || '',
-      notify_address: profile?.notify_address || '',
+      consignee: parties.consignee.name,
+      consignee_address: consigneeAddressOf(parties, profile),
+      notify_party: parties.notify.name,
+      notify_address: parties.notify.address,
       shipping_marks: order.shipping_marks || profile?.shipping_marks || '',
       attn_contacts: profile?.attn_contacts || '',
       po_number: order.customer_po || null,
@@ -834,7 +917,7 @@ export const documentService = {
       .eq('id', orderId)
       .maybeSingle()
     const email = (row?.customer as { email?: string } | null)?.email || ''
-    const base = inv.order_code.split(' — ')[0]
+    const base = inv.order_code   // số đơn (của đợt) — số chứng từ theo đợt, KHÔNG theo HĐ gốc
     return {
       cert_no: `${base}${lotNo ? `/L${lotNo}` : ''}/BC`,
       date: inv.invoice_date,
@@ -858,14 +941,20 @@ export const documentService = {
   async getNonWoodCertData(orderId: string, lotNo = 0): Promise<NonWoodCertData> {
     const inv = await this.getInvoiceData(orderId, lotNo)
     const gradeLabel = (inv.grade || '').replace(/_/g, ' ')
-    const base = inv.order_code.split(' — ')[0]
+    const base = inv.order_code   // số đơn (của đợt)
+    // Consignee là NGƯỜI NHẬN THẬT (tên người nhận / chữ gõ riêng KHÔNG phải dạng "TO ORDER…") → THE BUYER = người
+    // nhận + địa chỉ CỦA người nhận. Còn lại (NH / TO ORDER / hồ sơ người mua / trống) → giữ mẹo cũ bên dưới.
+    const realReceiver = !!inv.consignee && !isToOrder(inv.consignee)
+      && (inv.consignee_source === 'receiver' || inv.consignee_source === 'order_override')
     return {
       cert_no: `${base}${lotNo ? `/L${lotNo}` : ''}/NW`,
       date: inv.invoice_date,
       // "buyer" trên Non-Wood = consignee (to order of NH); ADDRESS = tên+địa chỉ người mua thật (khớp mẫu).
       // Chỉ ghép tên vào ADDRESS khi THE BUYER là consignee (khác người mua) — tránh lặp tên khi D/P.
-      buyer_name: inv.consignee || inv.buyer_name,
-      buyer_address: inv.consignee ? [inv.buyer_name, inv.buyer_address].filter(Boolean).join(', ') : inv.buyer_address,
+      buyer_name: realReceiver ? inv.consignee : (inv.consignee || inv.buyer_name),
+      buyer_address: realReceiver
+        ? inv.consignee_address
+        : (inv.consignee ? [inv.buyer_name, inv.buyer_address].filter(Boolean).join(', ') : inv.buyer_address),
       commodity: `${inv.quantity_tons.toFixed(2).replace(/\.00$/, '')} MT - NATURAL RUBBER ${gradeLabel}`,
       grade_label: gradeLabel,
       quantity_tons: inv.quantity_tons,
@@ -878,7 +967,8 @@ export const documentService = {
       port_of_loading: inv.port_of_loading,
       port_of_destination: inv.port_of_destination,
       bl_number: inv.bl_number || '',
-      contract_no: base,
+      // Số HĐ KÝ: đợt mua tiếp in số HĐ gốc (docs_cite_root) — số chứng từ (cert_no) vẫn theo số đợt
+      contract_no: inv.contract_no_doc || base,
       invoice_no: inv.invoice_code,
     }
   },

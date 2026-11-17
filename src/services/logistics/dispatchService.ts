@@ -7,6 +7,10 @@
 
 import { supabase } from '../../lib/supabase'
 import type { FleetVehicle, FleetDriver } from './fleetService'
+// Họ HĐ + người nhận (sales_family_parties_p1): app cân đã bundle sẵn salesOrderService (WeighingPage import thẳng)
+// nên không thêm phụ thuộc mới; salesOrderService KHÔNG import file này (không vòng).
+import { salesOrderService } from '../sales/salesOrderService'
+import { contractNoForDocs, partyShortName, soDisplayCode } from '../sales/salesTypes'
 
 export type DispatchStatus = 'draft' | 'dispatched' | 'in_transit' | 'completed' | 'cancelled'
 export type TripType = 'port' | 'lao' | 'internal' | 'other' | 'trading' | 'fetch_mu'
@@ -276,6 +280,18 @@ export interface SalesOrderOption {
   port_of_destination: string | null
   status: string | null
   container_count: number
+  // ── Thêm 17/11/2026 (sales_family_parties_p1) — vắng / null khi chưa migration ──
+  /** Nhãn chọn đơn '<số đơn> · NGƯỜI MUA → NGƯỜI NHẬN' (vd 'HA20260302-D3 · HARMONYTIDE → QINGDAO JINTONG');
+   *  đơn không có người nhận riêng → '<số đơn> · NGƯỜI MUA'. Tên qua partyShortName. */
+  label?: string
+  /** Tên ngắn NGƯỜI MUA (đứng tên HĐ) — partyShortName */
+  buyer_short?: string | null
+  /** Tên ngắn NGƯỜI NHẬN HÀNG — null = chính người mua */
+  ship_to_short?: string | null
+  /** Đợt mua tiếp: đơn gốc + số đợt (trigger cấp) + số HĐ gốc — null với HĐ mới */
+  parent_order_id?: string | null
+  continuation_seq?: number | null
+  root_contract_no?: string | null
 }
 
 const ORDER_SELECT = `
@@ -1107,23 +1123,74 @@ async function markWeighed(orderId: string): Promise<number> {
 // TÍCH HỢP ĐƠN HÀNG BÁN
 // ============================================================================
 
-/** Danh sách đơn hàng bán để chọn khi lập lệnh (kèm số container). */
-async function listSalesOrderOptions(search?: string): Promise<SalesOrderOption[]> {
-  let q = supabase
-    .from('sales_orders')
-    .select(`
+// ── Họ HĐ (đơn mua tiếp) + người nhận hàng — sales_family_parties_p1 (17/11/2026) ──
+// Mọi cột/embed mới CHỈ thêm khi salesOrderService.familyPartiesReady() (chưa migration → select y như cũ).
+/** Embed đơn GỐC theo TÊN CỘT. ⚠ Đừng viết `sales_orders!parent_order_id(...)`: khoá ngoại tự tham chiếu nên
+ *  PostgREST hiểu ngược thành "các đơn con" và trả MẢNG (cùng ghi chú PARENT_JOIN ở salesOrderService). */
+const SO_PARENT_EMBED = 'parent:parent_order_id(id, code, contract_no, contract_date)'
+
+/** Embed many-to-one là object; phòng bản PostgREST cũ trả mảng. */
+const firstOf = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null))
+
+/** Chuỗi gõ tay đưa vào .or(): bỏ ký tự phá cú pháp PostgREST (phẩy, ngoặc) và ký tự đại diện. */
+const orSearchSafe = (s?: string | null): string =>
+  (s || '').replace(/[,()*%\\:"]/g, ' ').replace(/\s+/g, ' ').trim()
+
+type SoContractRefInput = {
+  code?: string | null
+  contract_no?: string | null
+  parent_order_id?: string | null
+  docs_cite_root?: boolean | null
+  parent?: { contract_no?: string | null; contract_date?: string | null } | null
+}
+
+/**
+ * "Căn cứ HĐ" (dispatch_orders.contract_ref) của lệnh lập từ MỘT đơn bán = số đơn (soDisplayCode).
+ * Đợt mua tiếp in số HĐ GỐC trên chứng từ (docs_cite_root) → '<số đơn> (HĐ <số gốc>)', vd 'HA20260302-D3 (HĐ HA20260302)':
+ * giữ số riêng của đợt nên lệnh ghép nhiều đơn KHÔNG chập hai đơn cùng số (bộ gộp distinct ở form lệnh), mà vẫn thấy số HĐ
+ * ký để đối chiếu/khai hải quan. Số HĐ ký = contractNoForDocs (salesTypes) — KHÔNG đoán theo đuôi '-D<n>'. Đợt giữ số
+ * riêng (docs_cite_root = false, vd HA20260301) và đơn thường → chỉ số đơn, y như trước.
+ */
+function contractRefOf(so: SoContractRefInput): string | null {
+  const own = so.contract_no || so.code || null
+  if (!own) return null
+  const signed = contractNoForDocs(so)
+  return signed && signed !== own ? `${own} (HĐ ${signed})` : own
+}
+
+const SO_OPTION_COLUMNS = `
       id, code, contract_no, grade, incoterm, port_of_destination, status,
       customer:sales_customers!customer_id(name, short_name),
       sales_order_containers(id)
-    `)
+    `
+
+/**
+ * Danh sách đơn hàng bán để chọn khi lập lệnh (kèm số container). Đã migration họ HĐ/các bên → kèm người nhận hàng
+ * (truy vấn thứ hai qua salesOrderService.attachShipTo — ship_to KHÔNG có FK) + đợt mua tiếp, và `label`
+ * '<số đơn> · NGƯỜI MUA → NGƯỜI NHẬN'. Chưa migration → select y như cũ.
+ */
+async function listSalesOrderOptions(search?: string): Promise<SalesOrderOption[]> {
+  const ready = await salesOrderService.familyPartiesReady()
+  const columns = (ready
+    ? `${SO_OPTION_COLUMNS}, parent_order_id, continuation_seq, ship_to_customer_id, ${SO_PARENT_EMBED}`
+    : SO_OPTION_COLUMNS) as typeof SO_OPTION_COLUMNS
+  let q = supabase
+    .from('sales_orders')
+    .select(columns)
     .not('status', 'in', '(cancelled)')
     .order('created_at', { ascending: false })
     .limit(SALES_ORDER_OPTION_LIMIT)
-  if (search) q = q.or(`code.ilike.%${search}%,contract_no.ilike.%${search}%,grade.ilike.%${search}%`)
+  const term = orSearchSafe(search)
+  if (term) q = q.or(`code.ilike.%${term}%,contract_no.ilike.%${term}%,grade.ilike.%${term}%`)
   const { data, error } = await q
   if (error) throw error
-  return (data || []).map((r: any): SalesOrderOption => {
-    const cust = Array.isArray(r.customer) ? r.customer[0] : r.customer
+  const base = (data || []) as any[]
+  const rows: any[] = ready ? await salesOrderService.attachShipTo(base) : base
+  return rows.map((r: any): SalesOrderOption => {
+    const cust = firstOf<{ name?: string | null; short_name?: string | null }>(r.customer)
+    const parent = firstOf<{ code?: string | null; contract_no?: string | null }>(r.parent)
+    const buyer = cust && (cust.name || cust.short_name) ? partyShortName(cust) : null
+    const shipTo = r.ship_to ? partyShortName(r.ship_to) : null
     return {
       id: r.id,
       code: r.code,
@@ -1134,6 +1201,12 @@ async function listSalesOrderOptions(search?: string): Promise<SalesOrderOption[
       port_of_destination: r.port_of_destination ?? null,
       status: r.status ?? null,
       container_count: Array.isArray(r.sales_order_containers) ? r.sales_order_containers.length : 0,
+      label: `${soDisplayCode(r)}${buyer ? ` · ${buyer}` : ''}${shipTo ? ` → ${shipTo}` : ''}`,
+      buyer_short: buyer,
+      ship_to_short: shipTo,
+      parent_order_id: r.parent_order_id ?? null,
+      continuation_seq: r.continuation_seq ?? null,
+      root_contract_no: parent ? soDisplayCode(parent) : null,
     }
   })
 }
@@ -1146,12 +1219,16 @@ async function buildFromSalesOrder(soId: string): Promise<{
   header: Partial<CreateDispatchInput>
   lines: DispatchLineInput[]
 }> {
-  const { data: so, error } = await supabase
-    .from('sales_orders')
-    .select(`
+  // Đã migration họ HĐ → kèm đơn gốc để "Căn cứ HĐ" của đợt in số gốc có cả hai số (contractRefOf).
+  const ready = await salesOrderService.familyPartiesReady()
+  const baseColumns = `
       id, code, contract_no, grade, incoterm, port_of_destination,
       customer:sales_customers!customer_id(name, short_name)
-    `)
+    `
+  const columns = (ready ? `${baseColumns}, parent_order_id, docs_cite_root, ${SO_PARENT_EMBED}` : baseColumns) as typeof baseColumns
+  const { data: so, error } = await supabase
+    .from('sales_orders')
+    .select(columns)
     .eq('id', soId)
     .single()
   if (error) throw error
@@ -1190,7 +1267,7 @@ async function buildFromSalesOrder(soId: string): Promise<{
       sales_order_id: so.id,
       customer_name: cust?.short_name || cust?.name || null,
       destination: so.port_of_destination || null,
-      contract_ref: so.contract_no || so.code || null,
+      contract_ref: contractRefOf({ ...(so as SoContractRefInput), parent: firstOf((so as any).parent) }),
       trip_type: 'port',
     },
     lines,
@@ -1215,36 +1292,64 @@ export interface AttachedSalesOrder {
 async function ordersFromContainerIds(containerIds: string[]): Promise<AttachedSalesOrder[]> {
   const ids = [...new Set((containerIds || []).filter(Boolean))]
   if (ids.length === 0) return []
-  const { data, error } = await supabase
-    .from('sales_order_containers')
-    .select(`
+  const ready = await salesOrderService.familyPartiesReady()
+  const baseColumns = `
       id, sales_order_id,
       so:sales_orders!sales_order_id(
         id, code, contract_no, port_of_destination,
         customer:sales_customers!customer_id(name, short_name)
       )
-    `)
+    `
+  // Đã migration → thêm 2 CỘT họ HĐ vào embed đơn (cột thường — không lồng thêm embed nào).
+  // Kiểu = chuỗi literal cũ: chuỗi ghép động làm supabase-js suy ra GenericStringError (client không có kiểu DB).
+  const columns = (ready
+    ? 'id, sales_order_id, so:sales_orders!sales_order_id(id, code, contract_no, port_of_destination, '
+      + 'customer:sales_customers!customer_id(name, short_name), parent_order_id, docs_cite_root)'
+    : baseColumns) as typeof baseColumns
+  const { data, error } = await supabase
+    .from('sales_order_containers')
+    .select(columns)
     .in('id', ids)
   if (error) throw error
-  const byOrder = new Map<string, AttachedSalesOrder>()
+  const orders = new Map<string, any>()
+  const containersBy = new Map<string, string[]>()
   for (const row of (data || []) as any[]) {
     const so = Array.isArray(row.so) ? row.so[0] : row.so
     if (!so) continue
-    if (!byOrder.has(so.id)) {
-      const cust = Array.isArray(so.customer) ? so.customer[0] : so.customer
-      byOrder.set(so.id, {
-        id: so.id,
-        code: so.code,
-        contract_no: so.contract_no || null,
-        customer_name: cust?.short_name || cust?.name || null,
-        destination: so.port_of_destination || null,
-        contract_ref: so.contract_no || so.code || null,
-        containerIds: [],
-      })
-    }
-    byOrder.get(so.id)!.containerIds.push(row.id)
+    if (!orders.has(so.id)) orders.set(so.id, so)
+    const list = containersBy.get(so.id) || []
+    list.push(row.id)
+    containersBy.set(so.id, list)
   }
-  return [...byOrder.values()]
+  // Số HĐ GỐC cho các đợt in số gốc: truy vấn thứ hai theo id (không lồng embed tự tham chiếu vào embed đơn).
+  const parentIds = [...new Set([...orders.values()]
+    .filter((so) => so.docs_cite_root && so.parent_order_id)
+    .map((so) => so.parent_order_id as string))]
+  const parents = new Map<string, { contract_no: string | null; contract_date: string | null }>()
+  if (parentIds.length > 0) {
+    const { data: ps, error: pErr } = await supabase
+      .from('sales_orders')
+      .select('id, code, contract_no, contract_date')
+      .in('id', parentIds)
+    if (pErr) throw pErr
+    for (const p of (ps || []) as Array<{ id: string; contract_no: string | null; contract_date: string | null }>) {
+      parents.set(p.id, p)
+    }
+  }
+  const out: AttachedSalesOrder[] = []
+  for (const so of orders.values()) {
+    const cust = Array.isArray(so.customer) ? so.customer[0] : so.customer
+    out.push({
+      id: so.id,
+      code: so.code,
+      contract_no: so.contract_no || null,
+      customer_name: cust?.short_name || cust?.name || null,
+      destination: so.port_of_destination || null,
+      contract_ref: contractRefOf({ ...so, parent: so.parent_order_id ? parents.get(so.parent_order_id) ?? null : null }),
+      containerIds: containersBy.get(so.id) || [],
+    })
+  }
+  return out
 }
 
 // ============================================================================

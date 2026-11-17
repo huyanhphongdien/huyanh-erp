@@ -23,6 +23,13 @@ const hashLucNap = new URLSearchParams(typeof window === 'undefined' ? '' : wind
 const TOKEN_KHOI_PHUC = hashLucNap.get('type') === 'recovery' ? hashLucNap.get('access_token') : null
 const LINK_LOI = !!(hashLucNap.get('error_code') || hashLucNap.get('error_description'))
 
+// Link khôi phục gửi từ Supabase Dashboard ("Send password recovery") KHÔNG mang redirectTo → rơi về Site URL ('/'): người
+// dùng bị đăng nhập luôn mà không được hỏi mật khẩu mới (Cài đặt thì bắt mật khẩu cũ — họ không còn). Chuyển sang
+// /reset-password ĐỒNG BỘ ngay lúc nạp module: trước khi Router đọc URL và trước khi supabase-js (xử lý bất đồng bộ) đọc hash.
+if (typeof window !== 'undefined' && TOKEN_KHOI_PHUC && window.location.pathname !== '/reset-password') {
+  window.history.replaceState(window.history.state, '', `/reset-password${window.location.search}${window.location.hash}`)
+}
+
 const KEY = 'erp_pw_recovery_uid'   // sessionStorage: user id của phiên khôi phục đang mở ở tab này
 const ghiDau = (uid: string | null) => {
   try { if (uid) sessionStorage.setItem(KEY, uid); else sessionStorage.removeItem(KEY) } catch { /* trình duyệt chặn storage */ }

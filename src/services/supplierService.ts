@@ -675,7 +675,7 @@ export const supplierService = {
    * Lấy báo giá còn hiệu lực của NCC
    */
   async getActiveQuotations(supplierId: string): Promise<SupplierQuotation[]> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('sv-SE');
     
     const { data, error } = await supabase
       .from('supplier_quotations')

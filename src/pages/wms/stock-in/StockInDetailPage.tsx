@@ -365,7 +365,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
       align: 'right' as const,
       render: (v: number, r: OrderDetail) => (
         <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          {v.toLocaleString()} {r.unit}
+          {v.toLocaleString('vi-VN')} {r.unit}
         </Text>
       ),
     },
@@ -375,7 +375,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
       key: 'weight',
       align: 'right' as const,
       render: (v: number | null) => v ? (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v.toLocaleString()}</Text>
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v.toLocaleString('vi-VN')}</Text>
       ) : '—',
     },
     {
@@ -393,7 +393,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
       key: 'dry_weight',
       align: 'right' as const,
       render: (v: number | null) => v ? (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace", color: '#2D8B6E' }}>{v.toLocaleString()}</Text>
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace", color: '#2D8B6E' }}>{v.toLocaleString('vi-VN')}</Text>
       ) : '—',
     },
     {
@@ -502,7 +502,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
               </Space>
               {order.deal.quantity_kg && (
                 <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
-                  SL Deal: {(order.deal.quantity_kg / 1000).toFixed(1)} T · Don gia: {order.deal.unit_price?.toLocaleString()} d/kg
+                  SL Deal: {(order.deal.quantity_kg / 1000).toFixed(1)} T · Don gia: {order.deal.unit_price?.toLocaleString('vi-VN')} d/kg
                 </Text>
               )}
             </Col>

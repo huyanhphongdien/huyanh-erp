@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 import {
   ClipboardList,
   Clock,
@@ -68,9 +69,10 @@ interface DashboardStats {
   remainingLeaveDays: number
   pendingLeaveRequests: number
   recentTasks: RecentTask[]
-  myProjectCount: number
-  attendanceToday: AttendanceToday
-  monthlySummary: MonthlyAttSummary
+  /** null = khối này KHÔNG tải được (hiện "—" thay vì 0 giả) */
+  myProjectCount: number | null
+  attendanceToday: AttendanceToday | null
+  monthlySummary: MonthlyAttSummary | null
 }
 
 interface RecentTask {
@@ -235,59 +237,70 @@ export function EmployeeDashboard() {
     try {
       setError(null)
       const employeeId = user.employee_id
-      const { count: totalTasks } = await supabase
+      // supabase-js KHÔNG throw — lỗi nằm trong object trả về, phải tự throw để outer catch bắt được
+      const { count: totalTasks, error: eTotal } = await supabase
         .from('task_assignments').select('*', { count: 'exact', head: true }).eq('employee_id', employeeId)
-      const { data: inProgressData } = await supabase
+      if (eTotal) throw eTotal
+      const { data: inProgressData, error: eInProgress } = await supabase
         .from('task_assignments').select(`id, task:tasks!inner(status)`)
         .eq('employee_id', employeeId).in('tasks.status', ['new', 'in_progress'])
-      const { data: pendingEvalTasks } = await supabase
+      if (eInProgress) throw eInProgress
+      const { data: pendingEvalTasks, error: ePendingEval } = await supabase
         .from('task_assignments').select(`id, self_rating, task:tasks!inner(status)`)
         .eq('employee_id', employeeId).eq('tasks.status', 'pending_review').is('self_rating', null)
-      const { data: completedData } = await supabase
+      if (ePendingEval) throw ePendingEval
+      const { data: completedData, error: eCompleted } = await supabase
         .from('task_assignments').select(`id, task:tasks!inner(status)`)
         .eq('employee_id', employeeId).in('tasks.status', ['completed', 'accepted'])
-      const { count: pendingLeave } = await supabase
+      if (eCompleted) throw eCompleted
+      const { count: pendingLeave, error: ePendingLeave } = await supabase
         .from('leave_requests').select('*', { count: 'exact', head: true })
         .eq('employee_id', employeeId).eq('status', 'pending')
+      if (ePendingLeave) throw ePendingLeave
       // Phép năm: 14 ngày/năm. Chỉ trừ phép từ 01/05/2026 (trước đó chưa dùng ERP).
       // Từ 2027 trở đi tính bình thường từ 01/01.
       const ANNUAL_LEAVE_DAYS = 14
       const ERP_LEAVE_START = '2026-05-01' // Ngày bắt đầu tính phép trên ERP
       const currentYear = new Date().getFullYear()
       const leaveCountFrom = currentYear <= 2026 ? ERP_LEAVE_START : `${currentYear}-01-01`
-      const { data: usedLeave } = await supabase
+      const { data: usedLeave, error: eUsedLeave } = await supabase
         .from('leave_requests').select('total_days').eq('employee_id', employeeId)
         .eq('status', 'approved').gte('start_date', leaveCountFrom).lte('end_date', `${currentYear}-12-31`)
+      if (eUsedLeave) throw eUsedLeave
       const totalUsedDays = usedLeave?.reduce((sum, l) => sum + (l.total_days || 0), 0) || 0
       const remainingDays = Math.max(0, ANNUAL_LEAVE_DAYS - totalUsedDays)
-      const { data: recentTasksData } = await supabase
+      const { data: recentTasksData, error: eRecent } = await supabase
         .from('task_assignments').select(`id, task:tasks(id, name, code, status, due_date, priority)`)
         .eq('employee_id', employeeId).order('created_at', { ascending: false }).limit(5)
+      if (eRecent) throw eRecent
       const recentTasks: RecentTask[] = (recentTasksData || [])
         .filter(t => t.task)
         .map(t => ({
           id: (t.task as any).id, name: (t.task as any).name, code: (t.task as any).code || '',
           status: (t.task as any).status, due_date: (t.task as any).due_date, priority: (t.task as any).priority || 'medium',
         }))
-      let myProjectCount = 0
+      // Khối được phép degrade: lỗi → null (UI hiện "—"), không chặn cả dashboard
+      let myProjectCount: number | null = 0
       try {
-        const { count } = await supabase
+        const { count, error: eProject } = await supabase
           .from('project_members').select('*', { count: 'exact', head: true })
           .eq('employee_id', employeeId).eq('is_active', true)
+        if (eProject) throw eProject
         myProjectCount = count || 0
-      } catch {}
+      } catch { myProjectCount = null }
 
       // ── Attendance: today's check-in ──
       const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }) // YYYY-MM-DD
-      let attendanceToday: AttendanceToday = { checkedIn: false, checkInTime: null, checkOutTime: null, shiftName: null }
+      let attendanceToday: AttendanceToday | null = { checkedIn: false, checkInTime: null, checkOutTime: null, shiftName: null }
       try {
-        const { data: todayAtt } = await supabase
+        const { data: todayAtt, error: eToday } = await supabase
           .from('attendance')
           .select('check_in_time, check_out_time, shift:shifts!attendance_shift_id_fkey(name)')
           .eq('employee_id', employeeId)
           .eq('date', todayStr)
           .order('check_in_time', { ascending: true })
           .limit(1)
+        if (eToday) throw eToday
         if (todayAtt && todayAtt.length > 0) {
           const a = todayAtt[0] as any
           attendanceToday = {
@@ -297,19 +310,20 @@ export function EmployeeDashboard() {
             shiftName: Array.isArray(a.shift) ? a.shift[0]?.name : a.shift?.name,
           }
         }
-      } catch {}
+      } catch { attendanceToday = null }
 
       // ── Attendance: monthly summary ──
       const now = new Date()
       const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-      let monthlySummary: MonthlyAttSummary = { totalCong: 0, lateDays: 0, absentDays: 0, workDays: 0 }
+      let monthlySummary: MonthlyAttSummary | null = { totalCong: 0, lateDays: 0, absentDays: 0, workDays: 0 }
       try {
-        const { data: monthAtt } = await supabase
+        const { data: monthAtt, error: eMonth } = await supabase
           .from('attendance')
           .select('date, status, late_minutes, work_units, shift:shifts!attendance_shift_id_fkey(work_units)')
           .eq('employee_id', employeeId)
           .gte('date', monthStart)
           .lte('date', todayStr)
+        if (eMonth) throw eMonth
         if (monthAtt) {
           // Group by date to handle multi-shift days
           const byDate = new Map<string, typeof monthAtt>()
@@ -342,7 +356,7 @@ export function EmployeeDashboard() {
           }
           monthlySummary = { totalCong: Math.round(cong * 10) / 10, lateDays: late, absentDays: absent, workDays }
         }
-      } catch {}
+      } catch { monthlySummary = null }
 
       setStats({
         totalTasks: totalTasks || 0, pendingEvaluation: pendingEvalTasks?.length || 0,
@@ -352,7 +366,7 @@ export function EmployeeDashboard() {
       })
     } catch (err) {
       console.error('Error fetching dashboard data:', err)
-      setError('Không thể tải dữ liệu dashboard')
+      setError(dichLoiHeThong(err, 'Không thể tải dữ liệu dashboard'))
     } finally { setLoading(false); setRefreshing(false) }
   }
 
@@ -423,16 +437,21 @@ export function EmployeeDashboard() {
         {/* ─── CHECK-IN CARD (most important daily action) ─── */}
         <GlassCard className="p-4 sm:p-5 relative overflow-hidden">
           <div className="absolute inset-0 opacity-[0.04]"
-            style={{ background: stats.attendanceToday.checkedIn
+            style={{ background: stats.attendanceToday?.checkedIn
               ? 'linear-gradient(135deg, #10B981, #059669)'
               : 'linear-gradient(135deg, #F59E0B, #D97706)' }} />
           <div className="relative z-10">
             <div className="flex items-center gap-3 min-w-0 mb-3">
-              <div className={`p-2.5 rounded-xl flex-shrink-0 ${stats.attendanceToday.checkedIn ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+              <div className={`p-2.5 rounded-xl flex-shrink-0 ${stats.attendanceToday?.checkedIn ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
                 <Clock className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                {stats.attendanceToday.checkedIn ? (
+                {stats.attendanceToday === null ? (
+                  <>
+                    <p className="text-[14px] font-bold text-gray-500">Không tải được trạng thái chấm công hôm nay</p>
+                    <p className="text-[12px] text-gray-500">Vẫn chấm công được bằng hai nút bên dưới</p>
+                  </>
+                ) : stats.attendanceToday.checkedIn ? (
                   <>
                     <p className="text-[14px] font-bold text-emerald-700">✓ Đã chấm công hôm nay</p>
                     <p className="text-[12px] text-gray-500 truncate">
@@ -466,13 +485,22 @@ export function EmployeeDashboard() {
           </div>
         </GlassCard>
 
+        {/* ─── Cảnh báo khối không tải được (ô liên quan hiện "—") ─── */}
+        {(stats.attendanceToday === null || stats.monthlySummary === null || stats.myProjectCount === null) && (
+          <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-200">
+            <p className="text-xs font-medium text-red-700">Không tải được một phần số liệu — ô bị lỗi hiện "—"</p>
+            <button onClick={() => fetchDashboardData(true)}
+              className="text-xs font-bold text-red-700 underline whitespace-nowrap">Thử lại</button>
+          </div>
+        )}
+
         {/* ─── STATS GRID ─── */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3.5">
           {/* Attendance stats — first row */}
           <StatCard
             title="Công tháng này"
-            value={stats.monthlySummary.totalCong}
-            subtitle={`${stats.monthlySummary.workDays} ngày đi làm`}
+            value={stats.monthlySummary ? stats.monthlySummary.totalCong : '—'}
+            subtitle={stats.monthlySummary ? `${stats.monthlySummary.workDays} ngày đi làm` : 'không tải được'}
             icon={<Calendar />}
             accentColor={BRAND.primary}
             iconBg="bg-emerald-50 text-emerald-600"
@@ -480,8 +508,8 @@ export function EmployeeDashboard() {
           />
           <StatCard
             title="Đi trễ"
-            value={stats.monthlySummary.lateDays}
-            subtitle="lần trong tháng"
+            value={stats.monthlySummary ? stats.monthlySummary.lateDays : '—'}
+            subtitle={stats.monthlySummary ? 'lần trong tháng' : 'không tải được'}
             icon={<Timer />}
             accentColor="#F59E0B"
             iconBg="bg-amber-50 text-amber-600"
@@ -489,8 +517,8 @@ export function EmployeeDashboard() {
           />
           <StatCard
             title="Vắng"
-            value={stats.monthlySummary.absentDays}
-            subtitle="ngày chưa chấm công"
+            value={stats.monthlySummary ? stats.monthlySummary.absentDays : '—'}
+            subtitle={stats.monthlySummary ? 'ngày chưa chấm công' : 'không tải được'}
             icon={<AlertCircle />}
             accentColor="#EF4444"
             iconBg="bg-red-50 text-red-600"
@@ -549,11 +577,11 @@ export function EmployeeDashboard() {
             iconBg="bg-pink-50 text-pink-600"
             link="/payslips"
           />
-          {stats.myProjectCount > 0 && (
+          {(stats.myProjectCount === null || stats.myProjectCount > 0) && (
             <StatCard
               title="Dự án"
-              value={stats.myProjectCount}
-              subtitle="đang tham gia"
+              value={stats.myProjectCount ?? '—'}
+              subtitle={stats.myProjectCount === null ? 'không tải được' : 'đang tham gia'}
               icon={<FolderKanban />}
               accentColor="#6366F1"
               iconBg="bg-indigo-50 text-indigo-600"

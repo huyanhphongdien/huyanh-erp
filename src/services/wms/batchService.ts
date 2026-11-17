@@ -246,12 +246,12 @@ export const batchService = {
       initial_drc: data.initial_drc || null,
       latest_drc: data.initial_drc || null,
       qc_status: 'pending' as QCStatus,
-      last_qc_date: data.initial_drc ? new Date().toISOString().split('T')[0] : null,
+      last_qc_date: data.initial_drc ? new Date().toLocaleDateString('sv-SE') : null,
       batch_type: data.batch_type || 'production',
       production_order_id: data.production_order_id || null,
       blend_source_order_id: data.blend_source_order_id || null,
       supplier_id: data.supplier_id || null,
-      received_date: data.received_date || new Date().toISOString().split('T')[0],
+      received_date: data.received_date || new Date().toLocaleDateString('sv-SE'),
       expiry_date: data.expiry_date || null,
       status: 'active' as BatchStatus,
       created_by: data.created_by || null,
@@ -467,7 +467,7 @@ export const batchService = {
   // GET BATCHES DUE RECHECK — Lô cần tái kiểm DRC
   // --------------------------------------------------------------------------
   async getBatchesDueRecheck(): Promise<StockBatch[]> {
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
 
     const { data, error } = await supabase
       .from('stock_batches')
@@ -574,7 +574,7 @@ export const batchService = {
   ): Promise<StockBatch> {
     const updateData: Record<string, unknown> = {
       latest_drc: drcValue,
-      last_qc_date: new Date().toISOString().split('T')[0],
+      last_qc_date: new Date().toLocaleDateString('sv-SE'),
       updated_at: new Date().toISOString(),
     }
 
@@ -666,7 +666,7 @@ export const batchService = {
   // MARK EXPIRED — Đánh dấu lô hết hạn (chạy scheduled)
   // --------------------------------------------------------------------------
   async markExpiredBatches(): Promise<number> {
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
 
     const { data, error } = await supabase
       .from('stock_batches')
@@ -842,9 +842,9 @@ export const batchService = {
         initial_drc: avgDRC,
         latest_drc: avgDRC,
         qc_status: 'passed' as QCStatus,
-        last_qc_date: new Date().toISOString().split('T')[0],
+        last_qc_date: new Date().toLocaleDateString('sv-SE'),
         batch_type: firstBatch.batch_type || 'production',
-        received_date: new Date().toISOString().split('T')[0],
+        received_date: new Date().toLocaleDateString('sv-SE'),
         status: 'active' as BatchStatus,
         rubber_grade: avgDRC ? rubberGradeService.classifyByDRC(avgDRC) : firstBatch.rubber_grade || null,
         rubber_type: firstBatch.rubber_type || null,

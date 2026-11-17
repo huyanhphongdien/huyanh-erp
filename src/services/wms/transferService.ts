@@ -692,7 +692,7 @@ async function _createStockInForReceived(
         rubber_type: sourceBatch?.rubber_grade ? sourceBatch.rubber_grade.toLowerCase() : null,
         latest_drc: sourceBatch?.latest_drc || null,
         qc_status: 'passed',
-        received_date: new Date().toISOString().split('T')[0],
+        received_date: new Date().toLocaleDateString('sv-SE'),
         contamination_status: 'clean',
         contamination_notes: `Chuyển từ ${transfer.from_facility?.code || ''} (${transfer.code})`,
       })

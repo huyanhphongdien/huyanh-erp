@@ -38,7 +38,7 @@ export default function OrderInfoTab({ order }: { order: SalesOrder }) {
               <Tag color="blue" style={{ whiteSpace: 'normal', height: 'auto', lineHeight: 1.5, padding: '2px 8px', wordBreak: 'break-word' }}>{gradeLabel}</Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Khách hàng" span={2}>{cust?.name || '-'} {cust?.country ? `(${cust.country})` : ''}</Descriptions.Item>
-            <Descriptions.Item label="Số lượng">{order.quantity_tons} tấn ({order.quantity_kg?.toLocaleString()} kg)</Descriptions.Item>
+            <Descriptions.Item label="Số lượng">{order.quantity_tons} tấn ({order.quantity_kg?.toLocaleString('vi-VN')} kg)</Descriptions.Item>
             <Descriptions.Item label="Đơn giá">{fmtMoney(order.unit_price, order.currency, { decimals: 0 })} / tấn</Descriptions.Item>
             <Descriptions.Item label="Giá trị">{fmtMoney(orderTotalInCurrency(order), order.currency, { decimals: 0 })}</Descriptions.Item>
             <Descriptions.Item label="Incoterm">{INCOTERM_LABELS[order.incoterm as Incoterm] || order.incoterm}</Descriptions.Item>

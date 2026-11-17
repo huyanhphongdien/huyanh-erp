@@ -278,7 +278,7 @@ const BookingCard = ({
             <br />
             <Text strong style={{ color: '#fff', fontSize: 13 }}>
               {/* Live update: hiện counter_price khi đang negotiating */}
-              {((isNegotiating && booking.counter_price) ? booking.counter_price : booking.price_per_kg)?.toLocaleString() || '—'} đ/kg
+              {((isNegotiating && booking.counter_price) ? booking.counter_price : booking.price_per_kg)?.toLocaleString('vi-VN') || '—'} đ/kg
             </Text>
           </Col>
         </Row>

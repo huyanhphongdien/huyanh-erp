@@ -159,7 +159,7 @@ const BlendSuggestPage = () => {
   // Batch select options
   const batchOptions = batchesNeedingBlend.map(b => ({
     value: b.id,
-    label: `${b.batch_no} — DRC: ${b.latest_drc || b.initial_drc || '?'}% — ${b.quantity_remaining.toLocaleString()} kg`,
+    label: `${b.batch_no} — DRC: ${b.latest_drc || b.initial_drc || '?'}% — ${b.quantity_remaining.toLocaleString('vi-VN')} kg`,
   }))
 
   return (
@@ -239,7 +239,7 @@ const BlendSuggestPage = () => {
                 </Text>
                 <Text style={{ marginLeft: 8 }}>Còn lại:</Text>
                 <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                  {selectedBatch.quantity_remaining.toLocaleString()} kg
+                  {selectedBatch.quantity_remaining.toLocaleString('vi-VN')} kg
                 </Text>
                 <Text style={{ marginLeft: 8 }}>QC:</Text>
                 <Tag color={selectedBatch.qc_status === 'needs_blend' ? 'warning' : 'default'}>

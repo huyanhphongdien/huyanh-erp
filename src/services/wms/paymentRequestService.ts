@@ -575,7 +575,7 @@ async function create(input: CreatePaymentRequestInput): Promise<PaymentRequest>
     .insert({
       code,
       facility_id: input.facility_id || null,
-      request_date: input.request_date || new Date().toISOString().slice(0, 10),
+      request_date: input.request_date || new Date().toLocaleDateString('sv-SE'),
       rubber_type: input.rubber_type || null,
       title: input.title || null,
       currency: input.currency || 'VND',

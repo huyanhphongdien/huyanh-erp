@@ -37,7 +37,7 @@ export default function SalesDigestPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `sales-digest-${new Date().toISOString().split('T')[0]}.html`
+    a.download = `sales-digest-${new Date().toLocaleDateString('sv-SE')}.html`
     a.click()
     URL.revokeObjectURL(url)
   }

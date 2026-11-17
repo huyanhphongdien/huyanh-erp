@@ -173,12 +173,12 @@ export default function ConfirmOrderModal({
         ])
 
         setApprovalNumber(autoNumber)
-        setApprovalDate(new Date().toISOString().split('T')[0])
+        setApprovalDate(new Date().toLocaleDateString('sv-SE'))
         setApprovedByName(defaultApprover)
       } catch (err) {
         console.error('Init error:', err)
         setApprovalNumber(`DX-${new Date().getFullYear()}-000001`)
-        setApprovalDate(new Date().toISOString().split('T')[0])
+        setApprovalDate(new Date().toLocaleDateString('sv-SE'))
         setApprovedByName('Lê Văn Huy - Giám đốc')
       } finally {
         setInitLoading(false)

@@ -176,7 +176,7 @@ export const projectReportService = {
       .eq('project_id', projectId)
       .order('order_index', { ascending: true })
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     const phaseProgress: PhaseProgress[] = (phases || []).map(ph => ({
       ...ph,
       progress_pct: Number(ph.progress_pct) || 0,
@@ -333,7 +333,7 @@ export const projectReportService = {
     return {
       project_code: project.code,
       project_name: project.name,
-      report_period: period || new Date().toISOString().split('T')[0],
+      report_period: period || new Date().toLocaleDateString('sv-SE'),
       health,
       health_gap: gap,
       overall_progress: project.progress_pct,
@@ -382,7 +382,7 @@ export const projectReportService = {
 
     // Get upcoming milestone for each project
     const projectIds = all.map(p => p.id)
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
 
     let milestoneMap = new Map<string, { name: string; due_date: string }>()
     if (projectIds.length > 0) {

@@ -177,7 +177,7 @@ export const milestoneService = {
   // ==========================================================================
 
   async getUpcoming(days: number = 7, projectId?: string): Promise<ProjectMilestone[]> {
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + days)
     const futureDateStr = futureDate.toISOString().split('T')[0]
@@ -208,7 +208,7 @@ export const milestoneService = {
   // ==========================================================================
 
   async getOverdue(projectId?: string): Promise<ProjectMilestone[]> {
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
 
     let query = supabase
       .from('project_milestones')
@@ -247,7 +247,7 @@ export const milestoneService = {
     }))
 
     // Xác định status ban đầu
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     const daysUntilDue = Math.ceil(
       (new Date(formData.due_date).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24)
     )
@@ -351,7 +351,7 @@ export const milestoneService = {
       .from('project_milestones')
       .update({
         status: 'completed',
-        completed_date: new Date().toISOString().split('T')[0],
+        completed_date: new Date().toLocaleDateString('sv-SE'),
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -388,7 +388,7 @@ export const milestoneService = {
     const current = await this.getById(id)
     if (!current) throw new Error('Không tìm thấy milestone')
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     let newStatus: MilestoneStatus = 'pending'
     if (current.due_date < today) {
       newStatus = 'overdue'
@@ -497,7 +497,7 @@ export const milestoneService = {
   // ==========================================================================
 
   async refreshStatuses(projectId: string): Promise<number> {
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     const sevenDaysLater = new Date()
     sevenDaysLater.setDate(sevenDaysLater.getDate() + 7)
     const sevenDaysStr = sevenDaysLater.toISOString().split('T')[0]

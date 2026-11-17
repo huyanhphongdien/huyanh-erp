@@ -28,6 +28,7 @@ import {
   BulbOutlined,
 } from '@ant-design/icons'
 import blendingService from '../../../services/wms/blendingService'
+import { useDebounce } from '../../../hooks/useDebounce'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import type { BlendOrder, BlendStatus } from '../../../services/wms/wms.types'
 import {
@@ -50,6 +51,7 @@ const BlendListPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchText, setSearchText] = useState('')
+  const searchDebounced = useDebounce(searchText, 400) // gõ xong 400ms mới bắn query
   const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -63,7 +65,7 @@ const BlendListPage = () => {
         page,
         pageSize,
         status: filterStatus,
-        search: searchText.trim() || undefined,
+        search: searchDebounced.trim() || undefined,
       })
       setOrders(result.data)
       setTotalOrders(result.total)
@@ -73,7 +75,7 @@ const BlendListPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [filterStatus, searchText, page, pageSize])
+  }, [filterStatus, searchDebounced, page, pageSize])
 
   useEffect(() => {
     loadOrders()
@@ -119,7 +121,7 @@ const BlendListPage = () => {
       align: 'right' as const,
       render: (v: number) => (
         <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          {v ? v.toLocaleString() : '—'}
+          {v ? v.toLocaleString('vi-VN') : '—'}
         </Text>
       ),
     },

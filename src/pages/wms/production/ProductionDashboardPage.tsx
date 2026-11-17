@@ -130,7 +130,7 @@ const ProductionDashboardPage = () => {
       key: 'target_quantity',
       align: 'right' as const,
       render: (v: number) => (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v?.toLocaleString()}</Text>
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v?.toLocaleString('vi-VN')}</Text>
       ),
     },
     {

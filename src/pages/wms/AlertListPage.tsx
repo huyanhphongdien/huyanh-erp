@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenTab } from '../../hooks/useOpenTab'
+import PageState from '../../components/common/PageState'
 import {
   Card,
   Tabs,
@@ -73,6 +74,7 @@ const AlertListPage = () => {
 
   const [alerts, setAlerts] = useState<StockAlert[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey>('all')
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
@@ -85,11 +87,12 @@ const AlertListPage = () => {
     try {
       if (showRefresh) setRefreshing(true)
       else setLoading(true)
-
+      setLoadError(null)
       const data = await alertService.checkAllAlerts()
       setAlerts(data)
     } catch (err) {
       console.error('Load alerts error:', err)
+      setLoadError(err)   // lỗi tải ≠ "không có cảnh báo" — đừng để màn trống giả
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -216,7 +219,9 @@ const AlertListPage = () => {
       />
 
       <div style={{ padding: '0 16px 24px' }}>
-        {filteredAlerts.length === 0 ? (
+        {loadError ? (
+          <PageState error={loadError} onRetry={() => loadAlerts()} />
+        ) : filteredAlerts.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '64px 0' }}>
             <div style={{
               width: 64, height: 64, borderRadius: '50%', background: '#f6ffed',

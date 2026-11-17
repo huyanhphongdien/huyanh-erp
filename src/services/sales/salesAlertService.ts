@@ -76,7 +76,7 @@ export const salesAlertService = {
       if (days > 30) {
         alerts.push({
           id: `payment-${o.id}`, type: 'payment_overdue', severity: 'critical',
-          title: 'Công nợ quá hạn', message: `${o.code} — $${(o.total_value_usd||0).toLocaleString()} chưa TT (${days} ngày)`,
+          title: 'Công nợ quá hạn', message: `${o.code} — $${(o.total_value_usd||0).toLocaleString('vi-VN')} chưa TT (${days} ngày)`,
           order_id: o.id, order_code: o.code, customer_name: (o.customer as any)?.name || '',
           days_remaining: days,
         })

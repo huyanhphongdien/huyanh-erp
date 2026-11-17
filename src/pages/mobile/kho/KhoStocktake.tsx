@@ -117,7 +117,12 @@ export default function KhoStocktake() {
         <FacilitySelect value={facilityId} onChange={setFacilityId} facilities={facilities} />
       </header>
       <div className="kmx-body"><div className="kmx-inner">
-        {msg && <div className={`kmx-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>}
+        {msg && (
+          <div className={`kmx-msg ${msg.ok ? 'ok' : 'err'}`} style={msg.ok ? undefined : { display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ flex: 1, minWidth: 0 }}>{msg.text}</span>
+            {!msg.ok && <button type="button" className="kmx-pill sm" onClick={() => { setMsg(null); load(st?.id) }}>Thử lại</button>}
+          </div>
+        )}
         {loading && !st && <div className="kmx-skel" />}
         {!loading && !st && (
           <section className="kmx-card hero" style={{ gap: 10 }}>

@@ -627,7 +627,7 @@ async function getStats(
   inProgress: number
   totalNetWeight: number
 }> {
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toLocaleDateString('sv-SE')
   const types = ticketTypes && ticketTypes.length ? ticketTypes : null
 
   // Đang cân (chưa hoàn tất)
@@ -688,7 +688,7 @@ async function getStatsByFacility(date?: string): Promise<Array<{
   inProgress: number
   totalNetWeight: number
 }>> {
-  const today = date || new Date().toISOString().split('T')[0]
+  const today = date || new Date().toLocaleDateString('sv-SE')
 
   // Load tất cả facilities active để hiện đầy đủ ngay cả khi 0 ticket
   const { data: facilities } = await supabase

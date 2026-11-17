@@ -234,7 +234,7 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
       key: 'quantity_produced',
       align: 'right' as const,
       render: (v: number) => (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v?.toLocaleString()}</Text>
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v?.toLocaleString('vi-VN')}</Text>
       ),
     },
     {
@@ -322,7 +322,7 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
         </Col>
         <Col xs={6}>
           <Card bodyStyle={{ padding: 12 }}>
-            <Statistic title="Tổng SL (kg)" value={totalProduced.toLocaleString()}
+            <Statistic title="Tổng SL (kg)" value={totalProduced.toLocaleString('vi-VN')}
               valueStyle={{ fontSize: 20, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>

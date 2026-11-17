@@ -77,6 +77,7 @@ import ProductionProgress from '../../../components/b2b/ProductionProgress'
 import DealLifecycleActions from '../../../components/b2b/DealLifecycleActions'
 import CompletionCertSection from '../../../components/b2b/CompletionCertSection'
 import { supabase } from '../../../lib/supabase'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
@@ -176,10 +177,10 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
         <div>
           <p>Hệ thống sẽ tự động tạo phiếu quyết toán (nháp) cho Deal <strong>{deal.deal_number}</strong> với thông tin:</p>
           <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0' }}>
-            <li>Trọng lượng thực: <strong>{actualWeight.toLocaleString()} kg</strong></li>
+            <li>Trọng lượng thực: <strong>{actualWeight.toLocaleString('vi-VN')} kg</strong></li>
             {isDry && <li>DRC thực tế: <strong>{actualDrc}%</strong></li>}
-            <li>Đơn giá: <strong>{pricePerKg.toLocaleString()} đ/kg ({isDry ? 'khô' : 'ướt'})</strong></li>
-            <li>Giá trị ước tính: <strong>{finalValue.toLocaleString()} VNĐ</strong></li>
+            <li>Đơn giá: <strong>{pricePerKg.toLocaleString('vi-VN')} đ/kg ({isDry ? 'khô' : 'ướt'})</strong></li>
+            <li>Giá trị ước tính: <strong>{finalValue.toLocaleString('vi-VN')} VNĐ</strong></li>
           </ul>
           <p>Phiếu quyết toán sẽ ở trạng thái <strong>Nháp</strong>. Bạn có thể chỉnh sửa trước khi duyệt.</p>
         </div>
@@ -415,7 +416,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
     } catch (error: any) {
       // Hiển thị lý do cụ thể từ service (ví dụ: thiếu weight/drc/QC)
       message.error({
-        content: error?.message || 'Không thể cập nhật trạng thái',
+        content: dichLoiHeThong(error, 'Không thể cập nhật trạng thái'),
         duration: 5,
       })
     } finally {
@@ -438,7 +439,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
       openChatTab({ id: room.id, partner_name: deal.partner?.name })
     } catch (error: any) {
       console.error('handleOpenChat error:', error)
-      message.error('Không thể mở chat: ' + (error?.message || ''))
+      message.error(dichLoiHeThong(error, 'Không thể mở chat'))
     }
   }
 
@@ -464,15 +465,15 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
 
       message.success(
         `Đã tạo phiếu quyết toán ${result.settlement.code}. ` +
-        `Giá trị: ${result.summary.final_value.toLocaleString()} VNĐ, ` +
-        `Còn lại: ${result.summary.balance_due.toLocaleString()} VNĐ`
+        `Giá trị: ${result.summary.final_value.toLocaleString('vi-VN')} VNĐ, ` +
+        `Còn lại: ${result.summary.balance_due.toLocaleString('vi-VN')} VNĐ`
       )
 
       // Chuyển đến trang chi tiết settlement
       navigate(`/b2b/settlements/${result.settlement.id}`)
     } catch (error: any) {
       console.error('Auto settlement error:', error)
-      message.error(error.message || 'Không thể tạo phiếu quyết toán')
+      message.error(dichLoiHeThong(error, 'Không thể tạo phiếu quyết toán'))
     } finally {
       setSettleLoading(false)
     }
@@ -609,12 +610,12 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                         ) : '-'}
                       </Descriptions.Item>
                       <Descriptions.Item label="Đơn giá">
-                        {deal.unit_price?.toLocaleString() || '-'} đ/kg
+                        {deal.unit_price?.toLocaleString('vi-VN') || '-'} đ/kg
                       </Descriptions.Item>
                       <Descriptions.Item label="Giá chốt">
                         {deal.final_price ? (
                           <Text strong style={{ color: '#52c41a' }}>
-                            {deal.final_price.toLocaleString()} đ/kg
+                            {deal.final_price.toLocaleString('vi-VN')} đ/kg
                           </Text>
                         ) : '-'}
                       </Descriptions.Item>
@@ -666,7 +667,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                       </Descriptions.Item>
                       {deal.processing_fee_per_ton && (
                         <Descriptions.Item label="Phí gia công">
-                          {deal.processing_fee_per_ton.toLocaleString()} đ/tấn
+                          {deal.processing_fee_per_ton.toLocaleString('vi-VN')} đ/tấn
                         </Descriptions.Item>
                       )}
                       {deal.expected_output_rate && (
@@ -733,7 +734,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                                       <>
                                         <br />
                                         <Text type="secondary" style={{ fontSize: 12 }}>
-                                          Giá chốt: {deal.final_price.toLocaleString()} đ/kg
+                                          Giá chốt: {deal.final_price.toLocaleString('vi-VN')} đ/kg
                                         </Text>
                                       </>
                                     )}
@@ -856,7 +857,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                       <Row gutter={[16, 16]}>
                         <Col span={12}>
                           <Statistic title="Phí gia công" value={deal.processing_fee_per_ton || 0} suffix="đ/tấn"
-                            formatter={v => `${Number(v).toLocaleString()}`} />
+                            formatter={v => `${Number(v).toLocaleString('vi-VN')}`} />
                         </Col>
                         <Col span={12}>
                           <Statistic title="Tỷ lệ thu hồi" value={deal.expected_output_rate || 80} suffix="%" />
@@ -881,7 +882,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                             title="Đơn giá"
                             value={deal.unit_price || 0}
                             suffix="đ/kg"
-                            formatter={(value) => `${Number(value).toLocaleString()}`}
+                            formatter={(value) => `${Number(value).toLocaleString('vi-VN')}`}
                           />
                         </Col>
                         <Col span={24}>
@@ -891,7 +892,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                             value={deal.total_value_vnd || 0}
                             suffix="VNĐ"
                             valueStyle={{ color: '#1B4D3E', fontSize: 24 }}
-                            formatter={(value) => `${Number(value).toLocaleString()}`}
+                            formatter={(value) => `${Number(value).toLocaleString('vi-VN')}`}
                           />
                         </Col>
                       </Row>

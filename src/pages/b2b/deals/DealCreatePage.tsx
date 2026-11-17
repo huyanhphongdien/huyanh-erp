@@ -362,7 +362,7 @@ const DealInfoStep = ({ form, selectedPartner, onBack, onNext }: DealInfoStepPro
                 }}
               >
                 <Text strong style={{ color: '#1B4D3E', fontSize: 18 }}>
-                  {totalValue.toLocaleString()} VNĐ
+                  {totalValue.toLocaleString('vi-VN')} VNĐ
                 </Text>
               </div>
             </Form.Item>
@@ -457,11 +457,11 @@ const ConfirmStep = ({ form, selectedPartner, onBack, onSubmit, loading }: Confi
             <Text strong>{values.quantity_tons} tấn</Text>
           </Descriptions.Item>
           <Descriptions.Item label="Đơn giá">
-            {values.unit_price?.toLocaleString()} đ/kg
+            {values.unit_price?.toLocaleString('vi-VN')} đ/kg
           </Descriptions.Item>
           <Descriptions.Item label="Thành tiền" span={2}>
             <Text strong style={{ color: '#1B4D3E', fontSize: 20 }}>
-              {values.total_value_vnd?.toLocaleString()} VNĐ
+              {values.total_value_vnd?.toLocaleString('vi-VN')} VNĐ
             </Text>
           </Descriptions.Item>
           {values.delivery_terms && (
@@ -471,7 +471,7 @@ const ConfirmStep = ({ form, selectedPartner, onBack, onSubmit, loading }: Confi
           )}
           {values.processing_fee_per_ton && (
             <Descriptions.Item label="Phí gia công">
-              {values.processing_fee_per_ton.toLocaleString()} đ/tấn
+              {values.processing_fee_per_ton.toLocaleString('vi-VN')} đ/tấn
             </Descriptions.Item>
           )}
           {values.notes && (

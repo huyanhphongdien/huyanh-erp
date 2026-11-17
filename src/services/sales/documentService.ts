@@ -474,7 +474,7 @@ export const documentService = {
       quantity_tons: order.quantity_tons,
       batch_results: batchResults,
       grade_standard: gradeStandard,
-      test_date: new Date().toISOString().split('T')[0],
+      test_date: new Date().toLocaleDateString('sv-SE'),
       result,
     }
   },
@@ -576,7 +576,7 @@ export const documentService = {
       etd: booking?.etd || order.etd || '',
       // Khớp HỆT sheet PKL; invoice_code/bl/ngày/LC MIRROR getInvoiceData → 1 bộ khớp nhau
       pkl_no: `${soDisplayCode(order)}/PL${lotNo ? `/L${lotNo}` : ''}`,
-      date: order.invoice_date || invoice?.invoice_date || new Date().toISOString().split('T')[0],
+      date: order.invoice_date || invoice?.invoice_date || new Date().toLocaleDateString('sv-SE'),
       invoice_code: (order.invoice_no || invoice?.code || `INV-${order.code}`) + (lotNo ? `/L${lotNo}` : ''),
       bl_number: booking?.bl_number || order.bl_number || invoice?.bl_number || null,
       voyage_number: booking?.voyage_no || order.voyage_number || '',
@@ -656,7 +656,7 @@ export const documentService = {
     const packingStyle = order.packing_desc || profile?.default_packing_desc || ''
     return {
       wl_no: `${soDisplayCode(order)}/WL${lotNo ? `/L${lotNo}` : ''}`,
-      date: order.invoice_date || invoice?.invoice_date || new Date().toISOString().split('T')[0],
+      date: order.invoice_date || invoice?.invoice_date || new Date().toLocaleDateString('sv-SE'),
       order_code: soDisplayCode(order) + (lotNo ? ` — Lô ${lotNo}` : ''),
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
       consignee: await resolveConsignee(orderId, profile, lotNo),
@@ -777,7 +777,7 @@ export const documentService = {
       lc_number: lcInfo.lc_number || order.lc_number,
       // B/L: lô → từ booking của lô; cả đơn → order.bl_number
       bl_number: booking?.bl_number || order.bl_number || invoice?.bl_number || null,
-      invoice_date: order.invoice_date || invoice?.invoice_date || new Date().toISOString().split('T')[0],
+      invoice_date: order.invoice_date || invoice?.invoice_date || new Date().toLocaleDateString('sv-SE'),
       // Chưa chọn NH thụ hưởng → để TRỐNG (đừng in số TK/SWIFT GIẢ); readiness bankItem sẽ cảnh báo
       bank_info: bank
         ? { account_name: bank.account_name || 'HUY ANH RUBBER COMPANY LIMITED', name: bank.bank_name, account: bank.account_no, address: bank.bank_address || '', swift: bank.swift_code || '' }

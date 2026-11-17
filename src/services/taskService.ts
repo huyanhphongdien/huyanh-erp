@@ -200,7 +200,7 @@ export const taskService = {
 
     // Filter công việc quá hạn
     if (filter?.is_overdue === true) {
-      const today = new Date().toISOString().split('T')[0]
+      const today = new Date().toLocaleDateString('sv-SE')
       query = query
         .lt('due_date', today)
         .not('status', 'eq', 'finished')

@@ -61,22 +61,6 @@ export default function SalesCommandPalette({ orders, onOpenOrder }: Props) {
         action: () => navigate('/sales/orders/new'),
       },
       {
-        id: 'act-review',
-        group: 'Hành động',
-        icon: '📋',
-        title: 'Vào Queue Kiểm tra HĐ',
-        meta: 'Phú LV / Minh LD duyệt',
-        action: () => navigate('/sales/contracts/review'),
-      },
-      {
-        id: 'act-sign',
-        group: 'Hành động',
-        icon: '✍️',
-        title: 'Vào Queue Trình ký',
-        meta: 'Trung / Huy ký',
-        action: () => navigate('/sales/contracts/sign'),
-      },
-      {
         id: 'act-dashboard',
         group: 'Hành động',
         icon: '📊',

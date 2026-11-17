@@ -18,7 +18,7 @@ import {
 import { TaskFilters, TaskFiltersValue, DEFAULT_FILTERS } from './components/TaskFilters'
 import { TaskStatusBadge } from './components/TaskStatusBadge'
 import { TaskPriorityBadge } from './components/TaskPriorityBadge'
-import { SubtaskBadge } from './components/SubtaskBadge'
+import { SubtaskBadgeInline, useSubtaskCounts } from './components/SubtaskBadge'
 import { TaskOverviewTab } from './components/TaskOverviewTab'
 import { useTasks, useDeleteTask } from './hooks/useTasks'
 import { useDepartments } from '../departments/hooks/useDepartments'
@@ -237,6 +237,10 @@ export function TaskListPage() {
   const tasks = tasksData?.data || []
   const totalPages = tasksData?.totalPages || 1
   const total = tasksData?.total || 0
+
+  // MỘT query đếm việc con cho cả trang danh sách (SubtaskBadge cũ bắn 1 query/dòng)
+  const taskIds = useMemo(() => tasks.map((t: any) => t.id as string), [tasks])
+  const { data: subtaskCounts } = useSubtaskCounts(taskIds)
   
   const departments = Array.isArray(departmentsData?.data) ? departmentsData.data : []
   const allEmployees = Array.isArray(employeesData?.data) ? employeesData.data : []
@@ -467,7 +471,7 @@ export function TaskListPage() {
                               <Link to={`/tasks/${task.id}`} className="text-blue-600 hover:underline font-medium">
                                 {getTaskTitle(task)}
                               </Link>
-                              <SubtaskBadge taskId={task.id} />
+                              <SubtaskBadgeInline subtaskCount={subtaskCounts?.[task.id]?.total} completedCount={subtaskCounts?.[task.id]?.completed} />
                               {task.is_self_assigned && (
                                 <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">
                                   Tự giao
@@ -605,7 +609,7 @@ export function TaskListPage() {
                     {/* Badges row */}
                     <div className="flex flex-wrap gap-1.5 mb-3">
                       <TaskStatusBadge status={task.status} />
-                      <SubtaskBadge taskId={task.id} />
+                      <SubtaskBadgeInline subtaskCount={subtaskCounts?.[task.id]?.total} completedCount={subtaskCounts?.[task.id]?.completed} />
                       {task.is_self_assigned && (
                         <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">
                           Tự giao

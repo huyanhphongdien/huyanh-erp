@@ -1885,7 +1885,7 @@ const SalesOrderListPage = () => {
             Xuất Excel ({selectedOrders.length})
           </Button>
           <span style={{ marginLeft: 'auto', color: '#666' }}>
-            Tổng giá trị: <strong>${selectedOrders.reduce((s: number, o: SalesOrder) => s + (o.total_value_usd || 0), 0).toLocaleString()}</strong>
+            Tổng giá trị: <strong>${selectedOrders.reduce((s: number, o: SalesOrder) => s + (o.total_value_usd || 0), 0).toLocaleString('vi-VN')}</strong>
           </span>
         </div>
       )}
@@ -1985,7 +1985,7 @@ const SalesOrderListPage = () => {
                               ? fmtMoney((item.quantity_tons || 0) * (item.unit_price || 0), 'VND')
                               : fmtMoney(item.total_value_usd, 'USD', { decimals: 0 })}
                           </td>
-                          <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.total_bales?.toLocaleString()}</td>
+                          <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.total_bales?.toLocaleString('vi-VN')}</td>
                           <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.container_count}</td>
                           <td style={{ padding: '6px 12px' }}>{item.bale_weight_kg} kg</td>
                           <td style={{ padding: '6px 12px', fontSize: 11 }}>{PACKING_TYPE_LABELS[item.packing_type as PackingType] || 'Loose Bale'}</td>

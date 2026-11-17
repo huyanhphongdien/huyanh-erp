@@ -11,6 +11,7 @@ import {
   ArrowLeft, Loader2, Save, Plus, Trash2, Printer, Calendar, Building2, Scale,
   Send, CheckCircle2, Banknote, Undo2, XCircle, FileSpreadsheet,
 } from 'lucide-react'
+import { App as AntdApp } from 'antd'
 import {
   paymentRequestService,
   type PaymentRequest,
@@ -19,6 +20,7 @@ import {
   type PaymentCurrency,
 } from '../../../services/wms/paymentRequestService'
 import { useAuthStore } from '../../../stores/authStore'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 
 const CCY_SUFFIX: Record<PaymentCurrency, string> = { VND: 'đ', KIP: ' ₭', THB: ' ฿' }
 function fmtCur(a?: number | null, ccy: PaymentCurrency = 'VND'): string {
@@ -49,6 +51,7 @@ const PaymentRequestDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
 
   const user = useAuthStore(s => s.user)
+  const { message, modal } = AntdApp.useApp()
   const [req, setReq] = useState<PaymentRequest | null>(null)
   const [lines, setLines] = useState<EditLine[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,7 +107,7 @@ const PaymentRequestDetailPage: React.FC = () => {
       }
       await load()
     } catch (e: any) {
-      alert('Lưu thất bại: ' + (e?.message || 'lỗi'))
+      message.error(dichLoiHeThong(e, 'Lưu thất bại'))
     }
     setSaving(false)
   }
@@ -122,53 +125,79 @@ const PaymentRequestDetailPage: React.FC = () => {
       })
       await load()
     } catch (e: any) {
-      alert('Thêm dòng thất bại: ' + (e?.message || 'lỗi'))
+      message.error(dichLoiHeThong(e, 'Thêm dòng thất bại'))
     }
   }
 
-  const handleRemoveLine = async (lineId: string) => {
-    if (!confirm('Xoá dòng này?')) return
-    try {
-      await paymentRequestService.removeLine(lineId)
-      await load()
-    } catch (e: any) {
-      alert('Xoá dòng thất bại: ' + (e?.message || 'lỗi'))
-    }
+  const handleRemoveLine = (lineId: string) => {
+    modal.confirm({
+      title: 'Xoá dòng này?',
+      content: 'Nếu dòng lấy từ phiếu cân, phiếu cân sẽ được giải phóng để gom lại.',
+      okText: 'Xoá dòng',
+      okButtonProps: { danger: true },
+      cancelText: 'Không',
+      onOk: async () => {
+        try {
+          await paymentRequestService.removeLine(lineId)
+          await load()
+        } catch (e: any) {
+          message.error(dichLoiHeThong(e, 'Xoá dòng thất bại'))
+        }
+      },
+    })
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!req) return
-    if (!confirm(`Xoá đề nghị ${req.code}? Phiếu cân sẽ được giải phóng để gom lại.`)) return
-    try {
-      await paymentRequestService.remove(req.id)
-      navigate('/rubber/payment-requests')
-    } catch (e: any) {
-      alert('Xoá thất bại: ' + (e?.message || 'lỗi'))
-    }
+    modal.confirm({
+      title: `Xoá đề nghị ${req.code}?`,
+      content: 'Xoá hẳn, không hoàn tác được. Phiếu cân trong đề nghị sẽ được giải phóng để gom lại.',
+      okText: 'Xoá đề nghị',
+      okButtonProps: { danger: true },
+      cancelText: 'Không',
+      onOk: async () => {
+        try {
+          await paymentRequestService.remove(req.id)
+          navigate('/rubber/payment-requests')
+        } catch (e: any) {
+          message.error(dichLoiHeThong(e, 'Xoá thất bại'))
+        }
+      },
+    })
   }
 
-  const runAction = async (fn: () => Promise<unknown>, confirmMsg?: string) => {
-    if (confirmMsg && !confirm(confirmMsg)) return
+  const runAction = async (fn: () => Promise<unknown>) => {
     setActing(true)
     try { await fn(); await load() }
-    catch (e: any) { alert(e?.message || 'Thao tác thất bại') }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Thao tác thất bại')) }
     setActing(false)
   }
   const handleSubmit = () => req && runAction(() => paymentRequestService.submit(req.id))
   const handleApprove = () => req && runAction(() => paymentRequestService.approve(req.id, user?.id))
   const handleRevert = () => req && runAction(() => paymentRequestService.revertToDraft(req.id))
-  const handleCancel = () => req && runAction(() => paymentRequestService.cancel(req.id), `Huỷ đề nghị ${req.code}?`)
-  const handleMarkPaid = () => req && runAction(
-    () => paymentRequestService.markPaid(req.id, user?.id),
-    `Xác nhận ĐÃ CHI ${fmtCur(liveTotalRounded, req.currency)} (đã làm tròn)? Hệ thống sẽ ghi công nợ và không cho sửa nữa.`,
-  )
+  const handleCancel = () => req && modal.confirm({
+    title: `Huỷ đề nghị ${req.code}?`,
+    content: 'Phiếu cân trong đề nghị sẽ được giải phóng để gom vào đề nghị khác.',
+    okText: 'Huỷ đề nghị',
+    okButtonProps: { danger: true },
+    cancelText: 'Không',
+    onOk: () => runAction(() => paymentRequestService.cancel(req.id)),
+  })
+  const handleMarkPaid = () => req && modal.confirm({
+    title: `Xác nhận ĐÃ CHI ${fmtCur(liveTotalRounded, req.currency)}?`,
+    content: `Đề nghị ${req.code} — số tiền đã làm tròn đến nghìn. Hệ thống sẽ ghi công nợ và không cho sửa phiếu nữa.`,
+    okText: 'Đã chi',
+    okButtonProps: { danger: true },
+    cancelText: 'Chưa',
+    onOk: () => runAction(() => paymentRequestService.markPaid(req.id, user?.id)),
+  })
   const handleExportExcel = async () => {
     if (!req) return
     try {
       const exportLines = await paymentRequestService.enrichLinesWithBank(lines)
       const { exportPaymentRequestExcel } = await import('../../../utils/paymentRequestExportExcel')
       await exportPaymentRequestExcel(req, exportLines, { preparedBy: user?.full_name, msnv: user?.employee_code })
-    } catch (e: any) { alert('Xuất Excel thất bại: ' + (e?.message || 'lỗi')) }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Xuất Excel thất bại')) }
   }
 
   const liveTotalAmount = lines.reduce((s, l) => s + (l.amount || 0), 0)

@@ -17,7 +17,6 @@ import {
   Button,
   Space,
   Spin,
-  Alert,
   Empty,
   Typography,
   Tooltip,
@@ -30,11 +29,14 @@ import {
   RiseOutlined,
   FallOutlined,
   StarFilled,
+  DownloadOutlined,
 } from '@ant-design/icons'
 import supplierScoringService, {
   type SupplierScore,
   type SupplierDetail,
 } from '../../../services/wms/supplierScoringService'
+import PageState from '../../../components/common/PageState'
+import { xuatExcelBaoCao } from './wmsReportExcel'
 
 const { Title, Text } = Typography
 
@@ -178,6 +180,7 @@ const SupplierScoringPage = () => {
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null)
   const [supplierDetail, setSupplierDetail] = useState<SupplierDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<unknown>(null)
 
   // --------------------------------------------------------------------------
   // DATA LOADING
@@ -208,23 +211,30 @@ const SupplierScoringPage = () => {
   // EXPAND ROW — LOAD DETAIL
   // --------------------------------------------------------------------------
 
-  const handleExpand = useCallback(async (expanded: boolean, record: SupplierScore) => {
-    if (!expanded) {
-      setExpandedSupplier(null)
-      setSupplierDetail(null)
-      return
-    }
-    setExpandedSupplier(record.supplier_name)
+  const loadDetail = useCallback(async (supplierName: string) => {
     setDetailLoading(true)
+    setDetailError(null)
     try {
-      const detail = await supplierScoringService.getSupplierDetail(record.supplier_name)
+      const detail = await supplierScoringService.getSupplierDetail(supplierName)
       setSupplierDetail(detail)
     } catch (err: any) {
       console.error('Load supplier detail error:', err)
+      setDetailError(err)
     } finally {
       setDetailLoading(false)
     }
   }, [])
+
+  const handleExpand = useCallback((expanded: boolean, record: SupplierScore) => {
+    if (!expanded) {
+      setExpandedSupplier(null)
+      setSupplierDetail(null)
+      setDetailError(null)
+      return
+    }
+    setExpandedSupplier(record.supplier_name)
+    loadDetail(record.supplier_name)
+  }, [loadDetail])
 
   // --------------------------------------------------------------------------
   // COMPUTED
@@ -236,6 +246,36 @@ const SupplierScoringPage = () => {
     : 0
   const gradeACount = scores.filter(s => s.grade === 'A').length
   const gradeFCount = scores.filter(s => s.grade === 'F').length
+
+  const handleExportExcel = () => {
+    const ranked = [...scores].sort((a, b) => b.overall_score - a.overall_score)
+    xuatExcelBaoCao('cham-diem-ncc', [{
+      name: 'Chấm điểm NCC',
+      title: 'Bảng xếp hạng nhà cung cấp',
+      columns: [
+        { title: 'Thứ hạng' },
+        { title: 'Nhà cung cấp', align: 'left' },
+        { title: 'Số lô', summary: 'sum' },
+        { title: 'KL (tấn)', summary: 'sum', numFmt: '#,##0.0' },
+        { title: 'DRC TB (%)' },
+        { title: 'Độ ổn định' },
+        { title: 'Chất lượng' },
+        { title: 'Tổng điểm' },
+        { title: 'Hạng' },
+      ],
+      rows: ranked.map((r, i) => [
+        i + 1,
+        r.supplier_name,
+        r.total_batches,
+        Math.round(r.total_weight_kg / 100) / 10,
+        r.avg_drc > 0 ? r.avg_drc : '',
+        Math.round(r.consistency_score),
+        Math.round(r.quality_score),
+        Math.round(r.overall_score),
+        r.grade,
+      ]),
+    }])
+  }
 
   // --------------------------------------------------------------------------
   // LOADING
@@ -390,6 +430,14 @@ const SupplierScoringPage = () => {
     if (detailLoading) {
       return <div style={{ padding: 24, textAlign: 'center' }}><Spin /> Đang tải chi tiết...</div>
     }
+    if (detailError) {
+      return (
+        <PageState
+          error={detailError}
+          onRetry={() => { if (expandedSupplier) loadDetail(expandedSupplier) }}
+        />
+      )
+    }
     if (!supplierDetail) {
       return <Empty description="Không tải được chi tiết" />
     }
@@ -452,7 +500,7 @@ const SupplierScoringPage = () => {
                 align: 'right' as const,
                 render: (v: number) => (
                   <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
-                    {v.toLocaleString()}
+                    {v.toLocaleString('vi-VN')}
                   </Text>
                 ),
               },
@@ -510,21 +558,20 @@ const SupplierScoringPage = () => {
           </Space>
         </Col>
         <Col>
-          <Button
-            icon={<ReloadOutlined spin={refreshing} />}
-            onClick={() => loadData(true)}
-            loading={refreshing}
-          >
-            Làm mới
-          </Button>
+          <Space>
+            <Button icon={<DownloadOutlined />} onClick={handleExportExcel} disabled={scores.length === 0}>
+              Xuất Excel
+            </Button>
+            <Button
+              icon={<ReloadOutlined spin={refreshing} />}
+              onClick={() => loadData(true)}
+              loading={refreshing}
+            >
+              Làm mới
+            </Button>
+          </Space>
         </Col>
       </Row>
-
-      {/* Error */}
-      {error && (
-        <Alert type="error" message={error} closable onClose={() => setError(null)}
-          style={{ marginBottom: 16, borderRadius: 8 }} showIcon />
-      )}
 
       {/* KPI Stats */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
@@ -578,7 +625,12 @@ const SupplierScoringPage = () => {
         }
         bodyStyle={{ padding: 0 }}
       >
-        {scores.length > 0 ? (
+        <PageState
+          error={error}
+          onRetry={() => loadData()}
+          empty={scores.length === 0}
+          emptyText="Chưa có dữ liệu nhà cung cấp"
+        >
           <Table
             dataSource={scores}
             columns={columns}
@@ -599,11 +651,7 @@ const SupplierScoringPage = () => {
               style: { background: GRADE_BG[record.grade] || 'transparent' },
             })}
           />
-        ) : (
-          <div style={{ padding: 48 }}>
-            <Empty description="Chưa có dữ liệu nhà cung cấp" />
-          </div>
-        )}
+        </PageState>
       </Card>
     </div>
   )

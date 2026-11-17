@@ -361,7 +361,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
                       <td style={{ ...td, paddingLeft: 16 }}><strong>{item.grade || '—'}</strong></td>
                       <td style={td}>{(item.quantity_tons || 0).toFixed(2)}</td>
                       <td style={td}>{fmtMoney(item.unit_price || 0, order.currency, { decimals: 0 })}</td>
-                      <td style={td}>{bales.toLocaleString()}</td>
+                      <td style={td}>{bales.toLocaleString('vi-VN')}</td>
                       <td style={td}>{(item.packing_type || '—').replace(/_/g, ' ')}</td>
                       <td style={td}>{item.payment_terms || '—'}</td>
                       <td style={{ ...td, textAlign: 'right', paddingRight: 16 }}>

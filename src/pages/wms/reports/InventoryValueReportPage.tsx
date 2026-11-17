@@ -8,10 +8,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Card, Table, Button, Space, Typography, Row, Col,
-  Select, Spin, Empty, Tag,
+  Select, Tag,
 } from 'antd'
 import {
-  ArrowLeftOutlined, ReloadOutlined, DatabaseOutlined,
+  ArrowLeftOutlined, ReloadOutlined, DatabaseOutlined, DownloadOutlined,
 } from '@ant-design/icons'
 import wmsReportService from '../../../services/wms/wmsReportService'
 import type { InventoryValueReport } from '../../../services/wms/wms.types'
@@ -21,12 +21,15 @@ import GradeBadge from '../../../components/wms/GradeBadge'
 import { costTrackingService } from '../../../services/wms/costTrackingService'
 import type { InventoryValuation } from '../../../services/wms/costTrackingService'
 import { supabase } from '../../../lib/supabase'
+import PageState from '../../../components/common/PageState'
+import { xuatExcelBaoCao } from './wmsReportExcel'
 
 const { Title, Text } = Typography
 
 const InventoryValueReportPage = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<InventoryValueReport[]>([])
   const [valuation, setValuation] = useState<InventoryValuation | null>(null)
   const [warehouseId, setWarehouseId] = useState<string | undefined>()
@@ -48,6 +51,7 @@ const InventoryValueReportPage = () => {
 
   const loadData = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const [result, valuationResult] = await Promise.all([
         wmsReportService.getInventoryValueReport({
@@ -60,6 +64,7 @@ const InventoryValueReportPage = () => {
       setValuation(valuationResult)
     } catch (err) {
       console.error('Load inventory value report error:', err)
+      setError(err)
     } finally {
       setLoading(false)
     }
@@ -89,6 +94,40 @@ const InventoryValueReportPage = () => {
 
   const gradeOptions = Object.entries(RUBBER_GRADE_LABELS).map(([value, label]) => ({ value, label }))
 
+  const handleExportExcel = () => {
+    xuatExcelBaoCao('ton-kho-theo-vat-lieu', [{
+      name: 'Giá trị tồn kho',
+      title: 'Tồn kho theo vật liệu',
+      columns: [
+        { title: 'Vật liệu', align: 'left' },
+        { title: 'SKU' },
+        { title: 'Grade' },
+        { title: 'SL (kg)', summary: 'sum' },
+        { title: 'DRC TB (%)' },
+        { title: 'Dry Weight (kg)', summary: 'sum' },
+        { title: 'Số lô', summary: 'sum' },
+        { title: 'Giá vốn TB (đ/kg)' },
+        { title: 'Giá trị tồn (đ)', summary: 'sum', numFmt: '#,##0' },
+        { title: 'Kho', align: 'left' },
+      ],
+      rows: data.map(r => {
+        const avgCost = gradeCostMap[r.rubber_grade]?.avg_cost || 0
+        return [
+          r.material_name,
+          r.material_sku,
+          r.rubber_grade,
+          r.total_quantity_kg,
+          r.avg_drc,
+          r.total_dry_weight_kg,
+          r.batch_count,
+          avgCost > 0 ? avgCost : '',
+          avgCost > 0 ? Math.round(avgCost * r.total_quantity_kg) : '',
+          r.warehouse_breakdown.map(w => `${w.warehouse_name}: ${w.quantity_kg.toLocaleString('vi-VN')}`).join('; '),
+        ]
+      }),
+    }])
+  }
+
   const columns = [
     {
       title: 'Vật liệu', key: 'material', width: 200,
@@ -111,7 +150,7 @@ const InventoryValueReportPage = () => {
     {
       title: 'SL (kg)', dataIndex: 'total_quantity_kg', key: 'qty', align: 'right' as const, width: 120,
       sorter: (a: InventoryValueReport, b: InventoryValueReport) => a.total_quantity_kg - b.total_quantity_kg,
-      render: (v: number) => <Text style={numStyle}>{v.toLocaleString()}</Text>,
+      render: (v: number) => <Text style={numStyle}>{v.toLocaleString('vi-VN')}</Text>,
     },
     {
       title: 'DRC TB', dataIndex: 'avg_drc', key: 'drc', align: 'right' as const, width: 90,
@@ -119,7 +158,7 @@ const InventoryValueReportPage = () => {
     },
     {
       title: 'Dry Weight (kg)', dataIndex: 'total_dry_weight_kg', key: 'dry', align: 'right' as const, width: 130,
-      render: (v: number) => <Text style={{ ...numStyle, color: '#E8A838' }}>{v.toLocaleString()}</Text>,
+      render: (v: number) => <Text style={{ ...numStyle, color: '#E8A838' }}>{v.toLocaleString('vi-VN')}</Text>,
     },
     {
       title: 'Số lô', dataIndex: 'batch_count', key: 'batches', align: 'right' as const, width: 80,
@@ -131,17 +170,19 @@ const InventoryValueReportPage = () => {
         const costInfo = gradeCostMap[r.rubber_grade]
         const avgCost = costInfo?.avg_cost || 0
         return avgCost > 0
-          ? <Text style={{ ...numStyle, color: '#7C3AED' }}>{avgCost.toLocaleString()}</Text>
+          ? <Text style={{ ...numStyle, color: '#7C3AED' }}>{avgCost.toLocaleString('vi-VN')}</Text>
           : <Text type="secondary" style={{ fontSize: 11 }}>Chưa có</Text>
       },
     },
     {
       title: 'Giá trị tồn (đ)', key: 'total_cost', align: 'right' as const, width: 150,
       render: (_: unknown, r: InventoryValueReport) => {
+        // Giá trị mức VẬT LIỆU của dòng (giá vốn TB grade × SL dòng) — trước đây
+        // lặp tổng cả grade trên từng dòng, cộng dọc cột là đếm trùng.
         const costInfo = gradeCostMap[r.rubber_grade]
-        const value = costInfo?.total_value || 0
+        const value = Math.round((costInfo?.avg_cost || 0) * r.total_quantity_kg)
         return value > 0
-          ? <Text style={{ ...numStyle, color: '#DC2626', fontWeight: 600 }}>{value.toLocaleString()}</Text>
+          ? <Text style={{ ...numStyle, color: '#DC2626', fontWeight: 600 }}>{value.toLocaleString('vi-VN')}</Text>
           : <Text type="secondary" style={{ fontSize: 11 }}>—</Text>
       },
     },
@@ -151,7 +192,7 @@ const InventoryValueReportPage = () => {
         <Space size={4} wrap>
           {r.warehouse_breakdown.map(w => (
             <Tag key={w.warehouse_name} style={{ fontSize: 11, margin: 2 }}>
-              {w.warehouse_name}: <span style={{ fontFamily: "'JetBrains Mono'" }}>{w.quantity_kg.toLocaleString()}</span>
+              {w.warehouse_name}: <span style={{ fontFamily: "'JetBrains Mono'" }}>{w.quantity_kg.toLocaleString('vi-VN')}</span>
             </Tag>
           ))}
         </Space>
@@ -200,6 +241,9 @@ const InventoryValueReportPage = () => {
             style={{ width: 150 }}
             size="small"
           />
+          <Button size="small" icon={<DownloadOutlined />} onClick={handleExportExcel} disabled={data.length === 0}>
+            Xuất Excel
+          </Button>
         </Space>
       </Card>
 
@@ -208,13 +252,13 @@ const InventoryValueReportPage = () => {
         <Col xs={12} sm={6} md={4}>
           <Card styles={{ body: { padding: 12, textAlign: 'center' } }}>
             <Text type="secondary" style={{ fontSize: 11 }}>Tổng SL</Text>
-            <div style={{ ...numStyle, fontSize: 18, color: '#1B4D3E', fontWeight: 600 }}>{totalQty.toLocaleString()} kg</div>
+            <div style={{ ...numStyle, fontSize: 18, color: '#1B4D3E', fontWeight: 600 }}>{totalQty.toLocaleString('vi-VN')} kg</div>
           </Card>
         </Col>
         <Col xs={12} sm={6} md={4}>
           <Card styles={{ body: { padding: 12, textAlign: 'center' } }}>
             <Text type="secondary" style={{ fontSize: 11 }}>Dry Weight</Text>
-            <div style={{ ...numStyle, fontSize: 18, color: '#E8A838', fontWeight: 600 }}>{totalDry.toLocaleString()} kg</div>
+            <div style={{ ...numStyle, fontSize: 18, color: '#E8A838', fontWeight: 600 }}>{totalDry.toLocaleString('vi-VN')} kg</div>
           </Card>
         </Col>
         <Col xs={12} sm={6} md={4}>
@@ -233,7 +277,7 @@ const InventoryValueReportPage = () => {
           <Card styles={{ body: { padding: 12, textAlign: 'center' } }}>
             <Text type="secondary" style={{ fontSize: 11 }}>Giá trị tồn kho</Text>
             <div style={{ ...numStyle, fontSize: 18, color: '#DC2626', fontWeight: 600 }}>
-              {totalValue > 0 ? `${totalValue.toLocaleString()} đ` : 'Chưa có dữ liệu'}
+              {totalValue > 0 ? `${totalValue.toLocaleString('vi-VN')} đ` : 'Chưa có dữ liệu'}
             </div>
           </Card>
         </Col>
@@ -241,11 +285,13 @@ const InventoryValueReportPage = () => {
 
       {/* Table */}
       <Card>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-        ) : data.length === 0 ? (
-          <Empty description="Không có dữ liệu tồn kho" />
-        ) : (
+        <PageState
+          loading={loading}
+          error={error}
+          onRetry={() => loadData()}
+          empty={data.length === 0}
+          emptyText="Không có dữ liệu tồn kho"
+        >
           <Table
             dataSource={data}
             columns={columns}
@@ -254,7 +300,7 @@ const InventoryValueReportPage = () => {
             pagination={{ showSizeChanger: true, showTotal: (t, r) => `${r[0]}-${r[1]} / ${t}` }}
             scroll={{ x: 1300 }}
           />
-        )}
+        </PageState>
       </Card>
     </div>
   )

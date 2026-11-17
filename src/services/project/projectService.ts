@@ -415,12 +415,12 @@ export const projectService = {
 
     // Auto-set actual_start khi chuyển sang in_progress
     if (newStatus === 'in_progress' && !current.actual_start) {
-      updateData.actual_start = new Date().toISOString().split('T')[0]
+      updateData.actual_start = new Date().toLocaleDateString('sv-SE')
     }
 
     // Auto-set actual_end khi chuyển sang completed
     if (newStatus === 'completed' && !current.actual_end) {
-      updateData.actual_end = new Date().toISOString().split('T')[0]
+      updateData.actual_end = new Date().toLocaleDateString('sv-SE')
     }
 
     const { data, error } = await supabase

@@ -742,7 +742,7 @@ export const qcService = {
     if (error) throw error
 
     const batches = data || []
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = new Date().toLocaleDateString('sv-SE')
 
     // Tính DRC trung bình có trọng số (weighted by quantity_remaining)
     let totalWeightedDRC = 0
@@ -792,7 +792,7 @@ export const qcService = {
     if (batchErr) throw batchErr
 
     const all = batches || []
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = new Date().toLocaleDateString('sv-SE')
 
     // 3. Tính thống kê
     const drcValues = all
@@ -846,7 +846,7 @@ export const qcService = {
     if (error) throw error
 
     const all = batches || []
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = new Date().toLocaleDateString('sv-SE')
 
     // 2. Group by material_id
     const grouped: Record<string, typeof all> = {}

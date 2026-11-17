@@ -193,12 +193,12 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
         </Descriptions.Item>
         <Descriptions.Item label="SL mục tiêu">
           <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            {order.target_quantity?.toLocaleString()} kg
+            {order.target_quantity?.toLocaleString('vi-VN')} kg
           </Text>
         </Descriptions.Item>
         <Descriptions.Item label="SL thực tế">
           <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            {order.actual_quantity?.toLocaleString() || '—'} kg
+            {order.actual_quantity?.toLocaleString('vi-VN') || '—'} kg
           </Text>
         </Descriptions.Item>
         <Descriptions.Item label="Nhà máy">{order.facility?.name || '—'}</Descriptions.Item>
@@ -226,13 +226,13 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
       <Row gutter={16}>
         <Col span={6}>
           <Card bodyStyle={{ padding: 12 }}>
-            <Statistic title="Tổng NL (kg)" value={totalInput.toLocaleString()}
+            <Statistic title="Tổng NL (kg)" value={totalInput.toLocaleString('vi-VN')}
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
         <Col span={6}>
           <Card bodyStyle={{ padding: 12 }}>
-            <Statistic title="SL thực tế" value={order.actual_quantity?.toLocaleString() || '—'}
+            <Statistic title="SL thực tế" value={order.actual_quantity?.toLocaleString('vi-VN') || '—'}
               suffix="kg"
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
           </Card>
@@ -284,7 +284,7 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
       key: 'required_quantity',
       align: 'right' as const,
       render: (v: number) => (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v?.toLocaleString()}</Text>
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v?.toLocaleString('vi-VN')}</Text>
       ),
     },
     {
@@ -367,13 +367,13 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
                   <Col span={4}>
                     <Text type="secondary" style={{ fontSize: 11 }}>NL vào</Text><br />
                     <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
-                      {stage.input_quantity?.toLocaleString() || '—'} kg
+                      {stage.input_quantity?.toLocaleString('vi-VN') || '—'} kg
                     </Text>
                   </Col>
                   <Col span={4}>
                     <Text type="secondary" style={{ fontSize: 11 }}>NL ra</Text><br />
                     <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
-                      {stage.output_quantity?.toLocaleString() || '—'} kg
+                      {stage.output_quantity?.toLocaleString('vi-VN') || '—'} kg
                     </Text>
                   </Col>
                   <Col span={4}>
@@ -442,7 +442,7 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
       key: 'quantity_produced',
       align: 'right' as const,
       render: (v: number) => (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v?.toLocaleString()}</Text>
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v?.toLocaleString('vi-VN')}</Text>
       ),
     },
     {
@@ -514,7 +514,7 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
                 </Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: 11 }}>
-                  {item.required_quantity?.toLocaleString()} kg
+                  {item.required_quantity?.toLocaleString('vi-VN')} kg
                 </Text>
               </div>
             ))}
@@ -547,7 +547,7 @@ const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) =>
                 <Space>
                   <GradeBadge grade={batch.final_grade} size="small" />
                   <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
-                    {batch.quantity_produced?.toLocaleString()} kg
+                    {batch.quantity_produced?.toLocaleString('vi-VN')} kg
                   </Text>
                 </Space>
               </div>

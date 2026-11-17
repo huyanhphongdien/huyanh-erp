@@ -8,6 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { fgLotService, FG_QC_CHIP, FG_QC_LABELS, type FgLot } from '../../../services/wms/fgLotService'
 import { useRawRole } from '../../../hooks/useRawRole'
 import { fmtD, fmtDt, fmtKg } from './khoCommon'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { I } from './khoMixUtil'
 import './khoMix.css'
 
@@ -25,19 +26,20 @@ export default function KhoFgLotDetail() {
   const [po, setPo] = useState(['', '']); const [mv, setMv] = useState(['', ''])
   const [lyDo, setLyDo] = useState(''); const [qcNote, setQcNote] = useState('')
   const [chenBanh, setChenBanh] = useState(''); const [xuatBanh, setXuatBanh] = useState('')
+  const [huyArm, setHuyArm] = useState(false) // xác nhận hủy lô 2 bước tại chỗ (thay window.confirm)
   const role = useRawRole(l?.facility_id ?? null)
 
   const load = useCallback(async () => {
     if (!id) return
     try { const x = await fgLotService.get(id); if (!x) { setErr('Không tìm thấy lô'); return } setL(x); setChenBanh(String(x.ton_banh)); setXuatBanh(String(x.ton_banh)) }
-    catch (e: any) { setErr(e?.message || 'Không tải được lô') }
+    catch (e: any) { setErr(dichLoiHeThong(e, 'Không tải được lô')) }
   }, [id])
   useEffect(() => { load() }, [load])
 
   async function run(key: string, fn: () => Promise<unknown>, ok: string) {
     setBusy(key); setMsg(null)
     try { await fn(); setMsg({ ok: true, text: ok }); await load() }
-    catch (e: any) { setMsg({ ok: false, text: e?.message || 'Thao tác thất bại' }) }
+    catch (e: any) { setMsg({ ok: false, text: dichLoiHeThong(e, 'Thao tác thất bại') }) }
     finally { setBusy(null) }
   }
   const n = (s: string) => (s.trim() === '' ? null : Number.isFinite(Number(s)) ? Number(s) : null)
@@ -120,7 +122,17 @@ export default function KhoFgLotDetail() {
         )}
 
         {l.so_banh_da_xuat === 0 && l.so_banh_chen === 0 && l.status !== 'huy' && (role.perms.submit || role.isBGD) && (
-          <button type="button" className="kmx-btn ghost" style={{ color: '#B91C1C' }} disabled={busy === 'huy'} onClick={() => { if (window.confirm(`Hủy lô ${l.so_lo} (ghi nhầm)?`)) run('huy', () => fgLotService.huy(l.id, 'Ghi nhầm'), 'Đã hủy lô, phiếu ca đã trừ lại') }}>Ghi nhầm? Hủy lô</button>
+          huyArm ? (
+            <section className="kmx-card" style={{ gap: 8, borderColor: '#FECACA' }}>
+              <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Hủy lô {l.so_lo} vì ghi nhầm? Phiếu ca sẽ bị trừ lại số bành của lô này.</span>
+              <div className="kmx-grid2">
+                <button type="button" className="kmx-btn red" disabled={busy === 'huy'} onClick={() => { setHuyArm(false); run('huy', () => fgLotService.huy(l.id, 'Ghi nhầm'), 'Đã hủy lô, phiếu ca đã trừ lại') }}>Xác nhận hủy lô</button>
+                <button type="button" className="kmx-btn sec" onClick={() => setHuyArm(false)}>Không</button>
+              </div>
+            </section>
+          ) : (
+            <button type="button" className="kmx-btn ghost" style={{ color: '#B91C1C' }} disabled={busy === 'huy'} onClick={() => setHuyArm(true)}>Ghi nhầm? Hủy lô</button>
+          )
         )}
       </div></div>
     </div>

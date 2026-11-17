@@ -249,7 +249,7 @@ export const shiftTeamService = {
 
   // ── ADD MEMBER ──
   async addMember(input: AddMemberInput): Promise<ShiftTeamMember> {
-    const effectiveFrom = input.effective_from || new Date().toISOString().split('T')[0]
+    const effectiveFrom = input.effective_from || new Date().toLocaleDateString('sv-SE')
 
     // End any existing active membership in OTHER teams first
     await supabase
@@ -300,7 +300,7 @@ export const shiftTeamService = {
     effectiveFrom?: string,
     createdBy?: string
   ): Promise<{ added: number; skipped: number; errors: string[] }> {
-    const date = effectiveFrom || new Date().toISOString().split('T')[0]
+    const date = effectiveFrom || new Date().toLocaleDateString('sv-SE')
     let added = 0
     let skipped = 0
     const errors: string[] = []
@@ -353,7 +353,7 @@ export const shiftTeamService = {
 
   // ── REMOVE MEMBER (soft) ──
   async removeMember(memberId: string): Promise<void> {
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
 
     const { error } = await supabase
       .from('shift_team_members')
@@ -365,7 +365,7 @@ export const shiftTeamService = {
 
   // ── TRANSFER MEMBER ──
   async transferMember(input: TransferMemberInput): Promise<ShiftTeamMember> {
-    const effectiveFrom = input.effective_from || new Date().toISOString().split('T')[0]
+    const effectiveFrom = input.effective_from || new Date().toLocaleDateString('sv-SE')
 
     // End current membership
     const { error: endError } = await supabase

@@ -3,11 +3,13 @@
 // thủ kho xác nhận / chạm chọn mã đang mở / tạo mã mới; ghi DRC tại chỗ; thủ kho bấm "Nhận".
 // File: src/pages/mobile/kho/KhoIntake.tsx · Route: /m/kho/nhap
 // ============================================================================
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { rawStockService, type RawIntakeQueueRow } from '../../../services/wms/rawStockService'
 import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type MaGoiY, type RawLotBalance } from '../../../services/wms/rawLotService'
 import { useRawRole } from '../../../hooks/useRawRole'
 import { FacilitySelect, KhoAppBar, Msg, fmtDt, fmtKg, inp, useKhoFacility } from './khoCommon'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { I } from './khoMixUtil'
 import './khoMix.css'
 
@@ -16,31 +18,33 @@ interface MaChon { rawLotId?: string; ma?: string; label: string; moi?: boolean 
 export default function KhoIntake() {
   const { facilities, facilityId, facility, setFacilityId } = useKhoFacility()
   const role = useRawRole(facilityId)
-  const [rows, setRows] = useState<RawIntakeQueueRow[]>([])
-  const [goiY, setGoiY] = useState<Record<string, MaGoiY>>({})
-  const [lots, setLots] = useState<RawLotBalance[]>([])
-  const [nguon, setNguon] = useState<{ nguon: string; so_max: number }[]>([])
   const [chon, setChon] = useState<Record<string, MaChon>>({})
   const [picker, setPicker] = useState<string | null>(null)   // ticket_id đang chọn mã
   const [moiNguon, setMoiNguon] = useState('')
   const [moiSo, setMoiSo] = useState('')
   const [moiText, setMoiText] = useState('')
-  const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [drcEdit, setDrcEdit] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    if (!facilityId) return
-    setLoading(true)
-    try {
-      const r = await rawStockService.getIntakeQueue({ facilityId, limit: 100 })
-      const [g, l, n] = await Promise.all([rawLotService.goiY(r.map((x) => x.ticket_id)), rawLotService.list(facilityId), rawLotService.nguon(facilityId)])
-      setRows(r); setGoiY(g); setLots(l); setNguon(n)
-    } catch (e: any) { setMsg({ ok: false, text: e?.message || 'Không tải được hàng đợi' }) }
-    finally { setLoading(false) }
-  }, [facilityId])
-  useEffect(() => { load() }, [load])
+  // Hàng đợi nhập = màn chờ việc hằng ngày → TanStack Query tự làm mới mỗi 25 s (audit 17/11/2026)
+  const query = useQuery({
+    queryKey: ['kho-intake-queue', facilityId],
+    queryFn: async () => {
+      const r = await rawStockService.getIntakeQueue({ facilityId: facilityId!, limit: 100 })
+      const [g, l, n] = await Promise.all([rawLotService.goiY(r.map((x) => x.ticket_id)), rawLotService.list(facilityId!), rawLotService.nguon(facilityId!)])
+      return { rows: r, goiY: g, lots: l, nguon: n }
+    },
+    enabled: !!facilityId,
+    refetchInterval: 25000,
+    refetchOnWindowFocus: true,
+  })
+  const rows: RawIntakeQueueRow[] = query.data?.rows ?? []
+  const goiY: Record<string, MaGoiY> = query.data?.goiY ?? {}
+  const lots: RawLotBalance[] = query.data?.lots ?? []
+  const nguon: { nguon: string; so_max: number }[] = query.data?.nguon ?? []
+  const loading = query.isPending
+  const load = () => query.refetch()
 
   const canReceive = role.isKeeper || role.isBGD || (!role.perms.co_thu_kho && role.perms.receive)
   const canDrc = role.isQC || role.isKeeper || role.isBGD
@@ -92,9 +96,10 @@ export default function KhoIntake() {
         right={<FacilitySelect value={facilityId} onChange={setFacilityId} facilities={facilities} />} />
       <div className="ops-body">
         <div className="ops-inner">
+          {query.error != null && <Msg m={{ ok: false, text: dichLoiHeThong(query.error, 'Không tải được hàng đợi') }} onRetry={() => query.refetch()} />}
           <Msg m={msg} />
           {loading && !rows.length && <><div className="ops-skel" /><div className="ops-skel" /></>}
-          {!loading && !rows.length && <div className="ops-empty"><div className="em">✅</div><div className="et">Không có phiếu chờ</div><div className="ed">Phiếu cân hoàn tất sau ngày mở sổ sẽ hiện ở đây</div></div>}
+          {!loading && query.error == null && !rows.length && <div className="ops-empty"><div className="em">✅</div><div className="et">Không có phiếu chờ</div><div className="ed">Phiếu cân hoàn tất sau ngày mở sổ sẽ hiện ở đây</div></div>}
           {rows.map((r) => {
             const cho = r.ly_do_cho
             const m = maCua(r)

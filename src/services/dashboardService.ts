@@ -185,7 +185,7 @@ export const dashboardService = {
     try {
       const { startOfMonth, endOfMonth, monthLabel } = getCurrentMonthRange();
       const { startOfWeek } = getCurrentWeekRange();
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('sv-SE');
 
       const [
         // Tổng NV active (không filter tháng)
@@ -612,7 +612,7 @@ export const dashboardService = {
   async getOverdueTasks(limit: number = 10): Promise<{ data: OverdueTask[]; error: Error | null }> {
     try {
       const { startOfMonth } = getCurrentMonthRange();
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('sv-SE');
 
       const { data, error } = await supabase
         .from('tasks')
@@ -681,7 +681,7 @@ export const dashboardService = {
   async getUpcomingTasks(days?: number, limit: number = 10): Promise<{ data: UpcomingTask[]; error: Error | null }> {
     try {
       const { endOfMonth } = getCurrentMonthRange();
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('sv-SE');
 
       const { data, error } = await supabase
         .from('tasks')
@@ -784,7 +784,7 @@ export const dashboardService = {
   async getExpiringContracts(days?: number, limit: number = 5): Promise<{ data: ContractAlert[]; error: Error | null }> {
     try {
       const { startOfMonth, endOfMonth } = getCurrentMonthRange();
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('sv-SE');
 
       const { data, error } = await supabase
         .from('contracts')

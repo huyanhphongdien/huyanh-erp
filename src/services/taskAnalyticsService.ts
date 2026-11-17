@@ -491,7 +491,7 @@ export async function getOverdueTasks(filter: StatsFilter, limit: number = 10): 
   console.log('📊 [taskStatsService] getOverdueTasks:', filter);
 
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('sv-SE');
 
     let query = supabase
       .from('tasks')

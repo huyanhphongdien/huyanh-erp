@@ -2,8 +2,9 @@
 // SALES DASHBOARD PAGE — Bento overview (v2)
 // File: src/pages/sales/SalesDashboardPage.tsx
 //
-// Layout: 5 KPI hero + AI summary + 3 bento rows (pipeline/SLA, action/top-cust/
-// workflow, activity/LC). Sticky quick actions footer.
+// Layout: 4 KPI hero + AI summary + bento rows (pipeline/SLA, action/calendar/
+// top-cust, activity, LC/cashflow). Sticky quick actions footer.
+// Workflow duyệt/ký HĐ đã khai tử 08/2026 → không còn KPI/widget/nút queue ở đây.
 // Mock dựa trên docs/SALES_OVERVIEW_DASHBOARD_MOCKUP.html.
 // ============================================================================
 
@@ -12,14 +13,15 @@ import { useNavigate } from 'react-router-dom'
 import { Tag, Button, Spin, message } from 'antd'
 import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Trophy,
-  ShoppingCart, FileText, Activity, CreditCard, TrendingUp, Calendar,
-  Sparkles, Plus, ListChecks, Edit3, Search,
+  ShoppingCart, Activity, CreditCard, TrendingUp, Calendar,
+  Sparkles, Plus, Search,
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { salesDashboardService } from '../../services/sales/salesDashboardService'
-import { salesContractWorkflowService } from '../../services/sales/salesContractWorkflowService'
+import { salesLotService } from '../../services/sales/salesLotService'
 import { getSalesRole, SALES_ROLE_LABELS } from '../../services/sales/salesPermissionService'
+import { ORDER_STATUS_LABELS } from '../../services/sales/salesTypes'
 import type { TopCustomer, PipelineStage } from '../../services/sales/salesDashboardService'
 
 const PRIMARY = '#1B4D3E'
@@ -51,15 +53,6 @@ const STAGE_META: Record<string, { icon: string; color: string; bg: string }> = 
   paid:       { icon: '💰', color: '#1B4D3E', bg: '#d9f7e8' },
 }
 
-const WORKFLOW_META: Record<string, { label: string; color: string }> = {
-  drafting:  { label: 'Nháp (Sale)', color: '#1677ff' },
-  reviewing: { label: 'Chờ Kiểm tra', color: '#531dab' },
-  rejected:  { label: 'Bị trả lại', color: '#cf1322' },
-  approved:  { label: 'Đã duyệt, chờ ký', color: '#fa8c16' },
-  signed:    { label: 'Đã ký', color: '#389e0d' },
-  archived:  { label: 'Lưu trữ', color: '#bfbfbf' },
-}
-
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -71,7 +64,7 @@ interface SlaItem {
 }
 interface ActivityItem {
   id: string; actor: string; action: string; target: string
-  detail?: string; created_at: string; type: 'sign' | 'approve' | 'reject' | 'submit' | 'archive'
+  detail?: string; created_at: string; type: 'status' | 'payment'
 }
 interface LcItem {
   id: string; contract_no: string; customer: string; bank_name: string
@@ -95,14 +88,13 @@ interface DashboardData {
   pipeline: PipelineStage[]
   topCustomers: TopCustomer[]
   slaRisk: SlaItem[]
-  workflowCounts: Record<string, number>
   activityFeed: ActivityItem[]
   lcNearExpiry: LcItem[]
   calendar: CalendarEvent[]
   cashflow: CashflowBar[]
-  cycleTimeAvgDays: number
-  myPendingReview: number
-  myPendingSign: number
+  /** Lô đã giao đủ nhưng chưa thu đủ tiền (sổ lô) — số lô + USD còn phải thu. */
+  lotsDeliveredUnpaid: number
+  lotsDeliveredUnpaidUsd: number
 }
 
 // ============================================================================
@@ -121,38 +113,29 @@ export default function SalesDashboardPage() {
     pipeline: [],
     topCustomers: [],
     slaRisk: [],
-    workflowCounts: {},
     activityFeed: [],
     lcNearExpiry: [],
     calendar: [],
     cashflow: [],
-    cycleTimeAvgDays: 0,
-    myPendingReview: 0,
-    myPendingSign: 0,
+    lotsDeliveredUnpaid: 0,
+    lotsDeliveredUnpaidUsd: 0,
   })
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const empId = await salesContractWorkflowService.getCurrentEmployeeId()
-      const isReviewer = salesContractWorkflowService.isAllowedReviewer(user?.email)
-      const isSigner = salesContractWorkflowService.isAllowedSigner(user?.email)
-
-      const [kpis, pipeline, topCustomers, slaRisk, workflowCounts, activityFeed, lcNearExpiry,
-             calendar, cashflow, cycleTimeAvgDays, reviewList, signList] =
+      const [kpis, pipeline, topCustomers, slaRisk, activityFeed, lcNearExpiry,
+             calendar, cashflow, lotsUnpaid] =
         await Promise.all([
           salesDashboardService.getKPIs(period),
           salesDashboardService.getPipeline(),
           salesDashboardService.getTopCustomers(5),
           fetchSlaAtRisk(),
-          fetchWorkflowCounts(),
           fetchActivityFeed(),
           fetchLcNearExpiry(),
           fetchCalendar(),
           fetchCashflow(),
-          fetchCycleTime(),
-          isReviewer ? salesContractWorkflowService.listForReview(empId, true) : Promise.resolve([]),
-          isSigner ? salesContractWorkflowService.listForSigning() : Promise.resolve([]),
+          fetchLotsDeliveredUnpaid(),
         ])
 
       setData({
@@ -160,14 +143,12 @@ export default function SalesDashboardPage() {
         pipeline,
         topCustomers,
         slaRisk,
-        workflowCounts,
         activityFeed,
         lcNearExpiry,
         calendar,
         cashflow,
-        cycleTimeAvgDays,
-        myPendingReview: reviewList.length,
-        myPendingSign: signList.length,
+        lotsDeliveredUnpaid: lotsUnpaid.count,
+        lotsDeliveredUnpaidUsd: lotsUnpaid.remainingUsd,
       })
     } catch (e) {
       console.error('Dashboard load error', e)
@@ -175,7 +156,7 @@ export default function SalesDashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [period, user])
+  }, [period])
 
   useEffect(() => { void loadData() }, [loadData])
 
@@ -198,7 +179,7 @@ export default function SalesDashboardPage() {
 
   const k = data.kpis
   const periodLabel = period === 'month' ? 'Tháng này' : period === 'quarter' ? 'Quý này' : 'Năm nay'
-  const totalWorkflow = Object.values(data.workflowCounts).reduce((a, b) => a + b, 0)
+  const lcUrgentCount = data.lcNearExpiry.filter((l) => l.daysLeft <= 7).length
 
   return (
     <div style={{ padding: '20px 24px 48px', background: '#f5f6f8' }}>
@@ -275,14 +256,12 @@ export default function SalesDashboardPage() {
           <KpiCard label="SLA at risk" value={data.slaRisk.length} sub="đơn quá hạn giao"
                    trendLabel={data.slaRisk.length > 0 ? 'Cần xử lý' : 'Trong tầm kiểm soát'}
                    accent={data.slaRisk.length > 0 ? 'alert' : 'success'} />
-          <KpiCard label="Cần action của bạn" value={data.myPendingReview + data.myPendingSign}
-                   sub={`${data.myPendingReview} duyệt + ${data.myPendingSign} ký`}
-                   trendLabel="→ Xem queue" accent="warn" />
-          <KpiCard label="Đã ký kỳ này" value={data.workflowCounts.signed || 0}
-                   sub="đơn HĐ workflow signed"
-                   trendLabel="đã hoàn tất" accent="success" />
+          <KpiCard label="Lô đã giao chưa thu" value={data.lotsDeliveredUnpaid}
+                   sub={`lô · ${fmtUSD(data.lotsDeliveredUnpaidUsd)} chưa thu`}
+                   trendLabel={data.lotsDeliveredUnpaid > 0 ? 'Hàng đã đi, tiền chưa về' : 'Không có lô chờ thu'}
+                   accent={data.lotsDeliveredUnpaid > 0 ? 'warn' : 'success'} />
           <KpiCard label="L/C theo dõi" value={data.lcNearExpiry.length}
-                   sub={data.lcNearExpiry.filter(l => l.daysLeft <= 7).length + ' hết hạn ≤7d'}
+                   sub={lcUrgentCount + ' hết hạn ≤7d'}
                    trendLabel={data.lcNearExpiry.length > 0 ? `${data.lcNearExpiry[0].bank_name || ''}` : '—'} />
         </div>
       )}
@@ -346,24 +325,20 @@ export default function SalesDashboardPage() {
       <div style={{ ...bento, gridTemplateColumns: '1fr 1fr 1fr' }}>
 
         <Widget icon={<CheckCircle size={14} />} title="Cần action của bạn" iconColor="purple"
-                sub={`${data.myPendingReview + data.myPendingSign} mục`}>
-          {data.myPendingReview > 0 && (
-            <ActionGroup title="📋 Cần duyệt" count={data.myPendingReview}
-              ctaLabel="Mở queue Kiểm tra"
-              onClick={() => navigate('/sales/contracts/review')} />
+                sub={`${lcUrgentCount + data.lotsDeliveredUnpaid} mục`}>
+          {data.lotsDeliveredUnpaid > 0 && (
+            <ActionGroup title="📦 Lô đã giao chưa thu tiền"
+              count={data.lotsDeliveredUnpaid} countColor="yellow"
+              ctaLabel="Mở Sổ lô"
+              onClick={() => navigate('/sales/lots')} />
           )}
-          {data.myPendingSign > 0 && (
-            <ActionGroup title="✍️ Cần ký" count={data.myPendingSign} countColor="yellow"
-              ctaLabel="Mở queue Ký"
-              onClick={() => navigate('/sales/contracts/sign')} />
-          )}
-          {data.lcNearExpiry.filter(l => l.daysLeft <= 7).length > 0 && (
+          {lcUrgentCount > 0 && (
             <ActionGroup title="💰 LC sắp hết hạn ≤7d"
-              count={data.lcNearExpiry.filter(l => l.daysLeft <= 7).length} countColor="red"
+              count={lcUrgentCount} countColor="red"
               ctaLabel="Xem L/C"
               onClick={() => navigate('/sales/cash-flow')} />
           )}
-          {data.myPendingReview === 0 && data.myPendingSign === 0 && data.lcNearExpiry.filter(l => l.daysLeft <= 7).length === 0 && (
+          {data.lotsDeliveredUnpaid === 0 && lcUrgentCount === 0 && (
             <div style={emptyStyle}>Không có việc cần làm 🎉</div>
           )}
         </Widget>
@@ -399,42 +374,11 @@ export default function SalesDashboardPage() {
         </Widget>
       </div>
 
-      {/* ═══ BENTO ROW 3: Workflow Donut + Activity ═══ */}
-      <div style={{ ...bento, gridTemplateColumns: '1fr 1fr' }}>
-
-        <Widget icon={<FileText size={14} />} title="Workflow HĐ — trạng thái" iconColor="purple"
-                sub={`${totalWorkflow} HĐ active`}>
-          {totalWorkflow === 0 ? (
-            <div style={emptyStyle}>Chưa có HĐ workflow</div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <DonutChart counts={data.workflowCounts} total={totalWorkflow} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
-                  {Object.entries(WORKFLOW_META).map(([status, meta]) => {
-                    const count = data.workflowCounts[status] || 0
-                    if (count === 0) return null
-                    return (
-                      <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 8, height: 8, borderRadius: 4, background: meta.color, flexShrink: 0 }} />
-                        <span style={{ color: '#8c8c8c', flex: 1 }}>{meta.label}</span>
-                        <span style={{ fontWeight: 700 }}>{count}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-              {data.cycleTimeAvgDays > 0 && (
-                <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #f0f0f0', fontSize: 11, color: '#8c8c8c' }}>
-                  ⚡ <strong>Cycle time avg:</strong> Sale → Ký = <strong>{data.cycleTimeAvgDays.toFixed(1)} ngày</strong>
-                </div>
-              )}
-            </>
-          )}
-        </Widget>
+      {/* ═══ BENTO ROW 3: Activity (đơn chuyển trạng thái + tiền về) ═══ */}
+      <div style={{ ...bento, gridTemplateColumns: '1fr' }}>
 
         <Widget icon={<Activity size={14} />} title="Hoạt động gần đây" iconColor="blue"
-                action={<span style={widgetLink}>Xem tất cả →</span>}>
+                sub="Đơn chuyển trạng thái · tiền về">
           {data.activityFeed.length === 0 ? (
             <div style={emptyStyle}>Chưa có hoạt động</div>
           ) : data.activityFeed.slice(0, 6).map((a) => (
@@ -514,20 +458,6 @@ export default function SalesDashboardPage() {
                 style={{ background: PRIMARY }}>
           Tạo đơn mới
         </Button>
-        {salesContractWorkflowService.isAllowedReviewer(user?.email) && (
-          <Button icon={<ListChecks size={14} />} onClick={() => navigate('/sales/contracts/review')}>
-            Queue Kiểm tra {data.myPendingReview > 0 && (
-              <Tag color="purple" style={{ marginLeft: 4 }}>{data.myPendingReview}</Tag>
-            )}
-          </Button>
-        )}
-        {salesContractWorkflowService.isAllowedSigner(user?.email) && (
-          <Button icon={<Edit3 size={14} />} onClick={() => navigate('/sales/contracts/sign')}>
-            Queue Ký {data.myPendingSign > 0 && (
-              <Tag color="orange" style={{ marginLeft: 4 }}>{data.myPendingSign}</Tag>
-            )}
-          </Button>
-        )}
         <Button icon={<TrendingUp size={14} />} onClick={() => navigate('/sales/kanban')}>
           Xem Kanban
         </Button>
@@ -710,43 +640,6 @@ function CashflowWidget({ bars }: { bars: CashflowBar[] }) {
   )
 }
 
-// ─── Donut chart (SVG) ─────────────────────────────────────────────
-function DonutChart({ counts, total }: { counts: Record<string, number>; total: number }) {
-  const C = 88 // circumference baseline (2πr ≈ 87.96 for r=14)
-  let offset = 0
-  const segments: { status: string; len: number; off: number; color: string }[] = []
-  for (const [status, meta] of Object.entries(WORKFLOW_META)) {
-    const count = counts[status] || 0
-    if (count === 0) continue
-    const len = (count / total) * C
-    segments.push({ status, len, off: -offset, color: meta.color })
-    offset += len
-  }
-  return (
-    <div style={{ position: 'relative', width: 100, height: 100, flexShrink: 0 }}>
-      <svg viewBox="0 0 36 36" width="100" height="100" style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx="18" cy="18" r="14" fill="none" stroke="#f0f0f0" strokeWidth="4" />
-        {segments.map((s) => (
-          <circle
-            key={s.status}
-            cx="18" cy="18" r="14"
-            fill="none"
-            stroke={s.color}
-            strokeWidth="4"
-            strokeDasharray={`${s.len} ${C}`}
-            strokeDashoffset={s.off}
-          />
-        ))}
-      </svg>
-      <div style={{ position: 'absolute', inset: 0, display: 'flex',
-                    flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontSize: 22, fontWeight: 700 }}>{total}</div>
-        <div style={{ fontSize: 10, color: '#8c8c8c' }}>HĐ active</div>
-      </div>
-    </div>
-  )
-}
-
 function ActionGroup({ title, count, ctaLabel, onClick, countColor }: {
   title: string; count: number; ctaLabel: string; onClick: () => void;
   countColor?: 'red' | 'yellow'
@@ -794,61 +687,67 @@ async function fetchSlaAtRisk(): Promise<SlaItem[]> {
   }))
 }
 
-async function fetchWorkflowCounts(): Promise<Record<string, number>> {
-  const { data } = await supabase
-    .from('sales_order_contracts')
-    .select('status')
-  const counts: Record<string, number> = {}
-  for (const r of (data as { status: string }[]) || []) {
-    counts[r.status] = (counts[r.status] || 0) + 1
-  }
-  return counts
-}
-
+/**
+ * Feed hoạt động SỐNG: đơn chuyển trạng thái (sales_order_status_log — tên bảng thật,
+ * xem salesOrderService.getStatusLog) + tiền về (sales_order_payments).
+ * Bảng sales_order_contracts (workflow đã khai tử 08/2026) không còn được đọc ở đây.
+ */
 async function fetchActivityFeed(): Promise<ActivityItem[]> {
-  const { data } = await supabase
-    .from('sales_order_contracts')
-    .select(`
-      id, status, revision_no, submitted_at, reviewed_at, signed_at, rejected_at, rejected_reason,
-      form_data,
-      created_by_employee:employees!sales_order_contracts_created_by_fkey(full_name),
-      reviewer_employee:employees!sales_order_contracts_reviewer_id_fkey(full_name),
-      signer_employee:employees!sales_order_contracts_signer_id_fkey(full_name)
-    `)
-    .order('updated_at', { ascending: false })
-    .limit(8)
+  const [logRes, payRes] = await Promise.all([
+    supabase
+      .from('sales_order_status_log')
+      .select('id, from_status, to_status, changed_by_name, created_at, order:sales_orders!sales_order_id(contract_no, code)')
+      .order('created_at', { ascending: false })
+      .limit(8),
+    supabase
+      .from('sales_order_payments')
+      .select('id, amount, currency, lot_no, payment_type, created_at, order:sales_orders!sales_order_id(contract_no, code)')
+      .order('created_at', { ascending: false })
+      .limit(10),
+  ])
+
+  const statusLabel = (s: string | null) =>
+    s ? (ORDER_STATUS_LABELS as Record<string, string>)[s] || s : '—'
 
   const items: ActivityItem[] = []
-  for (const r of (data as any[]) || []) {
-    const contractNo = r.form_data?.contract_no || '—'
-    if (r.signed_at) {
-      items.push({
-        id: `${r.id}-signed`, actor: r.signer_employee?.full_name || 'Trình ký',
-        action: 'đã ký HĐ', target: contractNo, detail: `rev #${r.revision_no}`,
-        created_at: r.signed_at, type: 'sign',
-      })
-    } else if (r.rejected_at) {
-      items.push({
-        id: `${r.id}-rejected`, actor: r.reviewer_employee?.full_name || 'Kiểm tra',
-        action: 'trả lại HĐ', target: contractNo,
-        detail: r.rejected_reason ? `"${r.rejected_reason.slice(0, 40)}"` : '',
-        created_at: r.rejected_at, type: 'reject',
-      })
-    } else if (r.reviewed_at) {
-      items.push({
-        id: `${r.id}-approved`, actor: r.reviewer_employee?.full_name || 'Kiểm tra',
-        action: 'duyệt HĐ', target: contractNo, detail: `rev #${r.revision_no}`,
-        created_at: r.reviewed_at, type: 'approve',
-      })
-    } else if (r.submitted_at) {
-      items.push({
-        id: `${r.id}-submitted`, actor: r.created_by_employee?.full_name || 'Sale',
-        action: 'trình HĐ', target: contractNo, detail: `rev #${r.revision_no}`,
-        created_at: r.submitted_at, type: 'submit',
-      })
-    }
+  for (const r of (logRes.data as any[]) || []) {
+    items.push({
+      id: `st-${r.id}`,
+      actor: r.changed_by_name || 'Hệ thống',
+      action: 'chuyển đơn',
+      target: r.order?.contract_no || r.order?.code || '—',
+      detail: `${statusLabel(r.from_status)} → ${statusLabel(r.to_status)}`,
+      created_at: r.created_at,
+      type: 'status',
+    })
+  }
+  // fee_offset lọc phía client (giống salesLotService) — .neq sẽ rơi mất dòng payment_type NULL
+  for (const r of ((payRes.data as any[]) || []).filter((p) => p.payment_type !== 'fee_offset')) {
+    const amount = Number(r.amount || 0)
+    const money = !r.currency || r.currency === 'USD'
+      ? fmtUSD(amount)
+      : `${amount.toLocaleString('vi-VN')} ${r.currency}`
+    items.push({
+      id: `pay-${r.id}`,
+      actor: 'Khách',
+      action: 'thanh toán',
+      target: r.order?.contract_no || r.order?.code || '—',
+      detail: `${money}${r.lot_no ? ` · lô ${r.lot_no}` : ''}`,
+      created_at: r.created_at,
+      type: 'payment',
+    })
   }
   return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+}
+
+/** KPI "Lô đã giao chưa thu" — hàng đã sang khách, tiền chưa về đủ (đọc sổ lô). */
+async function fetchLotsDeliveredUnpaid(): Promise<{ count: number; remainingUsd: number }> {
+  const ledger = await salesLotService.getLedger()
+  // Cùng bộ lọc với totals.lotsDeliveredUnpaid — chỉ cộng thêm USD còn phải thu.
+  const remainingUsd = ledger.lots
+    .filter((l) => l.delivery_state === 'full' && l.payment_status !== 'paid')
+    .reduce((s, l) => s + l.remaining_usd, 0)
+  return { count: ledger.totals.lotsDeliveredUnpaid, remainingUsd }
 }
 
 async function fetchCalendar(): Promise<CalendarEvent[]> {
@@ -875,20 +774,6 @@ async function fetchCalendar(): Promise<CalendarEvent[]> {
     }
   }
   return Object.entries(byDate).map(([date, info]) => ({ date, ...info }))
-}
-
-async function fetchCycleTime(): Promise<number> {
-  const { data } = await supabase
-    .from('sales_order_contracts')
-    .select('submitted_at, signed_at')
-    .eq('status', 'signed')
-    .not('submitted_at', 'is', null)
-    .not('signed_at', 'is', null)
-    .limit(30)
-  const rows = (data as { submitted_at: string; signed_at: string }[]) || []
-  if (rows.length === 0) return 0
-  const totalMs = rows.reduce((s, r) => s + (new Date(r.signed_at).getTime() - new Date(r.submitted_at).getTime()), 0)
-  return totalMs / rows.length / 86400000
 }
 
 async function fetchCashflow(): Promise<CashflowBar[]> {
@@ -943,16 +828,13 @@ async function fetchLcNearExpiry(): Promise<LcItem[]> {
 // ─── Activity feed helpers ──────────────────────────────────────────
 
 function feedDotIcon(type: ActivityItem['type']): string {
-  return { sign: '✓', approve: '👍', reject: '✗', submit: '📤', archive: '📁' }[type]
+  return { status: '🔄', payment: '💵' }[type]
 }
 
 function feedDotColor(type: ActivityItem['type']): { background: string; color: string } {
   switch (type) {
-    case 'sign':     return { background: '#f6ffed', color: '#389e0d' }
-    case 'approve':  return { background: '#fff7e6', color: '#d46b08' }
-    case 'reject':   return { background: '#fff1f0', color: '#cf1322' }
-    case 'submit':   return { background: '#e6f4ff', color: '#1677ff' }
-    case 'archive':  return { background: '#f5f5f5', color: '#8c8c8c' }
+    case 'status':  return { background: '#e6f4ff', color: '#1677ff' }
+    case 'payment': return { background: '#f6ffed', color: '#389e0d' }
   }
 }
 
@@ -1002,7 +884,7 @@ const aiAction: React.CSSProperties = {
   fontSize: 11, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
 }
 const kpiRow: React.CSSProperties = {
-  display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16,
+  display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16,
 }
 const kpiStyle: React.CSSProperties = {
   background: '#fff', borderRadius: 12, padding: '14px 16px',

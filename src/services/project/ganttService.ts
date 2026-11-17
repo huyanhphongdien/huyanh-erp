@@ -711,7 +711,7 @@ export const ganttService = {
       planned_start: item.start, planned_end: item.end, progress: item.progress,
     }))
 
-    const snapshotDate = new Date().toISOString().split('T')[0]
+    const snapshotDate = new Date().toLocaleDateString('sv-SE')
     const { data, error } = await supabase
       .from('project_baselines')
       .insert({ project_id: projectId, snapshot_date: snapshotDate, data: baselineItems, created_by: createdBy || null })

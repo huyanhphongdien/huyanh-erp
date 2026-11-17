@@ -412,13 +412,13 @@ const MaterialDetailPage: React.FC = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500">Hiện tại</span>
                   <span className={`text-xl font-bold ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>
-                    {stockValue.toLocaleString()}
+                    {stockValue.toLocaleString('vi-VN')}
                     {isLowStock && <AlertTriangle className="w-4 h-4 inline ml-1" />}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500">Tối thiểu</span>
-                  <span className="font-medium">{minStockValue.toLocaleString()}</span>
+                  <span className="font-medium">{minStockValue.toLocaleString('vi-VN')}</span>
                 </div>
                 <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div 
@@ -639,7 +639,7 @@ const MaterialDetailPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {ms.min_order_qty?.toLocaleString() || '-'}
+                        {ms.min_order_qty?.toLocaleString('vi-VN') || '-'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {ms.lead_time_days ? `${ms.lead_time_days} ngày` : '-'}

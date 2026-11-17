@@ -212,8 +212,8 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
           <Descriptions.Item label="DRC ban đầu">{batchInfo.initial_drc || '—'}%</Descriptions.Item>
           <Descriptions.Item label="QC"><QCBadge result={batchInfo.qc_status} /></Descriptions.Item>
           <Descriptions.Item label="Kho">{batchInfo.warehouse_name}{batchInfo.location_code ? ` · ${batchInfo.location_code}` : ''}</Descriptions.Item>
-          <Descriptions.Item label="SL còn">{batchInfo.quantity_remaining?.toLocaleString()} kg</Descriptions.Item>
-          <Descriptions.Item label="Dry weight">{batchInfo.dry_weight ? `${batchInfo.dry_weight.toLocaleString()} kg` : '—'}</Descriptions.Item>
+          <Descriptions.Item label="SL còn">{batchInfo.quantity_remaining?.toLocaleString('vi-VN')} kg</Descriptions.Item>
+          <Descriptions.Item label="Dry weight">{batchInfo.dry_weight ? `${batchInfo.dry_weight.toLocaleString('vi-VN')} kg` : '—'}</Descriptions.Item>
           <Descriptions.Item label="Ngày nhập">{formatDate(batchInfo.received_date)}</Descriptions.Item>
           <Descriptions.Item label="Lưu kho">{batchInfo.storage_days || 0} ngay</Descriptions.Item>
           <Descriptions.Item label="Tái kiểm tiep">

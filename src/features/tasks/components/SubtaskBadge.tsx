@@ -26,6 +26,9 @@ interface SubtaskCountResult {
 // FETCH FUNCTION
 // ============================================================================
 
+// Hệ status hiện hành kết thúc ở 'finished' — giữ thêm 'completed' cho dữ liệu cũ
+const DONE_STATUSES = ['finished', 'completed']
+
 async function fetchSubtaskCount(taskId: string): Promise<SubtaskCountResult> {
   const { data, error } = await supabase
     .from('tasks')
@@ -37,8 +40,40 @@ async function fetchSubtaskCount(taskId: string): Promise<SubtaskCountResult> {
   const tasks = data || []
   return {
     total: tasks.length,
-    completed: tasks.filter(t => t.status === 'completed').length,
+    completed: tasks.filter(t => DONE_STATUSES.includes(t.status)).length,
   }
+}
+
+// ============================================================================
+// BATCH HOOK - MỘT query đếm việc con cho CẢ danh sách (tránh N+1 mỗi dòng)
+// Dùng ở cấp trang: const { data } = useSubtaskCounts(taskIds)
+// rồi truyền 2 số xuống <SubtaskBadgeInline />.
+// ============================================================================
+
+export function useSubtaskCounts(taskIds: string[]) {
+  return useQuery({
+    queryKey: ['subtask-counts', taskIds],
+    queryFn: async (): Promise<Record<string, SubtaskCountResult>> => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('parent_task_id, status')
+        .in('parent_task_id', taskIds)
+
+      if (error) throw error
+
+      const map: Record<string, SubtaskCountResult> = {}
+      for (const t of data || []) {
+        const pid = t.parent_task_id
+        if (!pid) continue
+        const entry = map[pid] || (map[pid] = { total: 0, completed: 0 })
+        entry.total += 1
+        if (DONE_STATUSES.includes(t.status)) entry.completed += 1
+      }
+      return map
+    },
+    enabled: taskIds.length > 0,
+    staleTime: 30000,
+  })
 }
 
 // ============================================================================

@@ -7,15 +7,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Card, Table, Tag, Button, Space, Typography, Row, Col, Spin, Empty,
+  Card, Table, Tag, Button, Space, Typography, Row, Col,
   DatePicker,
 } from 'antd'
 import {
-  ArrowLeftOutlined, ReloadOutlined, TeamOutlined,
+  ArrowLeftOutlined, ReloadOutlined, TeamOutlined, DownloadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import wmsReportService from '../../../services/wms/wmsReportService'
 import type { SupplierQualityReport } from '../../../services/wms/wms.types'
+import PageState from '../../../components/common/PageState'
+import { xuatExcelBaoCao } from './wmsReportExcel'
 
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
@@ -23,11 +25,13 @@ const { RangePicker } = DatePicker
 const SupplierQualityReportPage = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<SupplierQualityReport[]>([])
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const result = await wmsReportService.getSupplierQualityReport({
         from_date: dateRange ? dateRange[0].format('YYYY-MM-DD') : undefined,
@@ -36,6 +40,7 @@ const SupplierQualityReportPage = () => {
       setData(result)
     } catch (err) {
       console.error('Load supplier quality report error:', err)
+      setError(err)
     } finally {
       setLoading(false)
     }
@@ -49,6 +54,32 @@ const SupplierQualityReportPage = () => {
     if (rate >= 90) return '#16A34A'
     if (rate >= 70) return '#F59E0B'
     return '#DC2626'
+  }
+
+  const handleExportExcel = () => {
+    xuatExcelBaoCao('chat-luong-dai-ly', [{
+      name: 'Chất lượng NCC',
+      title: dateRange
+        ? `Chất lượng đại lý cung cấp ${dateRange[0].format('DD/MM/YYYY')} – ${dateRange[1].format('DD/MM/YYYY')}`
+        : 'Chất lượng đại lý cung cấp (toàn bộ thời gian)',
+      columns: [
+        { title: 'Đại lý', align: 'left' },
+        { title: 'Vùng', align: 'left' },
+        { title: 'Số lô', summary: 'sum' },
+        { title: 'Tổng KL (kg)', summary: 'sum' },
+        { title: 'DRC TB (%)' },
+        { title: 'DRC min (%)' },
+        { title: 'DRC max (%)' },
+        { title: 'Đạt', summary: 'sum' },
+        { title: 'Cảnh báo', summary: 'sum' },
+        { title: 'Lỗi', summary: 'sum' },
+        { title: 'Tỷ lệ đạt (%)' },
+      ],
+      rows: data.map(r => [
+        r.supplier_name, r.supplier_region || '', r.batch_count, r.total_weight_kg,
+        r.avg_drc, r.drc_min, r.drc_max, r.passed_count, r.warning_count, r.failed_count, r.pass_rate,
+      ]),
+    }])
   }
 
   const columns = [
@@ -66,7 +97,7 @@ const SupplierQualityReportPage = () => {
     },
     {
       title: 'Tong KL (kg)', dataIndex: 'total_weight_kg', key: 'weight', align: 'right' as const, width: 120,
-      render: (v: number) => <Text style={numStyle}>{v.toLocaleString()}</Text>,
+      render: (v: number) => <Text style={numStyle}>{v.toLocaleString('vi-VN')}</Text>,
     },
     {
       title: 'DRC TB', dataIndex: 'avg_drc', key: 'avg_drc', align: 'right' as const, width: 90,
@@ -125,6 +156,7 @@ const SupplierQualityReportPage = () => {
               size="small"
               allowClear
             />
+            <Button icon={<DownloadOutlined />} onClick={handleExportExcel} disabled={data.length === 0}>Xuất Excel</Button>
             <Button icon={<ReloadOutlined />} onClick={loadData}>Làm mới</Button>
           </Space>
         </Col>
@@ -132,11 +164,13 @@ const SupplierQualityReportPage = () => {
 
       {/* Table */}
       <Card>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-        ) : data.length === 0 ? (
-          <Empty description="Không có dữ liệu đại lý" />
-        ) : (
+        <PageState
+          loading={loading}
+          error={error}
+          onRetry={() => loadData()}
+          empty={data.length === 0}
+          emptyText="Không có dữ liệu đại lý"
+        >
           <Table
             dataSource={data}
             columns={columns}
@@ -145,7 +179,7 @@ const SupplierQualityReportPage = () => {
             pagination={{ showSizeChanger: true, showTotal: (t, r) => `${r[0]}-${r[1]} / ${t}` }}
             scroll={{ x: 1000 }}
           />
-        )}
+        </PageState>
       </Card>
     </div>
   )

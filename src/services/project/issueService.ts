@@ -162,7 +162,7 @@ export const issueService = {
         reported_by: input.reported_by || null,
         due_date: input.due_date || null,
         status: 'open',
-        reported_date: new Date().toISOString().split('T')[0],
+        reported_date: new Date().toLocaleDateString('sv-SE'),
       })
       .select(ISSUE_SELECT)
       .single()
@@ -199,7 +199,7 @@ export const issueService = {
       .update({
         status: 'resolved',
         resolution,
-        resolved_date: new Date().toISOString().split('T')[0],
+        resolved_date: new Date().toLocaleDateString('sv-SE'),
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -260,7 +260,7 @@ export const issueService = {
    */
   async getStats(project_id: string): Promise<IssueStats> {
     const issues = await this.getByProject(project_id)
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
 
     const stats: IssueStats = {
       total: issues.length,

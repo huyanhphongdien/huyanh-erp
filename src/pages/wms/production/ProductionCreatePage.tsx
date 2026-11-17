@@ -296,7 +296,7 @@ const ProductionCreatePage = () => {
       key: 'quantity_remaining',
       align: 'right' as const,
       render: (v: number) => (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v.toLocaleString()}</Text>
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v.toLocaleString('vi-VN')}</Text>
       ),
     },
     {
@@ -346,7 +346,7 @@ const ProductionCreatePage = () => {
       key: 'quantity',
       align: 'right' as const,
       render: (_: any, r: SelectedBatch) => (
-        <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>{r.quantity.toLocaleString()}</Text>
+        <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>{r.quantity.toLocaleString('vi-VN')}</Text>
       ),
     },
     {
@@ -527,7 +527,7 @@ const ProductionCreatePage = () => {
               <Row gutter={16} style={{ marginBottom: 24 }}>
                 <Col span={8}>
                   <Card bodyStyle={{ padding: 12 }}>
-                    <Statistic title="Tổng NL (kg)" value={totalInputWeight.toLocaleString()}
+                    <Statistic title="Tổng NL (kg)" value={totalInputWeight.toLocaleString('vi-VN')}
                       valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
                   </Card>
                 </Col>
@@ -590,7 +590,7 @@ const ProductionCreatePage = () => {
                   <Descriptions.Item label="Lô">{selectedRawBatch.batch_no}</Descriptions.Item>
                   <Descriptions.Item label="Grade"><GradeBadge grade={selectedRawBatch.rubber_grade} size="small" /></Descriptions.Item>
                   <Descriptions.Item label="DRC">{selectedRawBatch.latest_drc || selectedRawBatch.initial_drc || '—'}%</Descriptions.Item>
-                  <Descriptions.Item label="Còn lại">{selectedRawBatch.quantity_remaining.toLocaleString()} kg</Descriptions.Item>
+                  <Descriptions.Item label="Còn lại">{selectedRawBatch.quantity_remaining.toLocaleString('vi-VN')} kg</Descriptions.Item>
                 </Descriptions>
                 <Text strong style={{ display: 'block', marginBottom: 4 }}>Số lượng lấy (kg) *</Text>
                 <InputNumber
@@ -619,7 +619,7 @@ const ProductionCreatePage = () => {
             </Descriptions.Item>
             <Descriptions.Item label="Sản lượng mục tiêu">
               <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {targetQuantity?.toLocaleString()} kg
+                {targetQuantity?.toLocaleString('vi-VN')} kg
               </Text>
             </Descriptions.Item>
             <Descriptions.Item label="DRC mục tiêu">
@@ -647,7 +647,7 @@ const ProductionCreatePage = () => {
             </Col>
             <Col span={6}>
               <Card bodyStyle={{ padding: 12 }}>
-                <Statistic title="Tổng NL (kg)" value={totalInputWeight.toLocaleString()}
+                <Statistic title="Tổng NL (kg)" value={totalInputWeight.toLocaleString('vi-VN')}
                   valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
               </Card>
             </Col>

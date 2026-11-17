@@ -82,7 +82,7 @@ function SingleEntryForm() {
   const qc = useQueryClient()
   const [partnerId, setPartnerId] = useState<string | null>(null)
   const [rawRubberType, setRawRubberType] = useState<RawRubberType>('mu_tap')
-  const [intakeDate, setIntakeDate] = useState(new Date().toISOString().slice(0, 10))
+  const [intakeDate, setIntakeDate] = useState(new Date().toLocaleDateString('sv-SE'))
   const [netWeight, setNetWeight] = useState<number>(0)
   const [grossWeight, setGrossWeight] = useState<number | undefined>(undefined)
   const [drc, setDrc] = useState<number | undefined>(undefined)

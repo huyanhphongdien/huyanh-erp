@@ -105,7 +105,7 @@ export function AddInvoiceModal({
   // Form fields
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(
-    new Date().toISOString().split('T')[0]
+    new Date().toLocaleDateString('sv-SE')
   );
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -339,7 +339,7 @@ export function AddInvoiceModal({
     setSelectedSupplierId('');
     setOrderItems([]);
     setInvoiceNumber('');
-    setInvoiceDate(new Date().toISOString().split('T')[0]);
+    setInvoiceDate(new Date().toLocaleDateString('sv-SE'));
     setDueDate('');
     setNotes('');
     setImages([]);

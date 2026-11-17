@@ -20,6 +20,7 @@ import type { DayAssignment } from './ShiftCell';
 import { BatchScheduleModal } from './BatchScheduleModal';
 import { ShiftOverrideModal } from './ShiftOverrideModal';
 import { useAuthStore } from '../../stores/authStore';
+import { todayVN, toDateStrVN } from '../../utils/dateVN';
 import {
   CalendarDays, ChevronLeft, ChevronRight,
   Users, Layers, BarChart3, Building2,
@@ -60,7 +61,8 @@ function ensureArray<T>(val: any): T[] {
 // ============================================================
 
 function getToday(): string {
-  return new Date().toISOString().split('T')[0];
+  // todayVN: 'hôm nay' theo giờ máy — bản cũ toISOString trả ngày UTC (lùi 1 ngày trước 7h sáng VN)
+  return todayVN();
 }
 
 function getMonday(date: Date): Date {
@@ -78,7 +80,8 @@ function addDays(date: Date, days: number): Date {
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0];
+  // toDateStrVN: giữ đúng ngày local — toISOString đổi sang UTC làm lệch ngày từ 00:00–07:00
+  return toDateStrVN(d);
 }
 
 function formatDateVN(d: Date): string {

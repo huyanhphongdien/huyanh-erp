@@ -735,7 +735,7 @@ const PhasesTab: React.FC<{
 
   // ✅ MILESTONE PROGRESS: Update to specific status (dropdown)
   const handleUpdateMilestoneStatus = async (msId: string, newStatus: MilestoneStatus, phaseId: string | null) => {
-    const completedDate = newStatus === 'completed' ? new Date().toISOString().split('T')[0] : null
+    const completedDate = newStatus === 'completed' ? new Date().toLocaleDateString('sv-SE') : null
     try {
       const { error } = await supabase.from('project_milestones')
         .update({ status: newStatus, completed_date: completedDate, updated_at: new Date().toISOString() })
@@ -2501,12 +2501,12 @@ export const ProjectDetailPage: React.FC = () => {
 
         // Auto-set actual_start khi chuyển sang in_progress
         if (newStatus === 'in_progress' && !project.actual_start) {
-          updateData.actual_start = new Date().toISOString().split('T')[0]
+          updateData.actual_start = new Date().toLocaleDateString('sv-SE')
         }
 
         // Auto-set actual_end khi completed
         if (newStatus === 'completed') {
-          updateData.actual_end = new Date().toISOString().split('T')[0]
+          updateData.actual_end = new Date().toLocaleDateString('sv-SE')
         }
 
         const { error } = await supabase.from('projects')
@@ -2554,13 +2554,13 @@ export const ProjectDetailPage: React.FC = () => {
 
       if (status === 'completed') {
         updateData.progress_pct = 100
-        updateData.actual_end = new Date().toISOString().split('T')[0]
+        updateData.actual_end = new Date().toLocaleDateString('sv-SE')
       }
 
       if (status === 'in_progress') {
         const phase = phases.find(p => p.id === phaseId)
         if (phase && !(phase as any).actual_start) {
-          updateData.actual_start = new Date().toISOString().split('T')[0]
+          updateData.actual_start = new Date().toLocaleDateString('sv-SE')
         }
       }
 

@@ -608,7 +608,7 @@ export const projectTaskService = {
       }
     }
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
 
     const phaseIds = new Set<string>()
     const empIds = new Set<string>()

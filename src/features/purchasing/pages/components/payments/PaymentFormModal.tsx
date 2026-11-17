@@ -91,7 +91,7 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
 
   // Form state
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank_transfer'>('bank_transfer');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [amount, setAmount] = useState<string>('');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [bankName, setBankName] = useState('');
@@ -164,7 +164,7 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setPaymentMethod('bank_transfer');
-      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setPaymentDate(new Date().toLocaleDateString('sv-SE'));
       setAmount('');
       setReferenceNumber('');
       setBankName('');

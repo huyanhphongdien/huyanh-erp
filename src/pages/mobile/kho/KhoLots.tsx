@@ -101,7 +101,7 @@ export default function KhoLots() {
               <div style={{ textAlign: 'right' }}><div className="ops-lbl">Ướt · mã</div><div className="ops-mid">{fmtKg(tongUot)} kg</div><div className="ops-sm">{lots.filter((l) => l.dry_kg > 0.005).length} mã còn hàng · {rows.length} lô xe</div></div>
             </div>
           </div>
-          <Msg m={msg} />
+          <Msg m={msg} onRetry={() => { setMsg(null); load() }} />
           <input style={inp} placeholder="Tìm mã (TMHG-40), loại mủ, mã lô xe…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm" />
           <div style={{ display: 'flex', gap: 6 }}>
             {([['all', 'Còn hàng'], ['due', `Có xe đến hạn cân lại · ${nDue}`], ['done', 'Đã chạy xong / đóng']] as const).map(([k, t]) => (

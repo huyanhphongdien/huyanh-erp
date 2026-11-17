@@ -115,7 +115,7 @@ const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
   const [formData, setFormData] = useState<SupplierQuotationFormData>({
     supplier_id: supplierId,
     quotation_number: '',
-    quotation_date: new Date().toISOString().split('T')[0],
+    quotation_date: new Date().toLocaleDateString('sv-SE'),
     valid_until: '',
     title: '',
     description: '',

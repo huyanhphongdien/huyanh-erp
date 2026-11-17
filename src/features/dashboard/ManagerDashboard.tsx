@@ -322,6 +322,8 @@ export function ManagerDashboard() {
   const [salesKpi, setSalesKpi] = useState<{ revenue: number; orders: number; collected: number; uncollected: number } | null>(null)
   const [weeklyAttendance, setWeeklyAttendance] = useState<any[]>([])
   const [pendingTaskApprovals, setPendingTaskApprovals] = useState(0)
+  // ★ Audit 17/11/2026: tên các khối KHÔNG tải được — KPI liên quan hiện "—" + banner Thử lại (thay vì số 0 giả)
+  const [loiTai, setLoiTai] = useState<string[]>([])
 
   const [projectStats, setProjectStats] = useState<{
     total: number; active: number; completed: number;
@@ -332,6 +334,7 @@ export function ManagerDashboard() {
   const loadData = useCallback(async (showRefresh = false) => {
     if (showRefresh) setIsRefreshing(true)
     else setIsLoading(true)
+    const hong: string[] = [] // khối nào lỗi thì ghi tên vào đây (supabase-js không throw — phải tự kiểm error)
     try {
       const [
         statsResult, distributionResult, trendResult,
@@ -349,16 +352,22 @@ export function ManagerDashboard() {
         dashboardService.getExpiringContracts(30, 5),
       ])
       if (statsResult.data) setStats(statsResult.data)
+      if (statsResult.error) hong.push('KPI công việc')
+      if (distributionResult.error || trendResult.error || deptResult.error || topEmpResult.error ||
+        overdueResult.error || upcomingResult.error || activitiesResult.error || contractsResult.error)
+        hong.push('danh sách & biểu đồ công việc')
       // ★ Load new dashboard data
       try {
-        const today = new Date().toISOString().split('T')[0]
+        const today = new Date().toLocaleDateString('sv-SE')
         const now = new Date()
         const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
         const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
 
         // Chấm công hôm nay
-        const { count: totalActive } = await supabase.from('employees').select('*', { count: 'exact', head: true }).eq('status', 'active')
-        const { data: todayAtts } = await supabase.from('attendance').select('status, late_minutes').eq('date', today)
+        const { count: totalActive, error: eActive } = await supabase.from('employees').select('*', { count: 'exact', head: true }).eq('status', 'active')
+        if (eActive) throw eActive
+        const { data: todayAtts, error: eTodayAtts } = await supabase.from('attendance').select('status, late_minutes').eq('date', today)
+        if (eTodayAtts) throw eTodayAtts
         const present = (todayAtts || []).filter(a => a.status !== 'business_trip').length
         const late = (todayAtts || []).filter(a => a.status === 'late' || (a.late_minutes && a.late_minutes > 0)).length
         const bt = (todayAtts || []).filter(a => a.status === 'business_trip').length
@@ -379,11 +388,13 @@ export function ManagerDashboard() {
         } catch {}
 
         // Đơn chờ duyệt
-        const { data: leaves } = await supabase.from('leave_requests').select('id, employee_id, start_date, end_date, total_days, created_at, employee:employees!leave_requests_employee_id_fkey(full_name), leave_type:leave_types!leave_requests_leave_type_id_fkey(name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
+        const { data: leaves, error: eLeaves } = await supabase.from('leave_requests').select('id, employee_id, start_date, end_date, total_days, created_at, employee:employees!leave_requests_employee_id_fkey(full_name), leave_type:leave_types!leave_requests_leave_type_id_fkey(name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
+        if (eLeaves) throw eLeaves
         setPendingLeaves((leaves || []).map((l: any) => ({ ...l, employee: Array.isArray(l.employee) ? l.employee[0] : l.employee, leave_type: Array.isArray(l.leave_type) ? l.leave_type[0] : l.leave_type })))
 
         // ATT-A1 fix: schema thật là request_date + planned_minutes/actual_minutes (không phải overtime_date + hours)
-        const { data: ots } = await supabase.from('overtime_requests').select('id, employee_id, request_date, planned_minutes, actual_minutes, created_at, employee:employees(full_name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
+        const { data: ots, error: eOts } = await supabase.from('overtime_requests').select('id, employee_id, request_date, planned_minutes, actual_minutes, created_at, employee:employees(full_name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
+        if (eOts) throw eOts
         setPendingOvertimes((ots || []).map((o: any) => ({
           ...o,
           // Backward-compat: map sang field cũ để UI render không phải đổi
@@ -393,24 +404,28 @@ export function ManagerDashboard() {
         })))
 
         // ★ Task chờ phê duyệt (evaluation_status = pending_approval)
-        const { count: taskPendingCount } = await supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('evaluation_status', 'pending_approval')
+        const { count: taskPendingCount, error: eTaskPending } = await supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('evaluation_status', 'pending_approval')
+        if (eTaskPending) throw eTaskPending
         setPendingTaskApprovals(taskPendingCount || 0)
 
         // Công tác đang diễn ra
-        const btTypeId = await (async () => { const { data } = await supabase.from('leave_types').select('id').eq('code', 'BUSINESS_TRIP').maybeSingle(); return data?.id })()
+        const btTypeId = await (async () => { const { data, error: eBtType } = await supabase.from('leave_types').select('id').eq('code', 'BUSINESS_TRIP').maybeSingle(); if (eBtType) throw eBtType; return data?.id })()
         if (btTypeId) {
-          const { data: trips } = await supabase.from('leave_requests').select('id, start_date, end_date, trip_destination, trip_purpose, employee:employees!leave_requests_employee_id_fkey(full_name)').eq('leave_type_id', btTypeId).eq('status', 'approved').lte('start_date', today).gte('end_date', today).limit(10)
+          const { data: trips, error: eTrips } = await supabase.from('leave_requests').select('id, start_date, end_date, trip_destination, trip_purpose, employee:employees!leave_requests_employee_id_fkey(full_name)').eq('leave_type_id', btTypeId).eq('status', 'approved').lte('start_date', today).gte('end_date', today).limit(10)
+          if (eTrips) throw eTrips
           setActiveTrips((trips || []).map((t: any) => ({ ...t, employee: Array.isArray(t.employee) ? t.employee[0] : t.employee })))
         }
 
         // Tổng công tháng (top 10 thấp nhất)
-        const { data: monthAtts } = await supabase.from('attendance').select('employee_id, work_units').gte('date', monthStart).lte('date', monthEnd)
+        const { data: monthAtts, error: eMonthAtts } = await supabase.from('attendance').select('employee_id, work_units').gte('date', monthStart).lte('date', monthEnd)
+        if (eMonthAtts) throw eMonthAtts
         if (monthAtts) {
           const empMap: Record<string, number> = {}
           monthAtts.forEach((a: any) => { empMap[a.employee_id] = (empMap[a.employee_id] || 0) + (a.work_units || 1) })
           const empIds = Object.keys(empMap)
           if (empIds.length > 0) {
-            const { data: emps } = await supabase.from('employees').select('id, code, full_name').in('id', empIds).eq('status', 'active')
+            const { data: emps, error: eEmps } = await supabase.from('employees').select('id, code, full_name').in('id', empIds).eq('status', 'active')
+            if (eEmps) throw eEmps
             const list = (emps || []).map((e: any) => ({ ...e, totalCong: Math.round((empMap[e.id] || 0) * 10) / 10 })).sort((a: any, b: any) => a.totalCong - b.totalCong)
             setMonthlyWorkUnits(list.slice(0, 10))
           }
@@ -422,37 +437,42 @@ export function ManagerDashboard() {
           const d = new Date(); d.setDate(d.getDate() - i)
           const ds = d.toISOString().split('T')[0]
           const dayLabel = d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit' })
-          const { data: dayAtts } = await supabase.from('attendance').select('status, late_minutes').eq('date', ds)
+          const { data: dayAtts, error: eDayAtts } = await supabase.from('attendance').select('status, late_minutes').eq('date', ds)
+          if (eDayAtts) throw eDayAtts
           const p = (dayAtts || []).filter((a: any) => a.status !== 'business_trip').length
           const l = (dayAtts || []).filter((a: any) => a.status === 'late' || (a.late_minutes && a.late_minutes > 0)).length
           const b = (dayAtts || []).filter((a: any) => a.status === 'business_trip').length
           weekData.push({ date: dayLabel, 'Đi làm': p, 'Trễ': l, 'Công tác': b })
         }
         setWeeklyAttendance(weekData)
-      } catch (e) { console.error('New dashboard sections error:', e) }
+      } catch (e) { console.error('New dashboard sections error:', e); hong.push('chấm công & đơn chờ duyệt') }
 
       try {
-        const { count: totalProjects } = await supabase
+        const { count: totalProjects, error: eTotalProj } = await supabase
           .from('projects').select('*', { count: 'exact', head: true })
-        const { count: activeProjects } = await supabase
+        if (eTotalProj) throw eTotalProj
+        const { count: activeProjects, error: eActiveProj } = await supabase
           .from('projects').select('*', { count: 'exact', head: true })
           .in('status', ['in_progress', 'approved', 'planning'])
-        const { count: completedProjects } = await supabase
+        if (eActiveProj) throw eActiveProj
+        const { count: completedProjects, error: eCompletedProj } = await supabase
           .from('projects').select('*', { count: 'exact', head: true })
           .eq('status', 'completed')
-        const { data: recentProjs } = await supabase
+        if (eCompletedProj) throw eCompletedProj
+        const { data: recentProjs, error: eRecentProj } = await supabase
           .from('projects')
           .select('id, code, name, status, progress_pct')
           .neq('status', 'cancelled')
           .order('updated_at', { ascending: false })
           .limit(5)
+        if (eRecentProj) throw eRecentProj
         setProjectStats({
           total: totalProjects || 0,
           active: activeProjects || 0,
           completed: completedProjects || 0,
           recentProjects: recentProjs || [],
         })
-      } catch (e) { console.error('Project stats error:', e) }
+      } catch (e) { console.error('Project stats error:', e); hong.push('dự án') }
 
       // ★ Hiệu suất nhân viên tháng hiện tại
       try {
@@ -464,7 +484,7 @@ export function ManagerDashboard() {
         setPerfTopEmployees(ranking.map((r: any) => ({
           name: r.employee_name, dept: r.department_name, score: r.final_score, grade: r.grade, tasks: r.completed_tasks,
         })))
-      } catch (e) { console.error('Performance stats error:', e) }
+      } catch (e) { console.error('Performance stats error:', e); hong.push('hiệu suất nhân viên') }
 
       // ★ Sales KPI (executive/admin: role check via user metadata)
       try {
@@ -475,19 +495,20 @@ export function ManagerDashboard() {
           const monthEnd = now.getMonth() === 11
             ? `${now.getFullYear() + 1}-01-01`
             : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, '0')}-01`
-          const { data: orders } = await supabase
+          const { data: orders, error: eOrders } = await supabase
             .from('sales_orders')
             .select('total_value_usd, actual_payment_amount, deposit_amount, status')
             .gte('order_date', monthStart)
             .lt('order_date', monthEnd)
             .not('status', 'eq', 'cancelled')
+          if (eOrders) throw eOrders
           if (orders) {
             const revenue = orders.reduce((s, o) => s + (o.total_value_usd || 0), 0)
             const collected = orders.reduce((s, o) => s + (o.actual_payment_amount || 0) + (o.deposit_amount || 0), 0)
             setSalesKpi({ revenue: Math.round(revenue), orders: orders.length, collected: Math.round(collected), uncollected: Math.round(revenue - collected) })
           }
         }
-      } catch (e) { console.error('Sales KPI error:', e) }
+      } catch (e) { console.error('Sales KPI error:', e); hong.push('KPI bán hàng') }
 
       setStatusDistribution(distributionResult.data)
       setTaskTrend(trendResult.data)
@@ -499,7 +520,9 @@ export function ManagerDashboard() {
       setExpiringContracts(contractsResult.data)
     } catch (error) {
       console.error('Dashboard load error:', error)
+      hong.push('dữ liệu tổng quan')
     } finally {
+      setLoiTai(hong)
       setIsLoading(false)
       setIsRefreshing(false)
     }
@@ -544,6 +567,12 @@ export function ManagerDashboard() {
   // ── Computed values ──
   const attendanceRate = todayAttendance.total > 0 ? Math.round(todayAttendance.present / todayAttendance.total * 100) : 0
   const pendingTotal = pendingLeaves.length + pendingOvertimes.length + pendingTaskApprovals
+  // Khối lỗi → số liên quan hiện "—" (số 0 khi query lỗi là 0 giả, không đáng tin)
+  const tongHong = loiTai.includes('dữ liệu tổng quan')
+  const attHong = tongHong || loiTai.includes('chấm công & đơn chờ duyệt')
+  const statsHong = tongHong || loiTai.includes('KPI công việc')
+  const duAnHong = tongHong || loiTai.includes('dự án')
+  const perfHong = tongHong || loiTai.includes('hiệu suất nhân viên')
 
   return (
     <div className="min-h-screen" style={{ background: '#F8FAFB' }}>
@@ -579,25 +608,34 @@ export function ManagerDashboard() {
       {/* ══════════ MAIN CONTENT ══════════ */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-5">
 
+        {/* ═══ CẢNH BÁO KHỐI TẢI LỖI ═══ */}
+        {loiTai.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 rounded-2xl bg-red-50 border border-red-200">
+            <p className="text-xs font-medium text-red-700">Không tải được: {loiTai.join(', ')} — ô liên quan hiện "—"</p>
+            <button onClick={() => loadData(true)} disabled={isRefreshing}
+              className="text-xs font-bold text-red-700 underline whitespace-nowrap disabled:opacity-50">Thử lại</button>
+          </div>
+        )}
+
         {/* ═══ TẦNG 1: HERO KPI ═══ */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Đi làm hôm nay */}
           <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-4 text-white shadow-lg shadow-emerald-200">
             <div className="flex items-center justify-between mb-2">
               <UserCheck className="w-5 h-5 opacity-80" />
-              <span className="text-[11px] font-medium bg-white/20 px-2 py-0.5 rounded-full">{attendanceRate}%</span>
+              <span className="text-[11px] font-medium bg-white/20 px-2 py-0.5 rounded-full">{attHong ? '—' : `${attendanceRate}%`}</span>
             </div>
-            <div className="text-3xl font-bold">{todayAttendance.present}</div>
-            <div className="text-emerald-100 text-xs mt-0.5">Đi làm hôm nay / {todayAttendance.total}</div>
+            <div className="text-3xl font-bold">{attHong ? '—' : todayAttendance.present}</div>
+            <div className="text-emerald-100 text-xs mt-0.5">Đi làm hôm nay / {attHong ? '—' : todayAttendance.total}</div>
           </div>
 
           {/* CV hoàn thành */}
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg shadow-blue-200">
             <div className="flex items-center justify-between mb-2">
               <CheckCircle2 className="w-5 h-5 opacity-80" />
-              <span className="text-[11px] font-medium bg-white/20 px-2 py-0.5 rounded-full">{stats?.completionRate || 0}%</span>
+              <span className="text-[11px] font-medium bg-white/20 px-2 py-0.5 rounded-full">{statsHong ? '—' : `${stats?.completionRate || 0}%`}</span>
             </div>
-            <div className="text-3xl font-bold">{stats?.completedTasks || 0}</div>
+            <div className="text-3xl font-bold">{statsHong ? '—' : stats?.completedTasks || 0}</div>
             <div className="text-blue-100 text-xs mt-0.5">CV hoàn thành tháng này</div>
           </div>
 
@@ -608,7 +646,7 @@ export function ManagerDashboard() {
               <Bell className="w-5 h-5 opacity-80" />
               {pendingTotal > 0 && <span className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />}
             </div>
-            <div className="text-3xl font-bold">{pendingTotal}</div>
+            <div className="text-3xl font-bold">{attHong ? '—' : pendingTotal}</div>
             <div className={`text-xs mt-0.5 ${pendingTotal > 0 ? 'text-amber-100' : 'text-gray-400'}`}>Chờ duyệt</div>
           </div>
 
@@ -618,7 +656,7 @@ export function ManagerDashboard() {
             <div className="flex items-center justify-between mb-2">
               <AlertTriangle className="w-5 h-5 opacity-80" />
             </div>
-            <div className="text-3xl font-bold">{stats?.overdueTasks || 0}</div>
+            <div className="text-3xl font-bold">{statsHong ? '—' : stats?.overdueTasks || 0}</div>
             <div className={`text-xs mt-0.5 ${(stats?.overdueTasks || 0) > 0 ? 'text-red-100' : 'text-gray-400'}`}>Quá hạn</div>
           </div>
         </div>
@@ -668,8 +706,8 @@ export function ManagerDashboard() {
               {/* Progress bar lớn */}
               <div className="mb-4">
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
-                  <span>{todayAttendance.present} / {todayAttendance.total} nhân viên</span>
-                  <span className="font-bold text-emerald-600">{attendanceRate}%</span>
+                  <span>{attHong ? '— / —' : `${todayAttendance.present} / ${todayAttendance.total}`} nhân viên</span>
+                  <span className="font-bold text-emerald-600">{attHong ? '—' : `${attendanceRate}%`}</span>
                 </div>
                 <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all" style={{ width: `${attendanceRate}%` }} />
@@ -685,7 +723,7 @@ export function ManagerDashboard() {
                 ].map(s => (
                   <div key={s.label} className={`rounded-xl p-2.5 text-center ${s.color}`}>
                     <div className="flex justify-center mb-1">{s.icon}</div>
-                    <div className="text-lg font-bold">{s.val}</div>
+                    <div className="text-lg font-bold">{attHong ? '—' : s.val}</div>
                     <div className="text-[10px] font-medium opacity-70">{s.label}</div>
                   </div>
                 ))}
@@ -824,15 +862,15 @@ export function ManagerDashboard() {
               {/* Summary */}
               <div className="flex items-center gap-3 mb-3 text-center">
                 <div className="flex-1 p-2 bg-violet-50 rounded-lg">
-                  <div className="text-lg font-bold text-violet-700">{projectStats.active}</div>
+                  <div className="text-lg font-bold text-violet-700">{duAnHong ? '—' : projectStats.active}</div>
                   <div className="text-[10px] text-violet-500">Đang chạy</div>
                 </div>
                 <div className="flex-1 p-2 bg-emerald-50 rounded-lg">
-                  <div className="text-lg font-bold text-emerald-700">{projectStats.completed}</div>
+                  <div className="text-lg font-bold text-emerald-700">{duAnHong ? '—' : projectStats.completed}</div>
                   <div className="text-[10px] text-emerald-500">Hoàn thành</div>
                 </div>
                 <div className="flex-1 p-2 bg-gray-50 rounded-lg">
-                  <div className="text-lg font-bold text-gray-700">{projectStats.total}</div>
+                  <div className="text-lg font-bold text-gray-700">{duAnHong ? '—' : projectStats.total}</div>
                   <div className="text-[10px] text-gray-500">Tổng</div>
                 </div>
               </div>
@@ -921,15 +959,15 @@ export function ManagerDashboard() {
               {/* KPI Summary */}
               <div className="grid grid-cols-3 gap-2 mb-3">
                 <div className="text-center p-2 bg-blue-50 rounded-lg">
-                  <div className="text-lg font-bold text-blue-700">{perfKPIs.avg_score || '—'}</div>
+                  <div className="text-lg font-bold text-blue-700">{perfHong ? '—' : perfKPIs.avg_score || '—'}</div>
                   <div className="text-[10px] text-blue-500">Điểm TB</div>
                 </div>
                 <div className="text-center p-2 bg-emerald-50 rounded-lg">
-                  <div className="text-lg font-bold text-emerald-700">{perfKPIs.total_completed}</div>
+                  <div className="text-lg font-bold text-emerald-700">{perfHong ? '—' : perfKPIs.total_completed}</div>
                   <div className="text-[10px] text-emerald-500">Task xong</div>
                 </div>
                 <div className="text-center p-2 bg-amber-50 rounded-lg">
-                  <div className="text-lg font-bold text-amber-700">{perfKPIs.on_time_rate}%</div>
+                  <div className="text-lg font-bold text-amber-700">{perfHong ? '—' : `${perfKPIs.on_time_rate}%`}</div>
                   <div className="text-[10px] text-amber-500">Đúng hạn</div>
                 </div>
               </div>

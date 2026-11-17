@@ -211,7 +211,7 @@ export const riskService = {
         contingency_plan: input.contingency_plan || null,
         owner_id: input.owner_id || null,
         status: 'identified',
-        identified_date: new Date().toISOString().split('T')[0],
+        identified_date: new Date().toLocaleDateString('sv-SE'),
       })
       .select(RISK_SELECT)
       .single()
@@ -249,7 +249,7 @@ export const riskService = {
 
     const updates: Record<string, any> = { status, updated_at: new Date().toISOString() }
     if (status === 'resolved' || status === 'closed') {
-      updates.resolved_date = new Date().toISOString().split('T')[0]
+      updates.resolved_date = new Date().toLocaleDateString('sv-SE')
     }
 
     const { data, error } = await supabase

@@ -50,7 +50,7 @@ function POFormPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<POFormData>({
-    order_date: new Date().toISOString().split('T')[0],
+    order_date: new Date().toLocaleDateString('sv-SE'),
     project_name: '',
     project_code: '',
     expected_delivery_date: '',
@@ -63,6 +63,8 @@ function POFormPage() {
   })
 
   const [items, setItems] = useState<FormItem[]>([createEmptyItem()])
+  // _tempId các dòng dở (có tên nhưng thiếu SL/đơn giá/ĐVT) bị validateForm chặn — tô viền đỏ trong bảng
+  const [invalidItemKeys, setInvalidItemKeys] = useState<string[]>([])
   const [existingOrderId, setExistingOrderId] = useState<string | null>(null)
   const [orderCode, setOrderCode] = useState('')
 
@@ -175,18 +177,33 @@ function POFormPage() {
   // ===== VALIDATION =====
   const validateForm = (): string | null => {
     if (!formData.order_date) return 'Vui lòng chọn ngày đơn hàng'
+    // Dòng "dở dang" (có tên nhưng thiếu SL/đơn giá/ĐVT) sẽ bị filter bỏ lúc lưu → chặn lại, không vứt im lặng
+    const incomplete = items
+      .map((i, idx) => ({ key: i._tempId, row: idx + 1, bad: !!i.material_name && (!(i.quantity > 0) || !(i.unit_price > 0) || !i.unit) }))
+      .filter((r) => r.bad)
+    setInvalidItemKeys(incomplete.map((r) => r.key)) // tô viền đỏ các ô thiếu trong bảng
     const hasValid = items.some((i) => i.material_name && i.supplier_id && i.quantity > 0 && i.unit_price > 0 && i.unit)
     if (!hasValid) return 'Cần ít nhất 1 dòng vật tư hợp lệ (tên, NCC, SL, đơn giá, ĐVT)'
     const missing = items.filter((i) => i.material_name && !i.supplier_id)
     if (missing.length > 0) return 'Vui lòng chọn NCC cho tất cả vật tư'
-    // Dòng "dở dang" (có tên nhưng thiếu SL/đơn giá/ĐVT) sẽ bị filter bỏ lúc lưu → chặn lại, không vứt im lặng
-    const incompleteRows = items
-      .map((i, idx) => (i.material_name && (!(i.quantity > 0) || !(i.unit_price > 0) || !i.unit) ? idx + 1 : null))
-      .filter((r): r is number => r !== null)
-    if (incompleteRows.length > 0) {
-      return `${incompleteRows.length} dòng vật tư chưa đủ SL/đơn giá/ĐVT (dòng ${incompleteRows.join(', ')}) sẽ không được lưu. Vui lòng nhập đủ hoặc xóa dòng trước khi lưu.`
+    if (incomplete.length > 0) {
+      return `${incomplete.length} dòng vật tư chưa đủ SL/đơn giá/ĐVT (dòng ${incomplete.map((r) => r.row).join(', ')}) sẽ không được lưu. Vui lòng nhập đủ hoặc xóa dòng trước khi lưu.`
     }
     return null
+  }
+
+  // Người dùng sửa / xoá dòng dở đang tô đỏ → bỏ highlight dòng đó (lần Lưu sau sẽ validate lại)
+  const handleItemsChange = (next: FormItem[]) => {
+    if (invalidItemKeys.length > 0) {
+      const prevByKey = new Map(items.map((it) => [it._tempId, it]))
+      setInvalidItemKeys((keys) =>
+        keys.filter((key) => {
+          const nextItem = next.find((it) => it._tempId === key)
+          return !!nextItem && nextItem === prevByKey.get(key)
+        })
+      )
+    }
+    setItems(next)
   }
 
   // ===== SAVE =====
@@ -297,8 +314,9 @@ function POFormPage() {
         items={items}
         suppliers={suppliers}
         materials={materials}
-        onChange={setItems}
+        onChange={handleItemsChange}
         onMaterialCreated={(mat) => setMaterials((prev) => [mat, ...prev])}
+        invalidKeys={invalidItemKeys}
       />
 
       {/* Section 4: Summary */}

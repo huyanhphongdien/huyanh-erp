@@ -50,6 +50,7 @@ import {
 } from '../../services/wms/stockCheckService'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { useUnsavedWarning } from '../../hooks/useUnsavedWarning'
 
 const { Title, Text } = Typography
 const MONO_FONT = "'JetBrains Mono', monospace"
@@ -167,6 +168,12 @@ const StockCheckPage = () => {
       setSaving(true)
       const result = await stockCheckService.finalizeStockCheck(stockCheck, user.employee_id || user.id)
       message.success(`Kiểm kê hoàn tất! ${result.adjustments} dòng chênh lệch, ${result.transactions_created} phiếu điều chỉnh`)
+      // Tab Kiểm kê dùng forceRender nên component KHÔNG unmount khi rời tab —
+      // reset về bước chọn kho để không giữ đợt đã chốt + tắt cảnh báo rời trang
+      setStockCheck(null)
+      setStep('select_warehouse')
+      setSearchText('')
+      setShowOnlyDiscrepancy(false)
       navigate('/wms/vat-tu')
     } catch (err: any) {
       message.error(err.message || 'Lỗi hoàn tất kiểm kê')
@@ -179,6 +186,10 @@ const StockCheckPage = () => {
   const items = stockCheck?.items || []
   const summary = stockCheckService.summarizeDiscrepancy(items)
   const checkedCount = items.filter(i => i.actual_quantity !== undefined && i.actual_quantity !== null).length
+
+  // Số đã đếm chỉ nằm trong React state (DB chưa có bảng stock_check_items)
+  // → cảnh báo trình duyệt khi đóng tab / F5 lúc đã đếm mà chưa chốt
+  useUnsavedWarning(checkedCount > 0)
 
   // Filtered items
   const filteredItems = items.filter(item => {

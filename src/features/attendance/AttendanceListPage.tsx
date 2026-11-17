@@ -36,6 +36,7 @@ import { supabase } from '../../lib/supabase'
 import { attendanceService } from '../../services/attendanceService'
 import type { AttendanceRecord } from '../../services/attendanceService'
 import { CheckInOutWidget } from './CheckInOutWidget'
+import PageState from '../../components/common/PageState'
 
 // ============================================================
 // HELPERS
@@ -235,7 +236,7 @@ export default function AttendanceListPage() {
     scope === 'all' ? (departmentFilter !== 'all' ? departmentFilter : undefined) :
     undefined
 
-  const { data: attendanceData, isLoading } = useQuery({
+  const { data: attendanceData, isLoading, isError, error, refetch } = useQuery({
     queryKey: [
       'attendance', 'list',
       page, pageSize, scope, search,
@@ -598,6 +599,12 @@ export default function AttendanceListPage() {
                     </div>
                   </td>
                 </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={12} className="p-0">
+                    <PageState error={error} onRetry={() => refetch()} />
+                  </td>
+                </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
                   <td colSpan={12} className="text-center py-12 text-gray-400">
@@ -741,6 +748,8 @@ export default function AttendanceListPage() {
               <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2" />
               <span className="text-sm">Đang tải...</span>
             </div>
+          ) : isError ? (
+            <PageState error={error} onRetry={() => refetch()} />
           ) : filteredRecords.length === 0 ? (
             <div className="text-center py-12 text-gray-400 text-sm">
               Không có dữ liệu chấm công

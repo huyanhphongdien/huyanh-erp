@@ -137,7 +137,7 @@ export function BonusRulesPage() {
 }
 
 function RuleRow({ rule, onDelete }: { rule: BonusRule; onDelete: () => void }) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = new Date().toLocaleDateString('sv-SE')
   const expired = rule.effective_to && rule.effective_to < today
   return (
     <tr className={`border-t hover:bg-slate-50 ${expired ? 'opacity-50' : ''}`}>
@@ -174,7 +174,7 @@ function AddRuleForm({
   const [minTons, setMinTons] = useState<number>(0)
   const [maxTons, setMaxTons] = useState<string>('')
   const [bonusPerTon, setBonusPerTon] = useState<number>(0)
-  const [effectiveFrom, setEffectiveFrom] = useState<string>(new Date().toISOString().slice(0, 10))
+  const [effectiveFrom, setEffectiveFrom] = useState<string>(new Date().toLocaleDateString('sv-SE'))
   const [notes, setNotes] = useState<string>('')
 
   const createMutation = useMutation({

@@ -1050,7 +1050,7 @@ export const supplierInvoiceService = {
   // GET OVERDUE INVOICES - Hóa đơn quá hạn
   // ===================================================================
   async getOverdueInvoices(): Promise<SupplierInvoice[]> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('sv-SE');
 
     const { data, error } = await supabase
       .from('supplier_invoices')

@@ -74,7 +74,7 @@ export default function CompletionReportTab() {
   const [viewMode, setViewMode] = useState<ViewMode>('department')
   const [dateRange, setDateRange] = useState<DateRange>({
     start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end_date: new Date().toISOString().split('T')[0]
+    end_date: new Date().toLocaleDateString('sv-SE')
   })
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [exporting, setExporting] = useState(false)

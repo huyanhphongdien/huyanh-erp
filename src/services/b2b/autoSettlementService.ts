@@ -111,7 +111,7 @@ export const autoSettlementService = {
       const outputValue = pricePerKg > 0 ? Math.round(estimatedOutputKg * pricePerKg) : 0
       // Đại lý nhận = giá trị TP - phí gia công
       finalValue = outputValue > 0 ? outputValue - Math.round(processingFee) : Math.round(-processingFee)
-      settlementNotes = `Gia công: NVL ${(actualWeightKg/1000).toFixed(1)}T → TP ~${(estimatedOutputKg/1000).toFixed(1)}T (${expectedOutputRate}%). Phí GC: ${processingFee.toLocaleString()} VNĐ`
+      settlementNotes = `Gia công: NVL ${(actualWeightKg/1000).toFixed(1)}T → TP ~${(estimatedOutputKg/1000).toFixed(1)}T (${expectedOutputRate}%). Phí GC: ${processingFee.toLocaleString('vi-VN')} VNĐ`
     } else {
       // Mua đứt / Bán: Tính từ khối lượng NVL
       if (pricePerKg <= 0) {
@@ -263,7 +263,7 @@ export const autoSettlementService = {
       const items = confirmedStockIns.map(si => ({
         settlement_id: settlement.id,
         item_type: 'stock_in',
-        description: `Phiếu nhập kho ${si.code} — ${(si.total_weight || 0).toLocaleString()} kg`,
+        description: `Phiếu nhập kho ${si.code} — ${(si.total_weight || 0).toLocaleString('vi-VN')} kg`,
         quantity: si.total_quantity || null,
         unit_price: pricePerKg || null,
         amount: priceUnit === 'dry'

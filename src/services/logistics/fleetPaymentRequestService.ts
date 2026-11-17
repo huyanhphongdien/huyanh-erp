@@ -189,7 +189,7 @@ async function buildDraft(input: BuildDraftInput): Promise<FleetPaymentRequest> 
   const uid = await currentUid()
   const [y, m] = input.ym.split('-')
   const { data: req, error: reqErr } = await supabase.from('fleet_payment_requests').insert({
-    request_date: input.request_date || new Date().toISOString().slice(0, 10),
+    request_date: input.request_date || new Date().toLocaleDateString('sv-SE'),
     period_ym: input.ym,
     driver_id: input.driverId,
     payee_name: drv?.full_name || null,

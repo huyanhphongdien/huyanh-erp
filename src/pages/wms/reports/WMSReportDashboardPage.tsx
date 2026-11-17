@@ -14,7 +14,7 @@ import {
   ReloadOutlined, BarChartOutlined, ImportOutlined, ExportOutlined,
   ExperimentOutlined, PercentageOutlined, DatabaseOutlined,
   FileTextOutlined, TeamOutlined, LineChartOutlined,
-  AppstoreOutlined,
+  AppstoreOutlined, DownloadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import wmsReportService from '../../../services/wms/wmsReportService'
@@ -22,6 +22,8 @@ import type { DRCTrendReport } from '../../../services/wms/wms.types'
 import { RUBBER_GRADE_COLORS } from '../../../services/wms/wms.types'
 import type { RubberGrade } from '../../../services/wms/wms.types'
 import GradeBadge from '../../../components/wms/GradeBadge'
+import PageState from '../../../components/common/PageState'
+import { xuatExcelBaoCao } from './wmsReportExcel'
 
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
@@ -32,6 +34,7 @@ const WMSReportDashboardPage = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<unknown>(null)
   const [kpis, setKpis] = useState<KPIs | null>(null)
   const [drcTrend, setDrcTrend] = useState<DRCTrendReport[]>([])
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
@@ -42,6 +45,7 @@ const WMSReportDashboardPage = () => {
   const loadData = useCallback(async (refresh = false) => {
     try {
       if (refresh) setRefreshing(true); else setLoading(true)
+      setError(null)
       const from_date = dateRange[0].format('YYYY-MM-DD')
       const to_date = dateRange[1].format('YYYY-MM-DD')
       const [k, trend] = await Promise.all([
@@ -52,6 +56,7 @@ const WMSReportDashboardPage = () => {
       setDrcTrend(trend)
     } catch (err) {
       console.error('Load WMS report dashboard error:', err)
+      setError(err)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -66,7 +71,53 @@ const WMSReportDashboardPage = () => {
     : []
   const totalGradeWeight = gradeEntries.reduce((s, [, w]) => s + w, 0)
 
+  const handleExportExcel = () => {
+    if (!kpis) return
+    const khoang = `${dateRange[0].format('DD/MM/YYYY')} – ${dateRange[1].format('DD/MM/YYYY')}`
+    xuatExcelBaoCao('bao-cao-wms', [
+      {
+        name: 'Tổng quan',
+        title: `Báo cáo WMS ${khoang}`,
+        columns: [{ title: 'Chỉ số', align: 'left' }, { title: 'Giá trị' }],
+        rows: [
+          ['Nhập kho (kg)', kpis.total_stock_in_kg || 0],
+          ['Xuất kho (kg)', kpis.total_stock_out_kg || 0],
+          ['Sản xuất (kg)', kpis.total_production_kg || 0],
+          ['Yield TB (%)', kpis.avg_yield_percent || 0],
+          ['DRC TB (%)', kpis.avg_drc || 0],
+          ['Lô hoạt động', kpis.total_batches_active || 0],
+        ],
+      },
+      {
+        name: 'Phân bố Grade',
+        title: `Phân bố Grade tồn kho ${khoang}`,
+        columns: [
+          { title: 'Grade', align: 'left' },
+          { title: 'KL (kg)', summary: 'sum' },
+          { title: 'Tỷ trọng (%)' },
+        ],
+        rows: gradeEntries.map(([grade, weight]) => [
+          grade, weight, totalGradeWeight > 0 ? Math.round((weight / totalGradeWeight) * 1000) / 10 : 0,
+        ]),
+      },
+      {
+        name: 'DRC theo ngày',
+        title: `DRC trung bình theo ngày ${khoang}`,
+        columns: [{ title: 'Ngày' }, { title: 'DRC TB (%)' }],
+        rows: drcTrend.map(t => [dayjs(t.date).format('DD/MM/YYYY'), t.avg_drc]),
+      },
+    ])
+  }
+
   if (loading) return <div style={{ padding: 24, textAlign: 'center', paddingTop: 100 }}><Spin size="large" /></div>
+
+  if (error) {
+    return (
+      <div style={{ padding: 24 }}>
+        <PageState error={error} onRetry={() => loadData()} />
+      </div>
+    )
+  }
 
   return (
     <div style={{ padding: 24 }}>
@@ -87,6 +138,7 @@ const WMSReportDashboardPage = () => {
               format="DD/MM/YYYY"
               size="small"
             />
+            <Button icon={<DownloadOutlined />} onClick={handleExportExcel} disabled={!kpis}>Xuất Excel</Button>
             <Button icon={<ReloadOutlined spin={refreshing} />} onClick={() => loadData(true)}>Làm mới</Button>
           </Space>
         </Col>

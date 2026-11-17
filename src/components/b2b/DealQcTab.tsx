@@ -233,7 +233,7 @@ const DealQcTab = ({ dealId, deal: initialDeal }: DealQcTabProps) => {
                 title: 'SL còn (kg)',
                 dataIndex: 'quantity_remaining',
                 align: 'right' as const,
-                render: (v: number) => v ? v.toLocaleString() : '-',
+                render: (v: number) => v ? v.toLocaleString('vi-VN') : '-',
               },
               {
                 title: 'Ngày nhận',

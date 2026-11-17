@@ -204,7 +204,7 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
       children: (
         <div>
           <Text strong={ticket.gross_weight != null} type={ticket.gross_weight == null ? 'secondary' : undefined}>
-            Cân Gross{ticket.gross_weight != null ? ` — ${ticket.gross_weight.toLocaleString()} kg` : ''}
+            Cân Gross{ticket.gross_weight != null ? ` — ${ticket.gross_weight.toLocaleString('vi-VN')} kg` : ''}
           </Text>
           {ticket.gross_weighed_at && (
             <>
@@ -222,7 +222,7 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
       children: (
         <div>
           <Text strong={ticket.tare_weight != null} type={ticket.tare_weight == null ? 'secondary' : undefined}>
-            Cân Tare{ticket.tare_weight != null ? ` — ${ticket.tare_weight.toLocaleString()} kg` : ''}
+            Cân Tare{ticket.tare_weight != null ? ` — ${ticket.tare_weight.toLocaleString('vi-VN')} kg` : ''}
           </Text>
           {ticket.tare_weighed_at && (
             <>
@@ -246,7 +246,7 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
           >
             {ticket.status === 'cancelled'
               ? 'Đã hủy'
-              : `Hoàn tất${ticket.net_weight != null ? ` — NET ${ticket.net_weight.toLocaleString()} kg` : ''}`}
+              : `Hoàn tất${ticket.net_weight != null ? ` — NET ${ticket.net_weight.toLocaleString('vi-VN')} kg` : ''}`}
           </Text>
           {ticket.completed_at && (
             <>
@@ -290,14 +290,14 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
               <Col span={8} style={{ textAlign: 'center', padding: 16 }}>
                 <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Gross</Text>
                 <div style={{ ...MONO_FONT, fontSize: 22, fontWeight: 700, color: '#141414' }}>
-                  {ticket.gross_weight != null ? ticket.gross_weight.toLocaleString() : '---'}
+                  {ticket.gross_weight != null ? ticket.gross_weight.toLocaleString('vi-VN') : '---'}
                 </div>
                 <Text type="secondary" style={{ fontSize: 12 }}>kg</Text>
               </Col>
               <Col span={8} style={{ textAlign: 'center', padding: 16, borderLeft: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0' }}>
                 <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Tare</Text>
                 <div style={{ ...MONO_FONT, fontSize: 22, fontWeight: 700, color: '#141414' }}>
-                  {ticket.tare_weight != null ? ticket.tare_weight.toLocaleString() : '---'}
+                  {ticket.tare_weight != null ? ticket.tare_weight.toLocaleString('vi-VN') : '---'}
                 </div>
                 <Text type="secondary" style={{ fontSize: 12 }}>kg</Text>
               </Col>
@@ -313,7 +313,7 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
                   ...MONO_FONT, fontSize: 22, fontWeight: 700,
                   color: ticket.net_weight != null ? '#15803D' : '#141414',
                 }}>
-                  {ticket.net_weight != null ? ticket.net_weight.toLocaleString() : '---'}
+                  {ticket.net_weight != null ? ticket.net_weight.toLocaleString('vi-VN') : '---'}
                 </div>
                 <Text type="secondary" style={{ fontSize: 12 }}>kg</Text>
               </Col>
@@ -328,7 +328,7 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
                   Quy kho (DRC {(ticket as any).drc}%)
                 </Text>
                 <div style={{ ...MONO_FONT, fontSize: 20, fontWeight: 700, color: '#B45309' }}>
-                  {((ticket.net_weight * (ticket as any).drc) / 100).toLocaleString()} kg
+                  {((ticket.net_weight * (ticket as any).drc) / 100).toLocaleString('vi-VN')} kg
                 </div>
               </div>
             </Card>

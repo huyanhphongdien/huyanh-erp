@@ -46,7 +46,7 @@ const formatDate = (dateStr: string | null): string => {
 
 const formatWeight = (kg: number): string => {
   if (kg >= 1000) return `${(kg / 1000).toFixed(1)} T`
-  return `${kg.toLocaleString()} kg`
+  return `${kg.toLocaleString('vi-VN')} kg`
 }
 
 const fmtMoney = (v: number | null): string => (v ? v.toLocaleString('vi-VN') : '0')
@@ -276,21 +276,21 @@ const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
                 { title: 'Ngày', dataIndex: 'completed_at', width: 95, render: (d: string | null, r: any) => formatDate(d || r.created_at) },
                 { title: 'Mã cân', dataIndex: 'code', width: 130 },
                 { title: 'Xe', dataIndex: 'vehicle_plate', width: 90 },
-                { title: 'Net (kg)', dataIndex: 'net_weight', align: 'right' as const, render: (v: number | null) => v ? v.toLocaleString() : '-' },
+                { title: 'Net (kg)', dataIndex: 'net_weight', align: 'right' as const, render: (v: number | null) => v ? v.toLocaleString('vi-VN') : '-' },
                 { title: 'DRC', dataIndex: 'drc', align: 'center' as const, width: 60, render: (v: number | null) => v != null ? `${v}%` : '-' },
-                { title: 'KL khô (kg)', dataIndex: 'dry_weight', align: 'right' as const, render: (v: number | null) => v != null ? v.toLocaleString() : '-' },
-                { title: 'Thành tiền', dataIndex: 'amount', align: 'right' as const, render: (v: number | null) => v != null ? v.toLocaleString() : '-' },
-                { title: 'Cộng dồn (kg)', dataIndex: '_cum', align: 'right' as const, render: (v: number) => <Text type="secondary">{v.toLocaleString()}</Text> },
+                { title: 'KL khô (kg)', dataIndex: 'dry_weight', align: 'right' as const, render: (v: number | null) => v != null ? v.toLocaleString('vi-VN') : '-' },
+                { title: 'Thành tiền', dataIndex: 'amount', align: 'right' as const, render: (v: number | null) => v != null ? v.toLocaleString('vi-VN') : '-' },
+                { title: 'Cộng dồn (kg)', dataIndex: '_cum', align: 'right' as const, render: (v: number) => <Text type="secondary">{v.toLocaleString('vi-VN')}</Text> },
                 { title: 'TT', dataIndex: 'status', width: 100, render: (s: string) => (<Tag color={STATUS_COLORS[s] || 'default'}>{STATUS_LABELS[s] || s}</Tag>) },
               ]}
               summary={() => (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={{ background: '#FFFBEB' }}>
                     <Table.Summary.Cell index={0} colSpan={4}><Text strong>TỔNG CỘNG</Text></Table.Summary.Cell>
-                    <Table.Summary.Cell index={4} align="right"><Text strong>{totalNet.toLocaleString()}</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={4} align="right"><Text strong>{totalNet.toLocaleString('vi-VN')}</Text></Table.Summary.Cell>
                     <Table.Summary.Cell index={5} />
-                    <Table.Summary.Cell index={6} align="right"><Text strong>{totalDry.toLocaleString()}</Text></Table.Summary.Cell>
-                    <Table.Summary.Cell index={7} align="right"><Text strong style={{ color: '#92400E' }}>{totalValue.toLocaleString()}</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={6} align="right"><Text strong>{totalDry.toLocaleString('vi-VN')}</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={7} align="right"><Text strong style={{ color: '#92400E' }}>{totalValue.toLocaleString('vi-VN')}</Text></Table.Summary.Cell>
                     <Table.Summary.Cell index={8} />
                     <Table.Summary.Cell index={9} />
                   </Table.Summary.Row>

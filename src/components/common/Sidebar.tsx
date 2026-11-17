@@ -9,10 +9,12 @@
 // - Company name: Công ty TNHH MTV Cao su Huy Anh Phong Điền
 // LOGIC: 100% unchanged - same permissions, badges, collapsible, mobile
 // ============================================================
-// CẬP NHẬT: 
+// CẬP NHẬT:
 // - Thêm group MUA HÀNG với requirePurchaseAccess
 // - ★ Thêm group B2B THU MUA với requireB2BPurchaser (chỉ cho khuyennt@, duyhh@)
 // - ★ Thêm badge số tin chưa đọc cho B2B Chat
+// - ★ 17/11/2026 (audit UI): thêm group NHÂN SỰ — 12 route HR trước đó mồ côi
+//   (menu cũ chỉ nằm trong navigation.ts ĐÃ CHẾT, không được import ở đâu)
 // ============================================================
 
 import { useState, useEffect, useMemo } from 'react';
@@ -114,6 +116,7 @@ interface MenuItem {
   executiveOnly?: boolean;
   bgdOnly?: boolean;
   adminOnly?: boolean;        // CHỈ Admin (vd Nhật ký kiểm toán tài chính) — ẩn kể cả khi mở group cho BGĐ/Kế toán
+  hrOnly?: boolean;           // NHÂN SỰ: Admin / BGĐ / Hành chính - Tổng hợp (HCNS) — xem isHR
   requirePurchaseAccess?: boolean;
   requireB2BPurchaser?: boolean;
   approvalLevel?: boolean;
@@ -207,6 +210,30 @@ const getMenuGroups = (
         managerOnly: true,
         badge: pendingOT > 0 ? pendingOT : undefined,
       },
+    ],
+  },
+  // ============================================================
+  // ★ NHÂN SỰ — hồ sơ NV / phòng ban / hợp đồng LĐ / đánh giá
+  //   (audit 17/11/2026: 12 route HR mồ côi — trước đó HCNS phải gõ URL tay).
+  //   Gate theo PHÒNG như pattern VẬN TẢI: Admin / BGĐ / HCNS (hrOnly từng mục);
+  //   riêng 'Phiếu lương' hiện cho MỌI nhân viên (permissions.config.ts cũ: 'Hiện cho tất cả').
+  //   Bậc lương / Kỳ lương cố ý CHƯA vào menu — đợi module tính lương mới (chưa code).
+  // ============================================================
+  {
+    title: 'NHÂN SỰ',
+    icon: <Users size={18} />,
+    collapsible: true,
+    items: [
+      { path: '/employees', label: 'Nhân viên', icon: <IdCard size={18} />, hrOnly: true },
+      { path: '/departments', label: 'Phòng ban', icon: <Building2 size={18} />, hrOnly: true },
+      { path: '/positions', label: 'Chức vụ', icon: <Briefcase size={18} />, hrOnly: true },
+      { path: '/contracts', label: 'Hợp đồng LĐ', icon: <FileText size={18} />, hrOnly: true },
+      { path: '/contract-types', label: 'Loại hợp đồng', icon: <ScrollText size={18} />, hrOnly: true },
+      { path: '/leave-types', label: 'Loại nghỉ phép', icon: <Palmtree size={18} />, hrOnly: true },
+      { path: '/performance-criteria', label: 'Tiêu chí đánh giá', icon: <Target size={18} />, hrOnly: true },
+      { path: '/performance-reviews', label: 'Đánh giá hiệu suất', icon: <ClipboardCheck size={18} />, hrOnly: true },
+      // Hiện cho TẤT CẢ (nhân viên xem phiếu lương của mình; EmployeeDashboard cũng có quick-link)
+      { path: '/payslips', label: 'Phiếu lương', icon: <Receipt size={18} /> },
     ],
   },
   {
@@ -530,6 +557,7 @@ export function Sidebar() {
     'KHO NGUYÊN LIỆU': false,
     'VẬN TẢI': false,
     // Mặc định ĐÓNG: module ít dùng hàng ngày
+    'NHÂN SỰ': true,
     'QUẢN LÝ SẢN XUẤT': true,
     'QUẢN LÝ CÔNG VIỆC': true,
     'QUẢN LÝ DỰ ÁN': true,
@@ -579,6 +607,11 @@ export function Sidebar() {
   const isTransport = isAdmin || userLevel <= 3 || TRANSPORT_DEPTS.includes(deptCode)
     // fallback theo tên (cho phiên đăng nhập cũ chưa có department_code)
     || deptNameT.includes('hành chính') || deptNameT.includes('qc') || deptNameT.includes('logistics');
+  // NHÂN SỰ: Admin / BGĐ (level<=3 hoặc phòng BGĐ) / Hành chính - Tổng hợp (HCNS) — theo MÃ phòng
+  const HR_DEPTS = ['HAP-BGD', 'HAP-HCTH'];
+  const isHR = isAdmin || userLevel <= 3 || HR_DEPTS.includes(deptCode)
+    // fallback theo tên (cho phiên đăng nhập cũ chưa có department_code)
+    || deptNameT.includes('hành chính') || deptNameT.includes('nhân sự');
   const isBGD = isAdmin || userLevel <= 3;
   const isManagerLevel = isAdmin || userLevel <= 5;  // BGD + TP + PP — dùng cho Quản lý Dự án
   const canApproveOT = userLevel >= 4 && userLevel <= 5;
@@ -759,6 +792,7 @@ export function Sidebar() {
     if (item.managerOnly && !isManager) return false;
     if (item.executiveOnly && !isExecutive) return false;
     if (item.bgdOnly && !isBGD) return false;
+    if (item.hrOnly && !isHR) return false;
     if (item.requirePurchaseAccess && !hasPurchaseAccess) return false;
     if (item.requireB2BPurchaser && !isB2BPurchaser) return false;
     if (item.approvalLevel && !canApproveOT && !isExecutive) return false;

@@ -131,13 +131,13 @@ const DealProductionTab = ({ dealId }: DealProductionTabProps) => {
       title: 'SL mục tiêu',
       dataIndex: 'target_quantity',
       align: 'right' as const,
-      render: (v: number) => `${v.toLocaleString()} kg`,
+      render: (v: number) => `${v.toLocaleString('vi-VN')} kg`,
     },
     {
       title: 'SL thực tế',
       dataIndex: 'actual_quantity',
       align: 'right' as const,
-      render: (v: number | null) => v != null ? `${v.toLocaleString()} kg` : '-',
+      render: (v: number | null) => v != null ? `${v.toLocaleString('vi-VN')} kg` : '-',
     },
     {
       title: 'Công đoạn',

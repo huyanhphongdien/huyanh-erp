@@ -270,7 +270,7 @@ const InventoryDashboard = () => {
       sorter: (a: StockSummaryItem, b: StockSummaryItem) => a.total_quantity - b.total_quantity,
       render: (v: number) => (
         <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
-          {v.toLocaleString()}
+          {v.toLocaleString('vi-VN')}
         </Text>
       ),
     },

@@ -42,6 +42,7 @@ import type {
 import { usePurchaseAccess } from '../../../hooks/usePurchaseAccess';
 import { useAuthStore } from '../../../stores/authStore';
 import GrantAccessModal from './components/access/GrantAccessModal';
+import { useDebounce } from '../../../hooks/useDebounce';
 
 // ============================================================================
 // HELPERS
@@ -79,6 +80,7 @@ const AccessManagementPage: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400); // gõ xong 400ms mới bắn query
   const [showInactive, setShowInactive] = useState(false);
   const [showGrantModal, setShowGrantModal] = useState(false);
 
@@ -93,7 +95,7 @@ const AccessManagementPage: React.FC = () => {
 
       const data = await purchaseAccessService.getAccessList({
         activeOnly: !showInactive,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
       });
       setAccessList(data);
     } catch (err: any) {
@@ -102,7 +104,7 @@ const AccessManagementPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [showInactive, search]);
+  }, [showInactive, debouncedSearch]);
 
   const fetchStats = useCallback(async () => {
     try {

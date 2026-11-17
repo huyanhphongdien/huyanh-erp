@@ -249,7 +249,7 @@ const AddDetailModal: React.FC<{
           <InputNumber value={weightCalc} disabled style={{ width: '100%' }} size="large" />
           {dryWeight > 0 && (
             <Text type="secondary" style={{ fontSize: 11 }}>
-              Dry weight: {dryWeight.toLocaleString()} kg
+              Dry weight: {dryWeight.toLocaleString('vi-VN')} kg
               {autoGrade && <> · <GradeBadge grade={autoGrade} size="small" /></>}
             </Text>
           )}
@@ -448,7 +448,7 @@ const StockInCreatePage = () => {
         }, 500)
       }
 
-      message.success(`Đã tìm thấy phiếu cân: ${ticket.code} - KL ròng: ${ticket.net_weight ? `${ticket.net_weight.toLocaleString()} kg` : 'N/A'}`)
+      message.success(`Đã tìm thấy phiếu cân: ${ticket.code} - KL ròng: ${ticket.net_weight ? `${ticket.net_weight.toLocaleString('vi-VN')} kg` : 'N/A'}`)
     } catch (err: any) {
       message.error(`Lỗi tra cứu phiếu cân: ${err.message}`)
     } finally {
@@ -624,7 +624,7 @@ const StockInCreatePage = () => {
                     <Space direction="vertical" size={2}>
                       {scannedTicket.supplier_name && <Text>Đại lý: {scannedTicket.supplier_name}</Text>}
                       {scannedTicket.vehicle_plate && <Text>Biển số xe: {scannedTicket.vehicle_plate}</Text>}
-                      {scannedTicket.net_weight && <Text>Khối lượng ròng: {scannedTicket.net_weight.toLocaleString()} kg</Text>}
+                      {scannedTicket.net_weight && <Text>Khối lượng ròng: {scannedTicket.net_weight.toLocaleString('vi-VN')} kg</Text>}
                       {scannedTicket.rubber_type && <Text>Loại mủ: {RUBBER_TYPE_LABELS[scannedTicket.rubber_type as RubberType] || scannedTicket.rubber_type}</Text>}
                       {scannedTicket.deal && <Text>Deal: {scannedTicket.deal.deal_number}</Text>}
                     </Space>
@@ -800,7 +800,7 @@ const StockInCreatePage = () => {
                           SL: {item.quantity} {item.material?.unit || 'kg'}
                         </Text>
                         <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                          KL: {item.weight.toLocaleString()} kg
+                          KL: {item.weight.toLocaleString('vi-VN')} kg
                         </Text>
                         {item.drc_value && (
                           <Text style={{ fontFamily: "'JetBrains Mono', monospace", color: '#1B4D3E' }}>
@@ -809,7 +809,7 @@ const StockInCreatePage = () => {
                         )}
                         {item.dry_weight ? (
                           <Text style={{ fontFamily: "'JetBrains Mono', monospace", color: '#2D8B6E' }}>
-                            Dry: {item.dry_weight.toLocaleString()} kg
+                            Dry: {item.dry_weight.toLocaleString('vi-VN')} kg
                           </Text>
                         ) : null}
                         {item.location && (
@@ -919,9 +919,9 @@ const StockInCreatePage = () => {
                 </Space>
                 <div style={{ marginLeft: 24 }}>
                   <Text type="secondary" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
-                    {item.quantity} {item.material?.unit} · {item.weight.toLocaleString()} kg
+                    {item.quantity} {item.material?.unit} · {item.weight.toLocaleString('vi-VN')} kg
                     {item.drc_value ? ` · DRC ${item.drc_value}%` : ''}
-                    {item.dry_weight ? ` · Dry ${item.dry_weight.toLocaleString()} kg` : ''}
+                    {item.dry_weight ? ` · Dry ${item.dry_weight.toLocaleString('vi-VN')} kg` : ''}
                     {item.location ? ` · ${item.location.code}` : ''}
                   </Text>
                 </div>

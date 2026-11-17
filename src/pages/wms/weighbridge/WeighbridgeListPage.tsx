@@ -37,8 +37,9 @@ import {
 } from '@ant-design/icons'
 import weighbridgeService from '../../../services/wms/weighbridgeService'
 import { dealWmsService } from '../../../services/b2b/dealWmsService'
-import facilityService from '../../../services/wms/facilityService'
-import type { Facility } from '../../../services/wms/facilityService'
+import FacilityPicker from '../../../components/wms/FacilityPicker'
+import { useFacilityFilter } from '../../../stores/facilityFilterStore'
+import { useDebounce } from '../../../hooks/useDebounce'
 import type { ActiveDealForStockIn } from '../../../services/b2b/dealWmsService'
 import type { WeighbridgeTicket, TicketType, WeighbridgeStatus, PaginatedResponse } from '../../../services/wms/wms.types'
 import { ticketTypeLabel } from '../../../services/wms/wms.types'
@@ -104,6 +105,8 @@ export default function WeighbridgeListPage() {
 
   // Filters
   const [search, setSearch] = useState('')
+  // Query chỉ bắn sau khi NGỪNG gõ 400ms — trước đây mỗi phím gõ 1 lượt getAll (audit 17/11/2026)
+  const searchDebounced = useDebounce(search, 400)
   const [statusFilter, setStatusFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [fromDate, setFromDate] = useState('')
@@ -115,9 +118,9 @@ export default function WeighbridgeListPage() {
   const [activeDeals, setActiveDeals] = useState<ActiveDealForStockIn[]>([])
   const [dealStockInIds, setDealStockInIds] = useState<string[] | null>(null)
 
-  // F2 multi-facility filter
-  const [facilityFilter, setFacilityFilter] = useState<string>('')
-  const [facilities, setFacilities] = useState<Facility[]>([])
+  // F2 multi-facility filter — đọc/ghi store dùng chung (nhớ lựa chọn qua màn, localStorage)
+  const { currentFacilityId, setCurrentFacilityId } = useFacilityFilter()
+  const facilityFilter = currentFacilityId ?? ''
 
   // Stats
   const [stats, setStats] = useState<{
@@ -138,11 +141,6 @@ export default function WeighbridgeListPage() {
   // Phase 4: Load active deals for filter dropdown
   useEffect(() => {
     dealWmsService.getActiveDealsForStockIn().then(setActiveDeals).catch(() => {})
-  }, [])
-
-  // F2: Load facilities cho filter dropdown
-  useEffect(() => {
-    facilityService.getAllActive().then(setFacilities).catch(() => {})
   }, [])
 
   // Phase 4: When deal filter changes, resolve stock_in_ids
@@ -169,7 +167,7 @@ export default function WeighbridgeListPage() {
       const result = await weighbridgeService.getAll({
         page,
         pageSize,
-        search: search || undefined,
+        search: searchDebounced || undefined,
         status: statusFilter || undefined,
         type: typeFilter || undefined,
         from_date: fromDate || undefined,
@@ -184,7 +182,7 @@ export default function WeighbridgeListPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, statusFilter, typeFilter, fromDate, toDate, facilityFilter])
+  }, [page, searchDebounced, statusFilter, typeFilter, fromDate, toDate, facilityFilter])
 
   const loadStats = useCallback(async () => {
     try {
@@ -206,8 +204,10 @@ export default function WeighbridgeListPage() {
   }, [loadStats])
 
   function handleSearch() {
+    // Effect [loadData] tự chạy khi page / searchDebounced đổi; chỉ gọi tay khi chắc
+    // chắn không có gì sắp đổi (Enter để tìm lại y nguyên) — hết gọi đôi mỗi lần Enter.
     setPage(1)
-    loadData()
+    if (page === 1 && search === searchDebounced) loadData()
   }
 
   function clearFilters() {
@@ -215,7 +215,7 @@ export default function WeighbridgeListPage() {
     setStatusFilter('')
     setTypeFilter('')
     setDealFilter('')
-    setFacilityFilter('')
+    setCurrentFacilityId(undefined)
     setFromDate('')
     setToDate('')
     setPage(1)
@@ -291,7 +291,7 @@ export default function WeighbridgeListPage() {
       width: 110,
       align: 'right',
       render: (w: number | null) => w != null
-        ? <Text style={MONO_FONT}>{w.toLocaleString()}</Text>
+        ? <Text style={MONO_FONT}>{w.toLocaleString('vi-VN')}</Text>
         : <Text type="secondary">—</Text>,
     },
     {
@@ -301,7 +301,7 @@ export default function WeighbridgeListPage() {
       width: 110,
       align: 'right',
       render: (w: number | null) => w != null
-        ? <Text style={MONO_FONT}>{w.toLocaleString()}</Text>
+        ? <Text style={MONO_FONT}>{w.toLocaleString('vi-VN')}</Text>
         : <Text type="secondary">—</Text>,
     },
     {
@@ -311,7 +311,7 @@ export default function WeighbridgeListPage() {
       width: 120,
       align: 'right',
       render: (w: number | null) => w != null
-        ? <Text strong style={{ ...MONO_FONT, color: '#15803D' }}>{w.toLocaleString()}</Text>
+        ? <Text strong style={{ ...MONO_FONT, color: '#15803D' }}>{w.toLocaleString('vi-VN')}</Text>
         : <Text type="secondary">—</Text>,
     },
     {
@@ -430,7 +430,7 @@ export default function WeighbridgeListPage() {
                         hoverable
                         onClick={() => {
                           if (fs.facility_id) {
-                            setFacilityFilter(isActive ? '' : fs.facility_id)
+                            setCurrentFacilityId(isActive ? undefined : fs.facility_id)
                             setPage(1)
                           }
                         }}
@@ -480,7 +480,7 @@ export default function WeighbridgeListPage() {
               <div style={{ display: 'flex', gap: 8 }}>
                 <Input.Search
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => { setSearch(e.target.value); setPage(1) }}
                   onSearch={handleSearch}
                   placeholder="Tìm mã phiếu, biển số, tài xế..."
                   allowClear
@@ -504,14 +504,11 @@ export default function WeighbridgeListPage() {
                   <Row gutter={[12, 12]}>
                     <Col xs={12} sm={6}>
                       <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Nhà máy</Text>
-                      <Select
-                        value={facilityFilter}
-                        onChange={(v) => { setFacilityFilter(v); setPage(1) }}
+                      <FacilityPicker
+                        value={currentFacilityId}
+                        onChange={(id) => { setCurrentFacilityId(id); setPage(1) }}
+                        allowAll
                         style={{ width: '100%' }}
-                        options={[
-                          { value: '', label: 'Tất cả nhà máy' },
-                          ...facilities.map(f => ({ value: f.id, label: `${f.code} — ${f.name}` })),
-                        ]}
                       />
                     </Col>
                     <Col xs={12} sm={6}>

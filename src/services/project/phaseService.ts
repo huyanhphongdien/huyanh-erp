@@ -260,10 +260,10 @@ export const phaseService = {
 
     // Auto-set actual dates
     if (newStatus === 'in_progress' && !current.actual_start) {
-      updateData.actual_start = new Date().toISOString().split('T')[0]
+      updateData.actual_start = new Date().toLocaleDateString('sv-SE')
     }
     if (newStatus === 'completed') {
-      updateData.actual_end = new Date().toISOString().split('T')[0]
+      updateData.actual_end = new Date().toLocaleDateString('sv-SE')
       updateData.progress_pct = 100
     }
 
@@ -333,7 +333,7 @@ export const phaseService = {
     // Auto-complete nếu đạt 100%
     if (finalProgress >= 100 && current.status !== 'completed') {
       updateData.status = 'completed'
-      updateData.actual_end = new Date().toISOString().split('T')[0]
+      updateData.actual_end = new Date().toLocaleDateString('sv-SE')
     }
 
     const { data, error } = await supabase

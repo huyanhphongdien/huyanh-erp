@@ -703,7 +703,7 @@ export const rubberIntakeB2BService = {
           product_code: params.product_code || 'MU_CAO_SU',
           raw_rubber_type: params.raw_rubber_type ?? null,
           rubber_type: params.rubber_type ?? mapRawToBonusType(params.raw_rubber_type) ?? null,
-          intake_date: params.intake_date || new Date().toISOString().split('T')[0],
+          intake_date: params.intake_date || new Date().toLocaleDateString('sv-SE'),
           net_weight_kg: params.quantity_kg,
           gross_weight_kg: params.quantity_kg,
           drc_percent: params.drc_percent || null,

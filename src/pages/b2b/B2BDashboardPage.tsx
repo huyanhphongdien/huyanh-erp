@@ -626,7 +626,7 @@ const B2BDashboardPage = () => {
                         }
                         description={
                           <Text type="secondary" style={{ fontSize: 12 }}>
-                            {item.booking.price_per_kg.toLocaleString()} đ/kg • {formatTime(item.sentAt)}
+                            {item.booking.price_per_kg.toLocaleString('vi-VN')} đ/kg • {formatTime(item.sentAt)}
                           </Text>
                         }
                       />

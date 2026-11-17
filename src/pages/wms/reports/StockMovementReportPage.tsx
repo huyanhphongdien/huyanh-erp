@@ -8,15 +8,17 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Card, Table, Button, Space, Typography, Row, Col,
-  Select, DatePicker, Spin, Empty,
+  Select, DatePicker,
 } from 'antd'
 import {
-  ArrowLeftOutlined, ReloadOutlined, FileTextOutlined,
+  ArrowLeftOutlined, ReloadOutlined, FileTextOutlined, DownloadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import wmsReportService from '../../../services/wms/wmsReportService'
 import type { StockMovementReport } from '../../../services/wms/wms.types'
 import { supabase } from '../../../lib/supabase'
+import PageState from '../../../components/common/PageState'
+import { xuatExcelBaoCao } from './wmsReportExcel'
 
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
@@ -24,6 +26,7 @@ const { RangePicker } = DatePicker
 const StockMovementReportPage = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<StockMovementReport[]>([])
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
     dayjs().subtract(30, 'day'),
@@ -49,6 +52,7 @@ const StockMovementReportPage = () => {
 
   const loadData = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const result = await wmsReportService.getStockMovementReport({
         from_date: dateRange[0].format('YYYY-MM-DD'),
@@ -59,6 +63,7 @@ const StockMovementReportPage = () => {
       setData(result)
     } catch (err) {
       console.error('Load stock movement report error:', err)
+      setError(err)
     } finally {
       setLoading(false)
     }
@@ -80,6 +85,27 @@ const StockMovementReportPage = () => {
 
   const numStyle: React.CSSProperties = { fontFamily: "'JetBrains Mono'", fontSize: 13 }
 
+  const handleExportExcel = () => {
+    xuatExcelBaoCao('bao-cao-xuat-nhap-ton', [{
+      name: 'Xuất Nhập Tồn',
+      title: `Báo cáo Xuất – Nhập – Tồn ${dateRange[0].format('DD/MM/YYYY')} – ${dateRange[1].format('DD/MM/YYYY')}`,
+      columns: [
+        { title: 'Ngày' },
+        { title: 'Nhập', summary: 'sum' },
+        { title: 'Xuất', summary: 'sum' },
+        { title: 'Điều chỉnh', summary: 'sum' },
+        { title: 'Trộn vào', summary: 'sum' },
+        { title: 'Trộn ra', summary: 'sum' },
+        { title: 'Tồn cuối' },
+      ],
+      rows: data.map(r => [
+        dayjs(r.date).format('DD/MM/YYYY'),
+        r.in_quantity, r.out_quantity, r.adjust_quantity,
+        r.blend_in_quantity, r.blend_out_quantity, r.balance,
+      ]),
+    }])
+  }
+
   const columns = [
     {
       title: 'Ngay', dataIndex: 'date', key: 'date', width: 120,
@@ -87,27 +113,27 @@ const StockMovementReportPage = () => {
     },
     {
       title: 'Nhập', dataIndex: 'in_quantity', key: 'in', align: 'right' as const, width: 120,
-      render: (v: number) => <Text style={{ ...numStyle, color: v > 0 ? '#16A34A' : undefined }}>{v.toLocaleString()}</Text>,
+      render: (v: number) => <Text style={{ ...numStyle, color: v > 0 ? '#16A34A' : undefined }}>{v.toLocaleString('vi-VN')}</Text>,
     },
     {
       title: 'Xuất', dataIndex: 'out_quantity', key: 'out', align: 'right' as const, width: 120,
-      render: (v: number) => <Text style={{ ...numStyle, color: v > 0 ? '#DC2626' : undefined }}>{v.toLocaleString()}</Text>,
+      render: (v: number) => <Text style={{ ...numStyle, color: v > 0 ? '#DC2626' : undefined }}>{v.toLocaleString('vi-VN')}</Text>,
     },
     {
       title: 'Điều chỉnh', dataIndex: 'adjust_quantity', key: 'adjust', align: 'right' as const, width: 120,
-      render: (v: number) => <Text style={{ ...numStyle, color: v !== 0 ? '#F59E0B' : undefined }}>{v.toLocaleString()}</Text>,
+      render: (v: number) => <Text style={{ ...numStyle, color: v !== 0 ? '#F59E0B' : undefined }}>{v.toLocaleString('vi-VN')}</Text>,
     },
     {
       title: 'Trộn vào', dataIndex: 'blend_in_quantity', key: 'blend_in', align: 'right' as const, width: 120,
-      render: (v: number) => <Text style={{ ...numStyle, color: v > 0 ? '#2563EB' : undefined }}>{v.toLocaleString()}</Text>,
+      render: (v: number) => <Text style={{ ...numStyle, color: v > 0 ? '#2563EB' : undefined }}>{v.toLocaleString('vi-VN')}</Text>,
     },
     {
       title: 'Trộn ra', dataIndex: 'blend_out_quantity', key: 'blend_out', align: 'right' as const, width: 120,
-      render: (v: number) => <Text style={{ ...numStyle, color: v > 0 ? '#7C3AED' : undefined }}>{v.toLocaleString()}</Text>,
+      render: (v: number) => <Text style={{ ...numStyle, color: v > 0 ? '#7C3AED' : undefined }}>{v.toLocaleString('vi-VN')}</Text>,
     },
     {
       title: 'Tồn cuối', dataIndex: 'balance', key: 'balance', align: 'right' as const, width: 130,
-      render: (v: number) => <Text strong style={{ ...numStyle, color: '#1B4D3E' }}>{v.toLocaleString()}</Text>,
+      render: (v: number) => <Text strong style={{ ...numStyle, color: '#1B4D3E' }}>{v.toLocaleString('vi-VN')}</Text>,
     },
   ]
 
@@ -162,16 +188,21 @@ const StockMovementReportPage = () => {
             style={{ width: 180 }}
             size="small"
           />
+          <Button size="small" icon={<DownloadOutlined />} onClick={handleExportExcel} disabled={data.length === 0}>
+            Xuất Excel
+          </Button>
         </Space>
       </Card>
 
       {/* Table */}
       <Card>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-        ) : data.length === 0 ? (
-          <Empty description="Không có dữ liệu trong khoảng thời gian này" />
-        ) : (
+        <PageState
+          loading={loading}
+          error={error}
+          onRetry={() => loadData()}
+          empty={data.length === 0}
+          emptyText="Không có dữ liệu trong khoảng thời gian này"
+        >
           <>
             <Table
               dataSource={data}
@@ -185,16 +216,16 @@ const StockMovementReportPage = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, padding: '8px 16px', background: '#f5f5f5', borderRadius: 8 }}>
               <Text strong>Tổng cộng:</Text>
               <Space size="large">
-                <Text style={{ ...numStyle, color: '#16A34A' }}>Nhập: {totals.in_quantity.toLocaleString()}</Text>
-                <Text style={{ ...numStyle, color: '#DC2626' }}>Xuất: {totals.out_quantity.toLocaleString()}</Text>
-                <Text style={{ ...numStyle, color: '#F59E0B' }}>Điều chỉnh: {totals.adjust_quantity.toLocaleString()}</Text>
-                <Text style={{ ...numStyle, color: '#2563EB' }}>Trộn vào: {totals.blend_in_quantity.toLocaleString()}</Text>
-                <Text style={{ ...numStyle, color: '#7C3AED' }}>Trộn ra: {totals.blend_out_quantity.toLocaleString()}</Text>
-                <Text strong style={{ ...numStyle, color: '#1B4D3E' }}>Tồn cuối: {data.length > 0 ? data[data.length - 1].balance.toLocaleString() : 0}</Text>
+                <Text style={{ ...numStyle, color: '#16A34A' }}>Nhập: {totals.in_quantity.toLocaleString('vi-VN')}</Text>
+                <Text style={{ ...numStyle, color: '#DC2626' }}>Xuất: {totals.out_quantity.toLocaleString('vi-VN')}</Text>
+                <Text style={{ ...numStyle, color: '#F59E0B' }}>Điều chỉnh: {totals.adjust_quantity.toLocaleString('vi-VN')}</Text>
+                <Text style={{ ...numStyle, color: '#2563EB' }}>Trộn vào: {totals.blend_in_quantity.toLocaleString('vi-VN')}</Text>
+                <Text style={{ ...numStyle, color: '#7C3AED' }}>Trộn ra: {totals.blend_out_quantity.toLocaleString('vi-VN')}</Text>
+                <Text strong style={{ ...numStyle, color: '#1B4D3E' }}>Tồn cuối: {data.length > 0 ? data[data.length - 1].balance.toLocaleString('vi-VN') : 0}</Text>
               </Space>
             </div>
           </>
-        )}
+        </PageState>
       </Card>
     </div>
   )

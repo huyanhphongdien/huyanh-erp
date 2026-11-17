@@ -216,7 +216,7 @@ export const paymentService = {
       .insert({
         settlement_id: paymentData.settlement_id,
         amount: paymentData.amount,
-        payment_date: paymentData.payment_date || new Date().toISOString().split('T')[0],
+        payment_date: paymentData.payment_date || new Date().toLocaleDateString('sv-SE'),
         payment_method: paymentData.payment_method || 'bank_transfer',
         recipient_name: paymentData.recipient_name,
         bank_account: paymentData.bank_account,

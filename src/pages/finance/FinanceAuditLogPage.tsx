@@ -14,6 +14,8 @@ import {
 } from '../../services/finance/financeAuditService'
 import { isFinanceAdmin } from '../../lib/financeAccess'
 import { useAuthStore } from '../../stores/authStore'
+import PageState from '../../components/common/PageState'
+import { useDebounce } from '../../hooks/useDebounce'
 
 const { RangePicker } = DatePicker
 
@@ -30,12 +32,16 @@ export default function FinanceAuditLogPage() {
   const [entries, setEntries] = useState<AuditLogEntry[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [stats, setStats] = useState({ today: 0, last_7d: 0, last_30d: 0, by_action: { INSERT: 0, UPDATE: 0, DELETE: 0 } })
 
   const [tableName, setTableName] = useState<string>('all')
   const [action, setAction] = useState<'INSERT' | 'UPDATE' | 'DELETE' | 'all'>('all')
   const [recordCode, setRecordCode] = useState('')
   const [changedByEmail, setChangedByEmail] = useState('')
+  // gõ xong 400ms mới bắn query (trước đây mỗi phím gõ trong 2 ô tìm = 1 query)
+  const recordCodeDebounced = useDebounce(recordCode, 400)
+  const changedByEmailDebounced = useDebounce(changedByEmail, 400)
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
   const [page, setPage] = useState(1)
   const pageSize = 50
@@ -44,13 +50,14 @@ export default function FinanceAuditLogPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const params: AuditLogListParams = {
         page, pageSize,
         tableName: tableName === 'all' ? undefined : tableName,
         action,
-        recordCode: recordCode || undefined,
-        changedByEmail: changedByEmail || undefined,
+        recordCode: recordCodeDebounced || undefined,
+        changedByEmail: changedByEmailDebounced || undefined,
         dateFrom: dateRange?.[0]?.format('YYYY-MM-DD'),
         dateTo: dateRange?.[1]?.format('YYYY-MM-DD'),
       }
@@ -59,10 +66,11 @@ export default function FinanceAuditLogPage() {
       setTotal(res.total)
     } catch (e) {
       console.error(e)
+      setLoadError(e)
     } finally {
       setLoading(false)
     }
-  }, [page, tableName, action, recordCode, changedByEmail, dateRange])
+  }, [page, tableName, action, recordCodeDebounced, changedByEmailDebounced, dateRange])
 
   useEffect(() => { if (isAuthorized) fetchData() }, [fetchData, isAuthorized])
   useEffect(() => { if (isAuthorized) financeAuditService.getStats().then(setStats).catch(console.error) }, [isAuthorized])
@@ -122,8 +130,10 @@ export default function FinanceAuditLogPage() {
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
+        ) : loadError ? (
+          <PageState error={loadError} onRetry={fetchData} />
         ) : entries.length === 0 ? (
-          <Empty description="Chưa có sự kiện nào (hoặc chưa chạy migration finance_audit_log_v1.sql)" style={{ padding: 40 }} />
+          <Empty description="Chưa có sự kiện nào" style={{ padding: 40 }} />
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', minWidth: 1050 }}>

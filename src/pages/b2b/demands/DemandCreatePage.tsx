@@ -389,7 +389,7 @@ const Step2DetailsConfirm = ({
           </Descriptions.Item>
           <Descriptions.Item label="Số lượng">
             <Text strong>
-              {values.quantity_tons ? `${values.quantity_tons} tấn (${Math.round(values.quantity_tons * 1000).toLocaleString()} kg)` : '-'}
+              {values.quantity_tons ? `${values.quantity_tons} tấn (${Math.round(values.quantity_tons * 1000).toLocaleString('vi-VN')} kg)` : '-'}
             </Text>
           </Descriptions.Item>
           <Descriptions.Item label="Ưu tiên">
@@ -409,10 +409,10 @@ const Step2DetailsConfirm = ({
           {(values.price_min || values.price_max) && (
             <Descriptions.Item label="Khoảng giá">
               {values.price_min && values.price_max
-                ? `${values.price_min.toLocaleString()} - ${values.price_max.toLocaleString()} đ/kg`
+                ? `${values.price_min.toLocaleString('vi-VN')} - ${values.price_max.toLocaleString('vi-VN')} đ/kg`
                 : values.price_min
-                  ? `>= ${values.price_min.toLocaleString()} đ/kg`
-                  : `<= ${values.price_max.toLocaleString()} đ/kg`}
+                  ? `>= ${values.price_min.toLocaleString('vi-VN')} đ/kg`
+                  : `<= ${values.price_max.toLocaleString('vi-VN')} đ/kg`}
             </Descriptions.Item>
           )}
           {values.deadline && (
@@ -427,7 +427,7 @@ const Step2DetailsConfirm = ({
           )}
           {values.demand_type === 'processing' && values.processing_fee_per_ton && (
             <Descriptions.Item label="Phí gia công">
-              {values.processing_fee_per_ton.toLocaleString()} đ/tấn
+              {values.processing_fee_per_ton.toLocaleString('vi-VN')} đ/tấn
             </Descriptions.Item>
           )}
           {values.demand_type === 'processing' && values.expected_output_rate && (

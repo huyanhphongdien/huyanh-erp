@@ -28,6 +28,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { attendanceService, validateGPS } from '../../services/attendanceService'
 import { getActiveShifts } from '../../services/opsService'
 import { getDeviceType, getDeviceInfo } from '../../utils/deviceDetect'
+import { todayVN } from '../../utils/dateVN'
 import type {
   ShiftInfo,
   AttendanceRecord,
@@ -53,7 +54,7 @@ interface Props {
 // HELPER FUNCTIONS
 // ============================================================
 
-function formatTime(t: string): string {
+function formatTime(t: string | null | undefined): string {
   if (!t) return ''
   return t.substring(0, 5)
 }
@@ -553,7 +554,7 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
 
         {/* Ca qua đêm hôm qua đang mở */}
         {openAttendance &&
-          openAttendance.date !== new Date().toISOString().split('T')[0] && (
+          openAttendance.date !== todayVN() && (
             <div className="mt-1.5 flex items-center gap-1.5 text-yellow-200 text-xs">
               <AlertCircle size={10} />
               <span>Ca đêm từ hôm qua — cần check-out</span>
@@ -868,7 +869,7 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
                             </span>
                           )}
                           {/* ★ V4: Badge cho ca đêm hôm qua */}
-                          {sa.assignment_date !== new Date().toISOString().split('T')[0] && (
+                          {sa.assignment_date !== todayVN() && (
                             <span className="px-1 py-px bg-yellow-50 text-yellow-600 rounded text-[9px]">
                               hôm qua
                             </span>

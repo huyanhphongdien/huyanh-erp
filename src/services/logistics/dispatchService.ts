@@ -381,7 +381,7 @@ async function create(input: CreateDispatchInput): Promise<DispatchOrder> {
     .from('dispatch_orders')
     .insert({
       code,
-      dispatch_date: input.dispatch_date || new Date().toISOString().slice(0, 10),
+      dispatch_date: input.dispatch_date || new Date().toLocaleDateString('sv-SE'),
       trip_type: input.trip_type || 'port',
       // cargo_kind: chỉ gửi khi CÓ giá trị (an toàn PGRST204 nếu code lỡ chạy trước
       // migration dispatch_cargo_kind.sql → payload không mang key lạ).

@@ -207,7 +207,7 @@ export function TaskViewPage() {
         // ★ Recurring: auto-complete + 80 điểm, KHÔNG popup
         const { error } = await supabase.from('tasks').update({
           status: 'finished', progress: 100,
-          completed_date: new Date().toISOString().split('T')[0],
+          completed_date: new Date().toLocaleDateString('sv-SE'),
           self_score: 100, final_score: 80,
           evaluation_status: 'approved',
         }).eq('id', id)
@@ -220,7 +220,7 @@ export function TaskViewPage() {
         // ★ Self (tự giao): auto-approve 85 điểm (×0.85), KHÔNG popup
         const { error } = await supabase.from('tasks').update({
           status: 'finished', progress: 100,
-          completed_date: new Date().toISOString().split('T')[0],
+          completed_date: new Date().toLocaleDateString('sv-SE'),
           self_score: 100, final_score: 85,
           evaluation_status: 'approved',
         }).eq('id', id)
@@ -233,7 +233,7 @@ export function TaskViewPage() {
         // ★ Project: auto-approve 90 điểm (×0.90), đã check evidence ở trên
         const { error } = await supabase.from('tasks').update({
           status: 'finished', progress: 100,
-          completed_date: new Date().toISOString().split('T')[0],
+          completed_date: new Date().toLocaleDateString('sv-SE'),
           self_score: 100, final_score: 90,
           evaluation_status: 'approved',
         }).eq('id', id)
@@ -246,7 +246,7 @@ export function TaskViewPage() {
         // ★ Assigned: đưa thẳng vào phê duyệt, bỏ tự đánh giá
         const { error } = await supabase.from('tasks').update({
           status: 'pending_review', progress: 100,
-          completed_date: new Date().toISOString().split('T')[0],
+          completed_date: new Date().toLocaleDateString('sv-SE'),
           evaluation_status: 'pending_approval',
         }).eq('id', id)
         if (error) throw error
@@ -274,7 +274,7 @@ export function TaskViewPage() {
         // ★ QL phòng ban mark complete thay NV — auto 100 điểm
         const { error } = await supabase.from('tasks').update({
           status: 'finished', progress: 100,
-          completed_date: new Date().toISOString().split('T')[0],
+          completed_date: new Date().toLocaleDateString('sv-SE'),
           self_score: 100, final_score: 100,
           evaluation_status: 'approved',
         }).eq('id', id)
@@ -745,7 +745,7 @@ export function TaskViewPage() {
                 if (isRecurring) {
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
-                    completed_date: new Date().toISOString().split('T')[0],
+                    completed_date: new Date().toLocaleDateString('sv-SE'),
                     self_score: 100, final_score: 80,
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
@@ -754,7 +754,7 @@ export function TaskViewPage() {
                 } else if (isSelf2) {
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
-                    completed_date: new Date().toISOString().split('T')[0],
+                    completed_date: new Date().toLocaleDateString('sv-SE'),
                     self_score: 100, final_score: 85,
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
@@ -763,7 +763,7 @@ export function TaskViewPage() {
                 } else if (isProject2) {
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
-                    completed_date: new Date().toISOString().split('T')[0],
+                    completed_date: new Date().toLocaleDateString('sv-SE'),
                     self_score: 100, final_score: 90,
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
@@ -772,7 +772,7 @@ export function TaskViewPage() {
                 } else if (isAssignee2) {
                   await supabase.from('tasks').update({
                     status: 'pending_review', progress: 100,
-                    completed_date: new Date().toISOString().split('T')[0],
+                    completed_date: new Date().toLocaleDateString('sv-SE'),
                     evaluation_status: 'pending_approval',
                   }).eq('id', t.id)
                   // KHÔNG insertAutoApproval — đợi manager duyệt qua approve-batch
@@ -781,7 +781,7 @@ export function TaskViewPage() {
                   // Fallback: dept manager / khác → 85 điểm (cùng logic isSelf)
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
-                    completed_date: new Date().toISOString().split('T')[0],
+                    completed_date: new Date().toLocaleDateString('sv-SE'),
                     self_score: 100, final_score: 85,
                     evaluation_status: 'approved',
                   }).eq('id', t.id)

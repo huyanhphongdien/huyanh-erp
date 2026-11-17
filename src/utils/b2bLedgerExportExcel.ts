@@ -181,7 +181,7 @@ export async function exportLedgerReport(data: LedgerReportExportData): Promise<
 
   // ─── Save ───
   const buffer = await wb.xlsx.writeBuffer()
-  const ymd = new Date().toISOString().slice(0, 10)
+  const ymd = new Date().toLocaleDateString('sv-SE')
   const filename = `bao-cao-cong-no-b2b_${ymd}.xlsx`
   saveAs(new Blob([buffer]), filename)
 }
@@ -282,6 +282,6 @@ export async function exportPartnerBalances(balances: PartnerBalance[]): Promise
   ws.getColumn(7).width = 20
 
   const buffer = await wb.xlsx.writeBuffer()
-  const ymd = new Date().toISOString().slice(0, 10)
+  const ymd = new Date().toLocaleDateString('sv-SE')
   saveAs(new Blob([buffer]), `so-cong-no-doi-tac-b2b_${ymd}.xlsx`)
 }

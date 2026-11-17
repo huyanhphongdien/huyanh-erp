@@ -89,7 +89,7 @@ export default function KhoFgLots() {
       <KhoAppBar title="Kho thành phẩm · theo lô" sub={<span>{facility?.code || ''} · tồn {fmtKg(tong.kg)} kg</span>} right={<FacilitySelect value={facilityId} onChange={setFacilityId} facilities={facilities} />} />
       <div className="ops-body">
         <div className="ops-inner">
-          <Msg m={msg} />
+          <Msg m={msg} onRetry={() => { setMsg(null); load() }} />
           <div className="ops-card tint">
             <div className="ops-rw">
               <div><div className="ops-lbl">Đạt · chờ xuất</div><div className="ops-big">{tong.dat}<span className="ops-sm"> bành</span></div></div>

@@ -351,7 +351,7 @@ const BlendCreatePage = () => {
       key: 'quantity_remaining',
       align: 'right' as const,
       render: (v: number) => (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v.toLocaleString()}</Text>
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v.toLocaleString('vi-VN')}</Text>
       ),
     },
     {
@@ -389,7 +389,7 @@ const BlendCreatePage = () => {
       key: 'qty',
       align: 'right' as const,
       render: (_: any, r: SelectedBlendItem) => (
-        <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>{r.quantity_kg.toLocaleString()}</Text>
+        <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>{r.quantity_kg.toLocaleString('vi-VN')}</Text>
       ),
     },
     {
@@ -622,7 +622,7 @@ const BlendCreatePage = () => {
                     <Col span={12}>
                       <Statistic
                         title="Tổng sản lượng"
-                        value={simulation.total_quantity_kg.toLocaleString()}
+                        value={simulation.total_quantity_kg.toLocaleString('vi-VN')}
                         suffix="kg"
                         valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }}
                       />
@@ -697,7 +697,7 @@ const BlendCreatePage = () => {
                   <Descriptions.Item label="Lô">{selectedRawBatch.batch_no}</Descriptions.Item>
                   <Descriptions.Item label="Grade"><GradeBadge grade={selectedRawBatch.rubber_grade} size="small" /></Descriptions.Item>
                   <Descriptions.Item label="DRC">{selectedRawBatch.latest_drc || selectedRawBatch.initial_drc || '—'}%</Descriptions.Item>
-                  <Descriptions.Item label="Còn lại">{selectedRawBatch.quantity_remaining.toLocaleString()} kg</Descriptions.Item>
+                  <Descriptions.Item label="Còn lại">{selectedRawBatch.quantity_remaining.toLocaleString('vi-VN')} kg</Descriptions.Item>
                 </Descriptions>
                 <Text strong style={{ display: 'block', marginBottom: 4 }}>Số lượng phối trộn (kg) *</Text>
                 <InputNumber
@@ -728,7 +728,7 @@ const BlendCreatePage = () => {
               <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{targetDrc}%</Text>
             </Descriptions.Item>
             <Descriptions.Item label="Sản lượng mục tiêu">
-              <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{targetQuantity?.toLocaleString()} kg</Text>
+              <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{targetQuantity?.toLocaleString('vi-VN')} kg</Text>
             </Descriptions.Item>
             <Descriptions.Item label="Số lô nguyên liệu">{selectedItems.length}</Descriptions.Item>
             {notes && <Descriptions.Item label="Ghi chú" span={2}>{notes}</Descriptions.Item>}
@@ -747,7 +747,7 @@ const BlendCreatePage = () => {
             >
               <Row gutter={16}>
                 <Col span={6}>
-                  <Statistic title="Tổng NL (kg)" value={simulation.total_quantity_kg.toLocaleString()}
+                  <Statistic title="Tổng NL (kg)" value={simulation.total_quantity_kg.toLocaleString('vi-VN')}
                     valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
                 </Col>
                 <Col span={6}>

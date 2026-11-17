@@ -20,7 +20,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Card, Table, Button, Space, Typography, Tag, Select, Row, Col, Empty, Spin,
+  Card, Table, Button, Space, Typography, Tag, Row, Col, Empty, Spin,
   Modal, Form, Input, InputNumber, DatePicker, Segmented, AutoComplete, Popconfirm, Alert, message,
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, WarningOutlined, DeleteOutlined, EditOutlined, RetweetOutlined } from '@ant-design/icons'
@@ -29,7 +29,7 @@ import {
   qcRejectService, TINH_TRANG_LABEL, TINH_TRANG_COLOR, CACH_XU_LY_GOI_Y,
   type QCReject, type QCTinhTrang, type QCTheoLo, type VongTaiChe,
 } from '../../../services/wms/qcRejectService'
-import { facilityService, type Facility } from '../../../services/wms/facilityService'
+import FacilityPicker from '../../../components/wms/FacilityPicker'
 import { useAuthStore } from '../../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -46,7 +46,6 @@ const dai = (min: number | null, max: number | null): string => {
 export default function QCRejectPage() {
   const user = useAuthStore((s) => s.user)
   const [loading, setLoading] = useState(true)
-  const [facilities, setFacilities] = useState<Facility[]>([])
   const [facilityId, setFacilityId] = useState<string | undefined>()
   const [rows, setRows] = useState<QCReject[]>([])
   const [theoLo, setTheoLo] = useState<QCTheoLo[]>([])
@@ -56,12 +55,6 @@ export default function QCRejectPage() {
   const [moForm, setMoForm] = useState(false)
   const [dangSua, setDangSua] = useState<QCReject | null>(null)
   const [form] = Form.useForm()
-
-  useEffect(() => {
-    facilityService.getAllActive()
-      .then((fs) => { setFacilities(fs); setFacilityId((c) => c ?? fs.find((f) => f.code === 'PD')?.id ?? fs[0]?.id) })
-      .catch((e) => message.error('Không đọc được danh sách nhà máy: ' + (e as Error).message))
-  }, [])
 
   const nap = async () => {
     if (!facilityId) return
@@ -227,9 +220,10 @@ export default function QCRejectPage() {
         </Col>
         <Col>
           <Space wrap>
-            <Select
-              value={facilityId} onChange={setFacilityId} style={{ minWidth: 180 }}
-              options={facilities.map((f) => ({ value: f.id, label: f.name }))}
+            {/* Nhớ nhà máy qua màn (store wms-facility-filter); lần đầu mặc định Phong Điền. */}
+            <FacilityPicker
+              persist defaultCode="PD" allowAll={false}
+              onChange={setFacilityId} style={{ minWidth: 180 }}
             />
             <Button icon={<ReloadOutlined />} onClick={() => void nap()} />
             <Button type="primary" icon={<PlusOutlined />} onClick={() => mo()}>Ghi dòng mới</Button>

@@ -126,7 +126,7 @@ const QCRecheckPage = () => {
       ),
     },
     { title: 'Kho', key: 'wh', render: (_: any, r: RecheckBatchItem) => <Text type="secondary" style={{ fontSize: 11 }}>{r.warehouse_name}</Text> },
-    { title: 'SL', dataIndex: 'quantity_remaining', key: 'qty', align: 'right' as const, render: (v: number) => <Text style={{ fontFamily: "'JetBrains Mono'" }}>{v?.toLocaleString()}</Text> },
+    { title: 'SL', dataIndex: 'quantity_remaining', key: 'qty', align: 'right' as const, render: (v: number) => <Text style={{ fontFamily: "'JetBrains Mono'" }}>{v?.toLocaleString('vi-VN')}</Text> },
     {
       title: '',
       key: 'action',

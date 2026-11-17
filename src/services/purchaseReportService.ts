@@ -179,7 +179,7 @@ const purchaseReportService = {
       0
     )
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     const overdue_debt = (invoices || [])
       .filter((i) => i.due_date && i.due_date < today && Number(i.remaining_amount) > 0)
       .reduce((sum, i) => sum + (Number(i.remaining_amount) || 0), 0)
@@ -435,7 +435,7 @@ const purchaseReportService = {
   // 5. HÓA ĐƠN QUÁ HẠN
   // ==========================================================================
   async getOverdueInvoices(limit: number = 20): Promise<OverdueInvoice[]> {
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
 
     const { data } = await supabase
       .from('supplier_invoices')

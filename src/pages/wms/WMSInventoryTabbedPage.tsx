@@ -107,6 +107,9 @@ const WMSInventoryTabbedPage = () => {
         {
           key: 'stock-check',
           label: 'Kiểm kê',
+          // forceRender giữ pane mounted (display:none) kể cả khi destroyInactiveTabPane bật
+          // → đang đếm dở mà lỡ chạm tab Tồn kho/Cảnh báo thì số đã gõ KHÔNG mất.
+          forceRender: true,
           children: (
             <Suspense fallback={<TabFallback />}>
               <StockCheckPage />

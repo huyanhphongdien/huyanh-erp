@@ -40,7 +40,7 @@ export function ContractForm({ initialData, employeeId, onSuccess, onCancel }: P
           contract_number: '',
           employee_id: employeeId || '',
           contract_type_id: '',
-          start_date: new Date().toISOString().split('T')[0],
+          start_date: new Date().toLocaleDateString('sv-SE'),
           end_date: '',
           base_salary: 0,
           salary_currency: 'VND',

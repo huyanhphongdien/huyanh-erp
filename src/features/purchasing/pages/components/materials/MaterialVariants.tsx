@@ -169,7 +169,7 @@ const MaterialVariants: React.FC<MaterialVariantsProps> = ({
                   <td className="px-4 py-3"><span className="text-sm text-gray-500 font-mono">{variant.sku || '-'}</span></td>
                   <td className="px-4 py-3 text-right">
                     <div className={`text-sm font-medium ${isLowStock(variant) ? 'text-red-600' : 'text-gray-900'}`}>
-                      {variant.stock_quantity.toLocaleString()} {unitSymbol}
+                      {variant.stock_quantity.toLocaleString('vi-VN')} {unitSymbol}
                     </div>
                     <div className="text-xs text-gray-400">Tối thiểu: {variant.min_stock}</div>
                   </td>
@@ -205,7 +205,7 @@ const MaterialVariants: React.FC<MaterialVariantsProps> = ({
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-4">
-                <span className="text-gray-500">Tổng tồn kho: <span className="font-medium text-gray-900 ml-1">{variants.reduce((sum, v) => sum + v.stock_quantity, 0).toLocaleString()} {unitSymbol}</span></span>
+                <span className="text-gray-500">Tổng tồn kho: <span className="font-medium text-gray-900 ml-1">{variants.reduce((sum, v) => sum + v.stock_quantity, 0).toLocaleString('vi-VN')} {unitSymbol}</span></span>
                 {variants.some(isLowStock) && (
                   <span className="flex items-center gap-1 text-red-600">
                     <AlertTriangle className="w-4 h-4" />{variants.filter(isLowStock).length} biến thể tồn kho thấp

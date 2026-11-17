@@ -36,7 +36,7 @@ export default function ProductionLiveBoard() {
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['production-live-orders'],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0]
+      const today = new Date().toLocaleDateString('sv-SE')
       const { data } = await supabase
         .from('production_orders')
         .select('*, product:materials(name, code)')
@@ -80,7 +80,7 @@ export default function ProductionLiveBoard() {
   const { data: todaySummary = { output: 0, downtime: 0, orders_count: 0 } } = useQuery({
     queryKey: ['production-live-summary'],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0]
+      const today = new Date().toLocaleDateString('sv-SE')
 
       // Today's completed orders output
       const { data: completedToday } = await supabase

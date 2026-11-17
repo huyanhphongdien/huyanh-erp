@@ -11,7 +11,8 @@ import {
   ArrowLeft, Loader2, Check, Scale, Truck, Tag, Search, CheckSquare, Square,
 } from 'lucide-react'
 import { paymentRequestService, type AvailableTicket, type PaymentCurrency } from '../../../services/wms/paymentRequestService'
-import { facilityService, type Facility } from '../../../services/wms/facilityService'
+import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
+import { useFacilityFilter } from '../../../stores/facilityFilterStore'
 import { useAuthStore } from '../../../stores/authStore'
 
 function fmtVnd(a?: number | null): string {
@@ -50,13 +51,15 @@ const PRICE_SRC: Record<string, { label: string; cls: string }> = {
 // PaymentRequestPrintPage và app Cân mủ lẻ. Sửa ở đây thì phải sửa cả 3 chỗ kia.
 const roundThousand = (n: number | null | undefined) => Math.round((n || 0) / 1000) * 1000
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => new Date().toLocaleDateString('sv-SE')
 
 const PaymentRequestCreatePage: React.FC = () => {
   const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
 
-  const [facilities, setFacilities] = useState<Facility[]>([])
+  // Danh sách nhà máy qua cache dùng chung (TanStack) — không fetch lại mỗi lần mở màn
+  const { data: facilities = [] } = useActiveFacilities()
+  const { currentFacilityId, setCurrentFacilityId } = useFacilityFilter()
   const [facilityId, setFacilityId] = useState<string>('')
   // Mặc định 1 ngày (hôm nay) — 1 ngày có nhiều phiếu cân là đủ. Anh kéo dài range khi cần.
   const [dateFrom, setDateFrom] = useState(today())
@@ -70,9 +73,14 @@ const PaymentRequestCreatePage: React.FC = () => {
   const [title, setTitle] = useState('')
   const [currency, setCurrency] = useState<PaymentCurrency>('VND')
 
+  // Nhớ nhà máy đã chọn ở màn khác (store wms-facility-filter) — kế toán TL không phải
+  // chọn lại. KHÔNG mặc định PD khi store trống: màn này cố ý bắt chọn tường minh
+  // (mỗi đề nghị = 1 cơ sở). Giữ <select> Tailwind theo convention của file, chỉ nối store.
   useEffect(() => {
-    facilityService.getAllActive().then(setFacilities).catch(() => {})
-  }, [])
+    if (currentFacilityId && facilities.some(f => f.id === currentFacilityId)) {
+      setFacilityId(c => c || currentFacilityId)
+    }
+  }, [facilities, currentFacilityId])
 
   const search = useCallback(async () => {
     // BẮT chọn nhà máy: mỗi đề nghị thanh toán chỉ gom 1 cơ sở (tránh lẫn PD/QT/Lào).
@@ -155,7 +163,7 @@ const PaymentRequestCreatePage: React.FC = () => {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 space-y-2.5">
           <div>
             <label className="text-[11px] text-gray-400 font-medium">Nhà máy <span className="text-red-500">*</span> <span className="text-gray-300">(mỗi đề nghị = 1 cơ sở)</span></label>
-            <select value={facilityId} onChange={e => setFacilityId(e.target.value)} className={`mt-1 w-full px-3 py-2 rounded-xl border text-[13.5px] bg-white ${facilityId ? 'border-gray-200' : 'border-amber-300 bg-amber-50'}`}>
+            <select value={facilityId} onChange={e => { const v = e.target.value; setFacilityId(v); if (v) setCurrentFacilityId(v) }} className={`mt-1 w-full px-3 py-2 rounded-xl border text-[13.5px] bg-white ${facilityId ? 'border-gray-200' : 'border-amber-300 bg-amber-50'}`}>
               <option value="">— Chọn nhà máy —</option>
               {facilities.map(f => <option key={f.id} value={f.id}>{f.name} ({f.code})</option>)}
             </select>

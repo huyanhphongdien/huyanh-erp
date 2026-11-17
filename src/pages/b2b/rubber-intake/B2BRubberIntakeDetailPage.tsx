@@ -377,7 +377,7 @@ export default function B2BRubberIntakeDetailPage() {
                         <div key={b.id} className="flex items-center gap-2 text-xs bg-gray-50 rounded-lg p-2">
                           <span className="font-mono font-medium text-gray-700">{b.batch_no}</span>
                           <span className="text-gray-400">|</span>
-                          <span>{(b.quantity_kg || 0).toLocaleString()} kg</span>
+                          <span>{(b.quantity_kg || 0).toLocaleString('vi-VN')} kg</span>
                           {b.latest_drc && <span className="text-emerald-600 font-medium">DRC {b.latest_drc}%</span>}
                           <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold ${
                             b.qc_status === 'passed' ? 'bg-emerald-100 text-emerald-700' :

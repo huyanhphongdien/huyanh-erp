@@ -148,7 +148,7 @@ export default function TeamManagementPage() {
       return shiftTeamService.addMembersInBulk(
         teamId,
         employeeIds,
-        new Date().toISOString().split('T')[0],
+        new Date().toLocaleDateString('sv-SE'),
         emp?.id || undefined
       )
     },

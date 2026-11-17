@@ -194,7 +194,7 @@ export const projectDashboardService = {
     // Count by status
     const statusCount: Record<string, number> = {}
     let overdue = 0
-    const now = new Date().toISOString().split('T')[0]
+    const now = new Date().toLocaleDateString('sv-SE')
 
     for (const p of all) {
       statusCount[p.status] = (statusCount[p.status] || 0) + 1
@@ -404,7 +404,7 @@ export const projectDashboardService = {
     const projectIds = projects.map(p => p.id)
 
     // Count overdue milestones per project
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     const { data: overdueMilestones } = await supabase
       .from('project_milestones')
       .select('project_id')

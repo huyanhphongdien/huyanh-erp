@@ -665,7 +665,7 @@ export const purchaseOrderService = {
 
     const insertData = {
       order_code: orderCode,
-      order_date: formData.order_date || new Date().toISOString().split('T')[0],
+      order_date: formData.order_date || new Date().toLocaleDateString('sv-SE'),
       project_name: formData.project_name || null,
       project_code: formData.project_code || null,
       expected_delivery_date: formData.expected_delivery_date || null,
@@ -1594,7 +1594,7 @@ export const purchaseOrderService = {
       throw error
     }
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     const orders = data || []
 
     const stats: POStats = {
@@ -1744,7 +1744,7 @@ export const purchaseOrderService = {
 
     if (invError) throw invError
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     const invoiceList = invoices || []
 
     const totalInvoiced = invoiceList.reduce((sum, inv) => sum + (inv.total_amount || 0), 0)
@@ -1874,7 +1874,7 @@ export const purchaseOrderService = {
     }
 
     // 4. Build breakdown
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     const result: OrderSupplierInvoiceBreakdown[] = []
 
     for (const [supplierId, supplierInfo] of supplierMap) {
@@ -1955,7 +1955,7 @@ export const purchaseOrderService = {
 
     if (invErr) throw invErr
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     const invoiceMap = new Map<string, { count: number; overdue: number }>()
     for (const inv of (invoiceCounts || [])) {
       if (!invoiceMap.has(inv.order_id)) {

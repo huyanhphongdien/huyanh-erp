@@ -371,7 +371,7 @@ export const projectTemplateService = {
             phase_id: newPhaseId,
             name: ms.name,
             description: ms.description,
-            due_date: dueDate || new Date().toISOString().split('T')[0], // Fallback today
+            due_date: dueDate || new Date().toLocaleDateString('sv-SE'), // Fallback today
             deliverables: ms.deliverables || '[]',
             status: 'pending',
           })

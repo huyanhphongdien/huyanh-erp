@@ -203,7 +203,7 @@ export default function OutrightWizardPage() {
                 <Row>
                   <Col span={8}>qty: {form.getFieldValue('quantity_kg')} kg</Col>
                   <Col span={8}>DRC: {form.getFieldValue('drc_percent')}%</Col>
-                  <Col span={8}>Giá: {form.getFieldValue('unit_price')?.toLocaleString()} VNĐ/kg</Col>
+                  <Col span={8}>Giá: {form.getFieldValue('unit_price')?.toLocaleString('vi-VN')} VNĐ/kg</Col>
                 </Row>
                 <Row style={{ marginTop: 8 }}>
                   <Col span={24}>

@@ -436,7 +436,7 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({
                 icon="📅"
                 active={false}
                 onClick={() => {
-                  const today = new Date().toISOString().split('T')[0];
+                  const today = new Date().toLocaleDateString('sv-SE');
                   onChange({ ...DEFAULT_FILTERS, due_date_from: today, due_date_to: today });
                 }}
               />

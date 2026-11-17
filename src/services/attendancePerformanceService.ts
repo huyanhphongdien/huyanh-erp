@@ -138,7 +138,7 @@ export const attendancePerformanceService = {
 
       const presentDates = new Set(recs.map(r => r.date))
       // Today không tính (chưa kết thúc ngày → có thể chưa check-in)
-      const todayStr = new Date().toISOString().split('T')[0]
+      const todayStr = new Date().toLocaleDateString('sv-SE')
       const pastScheduled = (scheduledShifts || []).filter(s => s.date < todayStr)
       absentDays = pastScheduled.filter(s => !presentDates.has(s.date)).length
     } catch (e) {

@@ -218,7 +218,7 @@ function applyListFilters<T>(query: T, params: SalesOrderListParams): T {
   if (date_from) q = q.gte('order_date', date_from)
   if (date_to) q = q.lte('order_date', date_to)
   if (params.overdue_etd_only) {
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     q = q.lt('etd', today).not('status', 'in', '(delivered,invoiced,paid,cancelled)')
   }
   if (search) {
@@ -487,7 +487,7 @@ export const salesOrderService = {
         booking_reference: input.booking_reference || null,
 
         // Ngày tháng
-        order_date: input.order_date || new Date().toISOString().split('T')[0],
+        order_date: input.order_date || new Date().toLocaleDateString('sv-SE'),
         delivery_date: input.delivery_date || null,
         etd: input.etd || null,
         eta: input.eta || null,
@@ -862,7 +862,7 @@ export const salesOrderService = {
     ])
 
     // Đơn quá ETD: ETD < today, chưa delivered/paid/cancelled
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
     const { count: overdueEtd } = await supabase
       .from('sales_orders')
       .select('id', { count: 'exact', head: true })

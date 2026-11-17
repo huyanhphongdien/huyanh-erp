@@ -15,7 +15,9 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
-import { notify } from '../../services/notificationHelper'
+import { leaveRequestService, type BusinessTripCreateInput } from '../../services/leaveRequestService'
+import { todayVN } from '../../utils/dateVN'
+import { dichLoiHeThong } from '../../utils/dichLoiHeThong'
 
 // ============================================================================
 // TYPES
@@ -103,123 +105,10 @@ async function fetchBusinessTrips(
   return (data || []) as any
 }
 
-async function createBusinessTrips(params: {
-  employee_ids: string[]  // ★ Multi-select
-  start_date: string
-  end_date: string
-  total_days: number
-  trip_destination: string
-  trip_purpose: string
-  trip_with: string
-  reason: string
-  created_by: string
-  creator_name: string
-}): Promise<void> {
-  const typeId = await getBusinessTripTypeId()
-  if (!typeId) throw new Error('Loại phép "Công tác" chưa được cấu hình')
-
-  // Lấy số thứ tự mã đơn hiện tại
-  const year = new Date().getFullYear()
-  const { data: last } = await supabase
-    .from('leave_requests')
-    .select('request_number')
-    .ilike('request_number', `CT${year}%`)
-    .order('request_number', { ascending: false })
-    .limit(1)
-  let nextNum = last && last.length > 0 ? parseInt(last[0].request_number.slice(-4)) + 1 : 1
-
-  const startVN = new Date(params.start_date).toLocaleDateString('vi-VN')
-  const endVN = new Date(params.end_date).toLocaleDateString('vi-VN')
-
-  for (const empId of params.employee_ids) {
-    const requestNumber = `CT${year}-${String(nextNum++).padStart(4, '0')}`
-
-    // Tạo đơn — TP/PP tạo = auto approved
-    const { error: insertError } = await supabase
-      .from('leave_requests')
-      .insert({
-        employee_id: empId,
-        leave_type_id: typeId,
-        request_number: requestNumber,
-        start_date: params.start_date,
-        end_date: params.end_date,
-        total_days: params.total_days,
-        trip_destination: params.trip_destination,
-        trip_purpose: params.trip_purpose,
-        trip_with: params.trip_with,
-        reason: params.reason || `Công tác: ${params.trip_destination}`,
-        status: 'approved',
-        approved_by: params.created_by,
-        approved_at: new Date().toISOString(),
-      })
-    if (insertError) throw insertError
-
-    // Tạo attendance records
-    const start = new Date(params.start_date + 'T00:00:00+07:00')
-    const end = new Date(params.end_date + 'T00:00:00+07:00')
-
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0]
-      const { data: existing } = await supabase
-        .from('attendance')
-        .select('id')
-        .eq('employee_id', empId)
-        .eq('date', dateStr)
-        .maybeSingle()
-      if (existing) continue
-
-      await supabase.from('attendance').insert({
-        employee_id: empId,
-        date: dateStr,
-        status: 'business_trip',
-        work_units: 1.0,
-        working_minutes: 480,
-        notes: `Công tác: ${params.trip_destination} — ${params.trip_purpose || ''}`.trim(),
-        check_in_time: dateStr + 'T08:00:00+07:00',
-        check_out_time: dateStr + 'T17:00:00+07:00',
-      })
-    }
-
-    // ★ Gửi thông báo cho NV
-    try {
-      await notify({
-        recipientId: empId,
-        senderId: params.created_by,
-        module: 'attendance',
-        type: 'attendance_business_trip',
-        title: `Bạn được gán đi công tác: ${params.trip_destination}`,
-        message: `${params.creator_name} đã gán bạn đi công tác ${params.trip_destination} từ ${startVN} đến ${endVN} (${params.total_days} ngày).${params.trip_purpose ? ' Mục đích: ' + params.trip_purpose : ''}`,
-        referenceUrl: '/attendance/business-trips',
-        priority: 'normal',
-      })
-    } catch (e) {
-      console.error('[BusinessTrip] notification error:', e)
-    }
-  }
-}
-
-async function deleteBusinessTrip(id: string): Promise<void> {
-  // Lấy thông tin đơn trước
-  const { data: trip } = await supabase
-    .from('leave_requests')
-    .select('employee_id, start_date, end_date')
-    .eq('id', id)
-    .single()
-
-  if (!trip) throw new Error('Không tìm thấy đơn')
-
-  // Xóa attendance business_trip
-  await supabase
-    .from('attendance')
-    .delete()
-    .eq('employee_id', trip.employee_id)
-    .eq('status', 'business_trip')
-    .gte('date', trip.start_date)
-    .lte('date', trip.end_date)
-
-  // Xóa đơn
-  await supabase.from('leave_requests').delete().eq('id', id)
-}
+// Tạo / sửa / xoá đơn công tác: gọi leaveRequestService.createBusinessTrips /
+// updateBusinessTrip / deleteBusinessTrip — MỘT nguồn attendance công tác chung
+// với luồng duyệt nghỉ phép. Bản inline cũ tính ngày bằng toISOString (UTC) nên
+// attendance lùi 1 ngày, xoá đơn để sót dòng mồ côi (audit 17/11/2026).
 
 // ============================================================================
 // COMPONENT
@@ -247,8 +136,8 @@ export default function BusinessTripPage() {
 
   // Form state
   const [formEmployeeIds, setFormEmployeeIds] = useState<string[]>([])
-  const [formStartDate, setFormStartDate] = useState(new Date().toISOString().split('T')[0])
-  const [formEndDate, setFormEndDate] = useState(new Date().toISOString().split('T')[0])
+  const [formStartDate, setFormStartDate] = useState(todayVN())
+  const [formEndDate, setFormEndDate] = useState(todayVN())
   const [formDestination, setFormDestination] = useState('')
   const [formPurpose, setFormPurpose] = useState('')
   const [formWith, setFormWith] = useState('')
@@ -280,7 +169,7 @@ export default function BusinessTripPage() {
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: createBusinessTrips,
+    mutationFn: (input: BusinessTripCreateInput) => leaveRequestService.createBusinessTrips(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['business-trips'] })
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
@@ -289,7 +178,7 @@ export default function BusinessTripPage() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: deleteBusinessTrip,
+    mutationFn: (id: string) => leaveRequestService.deleteBusinessTrip(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['business-trips'] })
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
@@ -299,75 +188,14 @@ export default function BusinessTripPage() {
 
   // ★ Sửa đơn công tác
   const editMutation = useMutation({
-    mutationFn: async (tripId: string) => {
-      // Lấy đơn hiện tại
-      const { data: trip } = await supabase
-        .from('leave_requests')
-        .select('employee_id, start_date, end_date')
-        .eq('id', tripId)
-        .single()
-      if (!trip) throw new Error('Không tìm thấy đơn')
-
-      const datesChanged = trip.start_date !== editStart || trip.end_date !== editEnd
-      const newTotalDays = Math.max(1, Math.ceil((new Date(editEnd).getTime() - new Date(editStart).getTime()) / (1000 * 60 * 60 * 24)) + 1)
-
-      // Cập nhật đơn
-      const { error } = await supabase
-        .from('leave_requests')
-        .update({
-          trip_destination: editDest,
-          trip_purpose: editPurpose,
-          trip_with: editWith,
-          start_date: editStart,
-          end_date: editEnd,
-          total_days: newTotalDays,
-          reason: `Công tác: ${editDest}`,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', tripId)
-      if (error) throw error
-
-      // Nếu ngày thay đổi → xóa attendance cũ + tạo mới
-      if (datesChanged) {
-        await supabase
-          .from('attendance')
-          .delete()
-          .eq('employee_id', trip.employee_id)
-          .eq('status', 'business_trip')
-          .gte('date', trip.start_date)
-          .lte('date', trip.end_date)
-
-        const start = new Date(editStart + 'T00:00:00+07:00')
-        const end = new Date(editEnd + 'T00:00:00+07:00')
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          const dateStr = d.toISOString().split('T')[0]
-          const { data: existing } = await supabase
-            .from('attendance').select('id')
-            .eq('employee_id', trip.employee_id).eq('date', dateStr).maybeSingle()
-          if (existing) continue
-
-          await supabase.from('attendance').insert({
-            employee_id: trip.employee_id,
-            date: dateStr,
-            status: 'business_trip',
-            work_units: 1.0,
-            working_minutes: 480,
-            notes: `Công tác: ${editDest} — ${editPurpose || ''}`.trim(),
-            check_in_time: dateStr + 'T08:00:00+07:00',
-            check_out_time: dateStr + 'T17:00:00+07:00',
-          })
-        }
-      } else {
-        // Chỉ update notes attendance
-        await supabase
-          .from('attendance')
-          .update({ notes: `Công tác: ${editDest} — ${editPurpose || ''}`.trim() })
-          .eq('employee_id', trip.employee_id)
-          .eq('status', 'business_trip')
-          .gte('date', editStart)
-          .lte('date', editEnd)
-      }
-    },
+    mutationFn: (tripId: string) =>
+      leaveRequestService.updateBusinessTrip(tripId, {
+        trip_destination: editDest,
+        trip_purpose: editPurpose,
+        trip_with: editWith,
+        start_date: editStart,
+        end_date: editEnd,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['business-trips'] })
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
@@ -386,8 +214,8 @@ export default function BusinessTripPage() {
   function resetForm() {
     setShowForm(false)
     setFormEmployeeIds([])
-    setFormStartDate(new Date().toISOString().split('T')[0])
-    setFormEndDate(new Date().toISOString().split('T')[0])
+    setFormStartDate(todayVN())
+    setFormEndDate(todayVN())
     setFormDestination('')
     setFormPurpose('')
     setFormWith('')
@@ -600,7 +428,7 @@ export default function BusinessTripPage() {
               {createMutation.isError && (
                 <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
                   <AlertTriangle size={16} />
-                  {(createMutation.error as Error)?.message || 'Có lỗi xảy ra'}
+                  {dichLoiHeThong(createMutation.error, 'Không tạo được đơn công tác')}
                 </div>
               )}
 
@@ -709,7 +537,7 @@ export default function BusinessTripPage() {
                           </div>
                           {editMutation.isError && (
                             <div className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">
-                              {(editMutation.error as Error)?.message || 'Lỗi'}
+                              {dichLoiHeThong(editMutation.error, 'Không lưu được thay đổi')}
                             </div>
                           )}
                           <div className="flex gap-2">
@@ -777,7 +605,11 @@ export default function BusinessTripPage() {
                               </button>
                               {deleteId === trip.id ? (
                                 <div className="flex items-center gap-2 flex-1">
-                                  <span className="text-xs text-red-600 flex-1">Xác nhận xóa?</span>
+                                  <span className="text-xs text-red-600 flex-1">
+                                    {deleteMutation.isError && deleteMutation.variables === trip.id
+                                      ? dichLoiHeThong(deleteMutation.error, 'Không xoá được đơn')
+                                      : 'Xác nhận xóa?'}
+                                  </span>
                                   <button onClick={() => deleteMutation.mutate(trip.id)} disabled={deleteMutation.isPending}
                                     className="px-2 py-1 bg-red-600 text-white text-[11px] font-semibold rounded-lg disabled:opacity-50">
                                     {deleteMutation.isPending ? '...' : 'Xóa'}

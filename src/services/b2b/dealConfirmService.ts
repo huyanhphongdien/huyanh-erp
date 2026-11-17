@@ -300,7 +300,7 @@ export const dealConfirmService = {
             amount: formData.advance_amount,
             currency: 'VND',
             amount_vnd: formData.advance_amount,
-            payment_date: new Date().toISOString().split('T')[0],
+            payment_date: new Date().toLocaleDateString('sv-SE'),
             payment_method: formData.advance_payment_method || 'cash',
             purpose,
             status: 'approved',

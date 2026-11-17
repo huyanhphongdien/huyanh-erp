@@ -119,7 +119,7 @@ export const projectHealthService = {
       .from('project_milestones')
       .select('id, name')
       .eq('project_id', projectId)
-      .lt('due_date', new Date().toISOString().split('T')[0])
+      .lt('due_date', new Date().toLocaleDateString('sv-SE'))
       .in('status', ['pending', 'approaching'])
 
     const overdueCount = overdueMilestones?.length || 0

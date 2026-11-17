@@ -269,7 +269,7 @@ export const materialVariantService = {
 
   async updatePurchasePrice(id: string, price: number): Promise<void> {
     const { error } = await supabase.from('material_variants').update({ 
-      last_purchase_price: price, last_purchase_date: new Date().toISOString().split('T')[0], updated_at: new Date().toISOString() 
+      last_purchase_price: price, last_purchase_date: new Date().toLocaleDateString('sv-SE'), updated_at: new Date().toISOString() 
     }).eq('id', id)
     if (error) throw error
   },

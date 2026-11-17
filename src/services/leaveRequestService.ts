@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { eachDayStr } from '../utils/dateVN'
 
 // ============================================================================
 // TYPES
@@ -99,6 +100,20 @@ export interface LeaveBatchResult {
   success: number
   failed: number
   errors: Array<{ id: string; error: string }>
+}
+
+// ★ Input tạo đơn công tác (BusinessTripPage) — 1 đơn cho mỗi nhân viên được chọn
+export interface BusinessTripCreateInput {
+  employee_ids: string[]
+  start_date: string
+  end_date: string
+  total_days: number
+  trip_destination: string
+  trip_purpose: string
+  trip_with: string
+  reason: string
+  created_by: string
+  creator_name: string
 }
 
 // ============================================================================
@@ -693,6 +708,156 @@ export const leaveRequestService = {
   },
 
   // ==========================================================================
+  // ★ ĐƠN CÔNG TÁC (BusinessTripPage) — MỘT nguồn tạo/sửa/xoá đơn + attendance,
+  //   tái dùng _createBusinessTripAttendance / _deleteBusinessTripAttendance.
+  //   (Bản inline cũ trong page tính ngày bằng toISOString → attendance lùi
+  //   1 ngày, xoá đơn để sót dòng mồ côi — audit 17/11/2026.)
+  // ==========================================================================
+  async createBusinessTrips(params: BusinessTripCreateInput): Promise<void> {
+    const { data: typeRow } = await supabase
+      .from('leave_types')
+      .select('id')
+      .eq('code', 'BUSINESS_TRIP')
+      .maybeSingle()
+    const typeId = typeRow?.id
+    if (!typeId) throw new Error('Loại phép "Công tác" chưa được cấu hình')
+
+    // Mã đơn CT{year}-NNNN (công tác đánh số riêng, khác NP của nghỉ phép)
+    const year = new Date().getFullYear()
+    const { data: last } = await supabase
+      .from('leave_requests')
+      .select('request_number')
+      .ilike('request_number', `CT${year}%`)
+      .order('request_number', { ascending: false })
+      .limit(1)
+    let nextNum = last && last.length > 0 ? parseInt(last[0].request_number.slice(-4)) + 1 : 1
+
+    const startVN = new Date(params.start_date + 'T00:00:00+07:00').toLocaleDateString('vi-VN')
+    const endVN = new Date(params.end_date + 'T00:00:00+07:00').toLocaleDateString('vi-VN')
+
+    for (const empId of params.employee_ids) {
+      const requestNumber = `CT${year}-${String(nextNum++).padStart(4, '0')}`
+
+      // Tạo đơn — TP/PP tạo = auto approved
+      const { error: insertError } = await supabase
+        .from('leave_requests')
+        .insert({
+          employee_id: empId,
+          leave_type_id: typeId,
+          request_number: requestNumber,
+          start_date: params.start_date,
+          end_date: params.end_date,
+          total_days: params.total_days,
+          trip_destination: params.trip_destination,
+          trip_purpose: params.trip_purpose,
+          trip_with: params.trip_with,
+          reason: params.reason || `Công tác: ${params.trip_destination}`,
+          status: 'approved',
+          approved_by: params.created_by,
+          approved_at: new Date().toISOString(),
+        })
+      if (insertError) throw insertError
+
+      // Attendance business_trip — cùng một nguồn với luồng duyệt đơn nghỉ phép
+      await this._createBusinessTripAttendance({
+        employee_id: empId,
+        start_date: params.start_date,
+        end_date: params.end_date,
+        trip_destination: params.trip_destination,
+        trip_purpose: params.trip_purpose,
+        leave_type: { code: 'BUSINESS_TRIP' },
+      })
+
+      // Thông báo cho NV được gán
+      try {
+        const { notify } = await import('./notificationHelper')
+        await notify({
+          recipientId: empId,
+          senderId: params.created_by,
+          module: 'attendance',
+          type: 'attendance_business_trip',
+          title: `Bạn được gán đi công tác: ${params.trip_destination}`,
+          message: `${params.creator_name} đã gán bạn đi công tác ${params.trip_destination} từ ${startVN} đến ${endVN} (${params.total_days} ngày).${params.trip_purpose ? ' Mục đích: ' + params.trip_purpose : ''}`,
+          referenceUrl: '/attendance/business-trips',
+          priority: 'normal',
+        })
+      } catch (e) {
+        console.error('[leaveRequestService] business trip notify error:', e)
+      }
+    }
+  },
+
+  async updateBusinessTrip(id: string, changes: {
+    trip_destination: string
+    trip_purpose: string
+    trip_with: string
+    start_date: string
+    end_date: string
+  }): Promise<void> {
+    const { data: trip } = await supabase
+      .from('leave_requests')
+      .select('employee_id, start_date, end_date')
+      .eq('id', id)
+      .single()
+    if (!trip) throw new Error('Không tìm thấy đơn công tác')
+
+    const datesChanged = trip.start_date !== changes.start_date || trip.end_date !== changes.end_date
+    const newTotalDays = Math.max(1, eachDayStr(changes.start_date, changes.end_date).length)
+
+    const { error } = await supabase
+      .from('leave_requests')
+      .update({
+        trip_destination: changes.trip_destination,
+        trip_purpose: changes.trip_purpose,
+        trip_with: changes.trip_with,
+        start_date: changes.start_date,
+        end_date: changes.end_date,
+        total_days: newTotalDays,
+        reason: `Công tác: ${changes.trip_destination}`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+    if (error) throw error
+
+    if (datesChanged) {
+      // Xoá attendance theo KHOẢNG CŨ rồi tạo lại theo khoảng mới — không để dòng mồ côi
+      await this._deleteBusinessTripAttendance(trip.employee_id, trip.start_date, trip.end_date)
+      await this._createBusinessTripAttendance({
+        employee_id: trip.employee_id,
+        start_date: changes.start_date,
+        end_date: changes.end_date,
+        trip_destination: changes.trip_destination,
+        trip_purpose: changes.trip_purpose,
+        leave_type: { code: 'BUSINESS_TRIP' },
+      })
+    } else {
+      // Ngày không đổi → chỉ cập nhật ghi chú attendance
+      await supabase
+        .from('attendance')
+        .update({ notes: `Công tác: ${changes.trip_destination} — ${changes.trip_purpose || ''}`.trim() })
+        .eq('employee_id', trip.employee_id)
+        .eq('status', 'business_trip')
+        .gte('date', changes.start_date)
+        .lte('date', changes.end_date)
+    }
+  },
+
+  async deleteBusinessTrip(id: string): Promise<void> {
+    const { data: trip } = await supabase
+      .from('leave_requests')
+      .select('employee_id, start_date, end_date')
+      .eq('id', id)
+      .single()
+    if (!trip) throw new Error('Không tìm thấy đơn công tác')
+
+    // Xoá attendance business_trip đúng khoảng ngày của đơn
+    await this._deleteBusinessTripAttendance(trip.employee_id, trip.start_date, trip.end_date)
+
+    const { error } = await supabase.from('leave_requests').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  // ==========================================================================
   // ★ AUTO-ATTENDANCE CHO CÔNG TÁC (khi duyệt đơn)
   // ==========================================================================
   async _createBusinessTripAttendance(request: any): Promise<void> {
@@ -701,13 +866,8 @@ export const leaveRequestService = {
       const leaveType = Array.isArray(request.leave_type) ? request.leave_type[0] : request.leave_type
       if (!leaveType || leaveType.code !== 'BUSINESS_TRIP') return
 
-      const startDate = new Date(request.start_date + 'T00:00:00+07:00')
-      const endDate = new Date(request.end_date + 'T00:00:00+07:00')
-
-      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-        // Format local date (không dùng toISOString vì nó trả UTC → lùi 1 ngày ở VN timezone)
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-
+      // Duyệt ngày thuần lịch (dateVN.eachDayStr) — không đi qua Date/toISOString nên không lệch múi giờ
+      for (const dateStr of eachDayStr(request.start_date, request.end_date)) {
         // Kiểm tra đã có attendance cho ngày này chưa
         const { data: existing } = await supabase
           .from('attendance')

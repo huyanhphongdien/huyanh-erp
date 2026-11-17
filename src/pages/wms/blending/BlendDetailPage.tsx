@@ -290,7 +290,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
           <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{order.target_drc}%</Text>
         </Descriptions.Item>
         <Descriptions.Item label="SL mục tiêu">
-          <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{order.target_quantity_kg?.toLocaleString()} kg</Text>
+          <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{order.target_quantity_kg?.toLocaleString('vi-VN')} kg</Text>
         </Descriptions.Item>
         <Descriptions.Item label="DRC mô phỏng">
           <Text strong style={{ fontFamily: "'JetBrains Mono', monospace", color: '#1B4D3E' }}>
@@ -307,7 +307,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
         </Descriptions.Item>
         <Descriptions.Item label="SL thực tế">
           <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            {order.actual_quantity_kg != null ? `${order.actual_quantity_kg.toLocaleString()} kg` : '—'}
+            {order.actual_quantity_kg != null ? `${order.actual_quantity_kg.toLocaleString('vi-VN')} kg` : '—'}
           </Text>
         </Descriptions.Item>
         <Descriptions.Item label="Đạt mục tiêu">
@@ -373,7 +373,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
       <Row gutter={16}>
         <Col span={8}>
           <Card styles={{ body: { padding: 12 } }}>
-            <Statistic title="Tổng NL (kg)" value={totalInputQty.toLocaleString()}
+            <Statistic title="Tổng NL (kg)" value={totalInputQty.toLocaleString('vi-VN')}
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
@@ -385,7 +385,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
         </Col>
         <Col span={8}>
           <Card styles={{ body: { padding: 12 } }}>
-            <Statistic title="SL mô phỏng (kg)" value={order.simulated_quantity_kg?.toLocaleString() || '—'}
+            <Statistic title="SL mô phỏng (kg)" value={order.simulated_quantity_kg?.toLocaleString('vi-VN') || '—'}
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
@@ -433,7 +433,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
       key: 'quantity_kg',
       align: 'right' as const,
       render: (v: number) => (
-        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v?.toLocaleString()}</Text>
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v?.toLocaleString('vi-VN')}</Text>
       ),
     },
     {

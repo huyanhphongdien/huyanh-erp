@@ -462,7 +462,7 @@ export default function ExecutiveDashboardPage() {
                       opacity={0.85}
                     />
                     <text x={x + 30} y={175 - barH} textAnchor="middle" fontSize="11" fill="#333" fontWeight="600">
-                      {m.revenue >= 1000 ? `${(m.revenue / 1000).toFixed(0)}k` : m.revenue.toLocaleString()}
+                      {m.revenue >= 1000 ? `${(m.revenue / 1000).toFixed(0)}k` : m.revenue.toLocaleString('vi-VN')}
                     </text>
                     <text x={x + 30} y={200} textAnchor="middle" fontSize="11" fill="#666">
                       {m.month}
@@ -495,7 +495,7 @@ export default function ExecutiveDashboardPage() {
                   dataIndex: 'revenue',
                   key: 'revenue',
                   align: 'right' as const,
-                  render: (v: number) => <Text style={{ color: PRIMARY, fontWeight: 600 }}>${v.toLocaleString()}</Text>,
+                  render: (v: number) => <Text style={{ color: PRIMARY, fontWeight: 600 }}>${v.toLocaleString('vi-VN')}</Text>,
                 },
                 {
                   title: 'Đơn',

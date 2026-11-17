@@ -21,6 +21,7 @@ import { monthlyTimesheetService } from '../../services/monthlyTimesheetService'
 import type { DayDetail, EmployeeMonthlySummary } from '../../services/monthlyTimesheetService'
 import { exportMonthlyTimesheetExcel, exportEmployeeMonthlyExcel } from '../../services/monthlyTimesheetExcel'
 import EditAttendanceModal from './EditAttendanceModal'
+import PageState from '../../components/common/PageState'
 
 // ============================================================================
 // CONSTANTS
@@ -103,7 +104,7 @@ export default function MonthlyTimesheetPage() {
 
   const effectiveDeptId = selectedDept === 'all' ? undefined : selectedDept
 
-  const { data: timesheet, isLoading } = useQuery({
+  const { data: timesheet, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['monthly-timesheet', selectedYear, selectedMonth, effectiveDeptId],
     queryFn: () => monthlyTimesheetService.getMonthlyTimesheet(selectedYear, selectedMonth, effectiveDeptId || null),
     staleTime: 5 * 60 * 1000,
@@ -211,6 +212,8 @@ export default function MonthlyTimesheetPage() {
             <Loader2 size={24} className="animate-spin text-[#1B4D3E] mr-2" />
             <span className="text-gray-500">Đang tải bảng chấm công...</span>
           </div>
+        ) : isError ? (
+          <PageState error={error} onRetry={() => refetch()} />
         ) : !displayedTimesheet || displayedTimesheet.employees.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
             <Calendar size={40} className="mx-auto mb-3 opacity-50" />

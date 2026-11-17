@@ -38,6 +38,7 @@ import {
 import { materialCategoryService, type MaterialCategory } from '../../../services/materialCategoryService'
 import { materialTypeService, type MaterialType } from '../../../services/materialTypeService'
 import MaterialForm from './components/materials/MaterialForm'
+import { useDebounce } from '../../../hooks/useDebounce'
 
 const MaterialListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -46,6 +47,7 @@ const MaterialListPage: React.FC = () => {
   const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 400) // gõ xong 400ms mới bắn query
   const [filterCategory, setFilterCategory] = useState<string>('')
   const [filterType, setFilterType] = useState<string>('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -109,7 +111,7 @@ const MaterialListPage: React.FC = () => {
       const params: MaterialPaginationParams = {
         page,
         pageSize,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         categoryId: filterCategory || undefined,
         typeId: filterType || undefined,
         status: filterStatus === 'all' ? undefined : filterStatus as 'active' | 'inactive',
@@ -142,7 +144,7 @@ const MaterialListPage: React.FC = () => {
 
   useEffect(() => {
     fetchMaterials()
-  }, [page, search, filterCategory, filterType, filterStatus, filterLowStock])
+  }, [page, debouncedSearch, filterCategory, filterType, filterStatus, filterLowStock])
 
   useEffect(() => {
     fetchStats()
@@ -494,13 +496,13 @@ const MaterialListPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className={`font-medium ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>
-                          {stockValue.toLocaleString()}
+                          {stockValue.toLocaleString('vi-VN')}
                           {isLowStock && (
                             <AlertTriangle className="w-4 h-4 inline ml-1" />
                           )}
                         </div>
                         <div className="text-xs text-gray-500">
-                          Tối thiểu: {minStockValue.toLocaleString()}
+                          Tối thiểu: {minStockValue.toLocaleString('vi-VN')}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">

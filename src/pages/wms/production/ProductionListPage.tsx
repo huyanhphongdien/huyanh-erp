@@ -28,15 +28,14 @@ import {
   SearchOutlined,
 } from '@ant-design/icons'
 import productionService from '../../../services/wms/productionService'
+import { useDebounce } from '../../../hooks/useDebounce'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import type { ProductionOrder, ProductionStatus } from '../../../services/wms/wms.types'
 import {
   PRODUCTION_STATUS_LABELS,
   PRODUCTION_STATUS_COLORS,
   STAGE_NAMES,
-  RUBBER_GRADE_LABELS,
 } from '../../../services/wms/wms.types'
-import type { RubberGrade } from '../../../services/wms/wms.types'
 
 const { Title, Text } = Typography
 
@@ -53,6 +52,7 @@ const ProductionListPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchText, setSearchText] = useState('')
+  const searchDebounced = useDebounce(searchText, 400) // gõ xong 400ms mới bắn query
   const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -66,7 +66,7 @@ const ProductionListPage = () => {
         page,
         pageSize,
         status: filterStatus,
-        search: searchText.trim() || undefined,
+        search: searchDebounced.trim() || undefined,
       })
       setOrders(result.data)
       setTotalOrders(result.total)
@@ -76,7 +76,7 @@ const ProductionListPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [filterStatus, searchText, page, pageSize])
+  }, [filterStatus, searchDebounced, page, pageSize])
 
   useEffect(() => {
     loadOrders()
@@ -115,7 +115,7 @@ const ProductionListPage = () => {
       align: 'right' as const,
       render: (v: number) => (
         <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          {v ? v.toLocaleString() : '—'}
+          {v ? v.toLocaleString('vi-VN') : '—'}
         </Text>
       ),
     },
@@ -174,11 +174,6 @@ const ProductionListPage = () => {
   const statusOptions = [
     { value: 'all', label: 'Tất cả' },
     ...Object.entries(PRODUCTION_STATUS_LABELS).map(([value, label]) => ({ value, label })),
-  ]
-
-  const gradeOptions = [
-    { value: 'all', label: 'Tat ca Grade' },
-    ...Object.entries(RUBBER_GRADE_LABELS).map(([value, label]) => ({ value, label })),
   ]
 
   return (

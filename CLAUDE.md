@@ -41,6 +41,14 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
 - **Màu trạng thái DÒNG TIỀN (mọi luồng duyệt–chi: quyết toán B2B, ĐNTT mủ, ĐNTT đội xe…):** vàng/cam = chờ duyệt ·
   xanh **DƯƠNG** = đã duyệt CHỜ chi · xanh **LÁ** = đã chi/hoàn tất · đỏ = huỷ/từ chối. Đã đồng bộ 17/11/2026
   (settlementService + StatusTag đổi theo fleet/PaymentRequest); màn mới đừng tự chế bảng màu khác.
+- **Nền móng UI dùng chung (Đợt 2 audit 17/11/2026) — màn mới PHẢI dùng, đừng tự chế bản riêng:**
+  `src/components/common/PageState.tsx` (loading/lỗi+Thử lại/trống — lỗi xét TRƯỚC trống, cấm nuốt catch rồi hiện
+  "Không có dữ liệu"); `src/utils/dichLoiHeThong.ts` (dịch lỗi Supabase/mạng sang tiếng Việt — bọc mọi e.message
+  trước khi hiện); `src/hooks/useDebounce.ts` (ô tìm kiếm server-side bọc 400ms); `src/hooks/useUnsavedWarning.ts`
+  (form tạo/sửa dài gọi với cờ dirty); `src/utils/dateVN.ts` (todayVN/addDaysStr/eachDayStr). ⚠ CẤM
+  `toISOString().slice(0,10)`/`split('T')[0]` cho NGÀY (bug UTC lùi 1 ngày trước 7h sáng — codemod 17/11 đã quét
+  `new Date().toISOString()…` → `toLocaleDateString('sv-SE')`) và CẤM `toLocaleString()` trần (phải 'vi-VN' — đã
+  codemod 151 chỗ; USD dùng 'en-US' qua salesMoney).
 - **Điện thoại (≤ 640px)**: hook `src/hooks/useIsPhone.ts`. Sổ đơn hàng bán (`SalesOrderListPage`) trên điện thoại vẽ THẺ
   (`components/SalesOrderPhoneList.tsx`) thay cho bảng 20 cột và giấu Views/độ dày/Split/ẩn cột/Excel/chọn nhiều dòng
   (04/11/2026, đo bằng Chrome DevTools MCP). Thêm cột mới cho Sổ đơn → cân nhắc thêm vào thẻ; chi tiết đơn mở bằng

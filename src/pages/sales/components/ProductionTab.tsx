@@ -241,7 +241,7 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
     <Card size="small" title="Thông tin sản xuất" style={{ marginBottom: 16 }}>
       <Descriptions column={2} size="small" bordered>
         <Descriptions.Item label="Grade"><Tag color="green">{order.grade}</Tag></Descriptions.Item>
-        <Descriptions.Item label="Số lượng">{order.quantity_tons} tấn ({(order.quantity_kg || order.quantity_tons * 1000).toLocaleString()} kg)</Descriptions.Item>
+        <Descriptions.Item label="Số lượng">{order.quantity_tons} tấn ({(order.quantity_kg || order.quantity_tons * 1000).toLocaleString('vi-VN')} kg)</Descriptions.Item>
         <Descriptions.Item label="Tổng bành">{totalBales}</Descriptions.Item>
         <Descriptions.Item label="Bành/container">{balesPerContainer}</Descriptions.Item>
         <Descriptions.Item label="Container cần">{containerCount} x {order.container_type || '20ft'}</Descriptions.Item>

@@ -41,7 +41,7 @@ const FEE_FLAG_DEFAULT_BASIS: Record<string, 'ton' | 'lot'> = {
 interface FacilityOpt { id: string; code: string | null; name: string }
 
 const num = (v: string): number | null => (v === '' || v == null ? null : Number(v))
-const todayISO = () => new Date().toISOString().slice(0, 10)
+const todayISO = () => new Date().toLocaleDateString('sv-SE')
 
 function emptyForm(): PriceLockInput {
   return {

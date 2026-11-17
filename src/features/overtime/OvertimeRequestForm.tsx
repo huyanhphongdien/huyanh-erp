@@ -54,7 +54,7 @@ export default function OvertimeRequestForm({ onClose, onSuccess }: Props) {
   const employeeId = user?.employee_id
 
   const [formData, setFormData] = useState<FormData>({
-    request_date: new Date().toISOString().split('T')[0],
+    request_date: new Date().toLocaleDateString('sv-SE'),
     planned_start: '17:30',
     planned_end: '19:30',
     planned_minutes: 120,

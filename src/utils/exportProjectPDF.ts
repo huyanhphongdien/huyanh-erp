@@ -410,7 +410,7 @@ export function exportPortfolioCSV(items: Array<{
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `portfolio-report-${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `portfolio-report-${new Date().toLocaleDateString('sv-SE')}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }

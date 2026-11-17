@@ -474,7 +474,7 @@ export const invoicePaymentService = {
       if (iError) continue;
       if (!invoices?.length) continue;
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('sv-SE');
       const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       const summary: SupplierDebtSummary = {
@@ -578,7 +578,7 @@ export const invoicePaymentService = {
     }
 
     // 4. Tạo summary
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('sv-SE');
     const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const invList = invoices || [];
 
@@ -644,7 +644,7 @@ export const invoicePaymentService = {
    * Fallback: Lấy hóa đơn quá hạn khi view chưa tồn tại
    */
   async getOverdueInvoicesFallback(): Promise<OverdueInvoice[]> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('sv-SE');
 
     const { data, error } = await supabase
       .from('supplier_invoices')
@@ -735,7 +735,7 @@ export const invoicePaymentService = {
       .neq('status', 'cancelled')
       .neq('payment_status', 'paid');
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('sv-SE');
     const overdueList = (debtData || []).filter(d => d.due_date && d.due_date < today);
 
     const paymentList = payments || [];

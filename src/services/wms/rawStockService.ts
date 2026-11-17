@@ -493,7 +493,7 @@ export const rawStockService = {
   }> {
     const [byType, queue, flow] = await Promise.all([
       this.getBalanceByType(facilityId),
-      this.getIntakeQueue({ facilityId, includeDone: true, fromDate: new Date().toISOString().slice(0, 10) }),
+      this.getIntakeQueue({ facilityId, includeDone: true, fromDate: new Date().toLocaleDateString('sv-SE') }),
       this.getDailyFlow(facilityId, 1),
     ])
     const wet = byType.reduce((s, r) => s + r.wet_kg, 0)

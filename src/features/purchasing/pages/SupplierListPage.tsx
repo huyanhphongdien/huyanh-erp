@@ -42,6 +42,7 @@ import {
   type SupplierFilterParams,
 } from '../../../services/supplierService';
 import { Hac13CodeDisplay } from '../../../components/master-data/Hac13CodeDisplay';
+import { useDebounce } from '../../../hooks/useDebounce';
 
 // ============================================================================
 // TYPES
@@ -202,6 +203,7 @@ export const SupplierListPage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [filters, setFilters] = useState<FilterState>({ search: '', status: 'all', supplier_type: 'all', supplier_group: 'all', province: 'all' });
+  const debouncedSearch = useDebounce(filters.search, 400); // gõ xong 400ms mới bắn query
   const [showFilters, setShowFilters] = useState(false);
   const [provinces, setProvinces] = useState<string[]>([]);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
@@ -214,7 +216,7 @@ export const SupplierListPage: React.FC = () => {
       setError(null);
       const params: SupplierFilterParams = {
         page, pageSize,
-        search: filters.search || undefined,
+        search: debouncedSearch || undefined,
         status: filters.status !== 'all' ? filters.status : undefined,
         supplier_type: filters.supplier_type !== 'all' ? filters.supplier_type : undefined,
         supplier_group: filters.supplier_group !== 'all' ? filters.supplier_group : undefined,
@@ -241,7 +243,7 @@ export const SupplierListPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { loadSuppliers(); }, [page, pageSize, filters]);
+  useEffect(() => { loadSuppliers(); }, [page, pageSize, debouncedSearch, filters.status, filters.supplier_type, filters.supplier_group, filters.province]);
   useEffect(() => { loadProvinces(); }, []);
 
   const handleSearch = (value: string) => { setFilters((prev) => ({ ...prev, search: value })); setPage(1); };

@@ -17,6 +17,7 @@ import {
 import dayjs from 'dayjs'
 import { useAuthStore } from '../../../stores/authStore'
 import { isFinanceUser } from '../../../lib/financeAccess'
+import { dichLoiHeThong } from '../../../utils/dichLoiHeThong'
 import { fmtAmt } from '../../../services/logistics/fleetCostService'
 import {
   fleetPaymentRequestService, FLEET_PR_METHOD_LABELS,
@@ -53,7 +54,7 @@ export default function FleetPaymentRequestDetailPage() {
       const res = await fleetPaymentRequestService.getById(id)
       if (!res) { message.error('Không tìm thấy đề nghị'); navigate('/logistics/costs'); return }
       setReq(res.request); setLines(res.lines)
-    } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
+    } catch (e: any) { message.error(dichLoiHeThong(e, 'Lỗi tải')) }
     finally { setLoading(false) }
   }, [id, navigate])
   useEffect(() => { load() }, [load])
@@ -61,7 +62,7 @@ export default function FleetPaymentRequestDetailPage() {
   const act = async (fn: () => Promise<unknown>, okMsg: string) => {
     setActing(true)
     try { await fn(); message.success(okMsg); load() }
-    catch (e: any) { message.error(e?.message || String(e)) }
+    catch (e: any) { message.error(dichLoiHeThong(e, 'Thao tác thất bại')) }
     finally { setActing(false) }
   }
 

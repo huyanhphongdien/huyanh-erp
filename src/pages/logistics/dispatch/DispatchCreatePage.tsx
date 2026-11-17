@@ -22,6 +22,7 @@ import {
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
 import { useAuthStore } from '../../../stores/authStore'
+import { useUnsavedWarning } from '../../../hooks/useUnsavedWarning'
 
 const { Title } = Typography
 
@@ -101,6 +102,9 @@ export default function DispatchCreatePage() {
   const [origLineIds, setOrigLineIds] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(isEdit)
+  const [formDirty, setFormDirty] = useState(false)
+  // Đóng tab / F5 khi lệnh đang nhập dở → trình duyệt hỏi lại (đang lưu thì thôi)
+  useUnsavedWarning(formDirty && !saving)
 
   // SO picker
   const [soModalOpen, setSoModalOpen] = useState(false)
@@ -469,7 +473,7 @@ export default function DispatchCreatePage() {
           </Space>
         </div>
 
-        <Form form={form} layout="vertical" size="large" initialValues={{ dispatch_date: dayjs(), trip_type: 'port', cargo_kind: 'finished', is_hired: false }}>
+        <Form form={form} layout="vertical" size="large" onValuesChange={() => setFormDirty(true)} initialValues={{ dispatch_date: dayjs(), trip_type: 'port', cargo_kind: 'finished', is_hired: false }}>
           {/* ── LOẠI CHUYẾN — lưới thẻ gom theo nhóm xe (chạm 1 thẻ = set LUỒNG + LOẠI HÀNG) ── */}
           <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 600, fontSize: 15 }}>Loại chuyến <span style={{ color: '#dc2626' }}>*</span></span>

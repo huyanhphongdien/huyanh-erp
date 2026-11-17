@@ -171,7 +171,7 @@ export const rubberProfileService = {
 
     const insertData: Record<string, any> = {
       profile_code: profileCode,
-      intake_date: formData.intake_date || new Date().toISOString().split('T')[0],
+      intake_date: formData.intake_date || new Date().toLocaleDateString('sv-SE'),
       procurement_team: formData.procurement_team || null,
       vehicle_plate: formData.vehicle_plate,
       driver_name: formData.driver_name || null,

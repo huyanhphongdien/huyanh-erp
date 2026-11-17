@@ -81,8 +81,8 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
     defaultValues: initialData ? {
       employee_id: initialData.employee_id || '',
       leave_type_id: initialData.leave_type_id || '',
-      start_date: initialData.start_date || new Date().toISOString().split('T')[0],
-      end_date: initialData.end_date || new Date().toISOString().split('T')[0],
+      start_date: initialData.start_date || new Date().toLocaleDateString('sv-SE'),
+      end_date: initialData.end_date || new Date().toLocaleDateString('sv-SE'),
       total_days: initialData.total_days || 1,
       is_half_day: initialData.is_half_day || false,
       reason: initialData.reason || '',
@@ -92,8 +92,8 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
     } : {
       employee_id: user?.employee_id || '',
       leave_type_id: '',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: new Date().toISOString().split('T')[0],
+      start_date: new Date().toLocaleDateString('sv-SE'),
+      end_date: new Date().toLocaleDateString('sv-SE'),
       total_days: 1,
       is_half_day: false,
       reason: '',

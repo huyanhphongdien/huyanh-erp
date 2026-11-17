@@ -41,6 +41,7 @@ import type {
   PaymentStats,
   PaginatedResponse,
 } from '../../../services/invoicePaymentService';
+import { useDebounce } from '../../../hooks/useDebounce';
 
 // ============================================================================
 // HELPERS
@@ -82,7 +83,7 @@ const getFirstDayOfMonth = (): string => {
 
 // Lấy ngày hôm nay
 const getToday = (): string => {
-  return new Date().toISOString().split('T')[0];
+  return new Date().toLocaleDateString('sv-SE');
 };
 
 // ============================================================================
@@ -141,6 +142,13 @@ const PaymentListPage: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  // Gõ-là-tìm có debounce 400ms — đồng bộ hành vi tìm với các trang khác trong module
+  // (nút "Tìm" / Enter vẫn áp ngay như cũ)
+  const debouncedSearchInput = useDebounce(searchInput, 400);
+  useEffect(() => {
+    setFilters(prev => (prev.search === debouncedSearchInput ? prev : { ...prev, search: debouncedSearchInput }));
+    setPage(1);
+  }, [debouncedSearchInput]);
 
   // Sort
   const [sortField, setSortField] = useState<SortField>('payment_date');

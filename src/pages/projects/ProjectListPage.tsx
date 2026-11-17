@@ -679,7 +679,7 @@ export const ProjectListPage: React.FC = () => {
           .select('id', { count: 'exact', head: true })
           .eq('status', 'in_progress')
 
-        const today = new Date().toISOString().split('T')[0]
+        const today = new Date().toLocaleDateString('sv-SE')
         const { count: overdue } = await supabase
           .from('projects')
           .select('id', { count: 'exact', head: true })
@@ -731,7 +731,7 @@ export const ProjectListPage: React.FC = () => {
 
       // Ghi actual_start khi bắt đầu thực hiện
       if (finalStatus === 'in_progress') {
-        updatePayload.actual_start = new Date().toISOString().split('T')[0]
+        updatePayload.actual_start = new Date().toLocaleDateString('sv-SE')
       }
 
       const { error } = await supabase.from('projects')

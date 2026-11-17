@@ -174,7 +174,7 @@ export function ApprovalEvidenceForm({
 
         // 2. Default ngày duyệt = hôm nay nếu chưa có
         if (!initialData?.approval_date) {
-          setApprovalDate(new Date().toISOString().split('T')[0])
+          setApprovalDate(new Date().toLocaleDateString('sv-SE'))
         }
 
         // 3. Lấy Giám đốc làm người duyệt mặc định

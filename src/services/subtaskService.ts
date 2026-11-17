@@ -178,7 +178,7 @@ export const subtaskService = {
     }
 
     const tasks = data || []
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv-SE')
 
     const summary: SubtaskSummary = {
       total: tasks.length,

@@ -777,7 +777,7 @@ export const stockInService = {
         yard_zone: yardPosition?.zone || null,
         yard_row: yardPosition?.row || null,
         yard_col: yardPosition?.col || null,
-        received_date: new Date().toISOString().split('T')[0],
+        received_date: new Date().toLocaleDateString('sv-SE'),
       })
       .select('id, batch_no')
       .single()

@@ -383,7 +383,7 @@ function expenseRow(input: ExpenseInput, uid: string | null) {
   if (currency === 'LAK' && !(Number(input.fx_rate_vnd) > 0)) throw new Error('Khoản chi bằng LAK cần tỷ giá LAK → VNĐ')
   return {
     dispatch_order_id: input.dispatch_order_id,
-    expense_date: input.expense_date || new Date().toISOString().slice(0, 10),
+    expense_date: input.expense_date || new Date().toLocaleDateString('sv-SE'),
     kind: input.kind,
     description: input.description?.trim() || null,
     amount: input.amount,
@@ -503,7 +503,7 @@ async function addAdvance(input: AdvanceInput): Promise<DriverAdvance> {
   const uid = await currentUid()
   const { data, error } = await supabase.from('driver_advances').insert({
     driver_id: input.driver_id,
-    advance_date: input.advance_date || new Date().toISOString().slice(0, 10),
+    advance_date: input.advance_date || new Date().toLocaleDateString('sv-SE'),
     amount: input.amount, currency,
     fx_rate_vnd: currency === 'LAK' ? (input.fx_rate_vnd ?? null) : null,
     dispatch_order_id: input.dispatch_order_id ?? null,

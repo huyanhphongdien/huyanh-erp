@@ -45,7 +45,7 @@ export const bonusRulesService = {
     }
 
     if (!params.includeExpired) {
-      const asOf = params.activeAt ?? new Date().toISOString().slice(0, 10)
+      const asOf = params.activeAt ?? new Date().toLocaleDateString('sv-SE')
       query = query
         .lte('effective_from', asOf)
         .or(`effective_to.is.null,effective_to.gte.${asOf}`)

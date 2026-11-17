@@ -467,7 +467,7 @@ const NVLDashboardPage = () => {
                     {
                       key: 'weight',
                       align: 'right' as const,
-                      render: (_, r) => <Text style={{ fontSize: 12 }}>{r.weight.toLocaleString()} kg</Text>,
+                      render: (_, r) => <Text style={{ fontSize: 12 }}>{r.weight.toLocaleString('vi-VN')} kg</Text>,
                     },
                     {
                       key: 'days',
@@ -563,7 +563,7 @@ const NVLDashboardPage = () => {
                     {
                       key: 'weight',
                       align: 'right' as const,
-                      render: (_, r) => <Text style={{ fontSize: 12 }}>{r.weight.toLocaleString()} kg</Text>,
+                      render: (_, r) => <Text style={{ fontSize: 12 }}>{r.weight.toLocaleString('vi-VN')} kg</Text>,
                     },
                     {
                       key: 'action',
@@ -639,7 +639,7 @@ const NVLDashboardPage = () => {
                     align: 'right' as const,
                     render: (_, r) => (
                       <Text style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>
-                        {r.weight.toLocaleString()} kg
+                        {r.weight.toLocaleString('vi-VN')} kg
                       </Text>
                     ),
                   },
@@ -702,7 +702,7 @@ const NVLDashboardPage = () => {
                 defaultSortOrder: 'descend' as const,
                 render: (v: number) => (
                   <Text style={{ fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>
-                    {v.toLocaleString()}
+                    {v.toLocaleString('vi-VN')}
                   </Text>
                 ),
               },
@@ -786,7 +786,7 @@ const NVLDashboardPage = () => {
                 align: 'right' as const,
                 render: (v: number) => (
                   <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
-                    {v.toLocaleString()}
+                    {v.toLocaleString('vi-VN')}
                   </Text>
                 ),
               },
@@ -797,7 +797,7 @@ const NVLDashboardPage = () => {
                 align: 'right' as const,
                 render: (v: number) => (
                   <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                    {v > 0 ? v.toLocaleString() : '—'}
+                    {v > 0 ? v.toLocaleString('vi-VN') : '—'}
                   </Text>
                 ),
               },

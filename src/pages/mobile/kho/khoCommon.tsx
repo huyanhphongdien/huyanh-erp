@@ -57,9 +57,14 @@ export function FacilitySelect({ value, onChange, facilities }: { value: string 
   )
 }
 
-export function Msg({ m }: { m: { ok: boolean; text: string } | null }) {
+export function Msg({ m, onRetry }: { m: { ok: boolean; text: string } | null; onRetry?: () => void }) {
   if (!m) return null
-  return <div className="ops-card" role="status" style={{ background: m.ok ? 'var(--ok-bg)' : 'var(--red-bg)', color: m.ok ? 'var(--ok)' : 'var(--red)', fontWeight: 700, fontSize: 13.5 }}>{m.text}</div>
+  return (
+    <div className="ops-card" role="status" style={{ background: m.ok ? 'var(--ok-bg)' : 'var(--red-bg)', color: m.ok ? 'var(--ok)' : 'var(--red)', fontWeight: 700, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{m.text}</span>
+      {!m.ok && onRetry && <button type="button" onClick={onRetry} style={{ flex: '0 0 auto', background: 'transparent', border: '1.5px solid currentColor', color: 'inherit', borderRadius: 999, padding: '6px 12px', fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>Thử lại</button>}
+    </div>
+  )
 }
 
 /** Đọc giá trị QR: tem lô (URL …/wms/batch/<uuid>), uuid trần, mã lô NVL, mã lô chèn CH-…, mã phiếu chèn PC-… */

@@ -167,7 +167,7 @@ export const dealChatActionsService = {
         amount: formData.amount,
         currency: 'VND',
         amount_vnd: formData.amount,
-        payment_date: new Date().toISOString().split('T')[0],
+        payment_date: new Date().toLocaleDateString('sv-SE'),
         payment_method: formData.payment_method,
         purpose,
         status: 'paid',

@@ -651,7 +651,7 @@ export const materialService = {
       .from('materials')
       .update({
         last_purchase_price: price,
-        last_purchase_date: new Date().toISOString().split('T')[0],
+        last_purchase_date: new Date().toLocaleDateString('sv-SE'),
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)

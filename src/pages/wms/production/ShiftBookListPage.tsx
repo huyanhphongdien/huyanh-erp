@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Card, Table, Button, Space, Typography, Tag, Select, Row, Col, Empty, Spin, Tooltip, Switch, Alert, message,
+  Card, Table, Button, Space, Typography, Tag, Row, Col, Empty, Spin, Tooltip, Switch, Alert, message,
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, InboxOutlined, PrinterOutlined, TeamOutlined } from '@ant-design/icons'
 
@@ -24,7 +24,8 @@ import {
   shiftBookService, SHIFT_STATUS_LABEL, SHIFT_STATUS_COLOR, BUOC_DANG_CHO, QUYEN_DONG,
   type ShiftBook, type ShiftBookStatus, type TonKho, type QuyenKy,
 } from '../../../services/wms/shiftBookService'
-import { facilityService, type Facility } from '../../../services/wms/facilityService'
+import FacilityPicker from '../../../components/wms/FacilityPicker'
+import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import ChiDinhThuKhoModal from '../../../components/wms/ChiDinhThuKhoModal'
 
 const { Title, Text } = Typography
@@ -44,21 +45,14 @@ const DANG_CHO: Record<ShiftBookStatus, string> = {
 export default function ShiftBookListPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
-  const [facilities, setFacilities] = useState<Facility[]>([])
+  // Danh sách nhà máy từ cache dùng chung — còn dùng lấy tên NM cho modal thủ kho.
+  const { data: facilities = [] } = useActiveFacilities()
   const [facilityId, setFacilityId] = useState<string | undefined>()
   const [reports, setReports] = useState<ShiftBook[]>([])
   const [ton, setTon] = useState<Record<string, TonKho>>({})
   const [quyen, setQuyen] = useState<QuyenKy>(QUYEN_DONG)
   const [choToi, setChoToi] = useState(false)
   const [moChiDinh, setMoChiDinh] = useState(false)
-
-  useEffect(() => {
-    facilityService.getAllActive()
-      // Mặc định Phong Điền (HQ), không phải phần tử đầu — danh sách sắp theo tên nên
-      // phần tử đầu là "Lào". Xem chú thích cùng việc ở ShiftBookEntryPage.
-      .then((fs) => { setFacilities(fs); setFacilityId((c) => c ?? fs.find((f) => f.code === 'PD')?.id ?? fs[0]?.id) })
-      .catch((e) => message.error('Không đọc được danh sách nhà máy: ' + (e as Error).message))
-  }, [])
 
   const nap = async () => {
     if (!facilityId) return
@@ -209,9 +203,12 @@ export default function ShiftBookListPage() {
         </Col>
         <Col>
           <Space wrap>
-            <Select
-              value={facilityId} onChange={setFacilityId} style={{ minWidth: 180 }}
-              options={facilities.map((f) => ({ value: f.id, label: f.name }))}
+            {/* Nhớ nhà máy qua màn (store wms-facility-filter). Mặc định Phong Điền (HQ),
+                không phải phần tử đầu — danh sách sắp theo tên nên phần tử đầu là "Lào".
+                Xem chú thích cùng việc ở ShiftBookEntryPage. */}
+            <FacilityPicker
+              persist defaultCode="PD" allowAll={false}
+              onChange={setFacilityId} style={{ minWidth: 180 }}
             />
             <Button icon={<ReloadOutlined />} onClick={() => void nap()} />
             <Button icon={<TeamOutlined />} onClick={() => setMoChiDinh(true)}>Thủ kho</Button>

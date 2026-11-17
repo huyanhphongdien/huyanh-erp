@@ -80,6 +80,8 @@ interface OrderItemsTableProps {
   onChange: (items: FormItem[]) => void
   /** Callback khi tạo vật tư mới — parent thêm vào materials list */
   onMaterialCreated?: (material: Material) => void
+  /** _tempId các dòng dở (bị chặn lưu) — tô viền đỏ các ô SL/đơn giá/ĐVT còn thiếu */
+  invalidKeys?: (string | number)[]
 }
 
 // ============================================================================
@@ -127,9 +129,11 @@ interface MaterialComboboxProps {
   onSelect: (material: Material) => void
   onClear: () => void
   onQuickAdd: (searchText: string) => void
+  /** Dòng dở thiếu ĐVT — ĐVT lấy từ vật tư nên tô viền đỏ ô vật tư */
+  unitMissing?: boolean
 }
 
-function MaterialCombobox({ item, materials, onSelect, onClear, onQuickAdd }: MaterialComboboxProps) {
+function MaterialCombobox({ item, materials, onSelect, onClear, onQuickAdd, unitMissing }: MaterialComboboxProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchText, setSearchText] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -229,7 +233,9 @@ function MaterialCombobox({ item, materials, onSelect, onClear, onQuickAdd }: Ma
     return (
       <div
         ref={containerRef}
-        className="flex items-center gap-2 px-2.5 py-2 bg-blue-50 border border-blue-200 rounded-lg cursor-default group/mat"
+        className={`flex items-center gap-2 px-2.5 py-2 bg-blue-50 border rounded-lg cursor-default group/mat ${
+          unitMissing ? 'border-red-400' : 'border-blue-200'
+        }`}
       >
         <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center flex-shrink-0">
           <Check className="w-3.5 h-3.5 text-blue-600" />
@@ -242,6 +248,12 @@ function MaterialCombobox({ item, materials, onSelect, onClear, onQuickAdd }: Ma
               <>
                 <span className="mx-1 text-gray-300">·</span>
                 {item.unit}
+              </>
+            )}
+            {unitMissing && (
+              <>
+                <span className="mx-1 text-gray-300">·</span>
+                <span className="text-red-500 font-medium">Thiếu ĐVT</span>
               </>
             )}
             {item.specifications && (
@@ -270,7 +282,11 @@ function MaterialCombobox({ item, materials, onSelect, onClear, onQuickAdd }: Ma
   return (
     <div ref={containerRef} className="relative">
       {/* Search input */}
-      <div className="flex items-center gap-1.5 px-2.5 py-2 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all bg-white">
+      <div
+        className={`flex items-center gap-1.5 px-2.5 py-2 border rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all bg-white ${
+          unitMissing ? 'border-red-400' : 'border-gray-300'
+        }`}
+      >
         <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
         <input
           ref={inputRef}
@@ -433,6 +449,8 @@ interface ItemRowProps {
   onSelectMaterial: (material: Material) => void
   onClearMaterial: () => void
   onQuickAdd: (searchText: string) => void
+  /** Dòng dở bị chặn lưu — tô viền đỏ các ô còn thiếu */
+  invalid?: boolean
 }
 
 function ItemRow({
@@ -445,6 +463,7 @@ function ItemRow({
   onSelectMaterial,
   onClearMaterial,
   onQuickAdd,
+  invalid,
 }: ItemRowProps) {
   const handleFieldChange = (field: string, value: any) => {
     const updated = { ...item, [field]: value }
@@ -454,6 +473,11 @@ function ItemRow({
       onChange(updated)
     }
   }
+
+  // Dòng dở bị chặn lưu → chỉ tô viền đỏ đúng ô còn thiếu
+  const missingQty = !!invalid && !(item.quantity > 0)
+  const missingPrice = !!invalid && !(item.unit_price > 0)
+  const missingUnit = !!invalid && !item.unit
 
   return (
     <tr className="border-b border-gray-100 hover:bg-gray-50/30 group">
@@ -470,6 +494,7 @@ function ItemRow({
           onSelect={onSelectMaterial}
           onClear={onClearMaterial}
           onQuickAdd={onQuickAdd}
+          unitMissing={missingUnit}
         />
       </td>
 
@@ -507,7 +532,9 @@ function ItemRow({
           min={0}
           step="any"
           placeholder="0"
-          className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-blue-500 outline-none transition-colors tabular-nums"
+          className={`w-full px-2.5 py-2 border rounded-lg text-sm text-right focus:ring-2 focus:ring-blue-500 outline-none transition-colors tabular-nums ${
+            missingQty ? 'border-red-400' : 'border-gray-300'
+          }`}
         />
       </td>
 
@@ -520,7 +547,9 @@ function ItemRow({
           min={0}
           step="any"
           placeholder="0"
-          className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-blue-500 outline-none transition-colors tabular-nums"
+          className={`w-full px-2.5 py-2 border rounded-lg text-sm text-right focus:ring-2 focus:ring-blue-500 outline-none transition-colors tabular-nums ${
+            missingPrice ? 'border-red-400' : 'border-gray-300'
+          }`}
         />
         {item.material_id && item.unit_price > 0 && item.unit && (
           <p className="text-[10px] text-gray-400 text-right mt-0.5 tabular-nums">/{item.unit}</p>
@@ -583,6 +612,7 @@ export function OrderItemsTable({
   materials,
   onChange,
   onMaterialCreated,
+  invalidKeys,
 }: OrderItemsTableProps) {
   // Quick Add Modal state
   const [quickAdd, setQuickAdd] = useState<{
@@ -744,6 +774,7 @@ export function OrderItemsTable({
                   onSelectMaterial={(mat) => handleSelectMaterial(index, mat)}
                   onClearMaterial={() => handleClearMaterial(index)}
                   onQuickAdd={(name) => handleQuickAddOpen(index, name)}
+                  invalid={invalidKeys?.includes(item._tempId)}
                 />
               ))}
             </tbody>

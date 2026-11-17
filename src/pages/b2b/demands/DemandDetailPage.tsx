@@ -242,7 +242,7 @@ const DemandDetailPage = () => {
           <p>Chấp nhận chào giá từ <strong>{offer.partner?.name}</strong>?</p>
           <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0' }}>
             <li>Số lượng: <strong>{(offer.offered_quantity_kg / 1000).toFixed(1)} tấn</strong></li>
-            <li>Giá: <strong>{offer.offered_price.toLocaleString()} đ/kg</strong></li>
+            <li>Giá: <strong>{offer.offered_price.toLocaleString('vi-VN')} đ/kg</strong></li>
             {offer.offered_drc && <li>DRC: <strong>{offer.offered_drc}%</strong></li>}
           </ul>
           <p>Hệ thống sẽ tự động tạo Deal mới từ chào giá này.</p>
@@ -338,7 +338,7 @@ const DemandDetailPage = () => {
       align: 'right',
       render: (price: number) => (
         <Text strong style={{ color: '#1B4D3E' }}>
-          {price.toLocaleString()} đ/kg
+          {price.toLocaleString('vi-VN')} đ/kg
         </Text>
       ),
     },
@@ -457,7 +457,7 @@ const DemandDetailPage = () => {
       key: 'unit_price',
       width: 120,
       align: 'right',
-      render: (price: number) => price ? `${price.toLocaleString()} đ/kg` : '-',
+      render: (price: number) => price ? `${price.toLocaleString('vi-VN')} đ/kg` : '-',
     },
     {
       title: 'Trạng thái',
@@ -685,12 +685,12 @@ const DemandDetailPage = () => {
                       </Descriptions.Item>
                       <Descriptions.Item label="Số lượng yêu cầu">
                         <Text strong style={{ color: '#1B4D3E', fontSize: 16 }}>
-                          {(demand.quantity_kg / 1000).toFixed(1)} tấn ({demand.quantity_kg.toLocaleString()} kg)
+                          {(demand.quantity_kg / 1000).toFixed(1)} tấn ({demand.quantity_kg.toLocaleString('vi-VN')} kg)
                         </Text>
                       </Descriptions.Item>
                       <Descriptions.Item label="Đã đủ">
                         <Text strong>
-                          {(demand.quantity_filled_kg / 1000).toFixed(1)} tấn ({demand.quantity_filled_kg.toLocaleString()} kg)
+                          {(demand.quantity_filled_kg / 1000).toFixed(1)} tấn ({demand.quantity_filled_kg.toLocaleString('vi-VN')} kg)
                         </Text>
                       </Descriptions.Item>
                       <Descriptions.Item label="DRC yêu cầu">
@@ -700,7 +700,7 @@ const DemandDetailPage = () => {
                       </Descriptions.Item>
                       <Descriptions.Item label="Khoảng giá">
                         {demand.price_min || demand.price_max
-                          ? `${demand.price_min?.toLocaleString() || '?'} - ${demand.price_max?.toLocaleString() || '?'} đ/kg`
+                          ? `${demand.price_min?.toLocaleString('vi-VN') || '?'} - ${demand.price_max?.toLocaleString('vi-VN') || '?'} đ/kg`
                           : '-'}
                       </Descriptions.Item>
                       <Descriptions.Item label="Hạn chót">
@@ -743,7 +743,7 @@ const DemandDetailPage = () => {
                         <>
                           {demand.processing_fee_per_ton && (
                             <Descriptions.Item label="Phí gia công">
-                              {demand.processing_fee_per_ton.toLocaleString()} đ/tấn
+                              {demand.processing_fee_per_ton.toLocaleString('vi-VN')} đ/tấn
                             </Descriptions.Item>
                           )}
                           {demand.expected_output_rate && (

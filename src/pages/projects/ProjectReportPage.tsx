@@ -629,7 +629,7 @@ const ProjectReportPage: React.FC = () => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `bao-cao-${reportType}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `bao-cao-${reportType}-${new Date().toLocaleDateString('sv-SE')}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

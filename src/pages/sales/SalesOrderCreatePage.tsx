@@ -52,6 +52,7 @@ import { balesFromTons, containersFromBales, defaultBalesPerContainer } from '..
 import { rubberGradeService } from '../../services/wms/rubberGradeService'
 import type { SalesCustomer } from '../../services/sales/salesTypes'
 import { SALES_CURRENCY_OPTIONS, isVnd, priceUnitLabel, fmtMoney, vndInputProps } from '../../services/sales/salesMoney'
+import { useUnsavedWarning } from '../../hooks/useUnsavedWarning'
 import type { RubberGradeStandard } from '../../services/wms/wms.types'
 import {
   SVR_GRADE_OPTIONS,
@@ -80,6 +81,9 @@ function SalesOrderCreatePage() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [submittingReview, setSubmittingReview] = useState(false)
+  const [formDirty, setFormDirty] = useState(false)
+  // Đóng tab / F5 khi đang nhập dở → trình duyệt hỏi lại (đang lưu thì thôi)
+  useUnsavedWarning(formDirty && !loading && !submittingReview)
   const [docLoading, setDocLoading] = useState<'SC' | 'PI' | 'BOTH' | null>(null)
   const [previewTab, setPreviewTab] = useState<'SC' | 'PI'>('SC')
 
@@ -802,7 +806,7 @@ function SalesOrderCreatePage() {
                     </span>
                   ) : (
                     <>
-                      {balesFromTons(item.quantity_tons, item.bale_weight_kg || 35).toLocaleString()} bành |
+                      {balesFromTons(item.quantity_tons, item.bale_weight_kg || 35).toLocaleString('vi-VN')} bành |
                       {' '}{containersFromBales(balesFromTons(item.quantity_tons, item.bale_weight_kg || 35), item.bales_per_container || defaultBalesPerContainer(item.bale_weight_kg || 35, null))} cont
                     </>
                   )}
@@ -938,7 +942,7 @@ function SalesOrderCreatePage() {
                 fontWeight: 700,
                 color: hasFlexibleBaleWeight ? '#d46b08' : '#1B4D3E',
               }}>
-                {hasFlexibleBaleWeight ? 'Linh động' : itemsTotalBales.toLocaleString()}
+                {hasFlexibleBaleWeight ? 'Linh động' : itemsTotalBales.toLocaleString('vi-VN')}
               </div>
             </Col>
             <Col span={12}>
@@ -1187,6 +1191,7 @@ function SalesOrderCreatePage() {
         layout="vertical"
         requiredMark
         preserve
+        onValuesChange={() => setFormDirty(true)}
         initialValues={{
           contract_date: dayjs(),
           incoterm: 'FOB',

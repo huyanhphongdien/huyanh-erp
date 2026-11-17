@@ -28,7 +28,7 @@ export default function KhoMixOut() {
   const [sp] = useSearchParams()
   const { facilityId, facility } = useKhoFacility()
   const user = useAuthStore((s) => s.user)
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+  const [step, setStep] = useState<1 | 2 | 4>(1)   // 3 (Xem lại) đã gộp vào 2 — owner 17/11: bớt bước
   const [lots, setLots] = useState<MixLot[]>([])
   const [caIssues, setCaIssues] = useState<MixIssue[]>([])   // các lần đã chèn hôm nay → số lần kế tiếp
   const [lot, setLot] = useState<MixLot | null>(null)
@@ -519,47 +519,18 @@ export default function KhoMixOut() {
           <section className="kmx-card" aria-label="Chụp ảnh">
             <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Chụp 2 ảnh ngay tại cân</span><span className={`kmx-chip ${missing.length ? 'red' : 'ok'}`}>{required.length - missing.length}/{required.length} đã chụp</span></div>
             <KmxPhotoTiles refType="mix_issue_out" refId={issueId} photos={photos} required={required} facilityCode={facility?.code} onChange={loadPhotos} onError={setMsg} />
-            <span className="kmx-sm">Ảnh tự gắn giờ, vị trí và người chụp. Thiếu ảnh 1 hoặc 2 thì chưa qua bước sau được.</span>
+            <span className="kmx-sm">Ảnh tự gắn giờ, vị trí và người chụp. Thiếu ảnh thì nút Ghi chưa sáng.</span>
           </section>
-        </div></div>
-        <div className="kmx-foot">
-          <button type="button" className="kmx-btn" disabled={!kgOk || qua || missing.length > 0 || !viTri || !soLoOk || thieuLenh || (dungPallet && !pallet)} onClick={() => { setMsg(null); setStep(3) }}>{!soLoOk ? 'Gõ số lô của lô chèn' : !viTri ? 'Chọn chèn bể Slap, máy Mix hay băng tải' : dungPallet && !pallet ? 'Chạm pallet HC đang chở hàng' : thieuLenh ? 'Chạm lệnh pallet này chèn vào' : 'Tiếp tục'}{I.next}</button>
-        </div>
-        {scanPallet && <OpsQrScanner onClose={() => setScanPallet(false)} onDetect={onScanPallet} />}
-      </div>
-    )
-  }
-
-  // ── màn 3: xác nhận ──
-  if (step === 3 && lot) {
-    const thumbs = ['toan_canh', 'man_hinh_can'].map((k) => photos.filter((p) => p.kind === k).slice(-1)[0]).filter(Boolean) as RawPhoto[]
-    return (
-      <div className="kmx">
-        <Head eyebrow={`Lấy lần ${lan} · ${caTo}`} title="Xem lại rồi ghi" onBack={() => setStep(2)} />
-        <Steps cur={3} />
-        <div className="kmx-body"><div className="kmx-inner">
-          {msg && <div className="kmx-msg err">{msg}</div>}
-          <section className="kmx-card" aria-label="Tóm tắt phiếu" style={{ gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 8, padding: '6px 0 2px' }}><span className="kmx-num xxl">{kgTxt(kgN)}</span><span style={{ fontSize: 20, fontWeight: 700, color: '#6B7280' }}>kg</span></div>
-            <div style={{ borderTop: '1px solid #F3F4F6' }}>
-              <div className="kmx-kv"><span className="k">Lô chèn</span><span className="v"><span className="kmx-mono" style={{ color: '#0D2E25', fontWeight: 700 }}>{lot.so_lo || soLo.trim().toUpperCase()}</span> <span className="kmx-sm kmx-mono">{lot.code}</span><br /><span className="kmx-sm" style={{ fontWeight: 500 }}>{MIX_SOURCE_LABELS[lot.source_type]}{lot.grade ? ` · ${lot.grade}` : ''}</span></span></div>
-              <div className="kmx-kv"><span className="k">Chèn vào</span><span className="v">{viTri ? MIX_VI_TRI_LABELS[viTri] : '—'}</span></div>
-              <div className="kmx-kv"><span className="k">Cân</span><span className="v">{bangTai ? `băng tải · ${soBanhN ?? '—'} bành × ${kpb} = ${kgTxt(kgN)} kg · không pallet` : dungPallet && pallet ? `${soBanhN !== null ? `${soBanhN} bành${soBanh === '' ? ' (ước)' : ''} · ` : ''}pallet ${pallet.code} · cả pallet ${kgTxt(grossN)} − bì ${kgTxt(biN)} = ${kgTxt(kgN)} kg` : mode === 'pallet' ? `${soBanhN !== null ? `${soBanhN} bành${soBanh === '' ? ' (ước)' : ''} · ` : ''}cả pallet ${kgTxt(grossN)} kg · bì trừ lúc trả` : 'gõ thẳng kg hàng'}</span></div>
-              <div className="kmx-kv"><span className="k">Chèn vào mã</span><span className="v">{maChon.length ? <span className="kmx-mono" style={{ color: '#0D2E25' }}>{maLabel}</span> : <span style={{ color: '#B45309' }}>chưa chọn · lấy theo phiếu ca</span>}</span></div>
-              <div className="kmx-kv"><span className="k">Ca · tổ</span><span className="v">{caTo}</span></div>
-              <div className="kmx-kv" style={{ alignItems: 'center' }}><span className="k">Ảnh lúc lấy</span><span className="v" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{thumbs.map((p) => <span key={p.id} className="kmx-thumb" style={{ width: 46, height: 46 }}><img src={p.public_url || ''} alt="" /></span>)}<span style={{ fontSize: 12, fontWeight: 700, color: '#15803D' }}>{required.length - missing.length}/{required.length}</span></span></div>
-            </div>
-          </section>
+          {/* gộp màn "Xem lại" vào đây (owner 17/11): ghi chú + ghi ngay, khỏi qua màn trung gian */}
           <section className="kmx-card" aria-label="Ghi chú" style={{ gap: 6 }}>
             <label htmlFor="kmx-note" className="kmx-strong" style={{ fontSize: 13 }}>Ghi chú <span style={{ fontWeight: 500, color: '#6B7280' }}>(không bắt buộc)</span></label>
             <input id="kmx-note" className="kmx-text" placeholder="Ví dụ: chèn vào mẻ SVR 10 máy 2" value={note} onChange={(e) => setNote(e.target.value)} />
           </section>
-          <div className="kmx-note amb">{I.clock}<span><b>Cuối ca</b> vào <b>Trả cuối ca</b> ở trang chính, cân phần còn lại. Tiêu hao = {kgTxt(kgN)} − số trả. Kho chèn chỉ trừ khi thủ kho nhận.</span></div>
         </div></div>
         <div className="kmx-foot">
-          <button type="button" className="kmx-btn" disabled={busy} onClick={ghi}>{I.check}{busy ? 'Đang ghi…' : `Ghi lần ${lan} · ${kgTxt(kgN)} kg`}</button>
-          <button type="button" className="kmx-btn ghost" disabled={busy} onClick={() => setStep(2)}>Sửa lại</button>
+          <button type="button" className="kmx-btn" disabled={busy || !kgOk || qua || missing.length > 0 || !viTri || !soLoOk || thieuLenh || (dungPallet && !pallet)} onClick={ghi}>{I.check}{busy ? 'Đang ghi…' : !soLoOk ? 'Gõ số lô của lô chèn' : !viTri ? 'Chọn chèn bể Slap, máy Mix hay băng tải' : dungPallet && !pallet ? 'Chạm pallet HC đang chở hàng' : thieuLenh ? 'Chạm lệnh pallet này chèn vào' : missing.length > 0 ? 'Chụp đủ 2 ảnh rồi ghi' : !kgOk ? 'Gõ số trên cân' : `Ghi lần ${lan} · ${kgTxt(kgN)} kg`}</button>
         </div>
+        {scanPallet && <OpsQrScanner onClose={() => setScanPallet(false)} onDetect={onScanPallet} />}
       </div>
     )
   }

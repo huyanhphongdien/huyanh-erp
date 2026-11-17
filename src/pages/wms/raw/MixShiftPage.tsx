@@ -12,7 +12,7 @@ import FacilityPicker from '../../../components/wms/FacilityPicker'
 import MaTongKetModal from '../../../components/wms/MaTongKetModal'
 import { xacNhanBatDauMa } from '../../../components/wms/xacNhanBatDauMa'
 import { guiMailKetThuc } from '../../../services/wms/maTongKetMail'
-import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PALLET_BI_CHUAN, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_COLORS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPurpose, type MixSourceType, type MixViTri, type ShiftLite } from '../../../services/wms/mixService'
+import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PALLET_BI_CHUAN, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_COLORS, MIX_VI_TRI_LABELS, type MixBalance, type MixIssue, type MixLot, type MixPallet, type MixPurpose, type MixSourceType, type MixViTri, type ShiftLite } from '../../../services/wms/mixService'
 import { rawIssueService, type ProductionOrderLite } from '../../../services/wms/rawIssueService'
 import { fgLotService, type FgLot } from '../../../services/wms/fgLotService'
 import { rawLotService, RAW_LOT_TRANG_THAI_LABELS, type LenhChay, type RawLotBalance, type RawLotChen } from '../../../services/wms/rawLotService'
@@ -57,7 +57,8 @@ export default function MixShiftPage() {
   const [lenhs, setLenhs] = useState<LenhChay[]>([])   // lệnh đang chạy (SQL p13): một lệnh = 1..n mã gộp
   const [lenhOpen, setLenhOpen] = useState(false)
   const [lf, setLf] = useState<{ ids: string[]; cach: 'thay_the' | 'song_song' | 'gop'; gopVao?: string }>({ ids: [], cach: 'thay_the' })
-  const [f, setF] = useState({ lotId: undefined as string | undefined, kg: null as number | null, shiftId: undefined as string | undefined, team: '', purpose: 'chay_lai' as MixPurpose, targetIndex: '', targetValue: null as number | null, poId: undefined as string | undefined, note: '', rawLotIds: [] as string[], soBanh: null as number | null, grossKg: null as number | null, viTri: undefined as MixViTri | undefined, cach: 'nguon' as 'nguon' | 'lo', nguon: undefined as MixSourceType | undefined, fgLotId: undefined as string | undefined, soLoMoi: '', raKimLoai: false })
+  const [f, setF] = useState({ lotId: undefined as string | undefined, kg: null as number | null, shiftId: undefined as string | undefined, team: '', purpose: 'chay_lai' as MixPurpose, targetIndex: '', targetValue: null as number | null, poId: undefined as string | undefined, note: '', rawLotIds: [] as string[], soBanh: null as number | null, grossKg: null as number | null, palletId: undefined as string | undefined, viTri: undefined as MixViTri | undefined, cach: 'nguon' as 'nguon' | 'lo', nguon: undefined as MixSourceType | undefined, fgLotId: undefined as string | undefined, soLoMoi: '', raKimLoai: false })
+  const [pallets, setPallets] = useState<MixPallet[]>([])   // p19/p22: chạm pallet HC ngay trên modal desktop — bì trừ và chốt như bản điện thoại
 
   useEffect(() => {
     if (facilityInit || !facilities?.length) return
@@ -69,7 +70,7 @@ export default function MixShiftPage() {
     if (!facilityId) return
     setLoading(true); setError(null)
     try {
-      const [o, b, l, s, li, ma, ch, cm] = await Promise.all([
+      const [o, b, l, s, li, ma, ch, cm, pl] = await Promise.all([
         mixService.listIssues({ facilityId, status: OPEN }),
         mixService.balance(facilityId),
         mixService.listLots(facilityId),
@@ -78,8 +79,9 @@ export default function MixShiftPage() {
         rawLotService.list(facilityId, { includeClosed: true }).catch(() => [] as RawLotBalance[]),
         rawLotService.chen(facilityId, { all: true }).catch(() => [] as RawLotChen[]),
         mixService.listIssues({ facilityId, chuaMa: true, limit: 50 }).catch(() => [] as MixIssue[]),
+        mixService.listPallets(facilityId, false).catch(() => [] as MixPallet[]),
       ])
-      setOpenIssues(o); setBalance(b); setLots(l); setShifts(s); setLotIssues(li); setChenAll(ch); setChuaMa(cm)
+      setOpenIssues(o); setBalance(b); setLots(l); setShifts(s); setLotIssues(li); setChenAll(ch); setChuaMa(cm); setPallets(pl)
       const rank: Record<string, number> = { dang_chay: 0, san_sang: 1, da_chay_xong: 2 }
       const sorted = [...ma].sort((x, y) => (rank[x.trang_thai] ?? 3) - (rank[y.trang_thai] ?? 3) || (y.ngay_cuoi ?? '').localeCompare(x.ngay_cuoi ?? ''))
       setMaAll(sorted)
@@ -132,8 +134,15 @@ export default function MixShiftPage() {
   const lotChon = lotsCoHang.find((l) => l.id === f.lotId)
   // kg hàng chèn: gõ thẳng, hoặc = hàng + pallet − bì (như sổ tay tổ ép)
   const kpbChon = lotChon?.kg_per_banh || 35
-  // băng tải: bành × kg/bành, không pallet, không bì; còn lại: cân tổng, bì khai lúc trả
-  const kgNet = f.viTri === 'bang_tai' ? (f.kg ?? (f.soBanh ? Math.round(f.soBanh * kpbChon * 100) / 100 : null)) : (f.kg ?? f.grossKg)
+  // p22: chạm pallet HC trên modal → bì từ Sổ pallet, kg chốt ngay (như bản điện thoại);
+  // băng tải: bành × kg/bành, không pallet; không pallet HC: cân tổng, bì khai lúc trả (đường cũ)
+  const palletsDung = pallets.filter((p) => p.is_active)
+  const palletChon = f.viTri === 'bang_tai' ? undefined : palletsDung.find((p) => p.id === f.palletId && p.bi_kg !== null)
+  const kgNet = f.viTri === 'bang_tai'
+    ? (f.kg ?? (f.soBanh ? Math.round(f.soBanh * kpbChon * 100) / 100 : null))
+    : palletChon
+      ? (f.grossKg !== null ? Math.round((f.grossKg - (palletChon.bi_kg || 0)) * 100) / 100 : null)
+      : (f.kg ?? f.grossKg)
   // lệnh chạy (SQL p13): bắt đầu 1..n mã — thay thế (mặc định 30/10) / song song / gộp; kết thúc lệnh → tổng kết chèn + mail BGĐ
   const doiChay = async (batDau: boolean) => {
     if (!maChon) return
@@ -196,6 +205,8 @@ export default function MixShiftPage() {
     if (f.cach === 'nguon' && !f.fgLotId && !f.soLoMoi.trim()) { message.warning('Chọn lô TP hoặc gõ số lô trên bao'); return }
     if (f.cach === 'nguon' && f.nguon === 'dkl' && !f.raKimLoai) { message.warning('Hàng DKL: tick "Đã rà kim loại" trước'); return }
     if (!f.viTri) { message.warning('Chọn chèn bể Slap hay chèn máy Mix'); return }
+    if (palletChon && f.grossKg === null) { message.warning(`Gõ số trên cân (cả pallet ${palletChon.code})`); return }
+    if (palletChon && kgNet !== null && kgNet <= 0) { message.warning(`Số trên cân phải lớn hơn bì ${fmtKg(palletChon.bi_kg)} kg của ${palletChon.code}`); return }
     if (!kgNet || kgNet <= 0) { message.warning('Nhập kg hàng chèn (hoặc cân cả pallet — bì trừ lúc trả)'); return }
     if (f.cach === 'lo' && lotChon && lotChon.source_ref_type === 'fg_lot' && kgNet > lotChon.ton_kg + 0.01) { message.warning(`Lô chỉ còn ${fmtKg(lotChon.ton_kg)} kg`); return }
     setSaving(true)
@@ -203,9 +214,9 @@ export default function MixShiftPage() {
       const lotId = f.cach === 'nguon'
         ? await mixService.timHoacTaoLo({ facilityId, sourceType: f.nguon ?? null, soLo: f.fgLotId ? null : f.soLoMoi, fgLotId: f.fgLotId ?? null, metalCleared: f.nguon === 'dkl' ? f.raKimLoai : null })
         : f.lotId as string
-      const id = await mixService.lay({ lotId, kg: kgNet, viTri: f.viTri, rawLotIds: f.rawLotIds, soBanh: f.soBanh, grossKg: f.viTri === 'bang_tai' ? null : f.grossKg, palletKg: null, shiftDate: date, shiftId: f.shiftId ?? null, team: f.team.trim() || null, purpose: f.purpose, targetIndex: f.purpose === 'nang_chi_so' ? f.targetIndex.trim() || null : null, targetValue: f.purpose === 'nang_chi_so' ? f.targetValue : null, productionOrderId: f.poId ?? null, note: f.note.trim() || null })
+      const id = await mixService.lay({ lotId, kg: kgNet, viTri: f.viTri, rawLotIds: f.rawLotIds, soBanh: f.soBanh, grossKg: f.viTri === 'bang_tai' ? null : f.grossKg, palletKg: null, palletId: palletChon ? palletChon.id : null, shiftDate: date, shiftId: f.shiftId ?? null, team: f.team.trim() || null, purpose: f.purpose, targetIndex: f.purpose === 'nang_chi_so' ? f.targetIndex.trim() || null : null, targetValue: f.purpose === 'nang_chi_so' ? f.targetValue : null, productionOrderId: f.poId ?? null, note: f.note.trim() || null })
       message.success('Đã ghi lấy đầu ca — chụp 2 ảnh ở trang phiếu'); setOpen(false)
-      setF({ lotId: undefined, kg: null, shiftId: undefined, team: '', purpose: 'chay_lai', targetIndex: '', targetValue: null, poId: undefined, note: '', rawLotIds: [], soBanh: null, grossKg: null, viTri: undefined, cach: 'nguon', nguon: undefined, fgLotId: undefined, soLoMoi: '', raKimLoai: false })
+      setF({ lotId: undefined, kg: null, shiftId: undefined, team: '', purpose: 'chay_lai', targetIndex: '', targetValue: null, poId: undefined, note: '', rawLotIds: [], soBanh: null, grossKg: null, palletId: undefined, viTri: undefined, cach: 'nguon', nguon: undefined, fgLotId: undefined, soLoMoi: '', raKimLoai: false })
       navigate(`/wms/chen/phieu/${id}`)
     } catch (e: any) { message.error(e?.message || 'Không ghi được') }
     finally { setSaving(false) }
@@ -249,7 +260,7 @@ export default function MixShiftPage() {
           <Col>
             <div>
               <Title level={3} style={{ margin: 0 }}>Hàng chèn</Title>
-              <Text type="secondary">QS lấy đầu ca → trả cuối ca → QS ký → QC duyệt → thủ kho nhận · tiêu hao = lấy − trả · 2 ảnh lúc lấy · bì chuẩn pallet HC {MIX_PALLET_BI_CHUAN} kg — chạm pallet làm trên BẢN ĐIỆN THOẠI (kg chốt ngay, dùng hết không cân); modal máy tính: cân tổng, bì khai lúc trả · dòng CHÈN sổ ca tự điền</Text>
+              <Text type="secondary">QS lấy đầu ca → trả cuối ca → QS ký → QC duyệt → thủ kho nhận · tiêu hao = lấy − trả · 2 ảnh lúc lấy · bì chuẩn pallet HC {fmtKg(MIX_PALLET_BI_CHUAN)} kg — chạm pallet ngay trong modal Lấy (kg chốt ngay; dùng hết cuối ca không cân); không chọn pallet → cân tổng, bì khai lúc trả · dòng CHÈN sổ ca tự điền</Text>
             </div>
           </Col>
           <Col>
@@ -392,9 +403,37 @@ export default function MixShiftPage() {
               </>
             ) : (
               <>
+            {palletsDung.length > 0 && (
+              <Col span={24}>
+                <Text>Pallet HC <Text type="secondary">· chạm để máy trừ bì chuẩn {fmtKg(MIX_PALLET_BI_CHUAN)} kg và chốt kg ngay (như bản điện thoại)</Text></Text>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                  <Button size="small" type={!f.palletId ? 'primary' : 'default'} onClick={() => setF((x) => ({ ...x, palletId: undefined }))}>Không pallet</Button>
+                  {palletsDung.map((p) => {
+                    const dc = p.trang_thai === 'day_chuyen'; const noBi = p.bi_kg === null
+                    return (
+                      <Button key={p.id} size="small" disabled={dc || noBi} type={f.palletId === p.id ? 'primary' : 'default'}
+                        title={dc ? `đang ở dây chuyền (${p.issue_code ?? ''})` : noBi ? 'chưa khai số kg trong Sổ pallet' : `bì ${fmtKg(p.bi_kg)} kg`}
+                        onClick={() => { setF((x) => ({ ...x, palletId: p.id, kg: null })); setTimeout(() => document.getElementById('mix-gross-kg')?.focus(), 60) }}>
+                        {p.code}{dc ? ' · dây chuyền' : noBi ? ' · kg?' : ''}
+                      </Button>
+                    )
+                  })}
+                </div>
+              </Col>
+            )}
+            {palletChon ? (
+              <>
+                <Col span={8}><Text>Số trên cân (cả pallet {palletChon.code}) *</Text><InputNumber id="mix-gross-kg" style={{ width: '100%' }} min={0} step={10} value={f.grossKg} onChange={(v) => setF((x) => ({ ...x, grossKg: v === null || v === undefined ? null : Number(v) }))} autoFocus /></Col>
+                <Col span={8}><Text>Kg hàng <Text type="secondary">(− bì {fmtKg(palletChon.bi_kg)} kg, chốt ngay)</Text></Text><InputNumber style={{ width: '100%' }} value={kgNet} disabled /></Col>
+                <Col span={8}><Text>Số bành <Text type="secondary">(tự tính trên kg hàng)</Text></Text><InputNumber style={{ width: '100%' }} min={0} value={f.soBanh ?? (kgNet && kgNet > 0 ? Math.max(Math.round(kgNet / kpbChon), 1) : null)} onChange={(v) => setF((x) => ({ ...x, soBanh: v === null || v === undefined ? null : Number(v) }))} /></Col>
+              </>
+            ) : (
+              <>
             <Col span={6}><Text>Số bành <Text type="secondary">(tự tính)</Text></Text><InputNumber style={{ width: '100%' }} min={0} value={f.soBanh ?? (kgNet && lotChon ? Math.max(Math.round(Math.max(kgNet - (f.grossKg !== null ? MIX_PALLET_BI_CHUAN : 0), 0) / (lotChon.kg_per_banh || 35)), 1) : null)} onChange={(v) => setF((x) => ({ ...x, soBanh: v === null || v === undefined ? null : Number(v) }))} /></Col>
             <Col span={9}><Text>Cân cả pallet (kg) · bì khai lúc trả</Text><InputNumber style={{ width: '100%' }} min={0} step={10} value={f.grossKg} onChange={(v) => setF((x) => ({ ...x, grossKg: v === null || v === undefined ? null : Number(v), kg: null }))} /></Col>
             <Col span={9}><Text>Kg lấy (tạm = cân tổng) *</Text><InputNumber style={{ width: '100%' }} min={1} step={10} max={lotChon?.ton_kg} value={kgNet} onChange={(v) => setF((x) => ({ ...x, kg: v === null || v === undefined ? null : Number(v) }))} /></Col>
+              </>
+            )}
               </>
             )}
             <Col span={8}><Text>Ngày ca</Text><Input type="date" value={date} onChange={(e) => setDate(e.target.value || todayLocal())} /></Col>

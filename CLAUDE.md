@@ -279,6 +279,14 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
 - **Lúc trả** (phiếu có `pallet_id`): **Dùng hết** = 0 kg, không cân, ảnh trả chỉ cần `toan_canh` (`fn_mix_thieu_anh`); **Còn dư** = cân 1 lần
   (hàng + pallet) − bì. KHÔNG còn cân 3 pallet rỗng / ô gõ bì. Phiếu không pallet (băng tải, phiếu cũ) giữ đường v5 (bì khai lúc trả).
   Bàn giao ca sau: `fn_mix_ky` chép pallet_id + bì + vị trí + mã + lệnh sang phiếu mới.
+- **Đợt UX 17/11/2026** (soát sống bằng Chrome DevTools trên dev, lô thử UI-TEST đã nhập→hủy): ① màn Lấy điện thoại còn **2 bước**
+  ("Chọn lô" → "Cân · chụp · ghi" — bước soát lại cũ gộp vào bước cân, ghi chú dời lên bước 2); chạm chip số lô = DÙNG luôn;
+  chạm pallet → autofocus ô cân; nút Ghi mờ thì nhãn nói thẳng thiếu gì (vị trí → pallet → lệnh → ảnh → kg). ② màn Trả: phiếu có
+  pallet mặc định chọn sẵn **Dùng hết** (đa số ca dùng hết), chạm "Dùng hết" tự mở camera ảnh toàn cảnh nếu chưa chụp. ③ modal
+  "Lấy đầu ca" máy tính có **lưới pallet HC** như điện thoại (chạm → trừ bì chốt ngay, ô Kg hàng khoá, autofocus `#mix-gross-kg`
+  qua setTimeout 60ms — antd tái dùng InputNumber nên `autoFocus` mount-only không đủ). ⚠ Nhãn bì luôn qua `fmtKg(...)` vi-VN
+  ("27,5"), đừng nội suy thẳng `MIX_PALLET_BI_CHUAN`. ⚠ `KmxPhotoTiles.pick()` upload Storage NGAY khi chọn ảnh (không đợi Ghi) —
+  đừng giả lập ảnh khi thử giao diện.
 - Dữ liệu thử hàng chèn (10 phiếu, 10 lô, 38 ảnh, 30/10–10/11) đã xoá 10/11/2026 bằng `wms_don_du_lieu_hang_chen_261110.sql` + Storage API
   (giữ lệnh chạy, mã NVL, phân công). ⚠ `agent_sql` bắt `DELETE` phải có `WHERE` → viết `WHERE true`.
 - Màn: điện thoại `/m/kho/chen/so-pallet` (`KhoMixPallet.tsx`), máy tính `/wms/chen/pallet` (`MixPalletPage.tsx`), lưới pallet CSS `.kmx-pal`.

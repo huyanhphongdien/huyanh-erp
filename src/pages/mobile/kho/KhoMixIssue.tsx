@@ -4,7 +4,7 @@
 //   · sau đó: màn "đã trả" rồi DÒNG THỜI GIAN phiếu (ảnh gắn từng mốc) + nút ký của QS / thủ kho, sửa, hủy
 // File: src/pages/mobile/kho/KhoMixIssue.tsx · Route: /m/kho/chen/phieu/:id
 // ============================================================================
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { mixService, MIX_PALLET_BI_CHUAN, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue, type MixViTri } from '../../../services/wms/mixService'
 import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoService'
@@ -66,6 +66,7 @@ export default function KhoMixIssue() {
   const [team, setTeam] = useState(() => { try { return localStorage.getItem('kmx_team') || '' } catch { return '' } })   // nhớ tổ như màn Lấy
   const teams = ['Vang', 'Hiền']
   const [big, setBig] = useState<{ src: string; cap: string } | null>(null)
+  const retPhotoRef = useRef<HTMLElement | null>(null)   // chạm "Dùng hết" → tự mở máy ảnh chụp toàn cảnh
   const role = useMixRole(i?.facility_id ?? null)
 
   const load = useCallback(async () => {
@@ -90,6 +91,9 @@ export default function KhoMixIssue() {
   }, [i?.id, i?.shift_id, i?.status]) // eslint-disable-line react-hooks/exhaustive-deps
   // phiếu cũ đã có bì (khai lần trả trước / bì chốt) → điền sẵn số đó thay cho mặc định 27,5
   useEffect(() => { if (i && i.pallet_kg !== null) setRetPallet(String(i.pallet_kg)) }, [i?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  // phiếu pallet HC: mặc định chọn sẵn "Dùng hết" (đa số ca dùng hết — owner 17/11); chạm "Còn dư" là đổi.
+  // Nút Ghi ghi rõ "trả 0 kg" nên bấm nhầm vẫn thấy ngay; sửa lại được tới khi QC duyệt.
+  useEffect(() => { if (i && i.pallet_id && i.status === 'issued') setDungHetChon(true) }, [i?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const required = settings.anh_bat_buoc?.length ? settings.anh_bat_buoc : ['toan_canh', 'man_hinh_can']
   const missOut = rawPhotoService.missing(pOut, required)
@@ -288,7 +292,11 @@ export default function KhoMixIssue() {
             <section className="kmx-card" aria-label="Pallet về thế nào" style={{ gap: 10 }}>
               <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Pallet <span className="kmx-mono">{i.pallet_code}</span> về thế nào?</span><span className="kmx-sm" style={{ flex: '0 0 auto' }}>bì {kgTxt(i.pallet_kg)} kg · Sổ pallet</span></div>
               <div className="kmx-big2">
-                <button type="button" className={dungHetChon ? 'on' : ''} onClick={() => { setDungHetChon(true); setRetGross(''); setRetSoBanh('') }}>Dùng hết<small>pallet rỗng · không cân</small></button>
+                {/* chạm Dùng hết → mở luôn máy ảnh chụp 1 toàn cảnh (nếu chưa chụp) — lần trả chuẩn chỉ còn 3 chạm */}
+                <button type="button" className={dungHetChon ? 'on' : ''} onClick={() => {
+                  setDungHetChon(true); setRetGross(''); setRetSoBanh('')
+                  if (!pRet.some((p) => p.kind === 'toan_canh')) retPhotoRef.current?.querySelector<HTMLButtonElement>('button.kmx-ph')?.click()
+                }}>Dùng hết<small>pallet rỗng · không cân</small></button>
                 <button type="button" className={!dungHetChon ? 'on' : ''} onClick={() => { setDungHetChon(false); setRetSoBanh('') }}>Còn dư<small>cân cả pallet một lần</small></button>
               </div>
               {!dungHetChon ? (
@@ -380,7 +388,7 @@ export default function KhoMixIssue() {
               </label>
             )}
           </section>}
-          <section className="kmx-card" aria-label="Chụp ảnh lúc trả">
+          <section className="kmx-card" aria-label="Chụp ảnh lúc trả" ref={retPhotoRef}>
             <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>{dungHet ? (coPallet ? 'Chụp 1 ảnh pallet rỗng' : 'Chụp 2 ảnh pallet rỗng trên cân') : 'Chụp 2 ảnh phần trả'}</span><span className={`kmx-chip ${missRet.length ? 'red' : 'ok'}`}>{requiredRet.length - missRet.length}/{requiredRet.length}{missRet.length ? ` · thiếu ${missRet.length}` : ' đã chụp'}</span></div>
             <KmxPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={requiredRet} facilityCode={i.facility_code || undefined} labels={{ toan_canh: dungHet ? 'Pallet rỗng toàn cảnh' : 'Toàn cảnh phần trả', man_hinh_can: 'Màn hình cân' }} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />
             <span className="kmx-sm">{coPallet && dungHet ? 'Dùng hết với pallet HC: chỉ cần 1 ảnh toàn cảnh pallet rỗng (bì đã có trong Sổ pallet). Ảnh bổ sung không bắt buộc.' : 'Đủ 2 ảnh thì nút dưới mới sáng, kể cả dùng hết (ảnh pallet rỗng là bằng chứng bì). Ảnh bổ sung không bắt buộc.'}</span>
@@ -399,8 +407,8 @@ export default function KhoMixIssue() {
           </div>
         </div></div>
         <div className="kmx-foot">
-          <button type="button" className="kmx-btn" disabled={!ready || busy === 'tra'} onClick={traVaKy}>{I.pen}{busy === 'tra' ? 'Đang ghi…' : 'Ghi trả và ký bên giao'}</button>
-          <span className="kmx-sm kmx-center">Một chạm = ghi {kgRetN !== null && kgRetOk ? `${kgTxt(kgRetN)} kg trả` : 'kg trả'} + chữ ký 1/3 của bạn</span>
+          <button type="button" className="kmx-btn" disabled={!ready || busy === 'tra'} onClick={traVaKy}>{I.pen}{busy === 'tra' ? 'Đang ghi…' : dungHet ? `Dùng hết · ghi trả 0 kg và ký` : 'Ghi trả và ký bên giao'}</button>
+          <span className="kmx-sm kmx-center">Một chạm = ghi {dungHet ? `tiêu hao ${kgTxt(kgOutNew)} kg (trả 0)` : kgRetN !== null && kgRetOk ? `${kgTxt(kgRetN)} kg trả` : 'kg trả'} + chữ ký 1/3 của bạn</span>
         </div>
       </div>
     )

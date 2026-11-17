@@ -138,8 +138,9 @@ export function KmxPhotoTiles({ refType, refId, photos, facilityCode, disabled, 
   )
 }
 
-export function Steps({ cur }: { cur: 1 | 2 | 3 }) {
-  const items: [number, ReactNode][] = [[1, 'Chọn lô'], [2, <>Cân &amp; chụp</>], [3, 'Xác nhận']]
+// p22 UX (17/11): gộp màn "Xác nhận" vào màn Cân — còn 2 bước, bớt 1 chạm + 1 lần chuyển màn mỗi lần lấy
+export function Steps({ cur }: { cur: 1 | 2 }) {
+  const items: [number, ReactNode][] = [[1, 'Chọn lô'], [2, <>Cân · chụp · ghi</>]]
   return (
     <nav className="kmx-steps" aria-label="Các bước">
       {items.map(([n, t]) => <div key={n} className={`kmx-step${n < cur ? ' done' : n === cur ? ' now' : ''}`}><b /><span>{n} · {t}</span></div>)}

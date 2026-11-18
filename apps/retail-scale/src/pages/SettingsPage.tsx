@@ -154,12 +154,14 @@ export default function SettingsPage() {
                 message.success('Đã lưu khổ giấy mặc định')
               }}
               options={[
-                { label: 'Máy in nhiệt 80mm', value: '80mm' },
+                { label: 'Máy in nhiệt 80mm (XP-K200L)', value: '80mm' },
                 { label: 'A5 (máy in thường)', value: 'a5' },
               ]}
             />
             <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
-              Khổ 80mm in vừa 1 dải giấy, chiều dài tự co theo số bao.
+              Khổ 80mm in vừa 1 dải giấy, chiều dài tự co theo số bao; máy XP-K200L có dao cắt
+              nên tự cắt sau mỗi phiếu (bật "Cut at end of page" trong Preferences của driver XP-80C).
+              Hướng dẫn cài driver, IP máy in và code page Việt nằm ở màn <b>In phiếu</b>.
             </Text>
           </Card>
 

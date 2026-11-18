@@ -229,7 +229,7 @@ export default function PrintPage() {
             value={paper}
             onChange={v => changePaper(v as PaperSize)}
             options={[
-              { label: 'Nhiệt 80mm', value: '80mm' },
+              { label: 'Nhiệt 80mm (XP-K200L)', value: '80mm' },
               { label: 'A5', value: 'a5' },
             ]}
           />
@@ -241,9 +241,18 @@ export default function PrintPage() {
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           {paper === '80mm' && (
             <Card className="no-print" size="small" style={{ borderRadius: 12 }}>
-              <Text strong>Cài máy in nhiệt (làm 1 lần trên máy trạm):</Text>
+              <Text strong>Cài máy in nhiệt XP-K200L (làm 1 lần trên máy trạm):</Text>
               <ul style={{ margin: '6px 0 0 18px', padding: 0, fontSize: 13 }}>
+                <li>
+                  Driver: chọn <b>XP-80C</b> (giống app cân xe). Máy đang ở IP <b>192.168.123.100</b> —
+                  thêm máy in bằng cổng TCP/IP đó (Raw, cổng 9100) nếu không cắm USB.
+                  IP do DHCP cấp nên có thể đổi: nhờ IT <b>giữ cố định IP</b> trên router.
+                </li>
                 <li>Trong hộp thoại in: <b>Lề = Không</b>, bỏ tick <b>Đầu trang và chân trang</b></li>
+                <li>
+                  Preferences của máy in: <b>Code page = 27:(Vietnam)</b>; mục cắt giấy chọn
+                  <b> cắt sau mỗi trang (Cut at end of page)</b> — phiếu nào ra, dao cắt ngay sau phiếu đó.
+                </li>
                 <li>
                   Khổ giấy của driver: đặt <b>custom rộng 72mm, dài TỐI ĐA</b> mà driver cho phép.
                   {' '}<b>Đừng chọn 72 × 297mm</b> — phiếu nhiều bao dài hơn 297mm sẽ bị ngắt

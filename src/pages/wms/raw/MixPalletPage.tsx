@@ -1,6 +1,7 @@
 // ============================================================================
 // HÀNG CHÈN — SỔ PALLET (p19, chủ DN 10/11/2026): khai báo pallet · chữ viết tắt · số kg (bì pallet rỗng)
-//   Bản máy tính cho thủ kho / BGĐ: bảng HC1→HC30, sửa (tên, chữ viết tắt, số kg + lý do), tắt / bật, thêm bộ pallet, lịch sử.
+//   p22 (18/11/2026): 5 loại pallet mặc định H1 11,5 · H2 14,5 · EJ 15 · H3 13,5 · H4 25 (sắt) — mỗi pallet một số kg riêng.
+//   Bản máy tính cho thủ kho / BGĐ: bảng pallet, sửa (tên, chữ viết tắt, số kg + lý do), tắt / bật, thêm bộ pallet, lịch sử.
 //   Luật nằm ở DB (mix_pallets, fn_mix_pallet_khai / tat / tao_bo, v_mix_pallets). Điện thoại: /m/kho/chen/so-pallet.
 // File: src/pages/wms/raw/MixPalletPage.tsx · Route: /wms/chen/pallet
 // ============================================================================
@@ -10,7 +11,7 @@ import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, 
 import type { ColumnsType } from 'antd/es/table'
 import { ArrowLeftOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import FacilityPicker from '../../../components/wms/FacilityPicker'
-import { mixService, MIX_PALLET_BI_CHUAN, palletLechChuan, MIX_PALLET_LOG_LABELS, MIX_PALLET_TRANG_THAI_COLORS, MIX_PALLET_TRANG_THAI_LABELS, type MixPallet, type MixPalletLog } from '../../../services/wms/mixService'
+import { mixService, MIX_PALLET_MAC_DINH, palletBiMacDinh, palletLechMacDinh, MIX_PALLET_LOG_LABELS, MIX_PALLET_TRANG_THAI_COLORS, MIX_PALLET_TRANG_THAI_LABELS, type MixPallet, type MixPalletLog } from '../../../services/wms/mixService'
 import { useMixRole } from '../../../hooks/useMixRole'
 import { usePhoneRedirect } from '../../../hooks/useIsPhone'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
@@ -52,13 +53,15 @@ export default function MixPalletPage() {
   const dem = useMemo(() => ({
     trong: rows.filter((x) => x.trang_thai === 'trong').length, dc: rows.filter((x) => x.trang_thai === 'day_chuyen').length,
     chuaBi: rows.filter((x) => x.trang_thai === 'chua_bi').length, tat: rows.filter((x) => x.trang_thai === 'tat').length,
-    // p21: bỏ nhắc "cân lại > 90 ngày" (kế hoạch cân từng pallet đã bỏ) — chỉ đếm pallet LỆCH bì chuẩn 27,5
-    lech: rows.filter((x) => x.is_active && palletLechChuan(x.bi_kg)).length,
+    // p22: chỉ đếm pallet đã cân lại ra số KHÁC số mặc định của loại đó (pallet tự thêm không bị đếm)
+    lech: rows.filter((x) => x.is_active && palletLechMacDinh(x.code, x.bi_kg)).length,
   }), [rows])
   const hienThi = showTat ? rows : rows.filter((x) => x.is_active)
   const soMax = rows.reduce((m, x) => Math.max(m, x.so ?? 0), 0)
+  // loại mặc định chưa có trong sổ của nhà máy này → hiện nút "Nạp 5 loại mặc định"
+  const thieuMacDinh = MIX_PALLET_MAC_DINH.filter((x) => !rows.some((r) => r.code.toUpperCase() === x.code))
 
-  const moSua = (p: MixPallet) => { setEdit(p); form.setFieldsValue({ ten: p.ten ?? '', code: p.code, bi_kg: p.bi_kg ?? MIX_PALLET_BI_CHUAN, ly_do: '' }) }
+  const moSua = (p: MixPallet) => { setEdit(p); form.setFieldsValue({ ten: p.ten ?? '', code: p.code, bi_kg: p.bi_kg ?? palletBiMacDinh(p.code) ?? undefined, ly_do: '' }) }
   async function luuSua() {
     if (!edit) return
     const v = await form.validateFields()
@@ -75,11 +78,11 @@ export default function MixPalletPage() {
       await mixService.tatPallet(p.id, tatHay, lyDo ?? null)
       message.success(tatHay ? `Đã tắt ${p.code}` : `Đã bật lại ${p.code}`)
       await load()
-      // bật lại pallet chưa có bì → mở luôn form khai (điền sẵn 27,5), khỏi tìm lại dòng
+      // bật lại pallet chưa có bì → mở luôn form khai (điền sẵn số mặc định của loại), khỏi tìm lại dòng
       if (!tatHay && p.bi_kg === null) moSua({ ...p, is_active: true })
     } catch (e: any) { message.error(e?.message || 'Không đổi được') }
   }
-  // Bật cả dải pallet đang tắt một lượt (vd đưa HC21→30 vào dùng) — bì chuẩn 27,5 đã có sẵn từ p20
+  // Bật cả dải pallet đang tắt một lượt — ⚠ kiểm số kg từng pallet trước (HC21→30 còn số 27,5 cũ của p20)
   async function batCa() {
     const tatRows = rows.filter((x) => !x.is_active)
     if (!tatRows.length) return
@@ -87,15 +90,25 @@ export default function MixPalletPage() {
     let ok = 0
     for (const p of tatRows) { try { await mixService.tatPallet(p.id, false, null); ok++ } catch { /* bỏ qua pallet lỗi */ } }
     await load(); setBusy(false)
-    if (ok === tatRows.length) message.success(`Đã bật cả ${ok} pallet — dùng được ngay (bì chuẩn ${kg1(MIX_PALLET_BI_CHUAN)} kg)`)
+    if (ok === tatRows.length) message.success(`Đã bật cả ${ok} pallet — kiểm lại số kg từng pallet trước khi dùng`)
     else message.warning(`Bật được ${ok}/${tatRows.length} pallet`)
+  }
+  async function napMacDinh() {
+    if (!facilityId) return
+    setBusy(true)
+    try {
+      const n = await mixService.napPalletMacDinh(facilityId)
+      message.success(n ? `Đã nạp ${n} loại pallet mặc định (${MIX_PALLET_MAC_DINH.map((x) => `${x.code} ${kg1(x.bi)}`).join(' · ')})` : 'Đã có đủ 5 loại pallet mặc định')
+      await load()
+    } catch (e: any) { message.error(e?.message || 'Không nạp được') }
+    finally { setBusy(false) }
   }
   async function themBo() {
     if (!facilityId) return
     const v = await formThem.validateFields()
     setBusy(true)
     try {
-      const n = await mixService.taoBoPallet(facilityId, Number(v.tu), Number(v.den), { prefix: v.prefix || 'HC', ten: v.ten || null, biKg: v.bi_kg ?? null })
+      const n = await mixService.taoBoPallet(facilityId, Number(v.tu), Number(v.den), { prefix: v.prefix || 'HC', ten: v.ten || null, biKg: v.bi_kg })
       message.success(n ? `Đã thêm ${n} pallet` : 'Các mã này đã có trong sổ')
       setThem(false); await load()
     } catch (e: any) { message.error(e?.message || 'Không thêm được') }
@@ -106,7 +119,7 @@ export default function MixPalletPage() {
     { title: 'Chữ viết tắt', dataIndex: 'code', width: 110, render: (v: string, r) => <Text strong style={{ fontFamily: 'JetBrains Mono, Consolas, monospace', color: r.is_active ? '#0D2E25' : '#9CA3AF', textDecoration: r.is_active ? undefined : 'line-through' }}>{v}</Text> },
     { title: 'Pallet', dataIndex: 'ten', render: (v: string | null) => v || <Text type="secondary">—</Text> },
     { title: 'Số kg (bì)', dataIndex: 'bi_kg', width: 110, align: 'right', render: (v: number | null) => v === null ? <Tag color="red">chưa khai</Tag> : <Text strong style={{ fontFamily: 'JetBrains Mono, Consolas, monospace' }}>{kg1(v)}</Text> },
-    { title: 'Khai lúc · bởi', width: 190, render: (_, r) => r.bi_khai_at ? <span>{dt(r.bi_khai_at)}{r.bi_khai_name ? ` · ${r.bi_khai_name}` : ''}{palletLechChuan(r.bi_kg) && r.is_active ? <Tag color="blue" style={{ marginLeft: 6 }}>lệch chuẩn {kg1(MIX_PALLET_BI_CHUAN)}</Tag> : null}</span> : <Text type="secondary">—</Text> },
+    { title: 'Khai lúc · bởi', width: 190, render: (_, r) => r.bi_khai_at ? <span>{dt(r.bi_khai_at)}{r.bi_khai_name ? ` · ${r.bi_khai_name}` : ''}{palletLechMacDinh(r.code, r.bi_kg) && r.is_active ? <Tag color="blue" style={{ marginLeft: 6 }}>lệch mặc định {kg1(palletBiMacDinh(r.code))}</Tag> : null}</span> : <Text type="secondary">—</Text> },
     { title: 'Trạng thái', dataIndex: 'trang_thai', width: 130, render: (v: MixPallet['trang_thai'], r) => <Tag color={MIX_PALLET_TRANG_THAI_COLORS[v]}>{MIX_PALLET_TRANG_THAI_LABELS[v]}{v === 'tat' && r.tat_ly_do ? ` · ${r.tat_ly_do}` : ''}</Tag> },
     { title: 'Phiếu đang gắn', render: (_, r) => r.issue_id ? <Space size={4} wrap><a onClick={() => navigate(`/wms/chen/phieu/${r.issue_id}`)} style={{ fontFamily: 'JetBrains Mono, Consolas, monospace' }}>{r.issue_code}</a><Text type="secondary">{r.issue_lot_so_lo ? `lô ${r.issue_lot_so_lo} · ` : ''}{kg1(r.issue_kg_out)} kg · {dt(r.issue_out_at)}{r.issue_lenh_ma_gop ? ` · ${r.issue_lenh_ma_gop}` : ''}</Text></Space> : <Text type="secondary">—</Text> },
     { title: 'Ghi chú', dataIndex: 'note', render: (v: string | null, r) => <Text type="secondary">{v || ''}{r.so_lan_can_lai ? `${v ? ' · ' : ''}cân lại ${r.so_lan_can_lai} lần` : ''}</Text> },
@@ -136,7 +149,7 @@ export default function MixPalletPage() {
               <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/chen')}>Hàng chèn</Button>
               <div>
                 <Title level={3} style={{ margin: 0 }}>Sổ pallet hàng chèn</Title>
-                <Text type="secondary">Khai báo pallet · chữ viết tắt (in trên pallet, tổ chạm lúc lấy) · số kg (bì — <b>chuẩn {kg1(MIX_PALLET_BI_CHUAN)} kg</b> cho mọi pallet HC, chủ DN 17/11/2026; cân lại chỉ khi pallet lệch chuẩn). Lúc lấy: kg = cân cả pallet − bì, chốt ngay. Cuối ca: dùng hết không cân, còn dư cân một lần.</Text>
+                <Text type="secondary">Khai báo pallet · chữ viết tắt (in trên pallet, tổ chạm lúc lấy) · số kg (bì — <b>mỗi loại một số</b>: {MIX_PALLET_MAC_DINH.map((x) => `${x.code} ${kg1(x.bi)}`).join(' · ')}; H4 là pallet sắt — theo giấy cân tay 18/11/2026; cân lại chỉ khi sửa / thay pallet). Lúc lấy: kg = cân cả pallet − bì, chốt ngay. Cuối ca: dùng hết không cân, còn dư cân một lần.</Text>
               </div>
             </Space>
           </Col>
@@ -144,21 +157,22 @@ export default function MixPalletPage() {
             <Space wrap>
               <FacilityPicker value={facilityId} onChange={(id) => setFacilityId(id)} allowAll={false} style={{ minWidth: 180 }} />
               <Switch checked={showTat} onChange={setShowTat} checkedChildren="cả pallet tắt" unCheckedChildren="ẩn pallet tắt" />
-              {canEdit && dem.tat > 0 && <Popconfirm title={`Bật cả ${dem.tat} pallet đang tắt?`} description={`Bì chuẩn ${kg1(MIX_PALLET_BI_CHUAN)} kg đã có sẵn — bật là tổ chạm lấy được ngay.`} okText="Bật cả" cancelText="Không" onConfirm={batCa}><Button loading={busy}>Bật cả {dem.tat} pallet tắt</Button></Popconfirm>}
+              {canEdit && dem.tat > 0 && <Popconfirm title={`Bật cả ${dem.tat} pallet đang tắt?`} description="Kiểm lại số kg từng pallet trước — bật là tổ chạm lấy được ngay." okText="Bật cả" cancelText="Không" onConfirm={batCa}><Button loading={busy}>Bật cả {dem.tat} pallet tắt</Button></Popconfirm>}
               <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>Làm mới</Button>
-              {canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => { formThem.setFieldsValue({ prefix: 'HC', tu: soMax + 1, den: soMax + 10, ten: 'Pallet hàng chèn', bi_kg: MIX_PALLET_BI_CHUAN }); setThem(true) }}>Thêm pallet</Button>}
+              {canEdit && thieuMacDinh.length > 0 && <Popconfirm title={`Nạp ${thieuMacDinh.length} loại pallet mặc định?`} description={thieuMacDinh.map((x) => `${x.code} ${kg1(x.bi)} kg`).join(' · ')} okText="Nạp" cancelText="Không" onConfirm={napMacDinh}><Button type="primary" loading={busy}>Nạp {thieuMacDinh.length === MIX_PALLET_MAC_DINH.length ? '5 loại mặc định' : `${thieuMacDinh.length} loại còn thiếu`}</Button></Popconfirm>}
+              {canEdit && <Button icon={<PlusOutlined />} onClick={() => { formThem.setFieldsValue({ prefix: 'HC', tu: soMax + 1, den: soMax + 10, ten: 'Pallet hàng chèn', bi_kg: undefined }); setThem(true) }}>Thêm dải pallet</Button>}
             </Space>
           </Col>
         </Row>
         {error && <Alert type="error" showIcon message={error} />}
         {!canEdit && !role.loading && <Alert type="info" showIcon message="Chỉ thủ kho (bước 3 nhận kho) và Ban Giám đốc ghi được Sổ pallet. Bạn đang xem." />}
-        {dem.chuaBi > 0 && <Alert type="warning" showIcon message={`${dem.chuaBi} pallet chưa khai số kg: tổ chưa chạm lấy được. Bấm "Khai số kg" — máy điền sẵn bì chuẩn ${kg1(MIX_PALLET_BI_CHUAN)} kg, chỉ sửa khi pallet lệch chuẩn.`} />}
+        {dem.chuaBi > 0 && <Alert type="warning" showIcon message={`${dem.chuaBi} pallet chưa khai số kg: tổ chưa chạm lấy được. Bấm "Khai số kg" và gõ số kg pallet rỗng (5 loại mặc định máy điền sẵn).`} />}
         <Row gutter={[12, 12]}>
           <Col xs={12} md={4}><Card size="small"><Statistic title="Pallet đang dùng" value={rows.filter((x) => x.is_active).length} /></Card></Col>
           <Col xs={12} md={4}><Card size="small"><Statistic title="Trống" value={dem.trong} valueStyle={{ color: '#15803D' }} /></Card></Col>
           <Col xs={12} md={4}><Card size="small"><Statistic title="Ở dây chuyền" value={dem.dc} valueStyle={{ color: dem.dc ? '#B7791F' : undefined }} /></Card></Col>
           <Col xs={12} md={4}><Card size="small"><Statistic title="Chưa khai số kg" value={dem.chuaBi} valueStyle={{ color: dem.chuaBi ? '#B91C1C' : undefined }} /></Card></Col>
-          <Col xs={12} md={4}><Card size="small"><Statistic title={`Lệch chuẩn ${kg1(MIX_PALLET_BI_CHUAN)} kg`} value={dem.lech} valueStyle={{ color: dem.lech ? '#1D4ED8' : undefined }} /></Card></Col>
+          <Col xs={12} md={4}><Card size="small"><Statistic title="Lệch số mặc định" value={dem.lech} valueStyle={{ color: dem.lech ? '#1D4ED8' : undefined }} /></Card></Col>
           <Col xs={12} md={4}><Card size="small"><Statistic title="Tắt" value={dem.tat} /></Card></Col>
         </Row>
         <Card size="small" title={`Sổ pallet · ${hienThi.length} pallet`}>
@@ -174,7 +188,7 @@ export default function MixPalletPage() {
           <Form.Item name="ten" label="Pallet (tên, loại)"><Input placeholder="Pallet gỗ 1,1 m · Pallet sắt" /></Form.Item>
           <Row gutter={12}>
             <Col span={12}><Form.Item name="code" label="Chữ viết tắt" rules={[{ required: true, message: 'Gõ chữ viết tắt' }]} extra={edit?.trang_thai === 'day_chuyen' ? 'Đang ở dây chuyền: đổi sau khi trả phiếu' : 'In trên pallet, tổ chạm lúc lấy'}><Input style={{ fontFamily: 'JetBrains Mono, Consolas, monospace', fontWeight: 700, textTransform: 'uppercase' }} disabled={edit?.trang_thai === 'day_chuyen'} /></Form.Item></Col>
-            <Col span={12}><Form.Item name="bi_kg" label={`Số kg (bì — chuẩn ${kg1(MIX_PALLET_BI_CHUAN)} kg)`} rules={[{ required: true, message: `Gõ số kg (mặc định ${kg1(MIX_PALLET_BI_CHUAN)})` }]}><InputNumber min={0.5} max={199} step={0.5} style={{ width: '100%' }} addonAfter="kg" /></Form.Item></Col>
+            <Col span={12}><Form.Item name="bi_kg" label={`Số kg (bì)${edit && palletBiMacDinh(edit.code) !== null ? ` — mặc định ${kg1(palletBiMacDinh(edit.code))} kg` : ''}`} rules={[{ required: true, message: 'Gõ số kg pallet rỗng' }]}><InputNumber min={0.5} max={199} step={0.5} style={{ width: '100%' }} addonAfter="kg" /></Form.Item></Col>
           </Row>
           <Form.Item name="ly_do" label="Lý do (khi cân lại)"><Input placeholder="Thay ván, sửa pallet, tới kỳ cân lại…" /></Form.Item>
           {edit?.trang_thai === 'day_chuyen' && <Alert type="warning" showIcon message={`Phiếu ${edit.issue_code} đang mở giữ bì lúc lấy (${kg1(edit.bi_kg)} kg); số kg mới áp cho lần lấy sau.`} />}
@@ -188,8 +202,8 @@ export default function MixPalletPage() {
             <Col span={8}><Form.Item name="den" label="đến" rules={[{ required: true }]}><InputNumber min={1} style={{ width: '100%' }} /></Form.Item></Col>
           </Row>
           <Form.Item name="ten" label="Tên pallet (chung cho cả bộ)"><Input /></Form.Item>
-          <Form.Item name="bi_kg" label={`Số kg chung (bì chuẩn ${kg1(MIX_PALLET_BI_CHUAN)} kg)`}><InputNumber min={0.5} max={199} step={0.5} style={{ width: '100%' }} addonAfter="kg" /></Form.Item>
-          <Text type="secondary">Mã đã có trong sổ sẽ bỏ qua. Bộ mới vào sổ với bì chuẩn {kg1(MIX_PALLET_BI_CHUAN)} kg — tổ chạm lấy được ngay.</Text>
+          <Form.Item name="bi_kg" label="Số kg chung của cả dải (bì pallet rỗng)" rules={[{ required: true, message: 'Gõ số kg chung của cả dải' }]}><InputNumber min={0.5} max={199} step={0.5} style={{ width: '100%' }} addonAfter="kg" /></Form.Item>
+          <Text type="secondary">Mã đã có trong sổ sẽ bỏ qua. Cả dải vào sổ cùng số kg trên, tổ chạm lấy được ngay; từng pallet cân lại riêng ở "Sửa · cân lại".</Text>
         </Form>
       </Modal>
     </div>

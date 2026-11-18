@@ -8,7 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Alert, Button, Card, Checkbox, Col, Descriptions, Input, InputNumber, Modal, Row, Select, Space, Steps, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined, CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons'
 import RawPhotoTiles from '../../../components/wms/RawPhotoTiles'
-import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_PALLET_BI_CHUAN, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_COLORS, MIX_VI_TRI_LABELS, type MixIssue, type ShiftLite } from '../../../services/wms/mixService'
+import { mixService, MIX_ISSUE_STATUS_COLORS, MIX_ISSUE_STATUS_LABELS, MIX_BI_UOC_DUONG_CU, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_COLORS, MIX_VI_TRI_LABELS, type MixIssue, type ShiftLite } from '../../../services/wms/mixService'
 import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { RAW_SETTINGS_DEFAULT, type RawSettings } from '../../../services/wms/raw.types'
@@ -67,7 +67,7 @@ export default function MixIssueDetailPage() {
   const canEditPhotos = !!issue && ['issued', 'returned'].includes(issue.status)
   const missOut = rawPhotoService.missing(photosOut, required)
   const coPallet = !!issue?.pallet_id
-  // fn_mix_thieu_anh (p19): phiếu pallet HC "dùng hết" không cân → bỏ riêng ảnh màn hình cân lúc trả (như KhoMixIssue)
+  // fn_mix_thieu_anh (p19): phiếu pallet "dùng hết" không cân → bỏ riêng ảnh màn hình cân lúc trả (như KhoMixIssue)
   const requiredRet = coPallet && issue?.dung_het ? required.filter((k) => k !== 'man_hinh_can') : required
   const missRet = rawPhotoService.missing(photosRet, requiredRet)
 
@@ -79,12 +79,12 @@ export default function MixIssueDetailPage() {
   }
 
   // Trả — khớp fn_mix_tra (p21):
-  // · phiếu theo pallet HC: bì = bì đã chốt lúc lấy (Sổ pallet), kg lấy GIỮ NGUYÊN; dùng hết = 0, còn dư = cân 1 lần (hàng + pallet) − bì.
-  // · đường cũ (không pallet HC) có cân lúc lấy: 3 lần cân như điện thoại — cân 1 lúc lấy · cân 2 hàng trả + pallet · cân 3 pallet rỗng = bì.
+  // · phiếu theo pallet: bì = bì đã chốt lúc lấy (Sổ pallet), kg lấy GIỮ NGUYÊN; dùng hết = 0, còn dư = cân 1 lần (hàng + pallet) − bì.
+  // · đường cũ (không pallet) có cân lúc lấy: 3 lần cân như điện thoại — cân 1 lúc lấy · cân 2 hàng trả + pallet · cân 3 pallet rỗng = bì.
   const coCan1 = issue?.gross_kg !== null && issue?.gross_kg !== undefined
   const biEff = coPallet
-    ? (issue?.pallet_kg ?? MIX_PALLET_BI_CHUAN)
-    : (retBi ?? issue?.return_pallet_kg ?? issue?.pallet_kg ?? MIX_PALLET_BI_CHUAN)
+    ? (issue?.pallet_kg ?? MIX_BI_UOC_DUONG_CU)
+    : (retBi ?? issue?.return_pallet_kg ?? issue?.pallet_kg ?? MIX_BI_UOC_DUONG_CU)
   const kgEff = coPallet
     ? (retDungHet ? 0 : (retGross !== null ? Math.round((retGross - biEff) * 100) / 100 : null))
     : coCan1
@@ -122,12 +122,12 @@ export default function MixIssueDetailPage() {
   const canSubmit = st === 'returned' && mixRole.khaiBao
   const canQc = st === 'submitted' && mixRole.duyetQc
   const canReceive = st === 'qc_confirmed' && mixRole.nhanKho
-  // Sửa cân lúc lấy — khớp fn_mix_sua_lay (p21): pallet HC trừ bì đã chốt; đường cũ trừ bì đã khai lúc trả (chưa trả thì kg = số cân,
+  // Sửa cân lúc lấy — khớp fn_mix_sua_lay (p21): pallet trừ bì đã chốt; đường cũ trừ bì đã khai lúc trả (chưa trả thì kg = số cân,
   // số bành ước bớt bì chuẩn 27,5 kg như DB)
-  const biLay = coPallet ? (issue.pallet_kg ?? MIX_PALLET_BI_CHUAN) : (issue.return_pallet_kg ?? null)
+  const biLay = coPallet ? (issue.pallet_kg ?? MIX_BI_UOC_DUONG_CU) : (issue.return_pallet_kg ?? null)
   const kgLayTinh = sg !== null ? Math.round((sg - (biLay ?? 0)) * 100) / 100 : sk
   const banhLayUoc = kgLayTinh && kgLayTinh > 0
-    ? Math.max(Math.round(Math.max(kgLayTinh - (sg !== null && biLay === null ? MIX_PALLET_BI_CHUAN : 0), 0) / (issue.lot_kg_per_banh || 35)), 1)
+    ? Math.max(Math.round(Math.max(kgLayTinh - (sg !== null && biLay === null ? MIX_BI_UOC_DUONG_CU : 0), 0) / (issue.lot_kg_per_banh || 35)), 1)
     : null
 
   return (

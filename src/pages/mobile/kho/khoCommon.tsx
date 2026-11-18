@@ -7,6 +7,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useActiveFacilities } from '../../../hooks/useActiveFacilities'
 import { fmtDateTime, fmtDateShort } from '../../../utils/format'
+import { MIX_PALLET_MAC_DINH } from '../../../services/wms/mixService'
 
 const KEY = 'kho_mobile_facility'
 
@@ -130,5 +131,7 @@ export function parseKhoScan(raw: string): { kind: 'batch_id' | 'mix_lot' | 'mix
   if (hc1) return { kind: 'mix_pallet', value: `HC${Number(hc1[1])}` }
   const hc = /^HC-[A-Z0-9]+-0*(\d{1,3})$/.exec(up)
   if (hc) return { kind: 'mix_pallet', value: `HC${Number(hc[1])}` }
+  // p22: 5 loại pallet mặc định (H1, H2, EJ, H3, H4) — tem chỉ in chữ viết tắt; mã lô/phiếu luôn dài hơn nên không nhầm
+  if (MIX_PALLET_MAC_DINH.some((x) => x.code === up)) return { kind: 'mix_pallet', value: up }
   return up ? { kind: 'batch_no', value: up } : null
 }

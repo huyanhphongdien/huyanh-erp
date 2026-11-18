@@ -1,6 +1,6 @@
 // ============================================================================
 // KhoShell — vỏ mobile "Kho NVL" cho thủ kho: .ops-root + 5 tab (Lô NVL / Nhập / Kiểm kê / Chèn / Thành phẩm)
-// + FAB quẹt QR (tem lô, mã lô chèn, mã phiếu chèn, pallet HC). Vỏ dùng ops-*, nội dung các màn dùng kmx-*. Route: /m/kho/*
+// + FAB quẹt QR (tem lô, mã lô chèn, mã phiếu chèn, pallet). Vỏ dùng ops-*, nội dung các màn dùng kmx-*. Route: /m/kho/*
 // File: src/pages/mobile/kho/KhoShell.tsx
 // ============================================================================
 import { useState } from 'react'
@@ -46,7 +46,7 @@ export default function KhoShell() {
       if (p.kind === 'batch_id') { nav(`/m/kho/lo/${p.value}`); return }
       if (p.kind === 'mix_lot') { const l = await mixService.findLotByCode(p.value); if (l) { nav(`/m/kho/chen?lot=${l.id}`); return } }
       if (p.kind === 'mix_issue') { const i = await mixService.findIssueByCode(p.value); if (i) { nav(`/m/kho/chen/phieu/${i.id}`); return } }
-      if (p.kind === 'mix_pallet') { nav(`/m/kho/chen/so-pallet?hc=${encodeURIComponent(p.value)}`); return }   // tem pallet HC (Sổ pallet p19)
+      if (p.kind === 'mix_pallet') { nav(`/m/kho/chen/so-pallet?hc=${encodeURIComponent(p.value)}`); return }   // tem pallet (Sổ pallet p19)
       const hits = await rawStockService.getBatches({ search: p.value, includeEmpty: true, limit: 5 })
       const exact = hits.find((h) => h.batch_no.toUpperCase() === p.value) ?? (hits.length === 1 ? hits[0] : null)
       if (exact) { nav(`/m/kho/lo/${exact.batch_id}`); return }
@@ -66,7 +66,7 @@ export default function KhoShell() {
           return <button key={t.to} className={`it${on ? ' on' : ''}`} onClick={() => nav(t.to)}><span className="ico">{t.ico}</span>{t.label}</button>
         })}
       </nav>}
-      {scan && <OpsQrScanner onClose={() => setScan(false)} onDetect={onDetect} title="Quẹt tem lô / pallet" hint="Hoặc gõ mã trên tem (vd NVL-PD-…, CH-PD-…, HC7)" placeholder="NVL-… · CH-… · HC7" />}
+      {scan && <OpsQrScanner onClose={() => setScan(false)} onDetect={onDetect} title="Quẹt tem lô / pallet" hint="Hoặc gõ mã trên tem (vd NVL-PD-…, CH-PD-…, H1)" placeholder="NVL-… · CH-… · H1" />}
     </div>
   )
 }

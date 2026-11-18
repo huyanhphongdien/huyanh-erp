@@ -6,7 +6,7 @@
 // ============================================================================
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { mixService, MIX_PALLET_BI_CHUAN, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue, type MixViTri } from '../../../services/wms/mixService'
+import { mixService, MIX_BI_UOC_DUONG_CU, MIX_PURPOSE_LABELS, MIX_SOURCE_LABELS, MIX_VI_TRI_LABELS, type MixIssue, type MixViTri } from '../../../services/wms/mixService'
 import { rawPhotoService, type RawPhoto } from '../../../services/wms/rawPhotoService'
 import { rawSettingsService } from '../../../services/wms/rawSettingsService'
 import { rawLotService, type RawLotBalance } from '../../../services/wms/rawLotService'
@@ -39,8 +39,8 @@ export default function KhoMixIssue() {
   const [retSoBanh, setRetSoBanh] = useState('')
   const [dungHetChon, setDungHetChon] = useState(false)   // dùng hết → bỏ cân 2, chỉ cân 3 (pallet rỗng)
   const [retGross, setRetGross] = useState('')
-  // bì đường cũ (phiếu không pallet HC): mặc định = bì chuẩn 27,5 (p20); chỉ gõ lại khi pallet khác chuẩn
-  const [retPallet, setRetPallet] = useState(() => { try { return localStorage.getItem('kmx_pallet_kg') || String(MIX_PALLET_BI_CHUAN) } catch { return String(MIX_PALLET_BI_CHUAN) } })
+  // bì đường cũ (phiếu không pallet): mặc định = bì tạm 27,5 (MIX_BI_UOC_DUONG_CU, chỉ đường cũ)
+  const [retPallet, setRetPallet] = useState(() => { try { return localStorage.getItem('kmx_pallet_kg') || String(MIX_BI_UOC_DUONG_CU) } catch { return String(MIX_BI_UOC_DUONG_CU) } })
   // đổi mã nguyên liệu gốc của phiếu
   const [maList, setMaList] = useState<RawLotBalance[] | null>(null)
   const [maChon, setMaChon] = useState<string[]>([])
@@ -91,7 +91,7 @@ export default function KhoMixIssue() {
   }, [i?.id, i?.shift_id, i?.status]) // eslint-disable-line react-hooks/exhaustive-deps
   // phiếu cũ đã có bì (khai lần trả trước / bì chốt) → điền sẵn số đó thay cho mặc định 27,5
   useEffect(() => { if (i && i.pallet_kg !== null) setRetPallet(String(i.pallet_kg)) }, [i?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-  // phiếu pallet HC: mặc định chọn sẵn "Dùng hết" (đa số ca dùng hết — owner 17/11); chạm "Còn dư" là đổi.
+  // phiếu pallet: mặc định chọn sẵn "Dùng hết" (đa số ca dùng hết — owner 17/11); chạm "Còn dư" là đổi.
   // Nút Ghi ghi rõ "trả 0 kg" nên bấm nhầm vẫn thấy ngay; sửa lại được tới khi QC duyệt.
   useEffect(() => { if (i && i.pallet_id && i.status === 'issued') setDungHetChon(true) }, [i?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -111,9 +111,9 @@ export default function KhoMixIssue() {
   // lúc lấy có cân tổng → lúc trả bắt buộc cân cả pallet + khai bì (không gõ thẳng kg)
   const bangTai = i?.vi_tri === 'bang_tai'   // băng tải: trả theo số bành còn × kg/bành hoặc kg, không pallet
   const retModeEff: 'pallet' | 'kg' = i && i.gross_kg !== null ? 'pallet' : bangTai ? 'kg' : retMode
-  // bì khai ở lần trả (chỉ phiếu KHÔNG pallet HC): dùng hết → số trên cân chính là pallet rỗng
-  // lần trả nhập 2 số: bì pallet (mặc định bì chuẩn 27,5 — p20) và số trên cân hàng trả + pallet; dùng hết = cân bằng bì
-  // p19: phiếu có pallet HC → bì đã chốt lúc lấy (Sổ pallet), không hỏi bì; dùng hết = 0 không cân; còn dư cân 1 lần
+  // bì khai ở lần trả (chỉ phiếu KHÔNG pallet): dùng hết → số trên cân chính là pallet rỗng
+  // lần trả nhập 2 số: bì pallet (mặc định bì tạm 27,5, chỉ đường cũ) và số trên cân hàng trả + pallet; dùng hết = cân bằng bì
+  // p19: phiếu có pallet → bì đã chốt lúc lấy (Sổ pallet), không hỏi bì; dùng hết = 0 không cân; còn dư cân 1 lần
   const coPallet = !!i?.pallet_id
   const biN = coPallet ? (i?.pallet_kg ?? 0) : retPalletN
   const dungHet = retModeEff === 'pallet' && dungHetChon
@@ -124,15 +124,15 @@ export default function KhoMixIssue() {
     : retModeEff === 'pallet' ? (retGrossN !== null && Number.isFinite(retGrossN) && (coPallet || retPallet !== '') && Number.isFinite(biN) ? Math.round((retGrossN - biN) * 100) / 100 : null)
     : kgRet === '' ? (bangTai && retSoBanh !== '' && i ? Math.round(Number(retSoBanh) * (i.lot_kg_per_banh || 35) * 100) / 100 : null) : Number(kgRet)
   // kg lấy tính lại = cân tổng lúc lấy − bì khai lúc trả
-  const kgOutNew = i ? (!coPallet && i.gross_kg !== null && !editRet && retModeEff === 'pallet' && retPallet !== '' && Number.isFinite(biN) ? Math.round((i.gross_kg - biN) * 100) / 100 : i.kg_out) : 0   // pallet HC: kg lấy đã là kg hàng thật
+  const kgOutNew = i ? (!coPallet && i.gross_kg !== null && !editRet && retModeEff === 'pallet' && retPallet !== '' && Number.isFinite(biN) ? Math.round((i.gross_kg - biN) * 100) / 100 : i.kg_out) : 0   // pallet: kg lấy đã là kg hàng thật
   const kgTxt = (n: number | null) => (n === null ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }))
   const retSoBanhAuto = i && kgRetN !== null && Number.isFinite(kgRetN) && kgRetN >= 0 ? Math.round(kgRetN / (i.lot_kg_per_banh || 35)) : null
   const retSoBanhN = retSoBanh === '' ? retSoBanhAuto : Math.round(Number(retSoBanh))
   const chinhBanhTra = (d: number) => { setRetSoBanh(String(Math.max((retSoBanhN ?? 0) + d, 0))); if (bangTai) setKgRet('') }
   const lGrossN = lGross === '' ? null : Number(lGross)
-  const lKgN = lMode === 'pallet' ? (lGrossN !== null && Number.isFinite(lGrossN) ? (coPallet ? Math.round((lGrossN - biN) * 100) / 100 : lGrossN) : null) : lKg === '' ? null : Number(lKg)   // pallet HC: trừ bì sổ; đường cũ: cân tổng, bì khai lúc trả
+  const lKgN = lMode === 'pallet' ? (lGrossN !== null && Number.isFinite(lGrossN) ? (coPallet ? Math.round((lGrossN - biN) * 100) / 100 : lGrossN) : null) : lKg === '' ? null : Number(lKg)   // pallet: trừ bì sổ; đường cũ: cân tổng, bì khai lúc trả
   const lKgOk = lKgN !== null && Number.isFinite(lKgN) && lKgN > 0
-  const lBanhAuto = i && lKgOk ? Math.max(Math.round(Math.max(lKgN! - (lMode === 'pallet' && !coPallet ? MIX_PALLET_BI_CHUAN : 0), 0) / (i.lot_kg_per_banh || 35)), 1) : null   // đường cũ: ước bớt bì chuẩn 27,5 (cùng số với fn_mix_sua_lay p20)
+  const lBanhAuto = i && lKgOk ? Math.max(Math.round(Math.max(lKgN! - (lMode === 'pallet' && !coPallet ? MIX_BI_UOC_DUONG_CU : 0), 0) / (i.lot_kg_per_banh || 35)), 1) : null   // đường cũ: ước bớt bì chuẩn 27,5 (cùng số với fn_mix_sua_lay p20)
   const lBanhN = lBanh === '' ? lBanhAuto : Math.round(Number(lBanh))
   const moSuaLay = () => {
     if (!i) return
@@ -350,7 +350,7 @@ export default function KhoMixIssue() {
                     <span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>kg</span>
                   </div>
                 ) : <span className="kmx-sm" style={{ color: '#15803D', fontWeight: 600 }}>Không còn hàng trả → sang cân 3.</span>}
-                <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl"><b>Cân 3</b> · pallet rỗng (bì) · mặc định {kgTxt(MIX_PALLET_BI_CHUAN)} kg (bì chuẩn) · chỉ cân lại khi nghi sai</span><input id={dungHetChon ? 'kmx-ret' : 'kmx-ret-bi'} className="kmx-text kmx-mono" style={{ fontWeight: 700, fontSize: 17 }} type="number" inputMode="decimal" value={retPallet} onChange={(e) => { setRetPallet(e.target.value); setRetSoBanh('') }} aria-label="Cân pallet rỗng" /></label>
+                <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl"><b>Cân 3</b> · pallet rỗng (bì) · mặc định {kgTxt(MIX_BI_UOC_DUONG_CU)} kg (bì tạm đường cũ) · nên cân pallet rỗng thật rồi gõ số đó</span><input id={dungHetChon ? 'kmx-ret' : 'kmx-ret-bi'} className="kmx-text kmx-mono" style={{ fontWeight: 700, fontSize: 17 }} type="number" inputMode="decimal" value={retPallet} onChange={(e) => { setRetPallet(e.target.value); setRetSoBanh('') }} aria-label="Cân pallet rỗng" /></label>
                 <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span>Hàng trả = {dungHet ? '0 (dùng hết)' : `${retGross || '0'} − ${retPallet || '0'}`}</span><span className="kmx-num sm">{kgRetN === null ? '—' : `${kgTxt(kgRetN)} kg`}</span></div>
               </>
             ) : (
@@ -391,7 +391,7 @@ export default function KhoMixIssue() {
           <section className="kmx-card" aria-label="Chụp ảnh lúc trả" ref={retPhotoRef}>
             <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>{dungHet ? (coPallet ? 'Chụp 1 ảnh pallet rỗng' : 'Chụp 2 ảnh pallet rỗng trên cân') : 'Chụp 2 ảnh phần trả'}</span><span className={`kmx-chip ${missRet.length ? 'red' : 'ok'}`}>{requiredRet.length - missRet.length}/{requiredRet.length}{missRet.length ? ` · thiếu ${missRet.length}` : ' đã chụp'}</span></div>
             <KmxPhotoTiles refType="mix_issue_return" refId={i.id} photos={pRet} required={requiredRet} facilityCode={i.facility_code || undefined} labels={{ toan_canh: dungHet ? 'Pallet rỗng toàn cảnh' : 'Toàn cảnh phần trả', man_hinh_can: 'Màn hình cân' }} onChange={load} onError={(t) => setMsg({ ok: false, text: t })} />
-            <span className="kmx-sm">{coPallet && dungHet ? 'Dùng hết với pallet HC: chỉ cần 1 ảnh toàn cảnh pallet rỗng (bì đã có trong Sổ pallet). Ảnh bổ sung không bắt buộc.' : 'Đủ 2 ảnh thì nút dưới mới sáng, kể cả dùng hết (ảnh pallet rỗng là bằng chứng bì). Ảnh bổ sung không bắt buộc.'}</span>
+            <span className="kmx-sm">{coPallet && dungHet ? 'Dùng hết với pallet: chỉ cần 1 ảnh toàn cảnh pallet rỗng (bì đã có trong Sổ pallet). Ảnh bổ sung không bắt buộc.' : 'Đủ 2 ảnh thì nút dưới mới sáng, kể cả dùng hết (ảnh pallet rỗng là bằng chứng bì). Ảnh bổ sung không bắt buộc.'}</span>
           </section>
           <div className="kmx-col" style={{ gap: 6 }}>
             <label htmlFor="kmx-rnote" className="kmx-sm" style={{ fontWeight: 600 }}>Ghi chú (không bắt buộc)</label>

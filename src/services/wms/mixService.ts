@@ -157,13 +157,28 @@ export interface NhanVienLite { id: string; full_name: string; email: string | n
 export type MixPalletTrangThai = 'trong' | 'day_chuyen' | 'chua_bi' | 'tat'
 export const MIX_PALLET_TRANG_THAI_LABELS: Record<MixPalletTrangThai, string> = { trong: 'Trống', day_chuyen: 'Ở dây chuyền', chua_bi: 'Chưa khai số kg', tat: 'Tắt' }
 export const MIX_PALLET_TRANG_THAI_COLORS: Record<MixPalletTrangThai, string> = { trong: 'green', day_chuyen: 'gold', chua_bi: 'red', tat: 'default' }
-/** Bì CHUẨN pallet hàng chèn = 27,5 kg (chủ DN chốt 17/11/2026, migration p20): mọi pallet HC dùng
- *  chung số này, form khai / tạo bộ điền sẵn; "cân lại" chỉ còn là ngoại lệ khi pallet lệch chuẩn.
- *  (Thay cho bì tạm 15/25 của p19 và nhắc "cân lại > 90 ngày" — kế hoạch cân từng pallet đã bỏ.) */
-export const MIX_PALLET_BI_CHUAN = 27.5
-/** Pallet lệch bì chuẩn (đã cân riêng vì ngoại lệ) → UI gắn badge "lệch chuẩn 27,5", không nhắc gì thêm. */
-export const palletLechChuan = (biKg: number | null | undefined): boolean =>
-  biKg !== null && biKg !== undefined && Math.abs(biKg - MIX_PALLET_BI_CHUAN) > 0.005
+/** 5 LOẠI PALLET MẶC ĐỊNH theo giấy cân tay của kho (18/11/2026, migration p22): MỖI pallet một số kg riêng (H4 là pallet SẮT),
+ *  thay cho "bì chuẩn 27,5 kg cho mọi pallet HC" (p20). Nút "Nạp 5 loại mặc định" ghi đúng danh sách này vào sổ.
+ *  ⚠ Chép của fn_mix_pallet_nap_mac_dinh_core (DB) — sửa một nơi phải sửa cả hai. */
+export const MIX_PALLET_MAC_DINH: ReadonlyArray<{ code: string; ten: string; bi: number }> = [
+  { code: 'H1', ten: 'Pallet H1', bi: 11.5 },
+  { code: 'H2', ten: 'Pallet H2', bi: 14.5 },
+  { code: 'EJ', ten: 'Pallet EJ', bi: 15 },
+  { code: 'H3', ten: 'Pallet H3', bi: 13.5 },
+  { code: 'H4', ten: 'Pallet sắt H4', bi: 25 },
+]
+/** Số kg mặc định của một mã pallet (null nếu mã không thuộc 5 loại — pallet tự thêm). */
+export const palletBiMacDinh = (code: string | null | undefined): number | null =>
+  MIX_PALLET_MAC_DINH.find((x) => x.code === (code ?? '').trim().toUpperCase())?.bi ?? null
+/** Pallet đã cân lại ra số KHÁC số mặc định của loại đó → UI gắn badge "lệch mặc định", không nhắc gì thêm.
+ *  Pallet tự thêm (không có số mặc định) không bao giờ bị gắn. */
+export const palletLechMacDinh = (code: string | null | undefined, biKg: number | null | undefined): boolean => {
+  const md = palletBiMacDinh(code)
+  return md !== null && biKg !== null && biKg !== undefined && Math.abs(biKg - md) > 0.005
+}
+/** Bì TẠM của ĐƯỜNG CŨ (phiếu KHÔNG chọn pallet trong sổ — cân tổng chưa bì): chỉ để ƯỚC số bành / điền sẵn ô cân pallet rỗng.
+ *  KHÔNG phải số kg của pallet nào (p22: mỗi pallet trong sổ có số riêng). Chép của fn_mix_lay / fn_mix_sua_lay (DB, p20/p21). */
+export const MIX_BI_UOC_DUONG_CU = 27.5
 export interface MixPallet {
   id: string; facility_id: string; facility_code: string | null
   code: string; so: number | null; ten: string | null
@@ -397,10 +412,16 @@ export const mixService = {
     const { error } = await supabase.rpc('fn_mix_pallet_tat', { p_id: id, p_tat: tat, p_ly_do: lyDo ?? null })
     if (error) throw new Error(dichLoiNhapKho(error))
   },
-  /** Tạo bộ pallet HC<tu>→HC<den> cho một nhà máy (bỏ qua mã đã có); trả về số dòng tạo mới.
-   *  p21: bì mặc định = MIX_PALLET_BI_CHUAN (27,5) — bộ mới tạo ra là dùng được ngay, không phải khai từng cái. */
+  /** Tạo dải pallet <prefix><tu>→<prefix><den> (mặc định HC) với CÙNG một số kg; bỏ qua mã đã có, trả về số dòng tạo mới.
+   *  p22: không còn số kg mặc định 27,5 — truyền `biKg` rõ ràng (bỏ trống = pallet "chưa khai số kg", chưa lấy được). */
   async taoBoPallet(facilityId: string, tu: number, den: number, opts?: { prefix?: string; ten?: string | null; biKg?: number | null }): Promise<number> {
-    const { data, error } = await supabase.rpc('fn_mix_pallet_tao_bo', { p_facility_id: facilityId, p_tu: tu, p_den: den, p_prefix: opts?.prefix ?? 'HC', p_ten: opts?.ten ?? 'Pallet hàng chèn', p_bi_kg: opts?.biKg ?? MIX_PALLET_BI_CHUAN })
+    const { data, error } = await supabase.rpc('fn_mix_pallet_tao_bo', { p_facility_id: facilityId, p_tu: tu, p_den: den, p_prefix: opts?.prefix ?? 'HC', p_ten: opts?.ten ?? null, p_bi_kg: opts?.biKg ?? null })
+    if (error) throw new Error(dichLoiNhapKho(error))
+    return num(data)
+  },
+  /** Nạp 5 loại pallet mặc định (MIX_PALLET_MAC_DINH) vào sổ của một nhà máy; mã đã có thì bỏ qua. Trả về số pallet mới. */
+  async napPalletMacDinh(facilityId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('fn_mix_pallet_nap_mac_dinh', { p_facility_id: facilityId })
     if (error) throw new Error(dichLoiNhapKho(error))
     return num(data)
   },

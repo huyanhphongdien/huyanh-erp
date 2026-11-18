@@ -145,11 +145,26 @@
 
   <h2 id="s2">2 · Ai làm gì: ba bước ký</h2>
   <div class="roles">
-    <div class="r"><b>Bước 1 · QS khai báo</b>Nhập lô chèn, lấy đầu ca, trả cuối ca, ký khai báo. Thường là QS tại xưởng. Ai không có tên ở bước này sẽ thấy "chưa được phân công khai báo (QS)" và không lấy được.</div>
-    <div class="r"><b>Bước 2 · QC duyệt</b>Kiểm số lấy, trả, tiêu hao và ảnh rồi duyệt. Phòng QC (hiện là Lê Thành Nhân, Lê Thị Lệ Trinh).</div>
-    <div class="r"><b>Bước 3 · Thủ kho nhận</b>Nhận cuối: kho chèn trừ tiêu hao, sổ ca ép bành tự điền dòng CHÈN. Tạm thời chủ doanh nghiệp. Ban Giám đốc cấp cao làm được mọi bước.</div>
+    <div class="r"><b>Bước 1 · QS khai báo</b>Nhập lô chèn, lấy đầu ca, trả cuối ca, ký khai báo; cũng bắt đầu / kết thúc lệnh, sửa cân lúc lấy, hủy phiếu lấy nhầm. <b>Đang phân công (Phong Điền, từ 18/11/2026): Đặng Thị Lụa, Đỗ Thị Hồng Linh, Trần Thị Tươi, Võ Thị Kim Ngân.</b> Ai không có tên sẽ thấy "chưa được phân công khai báo (QS)" và không lấy được.</div>
+    <div class="r"><b>Bước 2 · QC duyệt</b>Kiểm số lấy, trả, tiêu hao và ảnh rồi duyệt. <b>Đang phân công (mọi nhà máy, từ 30/10/2026): Lê Thành Nhân, Lê Thị Lệ Trinh.</b></div>
+    <div class="r"><b>Bước 3 · Thủ kho nhận</b>Nhận cuối: kho chèn trừ tiêu hao, sổ ca ép bành tự điền dòng CHÈN; ghi Sổ pallet. <b>Chưa phân công ai</b> nên máy dùng luật cũ: thủ kho kho nguyên liệu và Ban Giám đốc nhận được. Ban Giám đốc cấp cao làm được mọi bước.</div>
   </div>
   <p class="sm muted">Phân công làm một lần trên máy tính: Hàng chèn → tab <b>Phân công</b> (mục 10). Chỉ Ban Giám đốc thêm hoặc thu người.</p>
+  <div class="card">
+    <b>Ai làm được việc nào</b> <span class="muted sm">— nút không có quyền sẽ không bấm được; ai cũng xem được số liệu</span>
+    <table>
+      <thead><tr><th>Việc</th><th>QS (bước 1)</th><th>QC (bước 2)</th><th>Thủ kho (bước 3)</th></tr></thead>
+      <tbody>
+        <tr><td>Lấy hàng chèn, sửa cân lúc lấy, trả cuối ca, hủy phiếu lấy nhầm</td><td><b>✓</b></td><td></td><td></td></tr>
+        <tr><td>Nhập / sửa lô chèn</td><td><b>✓</b></td><td></td><td></td></tr>
+        <tr><td>Bắt đầu và kết thúc lệnh</td><td><b>✓</b></td><td></td><td><b>✓</b></td></tr>
+        <tr><td>Kiểm kê kho chèn, đổi mã gốc của phiếu</td><td><b>✓</b></td><td></td><td><b>✓</b></td></tr>
+        <tr><td>Ký bước 1 · duyệt bước 2 · nhận bước 3</td><td><b>✓</b> ký</td><td><b>✓</b> duyệt</td><td><b>✓</b> nhận</td></tr>
+        <tr><td>Ghi Sổ pallet (sửa số kg, tắt / bật, thêm dải, nạp 5 loại)</td><td></td><td></td><td><b>✓</b></td></tr>
+      </tbody>
+    </table>
+    <div class="note info sm">Ban Giám đốc (cấp cao) làm được mọi việc. Một bước <b>đã có tên</b> thì người ngoài danh sách không làm được ở bất kỳ nhà máy nào; bước <b>chưa có ai</b> mới dùng luật cũ. Vì vậy khi mở hàng chèn ở Tân Lâm hay Lào, phải thêm người của nơi đó vào bước 1 (chọn đúng nhà máy) trước khi dùng.</div>
+  </div>
   <div class="card">
     <b>Trạng thái một phiếu chèn</b>
     <div class="status" style="margin-top:8px">
@@ -163,6 +178,7 @@
   </div>
 
   <h2 id="s3">3 · Đầu ca: khai lệnh đang chạy</h2>
+  <p class="sm"><b>Ai làm:</b> <span class="tag blue">QS</span> hoặc <span class="tag green">thủ kho</span>.</p>
   <div class="card">
     <p>Một <b>lệnh chạy</b> là một đợt chạy máy gồm một hay nhiều mã nguyên liệu, ví dụ "KHMN-15 + 17" chạy chung trong lúc "TMHG-39" chèn bể Slap. Khai một lần, không chọn lại trên từng phiếu.</p>
     <ol class="steps">
@@ -202,6 +218,7 @@
   </div>
 
   <h2 id="s4">4 · Sổ pallet và lấy hàng chèn <small>mỗi pallet một lần, nút "Lấy lần n" trên thẻ lệnh</small></h2>
+  <p class="sm"><b>Ai làm:</b> lấy hàng: <span class="tag blue">QS</span> · ghi Sổ pallet: <span class="tag green">thủ kho</span> hoặc Ban Giám đốc · xem sổ: mọi người.</p>
   <h3>Sổ pallet: khai một lần, dùng mọi lần <small style="font-weight:500;color:#6B7280">từ 10/11/2026</small></h3>
   <div class="shot">
     <div class="phone"><div class="screen"><img src="hang-chen/15-so-pallet.jpeg" alt="Màn Sổ pallet hàng chèn: lưới pallet và số kg"></div><div class="hint">cuộn trong khung để xem hết màn · ảnh chụp 18/11/2026</div></div>
@@ -263,6 +280,7 @@
   </div>
 
   <h2 id="s5">5 · Trả cuối ca: dùng hết hay còn dư</h2>
+  <p class="sm"><b>Ai làm:</b> <span class="tag blue">QS</span> — ghi trả và ký bước 1 một chạm.</p>
   <div class="shot">
     <div class="phone"><div class="screen"><img src="hang-chen/04-tra-cuoi-ca.jpeg" alt="Màn Trả cuối ca"></div><div class="hint">ảnh màn cũ (phiếu không pallet); phiếu có pallet hiện hai nút Dùng hết / Còn dư như mô tả bên phải, ảnh sẽ thay sau lần chèn thật đầu tiên</div></div>
     <div>
@@ -279,6 +297,7 @@
     </div>
   </div>
   <h2 id="s6">6 · Ký ba bước</h2>
+  <p class="sm"><b>Ai làm:</b> mỗi người ký bước của mình: <span class="tag blue">QS</span> bước 1 → <span class="tag purple">QC</span> bước 2 → <span class="tag green">thủ kho</span> bước 3.</p>
   <div class="shot">
     <div class="phone"><div class="screen"><img src="hang-chen/05-cho-ky.jpeg" alt="Màn Chờ ký"></div><div class="hint">cuộn trong khung để xem hết màn</div></div>
     <div>
@@ -293,6 +312,7 @@
   </div>
 
   <h2 id="s7">7 · Kho chèn và nhập lô</h2>
+  <p class="sm"><b>Ai làm:</b> nhập lô, hủy lô: <span class="tag blue">QS</span> · kiểm kê: <span class="tag blue">QS</span> hoặc <span class="tag green">thủ kho</span> · xem: mọi người.</p>
   <div class="shot">
     <div class="phone"><div class="screen"><img src="hang-chen/06-kho-chen.jpeg" alt="Màn Tồn kho chèn"></div><div class="hint">cuộn trong khung để xem hết màn</div></div>
     <div>
@@ -347,6 +367,7 @@
   </div>
 
   <h2 id="s9">9 · Kết thúc lệnh, tổng kết, mail Ban Giám đốc</h2>
+  <p class="sm"><b>Ai làm:</b> <span class="tag blue">QS</span> hoặc <span class="tag green">thủ kho</span>; mail Ban Giám đốc tự gửi.</p>
   <div class="shot">
     <div class="phone"><div class="screen"><img src="hang-chen/09-tong-ket-lenh.jpeg" alt="Màn Tổng kết lệnh"></div></div>
     <div>
@@ -364,7 +385,8 @@
   <div class="desk"><img src="hang-chen/10-may-tinh-hang-chen.jpeg" alt="Trang Hàng chèn trên máy tính"></div>
   <h3>Phân công ba bước (chỉ Ban Giám đốc)</h3>
   <div class="desk"><img src="hang-chen/11-may-tinh-phan-cong.jpeg" alt="Trang Phân công quy trình hàng chèn"></div>
-  <p class="sm">Gõ tên → Thêm vào cột của bước; Thu để bỏ. Bước chưa có ai thì máy dùng luật cũ (khai báo: thủ kho / QC; duyệt: phòng QC; nhận: thủ kho NVL). Đã phân công thì chỉ người trong danh sách và Ban Giám đốc làm được.</p>
+  <p class="sm muted">Ảnh chụp 18/11/2026, đã ẩn địa chỉ email. Bước 1: 4 người ở Phong Điền · Bước 2: 2 người, mọi nhà máy · Bước 3: chưa phân công (dùng luật cũ).</p>
+  <p class="sm">Gõ tên → chọn nhà máy → <span class="btn">Thêm</span> vào cột của bước; <span class="btn red">Thu</span> để bỏ. Bước chưa có ai thì máy dùng luật cũ (khai báo: thủ kho / QC; duyệt: phòng QC; nhận: thủ kho NVL). Đã phân công thì chỉ người trong danh sách và Ban Giám đốc làm được — kể cả ở nhà máy khác, nên mỗi nhà máy dùng hàng chèn phải có người của mình ở bước 1.</p>
 
     <div class="shot">
     <div><img src="hang-chen/16-pc-so-pallet.jpeg" alt="Tab Sổ pallet trên máy tính" style="width:100%;border:1px solid #E5E7EB;border-radius:10px"></div>

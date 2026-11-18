@@ -256,7 +256,7 @@
       <ol class="steps">
         <li>Chạm nguồn: <b>Hàng chuẩn</b>, <b>Hàng lỗi</b>, <b>DKL</b> (dính kim loại) hoặc <b>SBR / mua ngoài</b>.</li>
         <li>Hàng từ kho thành phẩm: chạm lô TP còn tồn, số lô tự điền, bành trừ thẳng lô TP. SBR hoặc hàng ghi số lô trên bao: gõ số lô → <span class="btn white">Dùng</span>. Chưa có lô thì máy tự tạo, nhập bằng lấy.</li>
-        <li>DKL bắt buộc tick <b>Đã rà kim loại pallet này</b>.</li>
+        <li><b>DKL</b>: hàng chỉ được đem vào chèn sau khi đã xử lý kim loại ở khâu trước, nên máy <b>mặc định là đã xử lý</b> — không tick, không hỏi lại, lấy như hàng khác.</li>
         <li>Lô đã nhập trước ở Kho chèn: bấm <b>Quét tem CH / chọn lô đã nhập trước</b> rồi quét tem hoặc chạm lô.</li>
       </ol>
       <div class="note ok sm">Thẻ xám trên cùng nhắc các lần đã chèn trong ca và lần đang lấy là lần mấy. Số lần đếm theo lệnh.</div>
@@ -319,7 +319,7 @@
       <p>Trang chính → <b>Kho chèn</b>. Ba ô số: Tại kho, Dây chuyền, Nhập tháng. Mỗi lô là một thẻ: số lô, mã CH, nguồn, Po / Mooney / PRI, tồn kg và bành, ba ô Nhập / Tiêu hao / Dây chuyền.</p>
       <ul class="tight">
         <li><b>Kiểm kê lô này</b>: gõ kg cân thực, lệch thì chọn lý do → Ghi kiểm kê.</li>
-        <li><b>Lô DKL</b> phải bấm <b>Đã xử lý kim loại, mở lấy</b> rồi mới lấy chèn được.</li>
+        <li><b>Lô DKL</b> lấy chèn được ngay như lô khác (máy mặc định đã xử lý kim loại, không còn nút "mở lấy").</li>
         <li>Lô chưa có số lô: gõ số lô trên bao → <b>Gán</b>.</li>
         <li><b>Nhập nhầm? Hủy lô</b>: chỉ khi lô chưa có phiếu lấy nào.</li>
         <li><b>Phiếu của lô</b>: xem mọi lần lấy từ lô đó. Cuối trang là <b>Sổ chuyển động 14 ngày</b>, chạm mã phiếu để mở.</li>
@@ -414,7 +414,6 @@
       <tr><td>"Tài khoản này chưa được phân công khai báo hàng chèn (QS)"</td><td>Bạn chưa có tên ở bước 1. Nhờ Ban Giám đốc thêm ở máy tính → Hàng chèn → Phân công.</td></tr>
       <tr><td>"Chưa khai lệnh đang chạy"</td><td>Vẫn lấy được, phiếu nằm ở thẻ "Chưa gắn lệnh". Nên bấm Bắt đầu lệnh… trước cho máy tự gắn.</td></tr>
       <tr><td>Nút Tiếp tục hoặc Ghi trả không sáng</td><td>Thiếu ảnh bắt buộc, chưa chọn vị trí chèn, chưa gõ số lô hoặc chưa chọn lệnh. Đọc chữ trên nút, máy ghi rõ thiếu gì.</td></tr>
-      <tr><td>"Dính kim loại · chưa xử lý, chưa lấy được"</td><td>Lô DKL chưa rà kim loại. Vào Kho chèn bấm "Đã xử lý kim loại, mở lấy".</td></tr>
       <tr><td>"Thiếu ảnh bắt buộc, mở phiếu để chụp bổ sung"</td><td>Ở Chờ ký, phiếu thiếu ảnh không ký được. Mở phiếu, chụp bổ sung rồi ký.</td></tr>
       <tr><td>Ca trên đầu trang không đúng</td><td>Máy nhận ca theo chấm công hoặc giờ. Lúc lấy hoặc trả bấm "Đổi ca" và chọn đúng ca.</td></tr>
       <tr><td>"Lấy nhiều hơn tồn lô TP"</td><td>Số cân vượt số bành lô thành phẩm còn lại. Kiểm lại lô hoặc số cân.</td></tr>

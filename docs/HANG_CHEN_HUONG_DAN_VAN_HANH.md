@@ -35,7 +35,7 @@ Ai không có tên ở bước 1 sẽ thấy "chưa được phân công khai b�
 | Hàng chuẩn lấy từ kho TP để nâng chỉ số | Hàng chuẩn → chạm chủng loại → kg → chọn ca (phiếu ca phải đang nháp) | gõ, có nút gợi ý lô đạt còn tồn |
 | SBR 1502 mua ngoài, hàng khác | Mua ngoài / Khác → **Số lô** → **Số bành** (máy ra kg, 35 kg/bành) hoặc gõ kg | gõ số lô nhà cung cấp |
 
-Quy tắc: không có số lô thì không nhập được. Lô **DKL** phải bấm "Đã xử lý kim loại, mở lấy" ở Kho chèn rồi mới lấy chèn được. Lô cũ chưa có số lô: ở Kho chèn gõ số lô → **Gán**, hoặc lúc lấy máy sẽ hỏi.
+Quy tắc: không có số lô thì không nhập được. Lô **DKL** mặc định là ĐÃ xử lý kim loại (p23, 18/11/2026: hàng phải xử lý trước khi đem vào chèn) — không còn nút "mở lấy", lấy chèn được ngay. Lô cũ chưa có số lô: ở Kho chèn gõ số lô → **Gán**, hoặc lúc lấy máy sẽ hỏi.
 
 ## 2. Khai lệnh chạy (mã nguyên liệu đang chạy)
 
@@ -55,7 +55,7 @@ Một **lệnh chạy** = một đợt chạy máy gồm **một hay nhiều mã
 
 Trang chính tab Chèn → nút **Lấy lần n** (máy đếm theo ca).
 
-1. **Nguồn và số lô (phương án B):** chạm nguồn *Hàng chuẩn* / *Hàng lỗi* / *DKL* / *SBR – mua ngoài*. Nguồn kho TP → chạm lô TP còn tồn (số lô tự điền, bành trừ thẳng lô TP). SBR hoặc hàng ghi số lô trên bao → gõ số lô (máy gợi ý số lô dùng gần đây, ví dụ 1502) → **Dùng**. DKL phải tick **"Đã rà kim loại"**. Máy tự tạo lô chèn nếu chưa có, nhập = lấy. Lô đã nhập trước vẫn chọn được ở "Quét tem CH / chọn lô đã nhập trước". Thẻ xám phía trên liệt kê các lần đã lấy của ca (L1, L2…) để đối chiếu sổ.
+1. **Nguồn và số lô (phương án B):** chạm nguồn *Hàng chuẩn* / *Hàng lỗi* / *DKL* / *SBR – mua ngoài*. Nguồn kho TP → chạm lô TP còn tồn (số lô tự điền, bành trừ thẳng lô TP). SBR hoặc hàng ghi số lô trên bao → gõ số lô (máy gợi ý số lô dùng gần đây, ví dụ 1502) → **Dùng**. DKL không phải tick gì (mặc định đã xử lý kim loại, p23). Máy tự tạo lô chèn nếu chưa có, nhập = lấy. Lô đã nhập trước vẫn chọn được ở "Quét tem CH / chọn lô đã nhập trước". Thẻ xám phía trên liệt kê các lần đã lấy của ca (L1, L2…) để đối chiếu sổ.
 2. **Ca:** tự nhận theo chấm công hoặc giờ, bấm Đổi ca nếu khác. Tổ trưởng: **Ca Vang** hoặc **Ca Hiền**. Dùng để: Chạy lại / Nâng chỉ số.
 3. **Chèn vào đâu:** Chèn bể Slap, Chèn máy Mix hoặc **Chèn băng tải** (bắt buộc, máy nhớ lần trước). Băng tải tính theo **bành × kg/bành của lô** (35 kg), không cân pallet, không bì: gõ số bành (máy ra kg) hoặc gõ kg; lúc trả bấm − + số bành còn hoặc gõ kg, có nút "Dùng hết · trả 0 bành".
 4. **Cân (p19/p22):** chạm **pallet** (H1, H2, EJ, H3, H4 — hoặc Quét tem) + gõ số trên cân → máy trừ đúng số kg của pallet đó từ Sổ pallet, **kg lấy chốt ngay** (ví dụ pallet H2: 612,0 − 14,5 = 597,5). Không chọn pallet: bấm "Không pallet · gõ kg" hoặc cân tổng theo đường cũ (bì khai lúc trả, ước số bành bớt 27,5 tạm).

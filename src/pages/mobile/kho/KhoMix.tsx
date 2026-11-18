@@ -304,17 +304,15 @@ export default function KhoMix() {
             {lots.length > 0 ? (
               <div className="kmx-list">
                 {lots.map((l) => {
-                  const khoa = l.source_type === 'dkl' && !l.metal_cleared
                   return (
                     <div key={l.id} className="kmx-li">
                       <span className="kmx-col" style={{ minWidth: 0, flex: 1 }}>
                         {/* Số lô và mã CH từng chung 1 dòng nowrap → mã CH bị cắt "CH-PD-261031-…". Giờ: số lô (≤ 3 dòng, đủ cho pallet ghép 5 số lô) · dòng dưới mở đầu bằng mã CH, xuống được 2 dòng. */}
-                        <span className="kmx-mono kmx-clamp3" style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.25, color: khoa ? '#6B7280' : l.so_lo ? '#0D2E25' : '#B91C1C' }}>{l.so_lo || 'Chưa có số lô'}</span>
-                        <span className="kmx-sm kmx-clamp2"><span className="kmx-mono">{l.code}</span>{khoa ? '' : ` · ${l.source_desc || `${MIX_SOURCE_LABELS[l.source_type]}${l.grade ? ` · ${l.grade}` : ''}`}`}</span>
-                        {khoa && <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Dính kim loại · chưa xử lý, chưa lấy được</span>}
+                        <span className="kmx-mono kmx-clamp3" style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.25, color: l.so_lo ? '#0D2E25' : '#B91C1C' }}>{l.so_lo || 'Chưa có số lô'}</span>
+                        <span className="kmx-sm kmx-clamp2"><span className="kmx-mono">{l.code}</span>{` · ${l.source_desc || `${MIX_SOURCE_LABELS[l.source_type]}${l.grade ? ` · ${l.grade}` : ''}`}`}</span>
                       </span>
                       <span className="kmx-col" style={{ alignItems: 'flex-end', flex: '0 0 auto', gap: 0 }}>
-                        <span className={`kmx-num sm${khoa ? ' mut' : ''}`} style={{ whiteSpace: 'nowrap' }}>{fmtKg(l.ton_kg)} <span className="kmx-sm">kg</span></span>
+                        <span className="kmx-num sm" style={{ whiteSpace: 'nowrap' }}>{fmtKg(l.ton_kg)} <span className="kmx-sm">kg</span></span>
                         <span className="kmx-sm" style={{ whiteSpace: 'nowrap' }}>{l.ton_banh} bành</span>
                         {l.kg_at_line > 0 && <span className="kmx-sm" style={{ whiteSpace: 'nowrap', color: '#B45309', fontWeight: 600 }}>dây chuyền {fmtKg(l.kg_at_line)}</span>}
                       </span>

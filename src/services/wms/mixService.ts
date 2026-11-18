@@ -284,7 +284,7 @@ export const mixService = {
       p_so_lo: input.soLo, p_so_banh: input.soBanhIn ?? null, p_kg_per_banh: input.kgPerBanh ?? null,
       p_facility_id: input.facilityId, p_source_type: input.sourceType, p_source_desc: input.sourceDesc ?? null, p_grade: input.grade ?? null, p_kg_in: input.kgIn ?? null,
       p_po: input.po ?? null, p_mooney: input.mooney ?? null, p_pri: input.pri ?? null, p_qc_allow_mix_pct: input.qcAllowMixPct ?? null,
-      p_qc_allow_rerun: input.qcAllowRerun ?? true, p_metal_cleared: input.metalCleared ?? false, p_received_date: input.receivedDate ?? null,
+      p_qc_allow_rerun: input.qcAllowRerun ?? true, p_metal_cleared: input.metalCleared ?? true, p_received_date: input.receivedDate ?? null,
       p_note: input.note ?? null, p_source_ref_type: input.sourceRefType ?? null, p_source_ref_id: input.sourceRefId ?? null,
     })
     if (error) throw new Error(dichLoiNhapKho(error))
@@ -506,7 +506,7 @@ export const mixService = {
     return ((data ?? []) as any[]).map((r) => ({ ...r, weight_per_unit: numOrNull(r.weight_per_unit), ton_banh: num(r.ton_banh), ton_kg: num(r.ton_kg) }))
   },
   /** LOI/DKL từ dòng sổ ca đã nhận → lô chèn (kg mặc định = phần chưa chuyển) */
-  async taoLoTuSoCa(lineId: string, kg?: number | null, note?: string | null, metalCleared = false, soLo?: string | null): Promise<string> {
+  async taoLoTuSoCa(lineId: string, kg?: number | null, note?: string | null, metalCleared = true, soLo?: string | null): Promise<string> {
     const { data, error } = await supabase.rpc('fn_mix_tao_lo_tu_so_ca', { p_line_id: lineId, p_kg: kg ?? null, p_note: note ?? null, p_metal_cleared: metalCleared, p_so_lo: soLo ?? null })
     if (error) throw new Error(dichLoiNhapKho(error))
     return String(data)

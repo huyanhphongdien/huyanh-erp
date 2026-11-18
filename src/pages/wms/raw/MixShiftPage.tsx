@@ -57,7 +57,7 @@ export default function MixShiftPage() {
   const [lenhs, setLenhs] = useState<LenhChay[]>([])   // lệnh đang chạy (SQL p13): một lệnh = 1..n mã gộp
   const [lenhOpen, setLenhOpen] = useState(false)
   const [lf, setLf] = useState<{ ids: string[]; cach: 'thay_the' | 'song_song' | 'gop'; gopVao?: string }>({ ids: [], cach: 'thay_the' })
-  const [f, setF] = useState({ lotId: undefined as string | undefined, kg: null as number | null, shiftId: undefined as string | undefined, team: '', purpose: 'chay_lai' as MixPurpose, targetIndex: '', targetValue: null as number | null, poId: undefined as string | undefined, note: '', rawLotIds: [] as string[], soBanh: null as number | null, grossKg: null as number | null, palletId: undefined as string | undefined, viTri: undefined as MixViTri | undefined, cach: 'nguon' as 'nguon' | 'lo', nguon: undefined as MixSourceType | undefined, fgLotId: undefined as string | undefined, soLoMoi: '', raKimLoai: false })
+  const [f, setF] = useState({ lotId: undefined as string | undefined, kg: null as number | null, shiftId: undefined as string | undefined, team: '', purpose: 'chay_lai' as MixPurpose, targetIndex: '', targetValue: null as number | null, poId: undefined as string | undefined, note: '', rawLotIds: [] as string[], soBanh: null as number | null, grossKg: null as number | null, palletId: undefined as string | undefined, viTri: undefined as MixViTri | undefined, cach: 'nguon' as 'nguon' | 'lo', nguon: undefined as MixSourceType | undefined, fgLotId: undefined as string | undefined, soLoMoi: '' })
   const [pallets, setPallets] = useState<MixPallet[]>([])   // p19/p22: chạm pallet ngay trên modal desktop — bì trừ và chốt như bản điện thoại
 
   useEffect(() => {
@@ -203,7 +203,6 @@ export default function MixShiftPage() {
     if (f.cach === 'lo' && !f.lotId) { message.warning('Chọn lô chèn'); return }
     if (f.cach === 'nguon' && !f.nguon) { message.warning('Chọn nguồn hàng chèn'); return }
     if (f.cach === 'nguon' && !f.fgLotId && !f.soLoMoi.trim()) { message.warning('Chọn lô TP hoặc gõ số lô trên bao'); return }
-    if (f.cach === 'nguon' && f.nguon === 'dkl' && !f.raKimLoai) { message.warning('Hàng DKL: tick "Đã rà kim loại" trước'); return }
     if (!f.viTri) { message.warning('Chọn chèn bể Slap hay chèn máy Mix'); return }
     if (palletChon && f.grossKg === null) { message.warning(`Gõ số trên cân (cả pallet ${palletChon.code})`); return }
     if (palletChon && kgNet !== null && kgNet <= 0) { message.warning(`Số trên cân phải lớn hơn bì ${fmtKg(palletChon.bi_kg)} kg của ${palletChon.code}`); return }
@@ -212,11 +211,11 @@ export default function MixShiftPage() {
     setSaving(true)
     try {
       const lotId = f.cach === 'nguon'
-        ? await mixService.timHoacTaoLo({ facilityId, sourceType: f.nguon ?? null, soLo: f.fgLotId ? null : f.soLoMoi, fgLotId: f.fgLotId ?? null, metalCleared: f.nguon === 'dkl' ? f.raKimLoai : null })
+        ? await mixService.timHoacTaoLo({ facilityId, sourceType: f.nguon ?? null, soLo: f.fgLotId ? null : f.soLoMoi, fgLotId: f.fgLotId ?? null })
         : f.lotId as string
       const id = await mixService.lay({ lotId, kg: kgNet, viTri: f.viTri, rawLotIds: f.rawLotIds, soBanh: f.soBanh, grossKg: f.viTri === 'bang_tai' ? null : f.grossKg, palletKg: null, palletId: palletChon ? palletChon.id : null, shiftDate: date, shiftId: f.shiftId ?? null, team: f.team.trim() || null, purpose: f.purpose, targetIndex: f.purpose === 'nang_chi_so' ? f.targetIndex.trim() || null : null, targetValue: f.purpose === 'nang_chi_so' ? f.targetValue : null, productionOrderId: f.poId ?? null, note: f.note.trim() || null })
       message.success('Đã ghi lấy đầu ca — chụp 2 ảnh ở trang phiếu'); setOpen(false)
-      setF({ lotId: undefined, kg: null, shiftId: undefined, team: '', purpose: 'chay_lai', targetIndex: '', targetValue: null, poId: undefined, note: '', rawLotIds: [], soBanh: null, grossKg: null, palletId: undefined, viTri: undefined, cach: 'nguon', nguon: undefined, fgLotId: undefined, soLoMoi: '', raKimLoai: false })
+      setF({ lotId: undefined, kg: null, shiftId: undefined, team: '', purpose: 'chay_lai', targetIndex: '', targetValue: null, poId: undefined, note: '', rawLotIds: [], soBanh: null, grossKg: null, palletId: undefined, viTri: undefined, cach: 'nguon', nguon: undefined, fgLotId: undefined, soLoMoi: '' })
       navigate(`/wms/chen/phieu/${id}`)
     } catch (e: any) { message.error(e?.message || 'Không ghi được') }
     finally { setSaving(false) }
@@ -373,20 +372,19 @@ export default function MixShiftPage() {
             </Col>
             {f.cach === 'nguon' ? (
               <>
-                <Col span={8}><Text>Nguồn *</Text><Select style={{ width: '100%' }} value={f.nguon} onChange={(v) => setF((x) => ({ ...x, nguon: v, fgLotId: undefined, soLoMoi: '', raKimLoai: false }))} placeholder="Hàng chuẩn / lỗi / DKL / SBR"
+                <Col span={8}><Text>Nguồn *</Text><Select style={{ width: '100%' }} value={f.nguon} onChange={(v) => setF((x) => ({ ...x, nguon: v, fgLotId: undefined, soLoMoi: '' }))} placeholder="Hàng chuẩn / lỗi / DKL / SBR"
                   options={[{ value: 'std', label: 'Hàng chuẩn (kho TP đạt)' }, { value: 'loi', label: 'Hàng lỗi (kho TP lỗi / CXL)' }, { value: 'dkl', label: 'DKL (dính kim loại)' }, { value: 'mua_ngoai', label: 'SBR / mua ngoài' }, { value: 'khac', label: 'Khác' }]} /></Col>
                 {(f.nguon === 'std' || f.nguon === 'loi' || f.nguon === 'dkl') && (
                   <Col span={8}><Text>Lô TP còn tồn</Text><Select style={{ width: '100%' }} allowClear showSearch optionFilterProp="label" value={f.fgLotId} onChange={(v) => setF((x) => ({ ...x, fgLotId: v }))} placeholder="chọn lô TP, hoặc gõ số lô bên cạnh"
                     options={fgLots.filter((g) => f.nguon === 'dkl' ? g.material_code === 'DKL' : f.nguon === 'loi' ? g.material_code !== 'DKL' && (g.material_code === 'LOI' || g.qc_status !== 'dat') : g.qc_status === 'dat' && g.material_code !== 'LOI' && g.material_code !== 'DKL').map((g) => ({ value: g.id, label: `${g.so_lo} · ${g.material_name} · còn ${g.ton_banh} bành` }))} /></Col>
                 )}
                 <Col span={8}><Text>Số lô trên bao {f.fgLotId ? '(theo lô TP)' : '*'}</Text><Input value={f.soLoMoi} disabled={!!f.fgLotId} onChange={(e) => setF((x) => ({ ...x, soLoMoi: e.target.value }))} placeholder="1502, S2308AB…" style={{ textTransform: 'uppercase', fontWeight: 600 }} /></Col>
-                {f.nguon === 'dkl' && <Col span={24}><Checkbox checked={f.raKimLoai} onChange={(e) => setF((x) => ({ ...x, raKimLoai: e.target.checked }))}>Đã rà kim loại pallet này (bắt buộc với DKL)</Checkbox></Col>}
                 <Col span={24}><Text type="secondary">Số lô đã có trong kho chèn thì lấy tiếp từ lô đó; chưa có thì máy tạo lô mới, nhập = lấy. Hàng kho TP trừ thẳng bành lô TP; SBR không chặn tồn.</Text></Col>
               </>
             ) : (
               <Col span={24}><Text>Lô đã nhập trước</Text>
               <Select style={{ width: '100%' }} showSearch optionFilterProp="label" value={f.lotId} onChange={(v) => setF((x) => ({ ...x, lotId: v }))}
-                options={lotsCoHang.map((l) => ({ value: l.id, disabled: l.source_type === 'dkl' && !l.metal_cleared, label: `${l.so_lo ? l.so_lo + ' · ' : 'CHƯA CÓ SỐ LÔ · '}${l.code} · ${MIX_SOURCE_LABELS[l.source_type]}${l.grade ? ' · ' + l.grade : ''} · tồn ${fmtKg(l.ton_kg)} kg${l.source_type === 'dkl' && !l.metal_cleared ? ' · CHƯA XỬ LÝ KIM LOẠI' : ''}` }))} />
+                options={lotsCoHang.map((l) => ({ value: l.id, label: `${l.so_lo ? l.so_lo + ' · ' : 'CHƯA CÓ SỐ LÔ · '}${l.code} · ${MIX_SOURCE_LABELS[l.source_type]}${l.grade ? ' · ' + l.grade : ''} · tồn ${fmtKg(l.ton_kg)} kg` }))} />
               </Col>
             )}
             <Col span={24}><Text>Chèn vào đâu *</Text><Select style={{ width: '100%' }} value={f.viTri} onChange={(v) => setF((x) => ({ ...x, viTri: v }))} placeholder="Chèn bể Slap / chèn máy Mix" options={(Object.keys(MIX_VI_TRI_LABELS) as MixViTri[]).map((k) => ({ value: k, label: `Chèn ${MIX_VI_TRI_LABELS[k]}` }))} /></Col>

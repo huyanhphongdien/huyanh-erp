@@ -353,6 +353,10 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
   thay bằng badge "lệch chuẩn 27,5" (p22: đổi thành "lệch mặc định" theo từng loại — `palletLechMacDinh`). ⑥ Ước lệ đường cũ 15 kg → 27,5 ở CẢ DB (fn_mix_lay/sua_lay) lẫn UI
   (KhoMixOut/KhoMixIssue/MixShiftPage) — sửa một bên thì sửa cả hai. ⑦ `parseKhoScan` đọc được tem đệm 0 (HC07→HC7); tem in KHÔNG đệm.
   ⚠ Luật "pallet đang gắn" nằm ở `fn_mix_pallet_phieu_dang_gan` VÀ chép trong LATERAL của `v_mix_pallets` — sửa thì sửa cả hai.
+- **DKL (dính kim loại) mặc định ĐÃ xử lý** (user chốt 18/11/2026, migration `wms_mix_p23_dkl_mac_dinh_da_xu_ly.sql` đã áp): hàng phải xử lý kim loại TRƯỚC khi đem vào chèn,
+  nên bỏ ô tick "Đã rà kim loại", nút "Đã xử lý kim loại, mở lấy" và mọi chặn "chưa xử lý, chưa lấy được". `mix_lots.metal_cleared` DEFAULT true + trigger
+  `trg_mix_lots_metal_mac_dinh` ép true mọi INSERT/UPDATE (client cũ gửi false vẫn không bị khoá); cột + nhánh `DKL_CHUA_XU_LY` trong `fn_mix_lay` giữ nguyên nhưng chết.
+  Đừng thêm lại bước chặn này ở màn mới.
 - **Lúc lấy** (bể Slap / máy Mix): chạm pallet (hoặc quét tem `H1` / `HC7` / `HC-PD-7`, `parseKhoScan` kind `mix_pallet`) + gõ số trên cân →
   `fn_mix_lay(p_pallet_id)`: `kg_out = gross − bì` CHỐT NGAY, `mix_issues.pallet_kg` = bì chép từ sổ (cân lại sau KHÔNG đổi phiếu đang mở).
   Index partial `mix_issues_pallet_issued_uniq` + `fn_mix_pallet_phieu_dang_gan`: một pallet chỉ ở dây chuyền trong một phiếu (phiếu bàn giao

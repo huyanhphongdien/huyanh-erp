@@ -54,7 +54,6 @@ export default function KhoMixLotNew() {
   const [po, setPo] = useState(''); const [mooney, setMooney] = useState(''); const [pri, setPri] = useState('')
   const [mixPct, setMixPct] = useState('')
   const [rerun, setRerun] = useState(true)
-  const [metal, setMetal] = useState(false)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -88,7 +87,7 @@ export default function KhoMixLotNew() {
     const n = Number(banh)
     if (!Number.isInteger(n) || n <= 0 || n > pickFg.ton_banh) { setMsg(`Số bành phải từ 1 đến ${pickFg.ton_banh}`); return }
     setBusy(true); setMsg(null)
-    try { await fgLotService.chuyenChen(pickFg.id, n, note.trim() || null, pickFg.material_code === 'DKL' ? metal : null); done(`Đã chuyển ${n} bành lô ${pickFg.so_lo} (${fmtKg(n * pickFg.kg_per_banh)} kg) vào kho chèn`) }
+    try { await fgLotService.chuyenChen(pickFg.id, n, note.trim() || null); done(`Đã chuyển ${n} bành lô ${pickFg.so_lo} (${fmtKg(n * pickFg.kg_per_banh)} kg) vào kho chèn`) }
     catch (e: any) { setMsg(e?.message || 'Không chuyển được') }
     finally { setBusy(false) }
   }
@@ -97,7 +96,7 @@ export default function KhoMixLotNew() {
     if (!facilityId || !kgOk) return
     setBusy(true); setMsg(null)
     try {
-      await mixService.createLot({ facilityId, sourceType, sourceDesc: desc.trim() || null, grade: grade.trim() || null, kgIn: kgN!, po: num(po), mooney: num(mooney), pri: num(pri), qcAllowMixPct: num(mixPct), qcAllowRerun: rerun, metalCleared: sourceType === 'dkl' ? metal : true, receivedDate: date || null, note: note.trim() || null, soLo: soLoClean, soBanhIn: banhIn !== '' ? Math.round(Number(banhIn)) : banhTay, kgPerBanh: kpbN })
+      await mixService.createLot({ facilityId, sourceType, sourceDesc: desc.trim() || null, grade: grade.trim() || null, kgIn: kgN!, po: num(po), mooney: num(mooney), pri: num(pri), qcAllowMixPct: num(mixPct), qcAllowRerun: rerun, metalCleared: true, receivedDate: date || null, note: note.trim() || null, soLo: soLoClean, soBanhIn: banhIn !== '' ? Math.round(Number(banhIn)) : banhTay, kgPerBanh: kpbN })
       done(`Đã nhập lô chèn ${soLoClean} · ${banhIn !== '' ? banhIn : banhTay ?? ''} bành · ${fmtKg(kgN)} kg (${code(MIX_SOURCE_LABELS[sourceType])})`)
     } catch (e: any) { setMsg(e?.message || 'Không nhập được') }
     finally { setBusy(false) }
@@ -105,7 +104,7 @@ export default function KhoMixLotNew() {
   async function ghiTuSoCa() {
     if (!pickLine || !kgOk || !soLoOk) return
     setBusy(true); setMsg(null)
-    try { await mixService.taoLoTuSoCa(pickLine.line_id, kgN, note.trim() || null, pickLine.material_code === 'DKL' ? metal : true, soLoClean); done(`Đã chuyển ${fmtKg(kgN)} kg ${pickLine.material_name} · lô ${soLoClean} (${pickLine.shift_name || ''} ${fmtD(pickLine.report_date)}) vào kho chèn`) }
+    try { await mixService.taoLoTuSoCa(pickLine.line_id, kgN, note.trim() || null, true, soLoClean); done(`Đã chuyển ${fmtKg(kgN)} kg ${pickLine.material_name} · lô ${soLoClean} (${pickLine.shift_name || ''} ${fmtD(pickLine.report_date)}) vào kho chèn`) }
     catch (e: any) { setMsg(e?.message || 'Không chuyển được') }
     finally { setBusy(false) }
   }
@@ -196,7 +195,6 @@ export default function KhoMixLotNew() {
               <label htmlFor="fg-banh" className="kmx-strong" style={{ fontSize: 13 }}>Số bành chuyển</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><input id="fg-banh" className="kmx-input" type="number" inputMode="numeric" value={banh} onChange={(e) => setBanh(e.target.value)} /><span style={{ fontSize: 18, fontWeight: 700, color: '#6B7280' }}>bành</span></div>
               <div className="kmx-tint"><span>= {banh || 0} × {pickFg.kg_per_banh} kg</span><span className="kmx-num sm">{fmtKg(Number(banh || 0) * pickFg.kg_per_banh)} kg</span></div>
-              {pickFg.material_code === 'DKL' && <label className="kmx-check-row" htmlFor="lot-metal3"><input id="lot-metal3" type="checkbox" checked={metal} onChange={(e) => setMetal(e.target.checked)} /><span><b>Đã xử lý kim loại</b></span></label>}
               <input className="kmx-text" placeholder="Ghi chú (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Ghi chú" />
             </section>
           </>
@@ -226,7 +224,6 @@ export default function KhoMixLotNew() {
             </div>
             {soLoBox('solo-soca', `Số lô ghi trên bao hàng ${pickLine.material_code} của ca này`)}
             {kgBox('kg-soca', kgOk && kgN! > pickLine.con_lai_kg + 0.01 ? `Nhiều hơn phần chưa chuyển (${fmtKg(pickLine.con_lai_kg)} kg)` : 'Mặc định = phần chưa chuyển; sửa nếu chỉ chuyển một phần')}
-            {pickLine.material_code === 'DKL' && <label className="kmx-check-row kmx-card" htmlFor="lot-metal2"><input id="lot-metal2" type="checkbox" checked={metal} onChange={(e) => setMetal(e.target.checked)} /><span><b>Đã xử lý kim loại</b><br /><span className="kmx-sm">Chưa tick thì vào kho nhưng chưa lấy chèn được.</span></span></label>}
           </>
         )}
 
@@ -319,11 +316,6 @@ export default function KhoMixLotNew() {
               </div>
               <div className="kmx-col" style={{ gap: 4 }}><label htmlFor="lot-date" className="kmx-lbl">Ngày nhập</label><input id="lot-date" className="kmx-text" type="date" value={date} max={todayLocal()} onChange={(e) => setDate(e.target.value)} /></div>
             </section>
-            {sourceType === 'dkl' && (
-              <section className="kmx-card" aria-label="Kim loại" style={{ borderColor: '#FECACA' }}>
-                <label className="kmx-check-row" htmlFor="lot-metal"><input id="lot-metal" type="checkbox" checked={metal} onChange={(e) => setMetal(e.target.checked)} /><span><b>Đã xử lý kim loại</b><br /><span className="kmx-sm">Chưa tick thì nhập được nhưng chưa lấy chèn được; sau xử lý vào Kho chèn bấm mở.</span></span></label>
-              </section>
-            )}
             <section className="kmx-card" aria-label="Chỉ số và QC" style={{ gap: 10 }}>
               <button type="button" className="kmx-row" style={{ background: 'none', border: 0, padding: 0, font: 'inherit', cursor: 'pointer', width: '100%' }} onClick={() => setMore((v) => !v)} aria-expanded={more}>
                 <span className="kmx-strong" style={{ fontSize: 13 }}>Chỉ số và QC cho phép <span style={{ fontWeight: 500, color: '#6B7280' }}>(không bắt buộc)</span></span>

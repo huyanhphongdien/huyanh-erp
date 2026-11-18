@@ -1,5 +1,5 @@
 // ============================================================================
-// KhoMixStock — Kho chèn trên điện thoại: tồn theo lô, đánh dấu đã xử lý kim loại,
+// KhoMixStock — Kho chèn trên điện thoại: tồn theo lô,
 // nhập lô mới, sổ chuyển động 14 ngày.
 // File: src/pages/mobile/kho/KhoMixStock.tsx · Route: /m/kho/chen/kho
 // ============================================================================
@@ -86,7 +86,6 @@ export default function KhoMixStock() {
         {loading && !lots.length && <div className="kmx-skel" />}
         {!loading && !lots.length && <div className="kmx-card muted kmx-center" style={{ fontSize: 13 }}>Kho chèn trống. Lô tự tạo khi lấy theo nguồn + số lô; "Nhập lô chèn" chỉ để nhập tồn.</div>}
         {lots.map((l) => {
-          const khoa = l.source_type === 'dkl' && !l.metal_cleared
           return (
             <section key={l.id} className="kmx-card" aria-label={`Lô ${l.code}`} style={{ gap: 8 }}>
               <div className="kmx-row">
@@ -98,19 +97,13 @@ export default function KhoMixStock() {
                   <span style={{ fontSize: 14, fontWeight: 600 }}>{l.source_desc || MIX_SOURCE_LABELS[l.source_type]}{l.grade ? ` · ${l.grade}` : ''}</span>
                   <span className="kmx-sm">{l.po !== null ? `Po ${l.po}` : ''}{l.mooney !== null ? ` · Mooney ${l.mooney}` : ''}{l.pri !== null ? ` · PRI ${l.pri}` : ''}{l.qc_allow_mix_pct !== null ? ` · trộn ≤ ${l.qc_allow_mix_pct} %` : ''}{!l.qc_allow_rerun ? ' · KHÔNG chạy lại' : ''} · nhập {new Date(l.received_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} · {l.tuoi_ngay} ng</span>
                 </span>
-                <span className="kmx-col" style={{ alignItems: 'flex-end' }}><span className={`kmx-num lg${khoa || l.ton_kg <= 0.005 ? ' mut' : ''}`}>{fmtKg(l.ton_kg)}</span><span className="kmx-sm" style={{ fontWeight: 600 }}>kg · {l.ton_banh} bành</span></span>
+                <span className="kmx-col" style={{ alignItems: 'flex-end' }}><span className={`kmx-num lg${l.ton_kg <= 0.005 ? ' mut' : ''}`}>{fmtKg(l.ton_kg)}</span><span className="kmx-sm" style={{ fontWeight: 600 }}>kg · {l.ton_banh} bành</span></span>
               </div>
               <div className="kmx-grid3" style={{ gap: 6 }}>
                 <div className="kmx-stat"><span className="kmx-lbl">Nhập</span><span className="kmx-num sm">{fmtKg(l.kg_in)}</span>{l.so_banh_in !== null && <span className="kmx-sm">{l.so_banh_in} bành</span>}</div>
                 <div className="kmx-stat"><span className="kmx-lbl">Tiêu hao</span><span className="kmx-num sm">{fmtKg(l.kg_used)}</span></div>
                 <div className="kmx-stat" style={l.kg_at_line > 0 ? { background: '#FEF3C7' } : undefined}><span className="kmx-lbl">Dây chuyền</span><span className="kmx-num sm" style={l.kg_at_line > 0 ? { color: '#B45309' } : undefined}>{fmtKg(l.kg_at_line)}</span></div>
               </div>
-              {khoa && (
-                <div className="kmx-col" style={{ gap: 6 }}>
-                  <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Dính kim loại, chưa xử lý: chưa lấy chèn được.</span>
-                  <button type="button" className="kmx-btn sec" disabled={!canWrite || busy === l.id} onClick={() => sua(l, { metalCleared: true }, `${l.code}: đã đánh dấu xử lý kim loại, lấy chèn được rồi`)}>{I.check}Đã xử lý kim loại, mở lấy</button>
-                </div>
-              )}
               {!l.so_lo && l.status !== 'cancelled' && (
                 <div className="kmx-col" style={{ gap: 6, background: '#FEF2F2', borderRadius: 12, padding: 10 }}>
                   <span className="kmx-sm" style={{ color: '#B91C1C', fontWeight: 600 }}>Lô chưa có số lô. Gán số lô để quản lý; chưa gán thì lúc lấy đầu ca tổ phải gõ.</span>

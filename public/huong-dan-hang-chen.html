@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Hướng dẫn Hàng chèn</title>
+<meta name="description" content="Hướng dẫn dùng module Hàng chèn trên điện thoại và máy tính: lấy đầu ca, trả cuối ca, ký 3 bước, kho chèn, kết thúc lệnh. Ảnh chụp thật từ hệ thống ngày 10/11/2026.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{--green:#1B4D3E;--green-d:#0D2E25;--green2:#2E7D5B;--lime:#E8A838;--line:#E5E7EB;--ink:#1F2937;--mut:#6B7280;
+        --bg:#F3F4F6;--soft:#F0F9F4;--gold-bg:#FFFBEB;--red:#B91C1C;--red-bg:#FEF2F2;--blue:#1d4ed8;--blue-bg:#EFF6FF;
+        --mono:'JetBrains Mono',Consolas,ui-monospace,monospace}
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:'Be Vietnam Pro','Segoe UI',Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:15px;line-height:1.6}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 18px 80px}
+  .hero{background:linear-gradient(135deg,var(--green-d),var(--green2));color:#fff;padding:34px 30px 28px;border-radius:0 0 18px 18px;margin-bottom:10px}
+  .hero .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--lime);font-weight:700}
+  .hero h1{margin:6px 0 8px;font-size:30px;font-weight:800;letter-spacing:-.01em}
+  .hero .sub{opacity:.92;font-size:15px;max-width:820px}
+  .hero .meta{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px}
+  .hero .pill{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:600}
+  nav.toc{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:14px 0 8px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px 24px}
+  nav.toc a{color:var(--green);text-decoration:none;font-weight:600;font-size:14px}
+  nav.toc a:hover{text-decoration:underline}
+  nav.toc .n{display:inline-block;width:26px;color:var(--mut);font-family:var(--mono);font-weight:500}
+  h2{font-size:21px;color:var(--green);border-left:5px solid var(--green);padding:3px 0 3px 12px;margin:38px 0 10px;scroll-margin-top:16px}
+  h2 small{font-weight:500;color:var(--mut);font-size:13px;margin-left:8px}
+  h3{font-size:16px;margin:20px 0 8px;color:var(--green-d)}
+  p{margin:8px 0}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .muted{color:var(--mut)}.sm{font-size:13px}.mono{font-family:var(--mono)}
+  .kbd{display:inline-block;background:#fff;border:1px solid #D1D5DB;border-bottom-width:2px;border-radius:6px;padding:1px 8px;font-size:13px;font-weight:700;color:var(--green);white-space:nowrap}
+  .btn{display:inline-block;background:var(--green);color:#fff;border-radius:7px;padding:1px 9px;font-size:13px;font-weight:700;white-space:nowrap}
+  .btn.gold{background:var(--lime);color:var(--green-d)}.btn.white{background:#fff;color:var(--green);border:1px solid var(--line)}.btn.red{background:var(--red-bg);color:var(--red);border:1px solid #FECACA}
+  .tag{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600}
+  .tag.blue{background:var(--blue-bg);color:var(--blue)}.tag.gold{background:#FEF3C7;color:#B45309}.tag.cyan{background:#E0F2FE;color:#0369A1}.tag.purple{background:#F3E8FF;color:#7E22CE}.tag.green{background:#DCFCE7;color:#15803D}.tag.red{background:#FEE2E2;color:var(--red)}
+  /* ảnh màn hình điện thoại trong khung, cuộn bên trong */
+  .shot{display:grid;grid-template-columns:minmax(300px,390px) 1fr;gap:22px;align-items:start;margin:14px 0}
+  .phone{background:#111827;border-radius:30px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+  .phone .screen{background:#fff;border-radius:22px;overflow:auto;max-height:720px;scrollbar-width:thin}
+  .phone .screen img{display:block;width:100%;height:auto}
+  .phone .hint{color:#9CA3AF;font-size:11px;text-align:center;padding:6px 0 0}
+  .desk{background:#111827;border-radius:12px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.18);margin:12px 0}
+  .desk img{display:block;width:100%;height:auto;border-radius:6px}
+  ol.steps{margin:6px 0 0;padding:0;list-style:none;counter-reset:s}
+  ol.steps li{position:relative;padding:8px 0 8px 44px;border-bottom:1px dashed #E5E7EB;counter-increment:s}
+  ol.steps li:last-child{border-bottom:0}
+  ol.steps li::before{content:counter(s);position:absolute;left:0;top:9px;width:30px;height:30px;border-radius:50%;background:var(--green);color:#fff;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center}
+  ol.steps li b{color:var(--green-d)}
+  ul.tight{margin:6px 0 0 18px;padding:0}ul.tight li{margin:4px 0}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px;background:#fff}
+  th{background:var(--soft);color:#1f2937;font-weight:700;text-align:left;padding:8px 10px;border-bottom:2px solid #cfe0d8}
+  td{padding:8px 10px;border-bottom:1px solid #F1F5F9;vertical-align:top}
+  .note{border-radius:10px;padding:10px 14px;font-size:14px;margin:10px 0;border:1px solid}
+  .note.warn{background:var(--gold-bg);border-color:#FDE68A}.note.red{background:var(--red-bg);border-color:#FECACA}.note.ok{background:var(--soft);border-color:#BBF7D0}.note.info{background:var(--blue-bg);border-color:#BFDBFE}
+  .flow{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:12px 0}
+  .flow .st{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .flow .st .n{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;font-weight:800;align-items:center;justify-content:center;margin-bottom:4px}
+  .flow .st b{display:block;font-size:13.5px}.flow .st span{font-size:12px;color:var(--mut)}
+  .roles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .roles .r{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .roles .r b{display:block;color:var(--green);margin-bottom:4px}
+  .status{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .status .arrow{color:#9CA3AF}
+  footer{margin-top:40px;padding-top:12px;border-top:1px solid var(--line);color:var(--mut);font-size:12.5px}
+  @media (max-width:860px){.shot{grid-template-columns:1fr}.flow{grid-template-columns:repeat(2,1fr)}.roles{grid-template-columns:1fr}nav.toc{grid-template-columns:1fr}.phone .screen{max-height:560px}}
+  @media print{body{background:#fff}.phone .screen{max-height:none;overflow:visible}.hero{border-radius:0}h2{break-after:avoid}.shot{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div style="display:inline-block;background:#FBF1DF;color:#8A5A00;border:1px solid #E8C97A;border-radius:6px;padding:3px 10px;font-size:13px;font-weight:600;margin-bottom:10px">TÀI LIỆU NỘI BỘ — Cao su Huy Anh · không phát hành ra ngoài công ty</div>
+    <div class="kicker">Huy Anh ERP · Kho nguyên liệu</div>
+    <h1>Hướng dẫn dùng module Hàng chèn</h1>
+    <div class="sub">Dành cho QS tại xưởng, QC, thủ kho và Ban Giám đốc. Hàng chèn là hàng lỗi, hàng dính kim loại, hàng chuẩn hoặc SBR mua ngoài được đưa vào máy để chạy lại hay nâng chỉ số. Mỗi pallet đưa vào dây chuyền là một <b>lần chèn</b>, có phiếu, có ảnh, có ba chữ ký.</div>
+    <div class="meta">
+      <span class="pill">Điện thoại: huyanhrubber.vn/m/kho/chen</span>
+      <span class="pill">Máy tính: Kho nguyên liệu → Hàng chèn</span>
+      <span class="pill">Ảnh chụp từ hệ thống thật 10–18/11/2026</span>
+    </div>
+  </div>
+
+  <nav class="toc">
+    <a href="#s1"><span class="n">1</span>Mở app và trang chính</a>
+    <a href="#s2"><span class="n">2</span>Ai làm gì: ba bước ký</a>
+    <a href="#s3"><span class="n">3</span>Đầu ca: khai lệnh đang chạy</a>
+    <a href="#s4"><span class="n">4</span>Sổ pallet và lấy hàng chèn</a>
+    <a href="#s5"><span class="n">5</span>Trả cuối ca: dùng hết hay còn dư</a>
+    <a href="#s6"><span class="n">6</span>Ký ba bước</a>
+    <a href="#s7"><span class="n">7</span>Kho chèn và nhập lô</a>
+    <a href="#s8"><span class="n">8</span>Lịch sử phiếu và sửa khi sai</a>
+    <a href="#s9"><span class="n">9</span>Kết thúc lệnh, tổng kết, mail BGĐ</a>
+    <a href="#s10"><span class="n">10</span>Trên máy tính</a>
+    <a href="#s11"><span class="n">11</span>Quy ước nhanh và lỗi thường gặp</a>
+  </nav>
+
+  <div class="card">
+    <b>Một ca làm việc nhìn từ trên xuống</b>
+    <div class="flow">
+      <div class="st"><span class="n">1</span><b>Khai lệnh</b><span>Bắt đầu lệnh… chọn mã đang chạy</span></div>
+      <div class="st"><span class="n">2</span><b>Lấy lần 1, 2…</b><span>mỗi pallet: nguồn, lô, chạm pallet, cân 1 lần, 2 ảnh</span></div>
+      <div class="st"><span class="n">3</span><b>Trả cuối ca</b><span>dùng hết: không cân · còn dư: cân 1 lần · ký khai báo</span></div>
+      <div class="st"><span class="n">4</span><b>QC duyệt</b><span>soát số và ảnh</span></div>
+      <div class="st"><span class="n">5</span><b>Thủ kho nhận</b><span>kho chèn trừ, sổ ca tự điền</span></div>
+      <div class="st"><span class="n">6</span><b>Kết thúc lệnh</b><span>tổng kết + mail BGĐ</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <b>Mỗi phiếu cân mấy lần?</b> <span class="muted sm">— chọn pallet trong Sổ pallet thì chỉ cân <b>1 hoặc 2 lần</b>, không bao giờ cân pallet rỗng</span>
+    <table>
+      <thead><tr><th>Trường hợp</th><th>Lúc lấy</th><th>Lúc trả cuối ca</th><th style="text-align:right">Tổng</th></tr></thead>
+      <tbody>
+        <tr><td><b>Có pallet · dùng hết</b></td><td>cân <b>1 lần</b> cả pallet + hàng, máy trừ bì pallet</td><td>bấm <span class="btn white">Dùng hết</span>, không cân</td><td style="text-align:right"><b>1 lần</b></td></tr>
+        <tr><td><b>Có pallet · còn dư</b></td><td>cân <b>1 lần</b> như trên</td><td>cân <b>1 lần</b> cả pallet + hàng còn, máy trừ bì</td><td style="text-align:right"><b>2 lần</b></td></tr>
+        <tr><td>Chèn băng tải</td><td>không cân — gõ số bành, máy nhân kg mỗi bành</td><td>gõ số bành còn, hoặc Dùng hết</td><td style="text-align:right">0 lần</td></tr>
+        <tr><td>Không chọn pallet (hàng cân rời, đường cũ)</td><td>cân tổng 1 lần</td><td>cân hàng trả + pallet, rồi cân pallet rỗng để khai bì (dùng hết thì bỏ cân hàng trả)</td><td style="text-align:right">2–3 lần</td></tr>
+      </tbody>
+    </table>
+    <div class="note ok sm">Muốn chỉ cân 1–2 lần: lúc lấy <b>luôn chạm chọn pallet</b> (H1, H2, EJ, H3, H4). Số kg của từng pallet đã có sẵn trong Sổ pallet nên máy tự trừ.</div>
+  </div>
+
+  <h2 id="s1">1 · Mở app và trang chính</h2>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/01-trang-chinh.jpeg" alt="Trang chính Hàng chèn trên điện thoại"></div><div class="hint">cuộn trong khung để xem hết màn</div></div>
+    <div>
+      <p>Trên điện thoại vào <b>huyanhrubber.vn</b>, đăng nhập, mở menu <b>Kho nguyên liệu → Hàng chèn</b>. Máy tự chuyển sang bản điện thoại. Có thể gõ thẳng <span class="mono">huyanhrubber.vn/m/kho/chen</span>. Thanh dưới có 5 tab: Lô NVL · Nhập · Kiểm kê · <b>Chèn</b> · Thành phẩm.</p>
+      <div class="note info sm">Nên thêm vào màn hình chính để mở như app: iPhone bấm <span class="kbd">Chia sẻ</span> → <b>Thêm vào MH chính</b>; Android bấm <span class="kbd">⋮</span> → <b>Thêm vào màn hình chính</b>.</div>
+      <p><b>Trang chính đọc từ trên xuống:</b></p>
+      <ol class="steps">
+        <li><b>Đầu trang</b>: nhà máy, ca hiện tại (tự nhận theo chấm công hoặc giờ), tên bạn, tổ trưởng. Ô <span class="kbd">PD ▾</span> đổi nhà máy.</li>
+        <li><b>Lệnh đang chạy · mã nguyên liệu</b>: nút <span class="btn white">Bắt đầu lệnh…</span> để khai mã đang chạy (mục 3).</li>
+        <li><b>Thẻ mỗi lệnh</b> (viền xanh): mã lệnh, số lần đã chèn, ba ô số Đã lấy / Dây chuyền / Tiêu hao, danh sách từng lần L1, L2… với nút <span class="btn white">Trả Ln · dùng hết hay còn dư</span> (phiếu không pallet: <span class="btn white">Trả Ln · cân cuối ca</span>), nút <span class="btn">+ Lấy lần n</span> và nút <span class="btn white">Kết thúc</span>.</li>
+        <li><b>Chưa gắn lệnh</b> (viền vàng): lần lấy trước khi khai lệnh. Khai đúng một lệnh thì máy tự gắn; nhiều lệnh thì mở phiếu → Đổi mã.</li>
+        <li><b>Lịch sử phiếu</b> và <b>Kho chèn</b>: hai nút đi tới mục 8 và 7.</li>
+        <li><b>Chờ ký</b>: số phiếu đang chờ chữ ký của bạn, chạm để vào mục 6.</li>
+        <li><b>Kho chèn</b> tóm tắt: tồn từng lô, số bành, phần đang ở dây chuyền (chữ cam).</li>
+      </ol>
+    </div>
+  </div>
+
+  <h2 id="s2">2 · Ai làm gì: ba bước ký</h2>
+  <div class="roles">
+    <div class="r"><b>Bước 1 · QS khai báo</b>Nhập lô chèn, lấy đầu ca, trả cuối ca, ký khai báo. Thường là QS tại xưởng. Ai không có tên ở bước này sẽ thấy "chưa được phân công khai báo (QS)" và không lấy được.</div>
+    <div class="r"><b>Bước 2 · QC duyệt</b>Kiểm số lấy, trả, tiêu hao và ảnh rồi duyệt. Phòng QC (hiện là Lê Thành Nhân, Lê Thị Lệ Trinh).</div>
+    <div class="r"><b>Bước 3 · Thủ kho nhận</b>Nhận cuối: kho chèn trừ tiêu hao, sổ ca ép bành tự điền dòng CHÈN. Tạm thời chủ doanh nghiệp. Ban Giám đốc cấp cao làm được mọi bước.</div>
+  </div>
+  <p class="sm muted">Phân công làm một lần trên máy tính: Hàng chèn → tab <b>Phân công</b> (mục 10). Chỉ Ban Giám đốc thêm hoặc thu người.</p>
+  <div class="card">
+    <b>Trạng thái một phiếu chèn</b>
+    <div class="status" style="margin-top:8px">
+      <span class="tag blue">Đã lấy · đang ở dây chuyền</span><span class="arrow">→</span>
+      <span class="tag gold">Đã trả · chờ ký</span><span class="arrow">→</span>
+      <span class="tag cyan">QS đã ký khai báo</span><span class="arrow">→</span>
+      <span class="tag purple">QC đã duyệt</span><span class="arrow">→</span>
+      <span class="tag green">Thủ kho đã nhận</span>
+      <span class="muted sm" style="margin-left:8px">(hoặc <span class="tag red">Đã hủy</span> khi lấy nhầm)</span>
+    </div>
+  </div>
+
+  <h2 id="s3">3 · Đầu ca: khai lệnh đang chạy</h2>
+  <div class="card">
+    <p>Một <b>lệnh chạy</b> là một đợt chạy máy gồm một hay nhiều mã nguyên liệu, ví dụ "KHMN-15 + 17" chạy chung trong lúc "TMHG-39" chèn bể Slap. Khai một lần, không chọn lại trên từng phiếu.</p>
+    <ol class="steps">
+      <li>Trang chính, thẻ <b>Lệnh đang chạy</b> → bấm <span class="btn white">Bắt đầu lệnh…</span>.</li>
+      <li>Chạm một hay nhiều mã (mã sinh lúc thủ kho nhận phiếu cân vào kho ở tab Nhập, xem phần ngay dưới) → bấm <span class="btn white">Bắt đầu lệnh: …</span>.</li>
+      <li>Đang có lệnh khác chạy thì máy hỏi một lần: <span class="btn">Thay thế</span> (kết thúc lệnh cũ), <span class="btn white">Chạy song song</span> (lệnh riêng) hoặc <span class="btn white">Gộp vào …</span> (thêm mã vào lệnh đang chạy).</li>
+      <li>Từ đó phiếu ca, phiếu chèn và lô thành phẩm tự gắn lệnh. Lệnh chạy nhiều ngày, nhiều ca vẫn là một thẻ; xong thì bấm <b>Kết thúc</b> (mục 9).</li>
+    </ol>
+    <div class="note warn sm">Chạy nhiều lệnh song song thì lúc lấy phải chạm chọn lệnh pallet này chèn vào. Lệnh gộp nhiều mã tính tiêu hao cho cả lệnh, không tách từng mã.</div>
+  </div>
+
+  <h3>Mã nguyên liệu khai ở đâu <small style="font-weight:500;color:#6B7280">tab Nhập · thủ kho</small></h3>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/12-nhap-ma-doc-tu-phieu-can.jpeg" alt="Tab Nhập: mã nguyên liệu đọc sẵn từ phiếu cân"></div><div class="hint">cuộn trong khung để xem hết màn</div></div>
+    <div>
+      <p>Mã nguyên liệu (TMHG-15, TMMN-26, HAQT-23…) <b>không khai ở trang Hàng chèn</b>. Nó sinh ra lúc thủ kho nhận phiếu cân vào kho ở tab <b>Nhập</b> (<span class="mono">huyanhrubber.vn/m/kho/nhap</span>). Mỗi phiếu cân chờ nhập có một ô <b>Mã nguyên liệu</b>:</p>
+      <ol class="steps">
+        <li><b>Máy đọc sẵn mã từ phiếu cân.</b> Người cân gõ gì ở ô mã lô trên trạm cân, máy đọc lại và chuẩn hoá: gõ "MU TO TMMN 26 01" thành <span class="mono">TMMN-26 · xe 01</span>, gõ nhầm TMGH-31 thành TMHG-31. Nhãn <span class="pill">mã mới</span> nghĩa là mã này chưa có trong kho, nhận phiếu là tạo luôn. Dòng nhỏ "phiếu cân gõ" giữ nguyên chữ gốc để đối chiếu.</li>
+        <li><b>Phiếu không có mã</b> (ô đỏ "Chưa có mã · phải chọn"): bấm <span class="btn white">Chọn mã</span> rồi chọn một trong ba cách ở hình dưới.</li>
+        <li>Phiếu <span class="pill">sẵn sàng</span> thì bấm <span class="btn">Chọn mã rồi nhận</span>. Phiếu <span class="pill">chờ DRC</span> phải ghi DRC trước. Phiếu <span class="pill">loại mủ lạ</span> thì báo Ban Giám đốc thêm loại mủ trên ERP rồi mới nhận được.</li>
+        <li>Nhận xong, mã hiện trong ô chọn <span class="btn white">Bắt đầu lệnh…</span> ở trang Hàng chèn (mục 3). Sai mã thì bấm <span class="btn white">Đổi</span> trước khi nhận, hoặc gán lại ở tab Lô NVL sau khi nhận.</li>
+      </ol>
+      <div class="note warn sm">Không có mã thì không nhập kho được. Tiền tố (TMHG, TMMN, HAQT, LAS…) là chữ trạm cân gõ, máy không tự đặt: muốn thống nhất cách đặt tên thì quy định cho người cân.</div>
+    </div>
+  </div>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/13-nhap-chon-ma.jpeg" alt="Hộp Chọn mã: mã đang mở, mã mới nguồn + số, gõ nguyên chữ"></div></div>
+    <div>
+      <p><b>Hộp Chọn mã</b> có ba cách, dùng một trong ba:</p>
+      <ol class="steps">
+        <li><b>Mã đang mở · chạm để chọn</b>: mỗi viên là một mã đã có trong kho, kèm số kg và trạng thái (Chưa có hàng, Sẵn sàng, Đang chạy). Xe này về cùng đợt với mã nào thì chạm mã đó.</li>
+        <li><b>Mã mới · nguồn + số</b>: chạm viên nguồn (máy ghi số lớn nhất đã dùng, ví dụ "TMHG · tới 40"), máy điền sẵn số kế tiếp vào ô Số (41), sửa nếu cần rồi bấm <span class="btn">Dùng</span>. Mã mới là nguồn-số, ví dụ TMHG-41.</li>
+        <li><b>Gõ nguyên chữ trên phiếu</b> (SBR-1502, TMMN 25 07…) rồi bấm <span class="btn white">Đọc</span>: máy tự đọc ra mã, dùng khi phiếu giấy ghi cách khác.</li>
+      </ol>
+      <div class="note info sm">Tạo mã trước khi hàng về: tab <b>Lô NVL</b>, ô "Tạo mã trước khi hàng về". Trên máy tính: Kho nguyên liệu → Nhập (<span class="mono">/wms/nvl/nhap</span>), hộp Nhập kho cũng có ô mã bắt buộc.</div>
+    </div>
+  </div>
+
+  <h2 id="s4">4 · Sổ pallet và lấy hàng chèn <small>mỗi pallet một lần, nút "Lấy lần n" trên thẻ lệnh</small></h2>
+  <h3>Sổ pallet: khai một lần, dùng mọi lần <small style="font-weight:500;color:#6B7280">từ 10/11/2026</small></h3>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/15-so-pallet.jpeg" alt="Màn Sổ pallet hàng chèn: lưới pallet và số kg"></div><div class="hint">cuộn trong khung để xem hết màn · ảnh chụp 18/11/2026</div></div>
+    <div>
+      <p>Nhà máy có một bộ pallet dành riêng cho hàng chèn. <b>Sổ pallet</b> ghi ba cột như sổ giấy: <b>Pallet</b> (tên, loại), <b>Chữ viết tắt</b> (in trên pallet) và <b>Số kg</b> (bì pallet rỗng). <b>Mỗi loại pallet có một số kg riêng</b>, ghi theo giấy cân tay của kho (18/11/2026):</p>
+      <table>
+        <tr><th>Chữ viết tắt</th><th>Pallet</th><th style="text-align:right">Số kg (bì)</th></tr>
+        <tr><td><b class="mono">H1</b></td><td>Pallet H1</td><td style="text-align:right" class="mono">11,5</td></tr>
+        <tr><td><b class="mono">H2</b></td><td>Pallet H2</td><td style="text-align:right" class="mono">14,5</td></tr>
+        <tr><td><b class="mono">EJ</b></td><td>Pallet EJ</td><td style="text-align:right" class="mono">15</td></tr>
+        <tr><td><b class="mono">H3</b></td><td>Pallet H3</td><td style="text-align:right" class="mono">13,5</td></tr>
+        <tr><td><b class="mono">H4</b></td><td>Pallet <b>sắt</b> H4</td><td style="text-align:right" class="mono">25</td></tr>
+      </table>
+      <p>Tổ ép chỉ chạm tên pallet rồi đọc cân, máy tự trừ đúng số kg của pallet đó. Không cân pallet rỗng cuối ca, không gõ bì tay, không phải khai gì trước.</p>
+      <ol class="steps">
+        <li>Mở: trang chính → thẻ <b>Sổ pallet</b> (lưới 5 ô nhỏ) → <span class="btn white">Xem</span>, hoặc gõ <span class="mono">huyanhrubber.vn/m/kho/chen/so-pallet</span>. Máy tính: Hàng chèn → <b>Sổ pallet</b>.</li>
+        <li>Lưới trên cùng: xanh nhạt = trống, vàng = đang ở dây chuyền (ghi phiếu đang gắn), nét đứt = chưa khai số kg (chỉ gặp ở pallet mới chưa có bì — chưa lấy được). Pallet tắt không hiện.</li>
+        <li><b>5 pallet đã có sẵn số kg — bình thường không phải khai gì.</b> Chỉ khi sửa hoặc thay pallet, thủ kho hoặc Ban Giám đốc mới chạm pallet → <b>Sửa · cân lại</b> → gõ số kg mới + lý do → <span class="btn">Ghi</span>. Máy giữ lịch sử từng lần; pallet đã cân lại ra số khác số trên mang nhãn <span class="pill">lệch mặc định</span>.</li>
+        <li>Pallet hỏng: bấm <span class="btn white">Tắt</span> (có lý do), sửa xong <span class="btn white">Bật lại</span> là dùng ngay. Nhà máy chưa có sổ (Tân Lâm, Lào): bấm <b>Nạp 5 loại mặc định</b> là có đủ H1, H2, EJ, H3, H4 với số kg như bảng trên. Pallet khác ngoài 5 loại: bấm <b>Thêm dải pallet</b> (ví dụ HC1→HC5, gõ số kg chung). Không xoá pallet vì phiếu cũ còn tham chiếu.</li>
+      </ol>
+      <div class="note ok sm"><b>Mỗi pallet một số kg riêng (từ 18/11/2026):</b> H1 11,5 · H2 14,5 · EJ 15 · H3 13,5 · H4 25 kg (pallet sắt) — thay cho "27,5 kg cho mọi pallet" của 17/11. <b>Sửa · cân lại</b> chỉ dùng khi sửa / thay pallet. Sổ chỉ còn đúng 5 pallet này, không còn pallet nào khác.</div>
+    </div>
+  </div>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/14-trang-chinh-so-pallet.jpeg" alt="Trang chính với thẻ Sổ pallet"></div></div>
+    <div>
+      <p>Trên trang chính, thẻ <b>Sổ pallet · 5 pallet</b> nằm ngay dưới các thẻ lệnh: mỗi ô là một pallet, ô vàng là pallet đang nằm ở dây chuyền. Dòng dưới đếm trống / ở dây chuyền / tắt. Từng lần chèn L1, L2… trên thẻ lệnh cũng hiện viên tên pallet (ví dụ <b>H2</b>) và phép trừ <i>cả pallet − bì = kg hàng</i> đã chốt lúc lấy.</p>
+      <div class="note info sm">Tem dán pallet: in chữ viết tắt to kèm mã QR nội dung là chính chữ viết tắt (<span class="mono">H1</span>, <span class="mono">H2</span>, <span class="mono">EJ</span>, <span class="mono">H3</span>, <span class="mono">H4</span>). Quét ở màn Lấy (nút <b>Quét tem</b>), hoặc nút máy ảnh của tab <b>Lô NVL</b> — quét tem pallet sẽ nhảy sang Sổ pallet. Mẫu tem in sẽ bổ sung sau.</div>
+    </div>
+  </div>
+  <h3>Bước 1 · Nguồn và số lô</h3>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/02-lay-buoc1-nguon-lo.jpeg" alt="Lấy hàng chèn, bước 1 chọn nguồn và số lô"></div></div>
+    <div>
+      <ol class="steps">
+        <li>Chạm nguồn: <b>Hàng chuẩn</b>, <b>Hàng lỗi</b>, <b>DKL</b> (dính kim loại) hoặc <b>SBR / mua ngoài</b>.</li>
+        <li>Hàng từ kho thành phẩm: chạm lô TP còn tồn, số lô tự điền, bành trừ thẳng lô TP. SBR hoặc hàng ghi số lô trên bao: gõ số lô → <span class="btn white">Dùng</span>. Chưa có lô thì máy tự tạo, nhập bằng lấy.</li>
+        <li>DKL bắt buộc tick <b>Đã rà kim loại pallet này</b>.</li>
+        <li>Lô đã nhập trước ở Kho chèn: bấm <b>Quét tem CH / chọn lô đã nhập trước</b> rồi quét tem hoặc chạm lô.</li>
+      </ol>
+      <div class="note ok sm">Thẻ xám trên cùng nhắc các lần đã chèn trong ca và lần đang lấy là lần mấy. Số lần đếm theo lệnh.</div>
+    </div>
+  </div>
+  <h3>Bước 2 · Cân và chụp</h3>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/03-lay-buoc2-can-chup.jpeg" alt="Lấy hàng chèn, bước 2 cân và chụp ảnh"></div><div class="hint">cuộn trong khung để xem hết màn · ảnh chụp trước 10/11, nay khối "Pallet nào?" nằm ngay trên ô cân</div></div>
+    <div>
+      <ol class="steps">
+        <li><b>Ca và tổ</b>: máy tự nhận, sai thì <span class="btn white">Đổi ca</span>; chạm tổ trưởng <b>Ca Vang</b> hoặc <b>Ca Hiền</b>.</li>
+        <li><b>Chèn vào đâu</b> (bắt buộc): <b>Chèn bể Slap</b>, <b>Chèn máy Mix</b> hoặc <b>Chèn băng tải</b>. Máy nhớ lựa chọn lần trước.</li>
+        <li><b>Pallet nào?</b>: chạm ô có chữ viết tắt ghi trên pallet (H1, H2, EJ, H3, H4; trên nút có ghi sẵn số kg) hoặc bấm <span class="btn white">Quét tem</span>. Ô vàng là pallet đang ở dây chuyền, chạm vào máy nhắc trả phiếu đó trước; ô nét đứt là chưa khai số kg, báo thủ kho. Dòng xanh dưới lưới hiện bì của pallet vừa chọn.</li>
+        <li><b>Số đọc trên cân</b> (lần cân duy nhất lúc lấy): gõ đúng số trên màn hình cân, cả pallet, không trừ gì. Máy hiện ngay phép trừ, ví dụ <span class="mono">612,0 − bì H2 14,5 = 597,5 kg</span>; đó là kg lấy, chốt luôn. Băng tải thì không chọn pallet, gõ <b>số bành</b>, máy nhân kg mỗi bành. Hàng cân rời không pallet: bấm <span class="btn white">Không pallet · gõ kg</span>.</li>
+        <li><b>Số bành</b>: máy ước trên kg hàng đã trừ bì (35 kg/bành), đếm khác thì bấm <span class="kbd">−</span> <span class="kbd">+</span>. Ô xám bên dưới báo lô còn lại bao nhiêu trong kho.</li>
+        <li><b>Chèn vào lệnh</b>: một lệnh thì tự gắn; nhiều lệnh song song thì chạm chip lệnh.</li>
+        <li><b>Chụp 2 ảnh ngay tại cân</b>: Toàn cảnh đống hàng và Màn hình cân. Ảnh tự nén, tự gắn giờ và người chụp. Thiếu ảnh thì nút Tiếp tục chưa sáng.</li>
+        <li>Bấm <span class="btn">Tiếp tục</span> → màn <b>Xem lại rồi ghi</b> hiện số kg to, lô, vị trí, mã, ca, ảnh → bấm <span class="btn">Ghi lần n · … kg</span>. Màn xanh "Đã ghi lần n" hiện ra, bấm <b>Lấy lần n+1</b> cho pallet tiếp theo hoặc <b>Về trang chính</b>.</li>
+      </ol>
+    </div>
+  </div>
+
+  <h2 id="s5">5 · Trả cuối ca: dùng hết hay còn dư</h2>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/04-tra-cuoi-ca.jpeg" alt="Màn Trả cuối ca"></div><div class="hint">ảnh màn cũ (phiếu không pallet); phiếu có pallet hiện hai nút Dùng hết / Còn dư như mô tả bên phải, ảnh sẽ thay sau lần chèn thật đầu tiên</div></div>
+    <div>
+      <p>Trang chính, dòng <b>L1 · Trả L1 · dùng hết hay còn dư</b>. Mỗi lần lấy có nút trả riêng. Bì của pallet đã có trong Sổ pallet nên chỉ còn một câu hỏi: pallet về thế nào?</p>
+      <ol class="steps">
+        <li><span class="btn white">Dùng hết</span>: một chạm. Trả 0 kg, tiêu hao = kg lấy, không phải cân gì. Chụp <b>1 ảnh</b> toàn cảnh pallet rỗng.</li>
+        <li><span class="btn white">Còn dư</span>: đặt pallet còn hàng lên cân, gõ đúng số trên cân (hàng còn + pallet). Máy trừ bì: <span class="mono">263,0 − bì H2 14,5 = trả 248,5 kg</span>, tiêu hao = kg lấy − kg trả. Chụp <b>2 ảnh</b> phần trả.</li>
+        <li><b>Số bành còn</b>: máy tự tính, đếm khác thì bấm <span class="kbd">−</span> <span class="kbd">+</span>.</li>
+        <li>Phần dư để lại dây chuyền cho ca sau: tick <b>Để … lại dây chuyền cho ca sau</b>. Pallet vẫn ghi "ở dây chuyền"; máy tự mở phiếu cho ca kế (cùng pallet, cùng bì) khi thủ kho nhận.</li>
+        <li>Bấm <span class="btn">Ghi trả và ký bên giao</span>: một chạm vừa ghi kg trả vừa ký bước 1. Pallet về "trống" trong Sổ pallet. Lấy nhầm thì bấm <span class="btn red">Lấy nhầm? Hủy phiếu</span>.</li>
+      </ol>
+      <div class="note warn sm">Gõ nhầm cân lúc lấy? Trên màn này có nút <b>Sửa cân lúc lấy</b>, dùng được tới khi QS ký xong bước 1; máy trừ lại bì của pallet đó. Thấy bì sai thì báo thủ kho cân lại trong Sổ pallet; phiếu đang mở vẫn giữ bì lúc lấy.</div>
+      <div class="note info sm"><b>Phiếu không chọn pallet</b> (hàng cân rời, phiếu lập trước 10/11; chèn băng tải thì không cân, tính theo bành): màn trả giữ cách cũ, cân tối đa ba lần — cân 1 lúc lấy, cân 2 hàng trả + pallet (dùng hết thì bỏ), cân 3 pallet rỗng để khai bì (ô cân 3 máy điền sẵn <b>27,5 kg</b> chỉ là số TẠM của đường cũ — hãy cân pallet rỗng thật rồi gõ số đó) — và 2 ảnh kể cả dùng hết. Muốn chỉ cân 1–2 lần: chọn pallet trong Sổ pallet ngay lúc lấy.</div>
+    </div>
+  </div>
+  <h2 id="s6">6 · Ký ba bước</h2>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/05-cho-ky.jpeg" alt="Màn Chờ ký"></div><div class="hint">cuộn trong khung để xem hết màn</div></div>
+    <div>
+      <p>Trang chính → <b>Chờ ký</b>. Mỗi người chỉ thấy nút của bước mình. Mỗi phiếu hiện ba ô số Lấy / Trả / Tiêu hao, các ảnh thu nhỏ (chạm xem to — phiếu dùng hết với pallet chỉ có 3 ảnh: 2 lúc lấy + 1 toàn cảnh lúc trả), ai đã ký lúc nào.</p>
+      <ol class="steps">
+        <li><b>QS ký khai báo</b>: thường đã ký ngay lúc trả; chưa thì ký ở đây.</li>
+        <li><b>QC duyệt</b>: soát số và ảnh, bấm nút duyệt. Thấy số sai thì <b>Mở phiếu · sửa kg trả</b> trước khi ký.</li>
+        <li><b>Thủ kho nhận</b>: bấm nhận. Sau bước này kho chèn trừ tiêu hao, sổ ca ép bành tự điền dòng CHÈN, số liệu gom vào mã gốc.</li>
+      </ol>
+      <div class="note ok sm">Nhiều phiếu một ca: thẻ đầu trang <b>Ký tất cả N phiếu · ngày · ca</b> ký một chạm cho cả ca. Phiếu thiếu ảnh bắt buộc bị bỏ qua và nhắc riêng, phải chụp bổ sung rồi mới ký được.</div>
+    </div>
+  </div>
+
+  <h2 id="s7">7 · Kho chèn và nhập lô</h2>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/06-kho-chen.jpeg" alt="Màn Tồn kho chèn"></div><div class="hint">cuộn trong khung để xem hết màn</div></div>
+    <div>
+      <p>Trang chính → <b>Kho chèn</b>. Ba ô số: Tại kho, Dây chuyền, Nhập tháng. Mỗi lô là một thẻ: số lô, mã CH, nguồn, Po / Mooney / PRI, tồn kg và bành, ba ô Nhập / Tiêu hao / Dây chuyền.</p>
+      <ul class="tight">
+        <li><b>Kiểm kê lô này</b>: gõ kg cân thực, lệch thì chọn lý do → Ghi kiểm kê.</li>
+        <li><b>Lô DKL</b> phải bấm <b>Đã xử lý kim loại, mở lấy</b> rồi mới lấy chèn được.</li>
+        <li>Lô chưa có số lô: gõ số lô trên bao → <b>Gán</b>.</li>
+        <li><b>Nhập nhầm? Hủy lô</b>: chỉ khi lô chưa có phiếu lấy nào.</li>
+        <li><b>Phiếu của lô</b>: xem mọi lần lấy từ lô đó. Cuối trang là <b>Sổ chuyển động 14 ngày</b>, chạm mã phiếu để mở.</li>
+      </ul>
+      <div class="note info sm">Bình thường <b>không cần nhập kho chèn trước</b>: lúc lấy chạm nguồn và số lô là máy tự tạo lô. Chỉ nhập trước khi muốn ghi tồn sẵn.</div>
+    </div>
+  </div>
+  <h3>Nhập lô chèn (khi cần nhập trước)</h3>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/07-nhap-lo-chen.jpeg" alt="Màn Đưa hàng vào kho chèn"></div></div>
+    <div>
+      <p>Kho chèn → <span class="btn">+ Nhập lô chèn</span>, chọn nguồn rồi làm theo bảng.</p>
+      <table>
+        <thead><tr><th>Nguồn</th><th>Cách làm</th><th>Số lô</th></tr></thead>
+        <tbody>
+          <tr><td>Lô thành phẩm bị QC đánh CXL / Loại</td><td>Hàng lỗi (hoặc DKL) → tab Lô TP lỗi → chạm lô → số bành → Chuyển</td><td>tự lấy số lô TP</td></tr>
+          <tr><td>Dòng LOI / DKL trên sổ ca đã ký</td><td>tab Từ sổ ca → chạm dòng → kg</td><td>gõ số lô trên bao</td></tr>
+          <tr><td>Sổ QC hàng không đạt</td><td>tab Từ sổ QC → chạm dòng → kg</td><td>tự lấy, sửa được</td></tr>
+          <tr><td>Hàng chuẩn lấy từ kho TP để nâng chỉ số</td><td>Hàng chuẩn → chạm chủng loại → kg → chọn ca</td><td>gõ, có gợi ý lô đạt còn tồn</td></tr>
+          <tr><td>SBR 1502 mua ngoài, hàng khác</td><td>Mua ngoài / Khác → số lô → số bành (máy ra kg) hoặc gõ kg</td><td>gõ số lô nhà cung cấp</td></tr>
+        </tbody>
+      </table>
+      <p class="sm muted">Không có số lô thì không nhập được.</p>
+    </div>
+  </div>
+
+  <h2 id="s8">8 · Lịch sử phiếu và sửa khi sai</h2>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/08-lich-su-phieu.jpeg" alt="Màn Lịch sử phiếu chèn"></div></div>
+    <div>
+      <p>Trang chính → <b>Lịch sử phiếu</b>. Lọc Theo ngày (chọn ngày), Đang mở, Đã nhận, Đã hủy. Ba ô số: Ở dây chuyền, Chờ ký, Đã nhận. Chạm thẻ để mở phiếu.</p>
+      <table>
+        <thead><tr><th>Sai gì</th><th>Làm gì</th><th>Được tới khi</th></tr></thead>
+        <tbody>
+          <tr><td>Gõ nhầm số cân hoặc số bành lúc lấy</td><td>Mở phiếu → <b>Sửa cân lúc lấy</b></td><td>trước khi QS ký xong bước 1</td></tr>
+          <tr><td>Nhầm kg trả</td><td>Mở phiếu → <b>Sửa kg trả</b></td><td>trước khi QC duyệt</td></tr>
+          <tr><td>Nhầm mã gốc, lệnh hoặc bể / máy</td><td>Mở phiếu → <b>Đổi mã</b></td><td>trước khi thủ kho nhận</td></tr>
+          <tr><td>Khai nhầm lệnh (thiếu hoặc thừa mã)</td><td>Kết thúc lệnh rồi Bắt đầu lệnh đúng, hoặc Bắt đầu mã còn thiếu → <b>Gộp vào lệnh đang chạy</b></td><td>bất kỳ lúc nào</td></tr>
+          <tr><td>Lấy nhầm lô</td><td>Mở phiếu → <b>Lấy nhầm? Hủy phiếu</b>, kg trả về tồn kho chèn</td><td>trước khi thủ kho nhận</td></tr>
+          <tr><td>Tồn kho chèn lệch cân thực</td><td>Kho chèn → <b>Kiểm kê lô này</b></td><td>bất kỳ lúc nào</td></tr>
+          <tr><td>Lô nhập nhầm</td><td>Kho chèn → <b>Nhập nhầm? Hủy lô</b></td><td>lô chưa có phiếu lấy</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2 id="s9">9 · Kết thúc lệnh, tổng kết, mail Ban Giám đốc</h2>
+  <div class="shot">
+    <div class="phone"><div class="screen"><img src="hang-chen/09-tong-ket-lenh.jpeg" alt="Màn Tổng kết lệnh"></div></div>
+    <div>
+      <ol class="steps">
+        <li>Khi lệnh chạy xong (hết nguyên liệu vào máy, phiếu chèn cuối đã trả): trang chính, thẻ lệnh → <span class="btn white">Kết thúc</span> → xác nhận <span class="btn">Kết thúc và gửi mail BGĐ</span>.</li>
+        <li>Máy mở ngay trang <b>Tổng kết lệnh</b>: tiêu hao chèn (kg, phần trăm hàng vào máy, bể Slap / máy Mix, theo nguồn, theo lô chèn, theo ca), nguyên liệu nhập kho / xuất vào máy / còn kho, thành phẩm và hiệu suất.</li>
+        <li>Mail "Báo cáo chèn hàng theo mã sản xuất …" tự gửi cho Ban Giám đốc kèm ảnh từng lần chèn, không hỏi thêm.</li>
+      </ol>
+      <div class="note warn sm">Phiếu ca, phiếu chèn và lô thành phẩm sẽ không tự gắn lệnh đã kết thúc nữa. Xem lại tổng kết qua trang chính hoặc đường dẫn của lệnh.</div>
+    </div>
+  </div>
+
+  <h2 id="s10">10 · Trên máy tính <small>Kho nguyên liệu → Hàng chèn</small></h2>
+  <p>Bản máy tính dành cho QC, thủ kho và Ban Giám đốc theo dõi; thao tác ngoài xưởng làm trên điện thoại. Bốn tab trên cùng: <b>Hàng chèn</b> (lệnh đang chạy, phiếu theo mã, phiếu đang mở, phiếu chưa gắn mã), <b>Phiếu theo ca</b>, <b>Kho chèn</b>, <b>Phân công</b>. Nút <b>Bản điện thoại</b> ở góc phải mở bản mobile.</p>
+  <div class="desk"><img src="hang-chen/10-may-tinh-hang-chen.jpeg" alt="Trang Hàng chèn trên máy tính"></div>
+  <h3>Phân công ba bước (chỉ Ban Giám đốc)</h3>
+  <div class="desk"><img src="hang-chen/11-may-tinh-phan-cong.jpeg" alt="Trang Phân công quy trình hàng chèn"></div>
+  <p class="sm">Gõ tên → Thêm vào cột của bước; Thu để bỏ. Bước chưa có ai thì máy dùng luật cũ (khai báo: thủ kho / QC; duyệt: phòng QC; nhận: thủ kho NVL). Đã phân công thì chỉ người trong danh sách và Ban Giám đốc làm được.</p>
+
+    <div class="shot">
+    <div><img src="hang-chen/16-pc-so-pallet.jpeg" alt="Tab Sổ pallet trên máy tính" style="width:100%;border:1px solid #E5E7EB;border-radius:10px"></div>
+    <div>
+      <p><b>Sổ pallet</b> trên máy tính (nút Sổ pallet ở đầu trang Hàng chèn, hoặc <span class="mono">/wms/chen/pallet</span>): bảng ba cột Chữ viết tắt · Pallet · Số kg, cột Khai lúc · bởi, trạng thái, phiếu đang gắn, nút <b>Sửa · cân lại</b>, <b>Tắt</b> / <b>Bật lại</b>, nút <b>Thêm dải pallet</b> (tạo HCn→HCm cùng một số kg), nút <b>Nạp 5 loại mặc định</b> (chỉ hiện khi sổ của nhà máy đó thiếu). Bảng Lịch sử sổ pallet ghi mọi lần khai, cân lại, đổi chữ viết tắt, tắt, bật.</p>
+    </div>
+  </div>
+<h2 id="s11">11 · Quy ước nhanh và lỗi thường gặp</h2>
+  <div class="card">
+    <ul class="tight">
+      <li>Một lệnh = một hay nhiều mã chạy chung; nhiều lệnh chạy song song được. Ba vị trí chèn: bể Slap, máy Mix (chạm pallet, cân cả pallet, máy trừ bì từ Sổ pallet), băng tải (theo bành, không pallet).</li>
+      <li>Sổ pallet: khai báo pallet · chữ viết tắt · số kg — <b>mỗi pallet một số kg riêng</b> (H1 11,5 · H2 14,5 · EJ 15 · H3 13,5 · H4 25 sắt); cân lại chỉ khi sửa / thay pallet (ghi lý do — máy gắn nhãn "lệch mặc định"). Chỉ thủ kho và Ban Giám đốc ghi sổ.</li>
+      <li>Mỗi phiếu = một pallet = một lần chèn; số lần đếm theo ca, gom theo lệnh.</li>
+      <li>Bành 35 kg hoặc cỡ bành của chủng loại, máy tự quy; chỉ chỉnh khi đếm khác.</li>
+      <li><b>Số lần cân:</b> có pallet thì cân 1 lần lúc lấy, cuối ca dùng hết không cân / còn dư cân 1 lần — tổng 1 hoặc 2 lần; không cân pallet rỗng.</li>
+      <li>Bì pallet: chạm pallet lúc lấy → máy trừ đúng số kg của pallet đó từ Sổ pallet và <b>chốt ngay</b> kg lấy. Chỉ phiếu không chọn pallet (băng tải, cân rời, phiếu cũ) mới khai bì lúc trả và tính lại kg lấy.</li>
+      <li>2 ảnh lúc lấy luôn bắt buộc. Lúc trả: dùng hết với pallet chỉ cần <b>1 ảnh toàn cảnh</b>; còn dư hoặc phiếu không pallet cần 2 ảnh.</li>
+      <li>Kho chèn, sổ ca, gom theo mã chỉ thay đổi ở bước thủ kho nhận.</li>
+      <li>Kho chèn không chặn lấy quá tồn với SBR và số lô gõ tay (máy ghi nhập thêm); chỉ hàng từ lô TP chặn theo bành còn lại.</li>
+    </ul>
+  </div>
+  <table>
+    <thead><tr><th style="width:38%">Màn hình báo</th><th>Nghĩa là gì, làm gì</th></tr></thead>
+    <tbody>
+      <tr><td>"Tài khoản này chưa được phân công khai báo hàng chèn (QS)"</td><td>Bạn chưa có tên ở bước 1. Nhờ Ban Giám đốc thêm ở máy tính → Hàng chèn → Phân công.</td></tr>
+      <tr><td>"Chưa khai lệnh đang chạy"</td><td>Vẫn lấy được, phiếu nằm ở thẻ "Chưa gắn lệnh". Nên bấm Bắt đầu lệnh… trước cho máy tự gắn.</td></tr>
+      <tr><td>Nút Tiếp tục hoặc Ghi trả không sáng</td><td>Thiếu ảnh bắt buộc, chưa chọn vị trí chèn, chưa gõ số lô hoặc chưa chọn lệnh. Đọc chữ trên nút, máy ghi rõ thiếu gì.</td></tr>
+      <tr><td>"Dính kim loại · chưa xử lý, chưa lấy được"</td><td>Lô DKL chưa rà kim loại. Vào Kho chèn bấm "Đã xử lý kim loại, mở lấy".</td></tr>
+      <tr><td>"Thiếu ảnh bắt buộc, mở phiếu để chụp bổ sung"</td><td>Ở Chờ ký, phiếu thiếu ảnh không ký được. Mở phiếu, chụp bổ sung rồi ký.</td></tr>
+      <tr><td>Ca trên đầu trang không đúng</td><td>Máy nhận ca theo chấm công hoặc giờ. Lúc lấy hoặc trả bấm "Đổi ca" và chọn đúng ca.</td></tr>
+      <tr><td>"Lấy nhiều hơn tồn lô TP"</td><td>Số cân vượt số bành lô thành phẩm còn lại. Kiểm lại lô hoặc số cân.</td></tr>
+    </tbody>
+  </table>
+
+  <footer>Tài liệu nội bộ Cao su Huy Anh · Huy Anh ERP · Ảnh chụp từ hệ thống thật ngày 10/11/2026 · Cập nhật 18/11/2026: Sổ pallet chỉ còn 5 pallet H1 11,5 · H2 14,5 · EJ 15 · H3 13,5 · H4 25 kg (mỗi pallet một số kg riêng); ảnh Sổ pallet và trang chính chụp lại 18/11. Ảnh màn Lấy (bước 2) và màn Trả còn là bản cũ, sẽ thay sau lần chèn thật đầu tiên. Tài liệu kỹ thuật chi tiết: <span class="mono">docs/HANG_CHEN_HUONG_DAN_VAN_HANH.md</span>.</footer>
+</div>
+</body>
+</html>

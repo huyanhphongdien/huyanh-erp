@@ -334,8 +334,8 @@ không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.
   hoặc BGĐ (`fn_mix_duoc_ky('nhan_kho')`). View `v_mix_pallets` (trạng thái trong | day_chuyen | chua_bi | tat + phiếu đang gắn) — UI chỉ đọc view.
 - **MỖI PALLET MỘT SỐ KG — 5 loại mặc định (giấy cân tay của kho, 18/11/2026; migration `wms_mix_p22_loai_pallet_mac_dinh.sql` đã áp
   18/11): H1 11,5 · H2 14,5 · EJ 15 · H3 13,5 · H4 25 kg (H4 = pallet SẮT; chữ viết tay "(sắt)" từng bị đọc nhầm là "sai")** — THAY quyết
-  định "bì chuẩn 27,5 kg cho mọi pallet HC" của 17/11 (p20; trước nữa là bì tạm 15/25 của p19). Phong Điền: HC1→HC20 đã XOÁ (0 phiếu dùng),
-  nạp 5 pallet trên; HC21→30 vẫn TẮT và còn số 27,5 cũ — kiểm lại từng pallet trước khi bật (nút "Bật cả N" chỉ nhắc, không sửa số).
+  định "bì chuẩn 27,5 kg cho mọi pallet HC" của 17/11 (p20; trước nữa là bì tạm 15/25 của p19). Phong Điền: HC1→HC30 đã XOÁ hết (0 phiếu dùng;
+  user chốt 18/11 "Sổ còn 5 loại pallet thôi"), sổ chỉ còn 5 pallet trên.
   Danh sách 5 loại nằm ở `fn_mix_pallet_nap_mac_dinh_core` (DB) VÀ `MIX_PALLET_MAC_DINH` (`mixService.ts`) — sửa một nơi sửa cả hai;
   `palletBiMacDinh(code)` / `palletLechMacDinh(code, bi)` cho badge "lệch mặc định" (pallet tự thêm không bị gắn). Nút "Nạp 5 loại mặc định"
   (`mixService.napPalletMacDinh` → RPC `fn_mix_pallet_nap_mac_dinh`, idempotent) cho nhà máy chưa có sổ — TL / Lào KHÔNG tự nạp (vẫn đường cũ

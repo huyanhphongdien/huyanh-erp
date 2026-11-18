@@ -2,8 +2,8 @@
 -- HÀNG CHÈN — p22: 5 LOẠI PALLET MẶC ĐỊNH THEO GIẤY CÂN TAY (18/11/2026)
 --   Giấy cân tay của kho (ảnh chụp 18/11): H1 11,5 · H2 14,5 · EJ 15 · H3 13,5 · H4 25 kg — H4 là pallet SẮT
 --   (chữ "sắt" viết tay, không phải "sai"). Thay quyết định "bì chuẩn 27,5 kg cho mọi pallet HC" (p20, 17/11):
---     · Phong Điền: XOÁ HC1→HC20 (chưa phiếu nào dùng — kiểm lại bằng NOT EXISTS), nạp 5 pallet H1,H2,EJ,H3,H4
---       với đúng số kg trên. HC21→HC30 GIỮ NGUYÊN (đang tắt, chưa đưa vào dùng).
+--     · Phong Điền: XOÁ HC1→HC30 (chưa phiếu nào dùng — kiểm lại bằng NOT EXISTS), nạp 5 pallet H1,H2,EJ,H3,H4
+--       với đúng số kg trên. User chốt 18/11: "Sổ còn 5 loại pallet thôi" → HC21→HC30 (đang tắt) cũng xoá.
 --     · fn_mix_pallet_nap_mac_dinh(facility): nút "Nạp 5 loại mặc định" cho nhà máy khác (Tân Lâm / Lào) —
 --       chạy lại nhiều lần vẫn an toàn (mã đã có thì bỏ qua). KHÔNG tự nạp cho TL / Lào: hai nơi này chưa có sổ.
 --     · fn_mix_pallet_tao_bo: bỏ mặc định 27,5 (số kg phải gõ rõ khi tạo dải HCn…); fn_mix_pallet_khai: bỏ
@@ -119,11 +119,11 @@ BEGIN
 END $$;
 GRANT EXECUTE ON FUNCTION public.fn_mix_pallet_khai(uuid, text, text, numeric, text) TO authenticated;
 
--- ─── 5) PHONG ĐIỀN: xoá HC1→HC20 (chỉ khi chưa phiếu nào tham chiếu) rồi nạp 5 loại mặc định ───
+-- ─── 5) PHONG ĐIỀN: xoá HC1→HC30 (chỉ khi chưa phiếu nào tham chiếu) rồi nạp 5 loại mặc định ───
 DELETE FROM public.mix_pallets p
  USING public.facilities f
  WHERE f.id = p.facility_id AND f.code = 'PD'
-   AND p.code ~ '^HC([1-9]|1[0-9]|20)$'
+   AND p.code ~ '^HC([1-9]|[12][0-9]|30)$'
    AND NOT EXISTS (SELECT 1 FROM public.mix_issues i WHERE i.pallet_id = p.id);
 
 SELECT public.fn_mix_pallet_nap_mac_dinh_core(f.id, NULL) AS so_pallet_nap_moi FROM public.facilities f WHERE f.code = 'PD';
@@ -134,6 +134,6 @@ NOTIFY pgrst, 'reload schema';
 
 -- ─── KIỂM CHỨNG ────────────────────────────────────────────────────────────
 SELECT (SELECT count(*) FROM public.mix_pallets p JOIN public.facilities f ON f.id = p.facility_id WHERE f.code = 'PD' AND p.is_active) AS pd_dang_dung_phai_la_5,
-       (SELECT count(*) FROM public.mix_pallets p JOIN public.facilities f ON f.id = p.facility_id WHERE f.code = 'PD' AND p.code ~ '^HC([1-9]|1[0-9]|20)$') AS hc1_20_phai_la_0,
-       (SELECT count(*) FROM public.mix_pallets p JOIN public.facilities f ON f.id = p.facility_id WHERE f.code = 'PD' AND NOT p.is_active) AS hc21_30_tat_phai_la_10,
+       (SELECT count(*) FROM public.mix_pallets p JOIN public.facilities f ON f.id = p.facility_id WHERE f.code = 'PD' AND p.code ~ '^HC([1-9]|[12][0-9]|30)$') AS hc1_30_phai_la_0,
+       (SELECT count(*) FROM public.mix_pallets p JOIN public.facilities f ON f.id = p.facility_id WHERE f.code = 'PD' AND NOT p.is_active) AS pallet_tat_phai_la_0,
        (SELECT string_agg(p.code || '=' || p.bi_kg::text, ' · ' ORDER BY p.so) FROM public.mix_pallets p JOIN public.facilities f ON f.id = p.facility_id WHERE f.code = 'PD' AND p.is_active) AS bang_5_loai;

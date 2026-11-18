@@ -3,7 +3,7 @@
 > **⚠ Cập nhật 10–18/11/2026 (p19 → p22 — SỔ PALLET):** flow cân bì trong tài liệu này là **đường cũ**, nay chỉ còn
 > cho phiếu KHÔNG chọn pallet (băng tải, cân rời, phiếu lập trước 10/11). **Flow chuẩn hiện tại:** Sổ pallet `mix_pallets`
 > (**5 loại pallet, mỗi loại một số kg riêng: H1 11,5 · H2 14,5 · EJ 15 · H3 13,5 · H4 25 kg (pallet sắt)** — giấy cân tay 18/11,
-> thay "bì chuẩn 27,5 cho mọi pallet" của 17/11; HC21→HC30 còn tắt); lúc lấy chạm pallet + gõ số
+> thay "bì chuẩn 27,5 cho mọi pallet" của 17/11; sổ chỉ còn 5 pallet này, đã xoá HC1→HC30); lúc lấy chạm pallet + gõ số
 > trên cân → kg lấy = cân − số kg của pallet đó **chốt ngay**; lúc trả **Dùng hết = 0 kg không cân, 1 ảnh toàn cảnh** / Còn dư = cân 1 lần − bì;
 > 1 pallet chỉ ở 1 phiếu đang mở; bàn giao ca sau kế thừa pallet + bì. Bản mô tả mới đầy đủ: `docs/HUONG_DAN_HANG_CHEN.html` (mục 4–5).
 

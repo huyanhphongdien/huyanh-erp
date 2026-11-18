@@ -16,9 +16,9 @@ import './khoMix.css'
 
 const kg1 = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }))
 const hm = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '')
-const CELL: Record<MixPallet['trang_thai'], string> = { trong: '', day_chuyen: 'line', chua_bi: 'nobi', tat: 'off' }
-const CHIP: Record<MixPallet['trang_thai'], string> = { trong: 'ok', day_chuyen: 'amb', chua_bi: 'red', tat: 'mut' }
-const HC_BG: Record<MixPallet['trang_thai'], string | undefined> = { trong: undefined, day_chuyen: '#B45309', chua_bi: '#B91C1C', tat: '#9CA3AF' }
+const CELL: Record<MixPallet['trang_thai'], string> = { trong: '', chua_bi: 'nobi', tat: 'off' }
+const CHIP: Record<MixPallet['trang_thai'], string> = { trong: 'ok', chua_bi: 'red', tat: 'mut' }
+const HC_BG: Record<MixPallet['trang_thai'], string | undefined> = { trong: undefined, chua_bi: '#B91C1C', tat: '#9CA3AF' }
 
 export default function KhoMixPallet() {
   const nav = useNavigate()
@@ -71,7 +71,7 @@ export default function KhoMixPallet() {
   // chưa có bì → điền sẵn số kg mặc định của loại pallet đó (nếu là 1 trong 5 loại), còn lại để trống cho thủ kho gõ
   function chon(p: MixPallet) { setSelId(p.id); setTen(p.ten ?? ''); setCode(p.code); setBi(p.bi_kg === null ? String(palletBiMacDinh(p.code) ?? '') : String(p.bi_kg)); setLyDo(''); setTatAsk(null); setMsg(null) }
   const dem = useMemo(() => ({
-    trong: rows.filter((x) => x.trang_thai === 'trong').length, dc: rows.filter((x) => x.trang_thai === 'day_chuyen').length,
+    trong: rows.filter((x) => x.trang_thai === 'trong').length, dc: rows.reduce((t, x) => t + x.so_phieu_dang_dung, 0),
     chuaBi: rows.filter((x) => x.trang_thai === 'chua_bi').length, tat: rows.filter((x) => x.trang_thai === 'tat').length,
   }), [rows])
   const hienThi = showTat ? rows : rows.filter((x) => x.is_active)
@@ -144,10 +144,9 @@ export default function KhoMixPallet() {
     setBusy(null)
   }
   const moTa = (p: MixPallet) => {
-    if (p.trang_thai === 'day_chuyen') return `${p.issue_code ?? ''}${p.issue_lot_so_lo ? ` · lô ${p.issue_lot_so_lo}` : ''}${p.issue_kg_out !== null ? ` · ${kg1(p.issue_kg_out)} kg` : ''}${p.issue_out_at ? ` · ${hm(p.issue_out_at)}` : ''}${p.issue_lenh_ma_gop ? ` · ${p.issue_lenh_ma_gop}` : ''}`
     if (p.trang_thai === 'tat') return `tắt${p.tat_ly_do ? ` · ${p.tat_ly_do}` : ''}`
     if (p.trang_thai === 'chua_bi') return 'chưa khai số kg → chưa lấy được'
-    return `khai ${p.bi_khai_at ? fmtD(p.bi_khai_at) : '—'}${p.bi_khai_name ? ` · ${firstName(p.bi_khai_name)}` : ''}${p.note ? ` · ${p.note}` : ''}${p.so_lan_can_lai ? ` · cân lại ${p.so_lan_can_lai} lần` : ''}`
+    return `${p.so_phieu_dang_dung > 0 ? `${p.so_phieu_dang_dung} phiếu đang mở · ` : ''}khai ${p.bi_khai_at ? fmtD(p.bi_khai_at) : '—'}${p.bi_khai_name ? ` · ${firstName(p.bi_khai_name)}` : ''}${p.note ? ` · ${p.note}` : ''}${p.so_lan_can_lai ? ` · cân lại ${p.so_lan_can_lai} lần` : ''}`
   }
   // p22: chỉ đánh dấu pallet đã cân lại ra số KHÁC số mặc định của loại đó (pallet tự thêm không bị gắn)
   const lech = (p: MixPallet) => p.is_active && palletLechMacDinh(p.code, p.bi_kg)
@@ -163,7 +162,7 @@ export default function KhoMixPallet() {
         {loading && !rows.length && <><div className="kmx-skel" /><div className="kmx-skel" /></>}
         <div className="kmx-grid3">
           <div className="kmx-stat ok"><span className="kmx-lbl ok">Trống</span><span className="kmx-num md ok">{dem.trong}</span></div>
-          <div className="kmx-stat" style={dem.dc ? { background: '#FEF3C7' } : undefined}><span className="kmx-lbl">Dây chuyền</span><span className="kmx-num md" style={dem.dc ? { color: '#B45309' } : undefined}>{dem.dc}</span></div>
+          <div className="kmx-stat" style={dem.dc ? { background: '#FEF3C7' } : undefined}><span className="kmx-lbl">Phiếu đang mở</span><span className="kmx-num md" style={dem.dc ? { color: '#B45309' } : undefined}>{dem.dc}</span></div>
           <div className="kmx-stat" style={dem.chuaBi ? { background: '#FEE2E2' } : undefined}><span className="kmx-lbl" style={dem.chuaBi ? { color: '#B91C1C' } : undefined}>Chưa số kg</span><span className="kmx-num md" style={dem.chuaBi ? { color: '#B91C1C' } : undefined}>{dem.chuaBi}</span></div>
         </div>
 
@@ -176,7 +175,7 @@ export default function KhoMixPallet() {
               </button>
             ))}
           </div>
-          <span className="kmx-sm">Xanh nhạt = trống · vàng = đang ở dây chuyền · nét đứt = chưa khai số kg (chưa lấy được). Pallet tắt không hiện ở lưới.</span>
+          <span className="kmx-sm">Mỗi ô là một LOẠI pallet (gồm nhiều pallet thật cùng số kg) — loại nào cũng lấy được nhiều lần. Nét đứt = chưa khai số kg (chưa lấy được). Loại tắt không hiện ở lưới.</span>
         </section>
 
         {canEdit ? (
@@ -188,11 +187,11 @@ export default function KhoMixPallet() {
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 86px 86px', gap: 6 }}>
                   <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Pallet</span><input className="kmx-text" placeholder="Pallet gỗ 1,1 m" value={ten} onChange={(e) => setTen(e.target.value)} aria-label="Tên pallet" /></label>
-                  <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Viết tắt</span><input className="kmx-text kmx-mono" style={{ fontWeight: 800, textTransform: 'uppercase' }} value={code} disabled={sel.trang_thai === 'day_chuyen'} onChange={(e) => setCode(e.target.value)} aria-label="Chữ viết tắt" /></label>
+                  <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Viết tắt</span><input className="kmx-text kmx-mono" style={{ fontWeight: 800, textTransform: 'uppercase' }} value={code} onChange={(e) => setCode(e.target.value)} aria-label="Chữ viết tắt" /></label>
                   <label className="kmx-col" style={{ gap: 4 }}><span className="kmx-lbl">Số kg</span><input className="kmx-text kmx-mono" style={{ fontWeight: 800 }} type="number" inputMode="decimal" placeholder={String(palletBiMacDinh(sel.code) ?? 'kg')} value={bi} onChange={(e) => setBi(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && biOk && daDoi) ghi() }} autoFocus aria-label="Số kg bì" /></label>
                 </div>
                 {canLai && <input className="kmx-text" placeholder="Lý do cân lại (thay ván, sửa pallet, tới kỳ…)" value={lyDo} onChange={(e) => setLyDo(e.target.value)} aria-label="Lý do cân lại" />}
-                {sel.trang_thai === 'day_chuyen' && <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Đang ở dây chuyền ({sel.issue_code}): đổi được tên và số kg, phiếu đang mở vẫn giữ bì lúc lấy; chữ viết tắt đổi sau khi trả.</span>}
+                {sel.so_phieu_dang_dung > 0 && <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Đang có {sel.so_phieu_dang_dung} phiếu mở dùng loại này: đổi số kg chỉ áp cho các lần lấy sau, phiếu đang mở vẫn giữ bì lúc lấy.</span>}
                 {sel.note && sel.bi_kg !== null && <span className="kmx-sm">{sel.note}</span>}
                 <button type="button" className="kmx-btn md" disabled={!biOk || !codeNorm || !daDoi || busy === 'ghi'} onClick={ghi}>{I.check}{busy === 'ghi' ? 'Đang ghi…' : `Ghi ${codeNorm || sel.code} · ${biOk ? `${kg1(biN)} kg` : 'gõ số kg'}`}</button>
               </>
@@ -223,7 +222,7 @@ export default function KhoMixPallet() {
                 {canEdit && (
                   <div className="kmx-row" style={{ gap: 6, justifyContent: 'flex-start' }}>
                     {p.is_active && <button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto' }} onClick={() => { chon(p); window.scrollTo({ top: 0 }) }}>{p.bi_kg === null ? 'Khai số kg' : 'Sửa · cân lại'}</button>}
-                    {p.is_active && p.trang_thai !== 'day_chuyen' && tatAsk !== p.id && <button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto', color: '#B91C1C' }} onClick={() => { setTatAsk(p.id); setTatLyDo('') }}>Tắt</button>}
+                    {p.is_active && tatAsk !== p.id && <button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto', color: '#B91C1C' }} onClick={() => { setTatAsk(p.id); setTatLyDo('') }}>Tắt</button>}
                     {!p.is_active && <button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto' }} disabled={busy === p.id} onClick={() => tat(p, false)}>{busy === p.id ? '…' : 'Bật lại'}</button>}
                   </div>
                 )}

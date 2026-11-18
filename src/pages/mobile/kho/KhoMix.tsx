@@ -94,7 +94,7 @@ export default function KhoMix() {
   const canTake = role.khaiBao
   const lanKe = (cur?.items.length ?? 0) + 1
   const palDung = pallets.filter((p) => p.is_active)
-  const palDem = { trong: palDung.filter((p) => p.trang_thai === 'trong').length, dc: palDung.filter((p) => p.trang_thai === 'day_chuyen').length, chuaBi: palDung.filter((p) => p.trang_thai === 'chua_bi').length, tat: pallets.length - palDung.length }
+  const palDem = { trong: palDung.filter((p) => p.trang_thai === 'trong').length, dc: palDung.reduce((t, p) => t + p.so_phieu_dang_dung, 0), chuaBi: palDung.filter((p) => p.trang_thai === 'chua_bi').length, tat: pallets.length - palDung.length }
   const maChuaChay = maMo.filter((x) => !lenhs.some((g) => g.raw_lot_ids.includes(x.raw_lot_id))).sort((a, b) => (b.ngay_cuoi ?? '').localeCompare(a.ngay_cuoi ?? '')).slice(0, 8)
   const maTen = (ids: string[]) => ids.map((id) => maMo.find((x) => x.raw_lot_id === id)?.ma ?? '?').join(' + ')
   // bắt đầu lệnh 1..n mã; đang có lệnh chạy → hỏi: thay thế (mặc định 30/10) / chạy song song / gộp vào lệnh đang chạy
@@ -252,11 +252,11 @@ export default function KhoMix() {
           {pallets.length > 0 && (
             <Link to="/m/kho/chen/so-pallet" className="kmx-card press" aria-label="Sổ pallet" style={{ gap: 8 }}>
               <div className="kmx-row"><span className="kmx-strong" style={{ fontSize: 13 }}>Sổ pallet · {palDung.length} pallet</span><span style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, fontWeight: 700, color: '#1B4D3E' }}>Xem{I.chev}</span></div>
-              <div className="kmx-pal mini">{palDung.map((p) => <span key={p.id} className={`cell${p.trang_thai === 'day_chuyen' ? ' line' : p.bi_kg === null ? ' nobi' : ''}`} title={`${p.code} · ${p.bi_kg === null ? 'chưa khai số kg' : `bì ${kg1(p.bi_kg)} kg`}`}>{p.code.replace(/^HC/, '')}</span>)}</div>
-              <span className="kmx-sm">{palDem.trong} trống · {palDem.dc} ở dây chuyền{palDem.chuaBi ? ` · ${palDem.chuaBi} chưa khai số kg` : ''}{palDem.tat ? ` · ${palDem.tat} tắt` : ''}</span>
+              <div className="kmx-pal mini">{palDung.map((p) => <span key={p.id} className={`cell${p.bi_kg === null ? ' nobi' : p.so_phieu_dang_dung > 0 ? ' line' : ''}`} title={`${p.code} · ${p.bi_kg === null ? 'chưa khai số kg' : `bì ${kg1(p.bi_kg)} kg`}${p.so_phieu_dang_dung > 0 ? ` · ${p.so_phieu_dang_dung} phiếu đang mở` : ''}`}>{p.code.replace(/^HC/, '')}</span>)}</div>
+              <span className="kmx-sm">{palDem.dc} phiếu đang dùng pallet{palDem.chuaBi ? ` · ${palDem.chuaBi} chưa khai số kg` : ''}{palDem.tat ? ` · ${palDem.tat} tắt` : ''}</span>
             </Link>
           )}
-          <span className="kmx-sm kmx-center" style={{ color: '#9CA3AF' }}>Mỗi lần lấy = một pallet · cuối ca dùng hết 1 chạm, còn dư cân 1 lần · Kết thúc = đóng lệnh + mail BGĐ</span>
+          <span className="kmx-sm kmx-center" style={{ color: '#9CA3AF' }}>Mỗi lần lấy = một pallet, chạm đúng loại pallet (loại nào cũng dùng được nhiều lần) · cuối ca dùng hết 1 chạm, còn dư cân 1 lần · Kết thúc = đóng lệnh + mail BGĐ</span>
 
           {otherIssued.length > 0 && (
             <section aria-label="Đang ở dây chuyền ca khác" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

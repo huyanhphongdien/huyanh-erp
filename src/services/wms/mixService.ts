@@ -154,9 +154,9 @@ export interface NhanVienLite { id: string; full_name: string; email: string | n
 
 /** Sổ pallet hàng chèn (p19, chủ DN 10/11/2026): khai báo pallet (ten) · chữ viết tắt (code: HC7) · số kg (bi_kg = BÌ pallet rỗng).
  *  Lúc lấy chạm pallet → kg lấy = cân cả pallet − bì chốt ngay; lúc trả dùng hết = 0 không cân, còn dư cân 1 lần. */
-export type MixPalletTrangThai = 'trong' | 'day_chuyen' | 'chua_bi' | 'tat'
-export const MIX_PALLET_TRANG_THAI_LABELS: Record<MixPalletTrangThai, string> = { trong: 'Trống', day_chuyen: 'Ở dây chuyền', chua_bi: 'Chưa khai số kg', tat: 'Tắt' }
-export const MIX_PALLET_TRANG_THAI_COLORS: Record<MixPalletTrangThai, string> = { trong: 'green', day_chuyen: 'gold', chua_bi: 'red', tat: 'default' }
+export type MixPalletTrangThai = 'trong' | 'chua_bi' | 'tat'   // p24: mã là LOẠI pallet (nhiều pallet thật) → không còn trạng thái 'ở dây chuyền'
+export const MIX_PALLET_TRANG_THAI_LABELS: Record<MixPalletTrangThai, string> = { trong: 'Dùng được', chua_bi: 'Chưa khai số kg', tat: 'Tắt' }
+export const MIX_PALLET_TRANG_THAI_COLORS: Record<MixPalletTrangThai, string> = { trong: 'green', chua_bi: 'red', tat: 'default' }
 /** 5 LOẠI PALLET MẶC ĐỊNH theo giấy cân tay của kho (18/11/2026, migration p22): MỖI pallet một số kg riêng (H4 là pallet SẮT),
  *  thay cho "bì chuẩn 27,5 kg cho mọi pallet HC" (p20). Nút "Nạp 5 loại mặc định" ghi đúng danh sách này vào sổ.
  *  ⚠ Chép của fn_mix_pallet_nap_mac_dinh_core (DB) — sửa một nơi phải sửa cả hai. */
@@ -188,6 +188,7 @@ export interface MixPallet {
   issue_id: string | null; issue_code: string | null; issue_kg_out: number | null; issue_out_at: string | null; issue_status: string | null; issue_vi_tri: MixViTri | null
   issue_lot_so_lo: string | null; issue_lot_code: string | null; issue_lenh_ma_gop: string | null
   bi_cu_ngay: number | null; so_lan_can_lai: number
+  /** p24: số phiếu đang mở dùng loại pallet này (chỉ để xem — một loại dùng được cho nhiều phiếu cùng lúc) */ so_phieu_dang_dung: number
   created_at: string; updated_at: string
 }
 export type MixPalletLogLoai = 'khai' | 'can_lai' | 'doi_ma' | 'sua_ten' | 'tat' | 'bat'
@@ -249,7 +250,7 @@ const normIssue = (r: any): MixIssue => ({
   pallet_id: r.pallet_id ?? null, pallet_code: r.pallet_code ?? null, pallet_ten: r.pallet_ten ?? null,
 })
 const normPallet = (r: any): MixPallet => ({
-  ...r, so: numOrNull(r.so), bi_kg: numOrNull(r.bi_kg), is_active: !!r.is_active, issue_kg_out: numOrNull(r.issue_kg_out), bi_cu_ngay: numOrNull(r.bi_cu_ngay), so_lan_can_lai: num(r.so_lan_can_lai),
+  ...r, so: numOrNull(r.so), bi_kg: numOrNull(r.bi_kg), is_active: !!r.is_active, issue_kg_out: numOrNull(r.issue_kg_out), bi_cu_ngay: numOrNull(r.bi_cu_ngay), so_lan_can_lai: num(r.so_lan_can_lai), so_phieu_dang_dung: num(r.so_phieu_dang_dung),
 })
 
 export const mixService = {

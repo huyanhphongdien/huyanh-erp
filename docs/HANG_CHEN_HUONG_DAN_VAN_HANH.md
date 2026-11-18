@@ -6,7 +6,7 @@
 > thay "bì chuẩn 27,5 cho mọi pallet" của 17/11; sổ chỉ còn 5 pallet này, đã xoá HC1→HC30); lúc lấy chạm pallet + gõ số
 > trên cân → kg lấy = cân − số kg của pallet đó **chốt ngay**; lúc trả **Dùng hết = 0 kg không cân, 1 ảnh toàn cảnh** / Còn dư = cân 1 lần − bì;
 > **số lần cân mỗi phiếu có pallet = 1 (dùng hết) hoặc 2 (còn dư)**, không cân pallet rỗng; chèn băng tải 0 lần (theo bành); không chọn pallet = đường cũ 2–3 lần;
-> 1 pallet chỉ ở 1 phiếu đang mở; bàn giao ca sau kế thừa pallet + bì. Bản mô tả mới đầy đủ: `docs/HUONG_DAN_HANG_CHEN.html` (mục 4–5).
+> mã trong sổ là LOẠI pallet (nhiều pallet thật) → một loại dùng cho nhiều phiếu cùng lúc, 1 ca chèn 20 lần vẫn được (p24, 18/11); bàn giao ca sau kế thừa loại pallet + bì. Bản mô tả mới đầy đủ: `docs/HUONG_DAN_HANG_CHEN.html` (mục 4–5).
 
 Dành cho QS tại xưởng, QC, thủ kho và chủ doanh nghiệp. Điện thoại: `huyanhrubber.vn/m/kho` → tab **Chèn**. Máy tính: menu Kho nguyên liệu → **Hàng chèn**.
 
@@ -124,7 +124,7 @@ Khi lệnh chạy xong (hết NVL vào máy, phiếu chèn cuối đã trả):
 ## 8. Quy ước nhanh
 
 - Một lệnh = một hay nhiều mã chạy chung; nhiều lệnh chạy song song được. **3 vị trí chèn**: bể Slap và máy Mix (chạm pallet, máy trừ số kg riêng của pallet từ Sổ pallet, kg chốt ngay) và băng tải (theo bành, không pallet).
-- Mỗi phiếu = một pallet = một lần chèn; số lần đếm theo ca, gom theo lệnh / mã gốc. Một pallet chỉ ở một phiếu đang mở.
+- Mỗi phiếu = một pallet = một lần chèn; số lần đếm theo ca, gom theo lệnh / mã gốc. Một loại pallet dùng được cho nhiều phiếu đang mở cùng lúc (p24).
 - Bành 35 kg (hoặc cỡ bành của chủng loại), máy tự quy; chỉ chỉnh khi đếm khác.
 - Bì pallet: chốt ngay lúc lấy theo số kg riêng của từng pallet trong Sổ pallet (H1 11,5 · H2 14,5 · EJ 15 · H3 13,5 · H4 25 sắt). Chỉ phiếu không chọn pallet mới khai bì lúc trả và tính lại kg lấy = cân tổng − bì.
 - 2 ảnh lúc lấy luôn bắt buộc. Lúc trả: dùng hết với pallet chỉ cần 1 ảnh toàn cảnh; còn dư hoặc phiếu không chọn pallet cần 2 ảnh (ảnh pallet rỗng trên cân là bằng chứng bì đường cũ).

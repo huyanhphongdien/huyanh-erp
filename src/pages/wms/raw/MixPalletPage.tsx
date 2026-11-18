@@ -51,7 +51,7 @@ export default function MixPalletPage() {
   useEffect(() => { load() }, [load])
 
   const dem = useMemo(() => ({
-    trong: rows.filter((x) => x.trang_thai === 'trong').length, dc: rows.filter((x) => x.trang_thai === 'day_chuyen').length,
+    trong: rows.filter((x) => x.trang_thai === 'trong').length, dc: rows.reduce((t, x) => t + x.so_phieu_dang_dung, 0),
     chuaBi: rows.filter((x) => x.trang_thai === 'chua_bi').length, tat: rows.filter((x) => x.trang_thai === 'tat').length,
     // p22: chỉ đếm pallet đã cân lại ra số KHÁC số mặc định của loại đó (pallet tự thêm không bị đếm)
     lech: rows.filter((x) => x.is_active && palletLechMacDinh(x.code, x.bi_kg)).length,
@@ -121,12 +121,12 @@ export default function MixPalletPage() {
     { title: 'Số kg (bì)', dataIndex: 'bi_kg', width: 110, align: 'right', render: (v: number | null) => v === null ? <Tag color="red">chưa khai</Tag> : <Text strong style={{ fontFamily: 'JetBrains Mono, Consolas, monospace' }}>{kg1(v)}</Text> },
     { title: 'Khai lúc · bởi', width: 190, render: (_, r) => r.bi_khai_at ? <span>{dt(r.bi_khai_at)}{r.bi_khai_name ? ` · ${r.bi_khai_name}` : ''}{palletLechMacDinh(r.code, r.bi_kg) && r.is_active ? <Tag color="blue" style={{ marginLeft: 6 }}>lệch mặc định {kg1(palletBiMacDinh(r.code))}</Tag> : null}</span> : <Text type="secondary">—</Text> },
     { title: 'Trạng thái', dataIndex: 'trang_thai', width: 130, render: (v: MixPallet['trang_thai'], r) => <Tag color={MIX_PALLET_TRANG_THAI_COLORS[v]}>{MIX_PALLET_TRANG_THAI_LABELS[v]}{v === 'tat' && r.tat_ly_do ? ` · ${r.tat_ly_do}` : ''}</Tag> },
-    { title: 'Phiếu đang gắn', render: (_, r) => r.issue_id ? <Space size={4} wrap><a onClick={() => navigate(`/wms/chen/phieu/${r.issue_id}`)} style={{ fontFamily: 'JetBrains Mono, Consolas, monospace' }}>{r.issue_code}</a><Text type="secondary">{r.issue_lot_so_lo ? `lô ${r.issue_lot_so_lo} · ` : ''}{kg1(r.issue_kg_out)} kg · {dt(r.issue_out_at)}{r.issue_lenh_ma_gop ? ` · ${r.issue_lenh_ma_gop}` : ''}</Text></Space> : <Text type="secondary">—</Text> },
+    { title: 'Đang dùng', width: 260, render: (_, r) => r.so_phieu_dang_dung > 0 ? <Space size={4} wrap><Text strong>{r.so_phieu_dang_dung} phiếu mở</Text>{r.issue_id && <><Text type="secondary">· gần nhất</Text><a onClick={() => navigate(`/wms/chen/phieu/${r.issue_id}`)} style={{ fontFamily: 'JetBrains Mono, Consolas, monospace' }}>{r.issue_code}</a></>}</Space> : <Text type="secondary">—</Text> },
     { title: 'Ghi chú', dataIndex: 'note', render: (v: string | null, r) => <Text type="secondary">{v || ''}{r.so_lan_can_lai ? `${v ? ' · ' : ''}cân lại ${r.so_lan_can_lai} lần` : ''}</Text> },
     { title: 'Thao tác', width: 170, render: (_, r) => canEdit ? (
       <Space size={4}>
         {r.is_active && <Button size="small" onClick={() => moSua(r)}>{r.bi_kg === null ? 'Khai số kg' : 'Sửa · cân lại'}</Button>}
-        {r.is_active && r.trang_thai !== 'day_chuyen' && <Popconfirm title={`Tắt ${r.code}?`} description="Pallet hỏng / không dùng nữa. Không hiện ở màn lấy; bật lại được." okText="Tắt" cancelText="Không" onConfirm={() => tat(r, true)}><Button size="small" danger>Tắt</Button></Popconfirm>}
+        {r.is_active && <Popconfirm title={`Tắt ${r.code}?`} description="Pallet hỏng / không dùng nữa. Không hiện ở màn lấy; bật lại được." okText="Tắt" cancelText="Không" onConfirm={() => tat(r, true)}><Button size="small" danger>Tắt</Button></Popconfirm>}
         {!r.is_active && <Button size="small" onClick={() => tat(r, false)}>Bật lại</Button>}
       </Space>
     ) : null },
@@ -170,7 +170,7 @@ export default function MixPalletPage() {
         <Row gutter={[12, 12]}>
           <Col xs={12} md={4}><Card size="small"><Statistic title="Pallet đang dùng" value={rows.filter((x) => x.is_active).length} /></Card></Col>
           <Col xs={12} md={4}><Card size="small"><Statistic title="Trống" value={dem.trong} valueStyle={{ color: '#15803D' }} /></Card></Col>
-          <Col xs={12} md={4}><Card size="small"><Statistic title="Ở dây chuyền" value={dem.dc} valueStyle={{ color: dem.dc ? '#B7791F' : undefined }} /></Card></Col>
+          <Col xs={12} md={4}><Card size="small"><Statistic title="Phiếu đang mở" value={dem.dc} valueStyle={{ color: dem.dc ? '#B7791F' : undefined }} /></Card></Col>
           <Col xs={12} md={4}><Card size="small"><Statistic title="Chưa khai số kg" value={dem.chuaBi} valueStyle={{ color: dem.chuaBi ? '#B91C1C' : undefined }} /></Card></Col>
           <Col xs={12} md={4}><Card size="small"><Statistic title="Lệch số mặc định" value={dem.lech} valueStyle={{ color: dem.lech ? '#1D4ED8' : undefined }} /></Card></Col>
           <Col xs={12} md={4}><Card size="small"><Statistic title="Tắt" value={dem.tat} /></Card></Col>
@@ -187,11 +187,11 @@ export default function MixPalletPage() {
         <Form form={form} layout="vertical" style={{ marginTop: 8 }}>
           <Form.Item name="ten" label="Pallet (tên, loại)"><Input placeholder="Pallet gỗ 1,1 m · Pallet sắt" /></Form.Item>
           <Row gutter={12}>
-            <Col span={12}><Form.Item name="code" label="Chữ viết tắt" rules={[{ required: true, message: 'Gõ chữ viết tắt' }]} extra={edit?.trang_thai === 'day_chuyen' ? 'Đang ở dây chuyền: đổi sau khi trả phiếu' : 'In trên pallet, tổ chạm lúc lấy'}><Input style={{ fontFamily: 'JetBrains Mono, Consolas, monospace', fontWeight: 700, textTransform: 'uppercase' }} disabled={edit?.trang_thai === 'day_chuyen'} /></Form.Item></Col>
+            <Col span={12}><Form.Item name="code" label="Chữ viết tắt" rules={[{ required: true, message: 'Gõ chữ viết tắt' }]} extra="In trên pallet, tổ chạm lúc lấy"><Input style={{ fontFamily: 'JetBrains Mono, Consolas, monospace', fontWeight: 700, textTransform: 'uppercase' }} /></Form.Item></Col>
             <Col span={12}><Form.Item name="bi_kg" label={`Số kg (bì)${edit && palletBiMacDinh(edit.code) !== null ? ` — mặc định ${kg1(palletBiMacDinh(edit.code))} kg` : ''}`} rules={[{ required: true, message: 'Gõ số kg pallet rỗng' }]}><InputNumber min={0.5} max={199} step={0.5} style={{ width: '100%' }} addonAfter="kg" /></Form.Item></Col>
           </Row>
           <Form.Item name="ly_do" label="Lý do (khi cân lại)"><Input placeholder="Thay ván, sửa pallet, tới kỳ cân lại…" /></Form.Item>
-          {edit?.trang_thai === 'day_chuyen' && <Alert type="warning" showIcon message={`Phiếu ${edit.issue_code} đang mở giữ bì lúc lấy (${kg1(edit.bi_kg)} kg); số kg mới áp cho lần lấy sau.`} />}
+          {edit && edit.so_phieu_dang_dung > 0 && <Alert type="warning" showIcon message={`Đang có ${edit.so_phieu_dang_dung} phiếu mở dùng loại ${edit.code} (giữ bì lúc lấy ${kg1(edit.bi_kg)} kg); số kg mới chỉ áp cho các lần lấy sau.`} />}
         </Form>
       </Modal>
       <Modal open={them} title="Thêm pallet vào sổ" onCancel={() => setThem(false)} onOk={themBo} okText="Thêm" cancelText="Đóng" confirmLoading={busy} destroyOnHidden>

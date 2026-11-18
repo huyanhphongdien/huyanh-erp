@@ -191,9 +191,8 @@ export default function KhoMixOut() {
     } catch (e: any) { setMsg(e?.message || 'Không đọc được mã') }
   }
 
-  // chạm pallet: đang ở dây chuyền / chưa khai số kg thì báo, không chọn
+  // chạm loại pallet: chưa khai số kg thì báo, không chọn (p24: một loại dùng được cho NHIỀU phiếu cùng lúc — không khoá theo phiếu)
   function chonPallet(p: MixPallet) {
-    if (p.trang_thai === 'day_chuyen') { setMsg(`${p.code} đang ở dây chuyền (${p.issue_code ?? ''}${p.issue_lot_so_lo ? ` · lô ${p.issue_lot_so_lo}` : ''}). Trả phiếu đó trước hoặc chọn pallet khác.`); return }
     if (p.bi_kg === null) { setMsg(`${p.code} chưa khai số kg trong Sổ pallet. Báo thủ kho khai rồi mới lấy được.`); return }
     setPalletId(p.id); setMsg(null)
     // chạm pallet xong → nhảy thẳng vào ô số cân (bớt 1 chạm)
@@ -229,12 +228,6 @@ export default function KhoMixOut() {
           const i = await mixService.getIssue(issueId)
           if (i) { setCodeDone(i.code); setDoneAt(i.out_at); setStep(4); setBusy(false); return }
         } catch { /* rơi xuống báo lỗi thường */ }
-      }
-      // thua cuộc đua pallet (2 máy chạm cùng pallet): tải lại lưới + bỏ pallet đã chọn để chạm pallet khác ngay
-      if (m.includes('Pallet đang ở dây chuyền')) {
-        setPalletId(null)
-        if (facilityId) mixService.listPallets(facilityId, false).then((pl) => { setPallets(pl); setPalletLoi(false) }).catch(() => { /* bỏ qua */ })
-        setStep(2)
       }
       setMsg(m || 'Không ghi được')
     }
@@ -447,13 +440,13 @@ export default function KhoMixOut() {
                 <div className="kmx-row"><span className="kmx-lbl">Pallet nào? · chạm chữ viết tắt trên pallet</span><button type="button" className="kmx-pill sm" style={{ flex: '0 0 auto', gap: 4 }} onClick={() => setScanPallet(true)}>Quét tem</button></div>
                 <div className="kmx-pal">
                   {palletsDung.map((p) => {
-                    const cls = p.trang_thai === 'day_chuyen' ? 'line' : p.bi_kg === null ? 'nobi' : ''
-                    return <button key={p.id} type="button" className={`${cls}${palletId === p.id ? ' sel' : ''}`} onClick={() => chonPallet(p)} aria-label={`${p.code}${p.bi_kg !== null ? ` bì ${kgTxt(p.bi_kg)} kg` : ' chưa khai số kg'}`}>{p.code}<small>{p.trang_thai === 'day_chuyen' ? 'dây chuyền' : p.bi_kg === null ? 'kg?' : `bì ${kgTxt(p.bi_kg)}`}</small></button>
+                    const cls = p.bi_kg === null ? 'nobi' : ''
+                    return <button key={p.id} type="button" className={`${cls}${palletId === p.id ? ' sel' : ''}`} onClick={() => chonPallet(p)} aria-label={`${p.code}${p.bi_kg !== null ? ` bì ${kgTxt(p.bi_kg)} kg` : ' chưa khai số kg'}`}>{p.code}<small>{p.bi_kg === null ? 'kg?' : `bì ${kgTxt(p.bi_kg)}`}</small></button>
                   })}
                 </div>
                 {pallet ? (
-                  <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span><b className="kmx-mono">{pallet.code}</b>{pallet.ten ? ` · ${pallet.ten}` : ''} · bì <b className="kmx-mono">{kgTxt(pallet.bi_kg)} kg</b>{pallet.note ? ` · ${pallet.note}` : pallet.bi_khai_at ? ` · khai ${new Date(pallet.bi_khai_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}` : ''}</span><span className="kmx-chip ok">trống</span></div>
-                ) : <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Chạm pallet đang chở hàng chèn này. Vàng = đang ở dây chuyền, nét đứt = chưa khai số kg (báo thủ kho).</span>}
+                  <div className="kmx-tint" style={{ background: '#E8F5F0', color: '#0D2E25' }}><span><b className="kmx-mono">{pallet.code}</b>{pallet.ten ? ` · ${pallet.ten}` : ''} · bì <b className="kmx-mono">{kgTxt(pallet.bi_kg)} kg</b>{pallet.note ? ` · ${pallet.note}` : pallet.bi_khai_at ? ` · khai ${new Date(pallet.bi_khai_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}` : ''}</span><span className="kmx-chip ok">dùng được</span></div>
+                ) : <span className="kmx-sm" style={{ color: '#B45309', fontWeight: 600 }}>Chạm loại pallet đang chở hàng chèn này (loại nào cũng dùng được nhiều lần trong ca). Nét đứt = chưa khai số kg (báo thủ kho).</span>}
                 <label htmlFor="kmx-kg" className="kmx-lbl">Số đọc trên cân · cả pallet, không trừ gì</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <input id="kmx-kg" className={`kmx-input${qua || (kgN !== null && kgN <= 0) ? ' red' : ''}`} type="number" inputMode="decimal" placeholder="0" value={gross} onChange={(e) => { setGross(e.target.value); setSoBanh('') }} autoFocus={!!palletId} />

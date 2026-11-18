@@ -407,12 +407,12 @@ export default function MixShiftPage() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                   <Button size="small" type={!f.palletId ? 'primary' : 'default'} onClick={() => setF((x) => ({ ...x, palletId: undefined }))}>Không pallet</Button>
                   {palletsDung.map((p) => {
-                    const dc = p.trang_thai === 'day_chuyen'; const noBi = p.bi_kg === null
+                    const noBi = p.bi_kg === null
                     return (
-                      <Button key={p.id} size="small" disabled={dc || noBi} type={f.palletId === p.id ? 'primary' : 'default'}
-                        title={dc ? `đang ở dây chuyền (${p.issue_code ?? ''})` : noBi ? 'chưa khai số kg trong Sổ pallet' : `bì ${fmtKg(p.bi_kg)} kg`}
+                      <Button key={p.id} size="small" disabled={noBi} type={f.palletId === p.id ? 'primary' : 'default'}
+                        title={noBi ? 'chưa khai số kg trong Sổ pallet' : `bì ${fmtKg(p.bi_kg)} kg`}
                         onClick={() => { setF((x) => ({ ...x, palletId: p.id, kg: null })); setTimeout(() => document.getElementById('mix-gross-kg')?.focus(), 60) }}>
-                        {p.code}{dc ? ' · dây chuyền' : noBi ? ' · kg?' : ` · ${fmtKg(p.bi_kg)}`}
+                        {p.code}{noBi ? ' · kg?' : ` · ${fmtKg(p.bi_kg)}`}
                       </Button>
                     )
                   })}

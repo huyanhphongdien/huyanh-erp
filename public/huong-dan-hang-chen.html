@@ -223,7 +223,7 @@
   <div class="shot">
     <div class="phone"><div class="screen"><img src="hang-chen/15-so-pallet.jpeg" alt="Màn Sổ pallet hàng chèn: lưới pallet và số kg"></div><div class="hint">cuộn trong khung để xem hết màn · ảnh chụp 18/11/2026</div></div>
     <div>
-      <p>Nhà máy có một bộ pallet dành riêng cho hàng chèn. <b>Sổ pallet</b> ghi ba cột như sổ giấy: <b>Pallet</b> (tên, loại), <b>Chữ viết tắt</b> (in trên pallet) và <b>Số kg</b> (bì pallet rỗng). <b>Mỗi loại pallet có một số kg riêng</b>, ghi theo giấy cân tay của kho (18/11/2026):</p>
+      <p>Nhà máy có một số <b>loại pallet</b> dành riêng cho hàng chèn; <b>mỗi mã trong sổ là một LOẠI, gồm nhiều pallet thật cùng số kg</b> (không phải một chiếc pallet duy nhất). <b>Sổ pallet</b> ghi ba cột như sổ giấy: <b>Pallet</b> (tên, loại), <b>Chữ viết tắt</b> (mã loại, in trên pallet) và <b>Số kg</b> (bì pallet rỗng). <b>Mỗi loại có một số kg riêng</b>, ghi theo giấy cân tay của kho (18/11/2026). Một loại dùng được cho <b>nhiều lần chèn cùng lúc</b> — một ca chèn 20 lần, loại nào cũng chạm lại được:</p>
       <table>
         <tr><th>Chữ viết tắt</th><th>Pallet</th><th style="text-align:right">Số kg (bì)</th></tr>
         <tr><td><b class="mono">H1</b></td><td>Pallet H1</td><td style="text-align:right" class="mono">11,5</td></tr>
@@ -235,17 +235,17 @@
       <p>Tổ ép chỉ chạm tên pallet rồi đọc cân, máy tự trừ đúng số kg của pallet đó. Không cân pallet rỗng cuối ca, không gõ bì tay, không phải khai gì trước.</p>
       <ol class="steps">
         <li>Mở: trang chính → thẻ <b>Sổ pallet</b> (lưới 5 ô nhỏ) → <span class="btn white">Xem</span>, hoặc gõ <span class="mono">huyanhrubber.vn/m/kho/chen/so-pallet</span>. Máy tính: Hàng chèn → <b>Sổ pallet</b>.</li>
-        <li>Lưới trên cùng: xanh nhạt = trống, vàng = đang ở dây chuyền (ghi phiếu đang gắn), nét đứt = chưa khai số kg (chỉ gặp ở pallet mới chưa có bì — chưa lấy được). Pallet tắt không hiện.</li>
+        <li>Lưới trên cùng: mỗi ô là một loại pallet, loại nào cũng chạm lấy được nhiều lần; nét đứt = chưa khai số kg (chỉ gặp ở loại mới chưa có bì — chưa lấy được). Loại tắt không hiện. Trong danh sách bên dưới, mỗi loại ghi số phiếu đang mở dùng loại đó.</li>
         <li><b>5 pallet đã có sẵn số kg — bình thường không phải khai gì.</b> Chỉ khi sửa hoặc thay pallet, thủ kho hoặc Ban Giám đốc mới chạm pallet → <b>Sửa · cân lại</b> → gõ số kg mới + lý do → <span class="btn">Ghi</span>. Máy giữ lịch sử từng lần; pallet đã cân lại ra số khác số trên mang nhãn <span class="pill">lệch mặc định</span>.</li>
         <li>Pallet hỏng: bấm <span class="btn white">Tắt</span> (có lý do), sửa xong <span class="btn white">Bật lại</span> là dùng ngay. Nhà máy chưa có sổ (Tân Lâm, Lào): bấm <b>Nạp 5 loại mặc định</b> là có đủ H1, H2, EJ, H3, H4 với số kg như bảng trên. Pallet khác ngoài 5 loại: bấm <b>Thêm dải pallet</b> (ví dụ HC1→HC5, gõ số kg chung). Không xoá pallet vì phiếu cũ còn tham chiếu.</li>
       </ol>
-      <div class="note ok sm"><b>Mỗi pallet một số kg riêng (từ 18/11/2026):</b> H1 11,5 · H2 14,5 · EJ 15 · H3 13,5 · H4 25 kg (pallet sắt) — thay cho "27,5 kg cho mọi pallet" của 17/11. <b>Sửa · cân lại</b> chỉ dùng khi sửa / thay pallet. Sổ chỉ còn đúng 5 pallet này, không còn pallet nào khác.</div>
+      <div class="note ok sm"><b>5 loại pallet, mỗi loại một số kg (từ 18/11/2026):</b> H1 11,5 · H2 14,5 · EJ 15 · H3 13,5 · H4 25 kg (pallet sắt) — thay cho "27,5 kg cho mọi pallet" của 17/11. Mỗi loại gồm nhiều pallet thật, <b>không giới hạn số lần chèn</b> trong ca. <b>Sửa · cân lại</b> chỉ dùng khi đổi số kg của cả loại.</div>
     </div>
   </div>
   <div class="shot">
     <div class="phone"><div class="screen"><img src="hang-chen/14-trang-chinh-so-pallet.jpeg" alt="Trang chính với thẻ Sổ pallet"></div></div>
     <div>
-      <p>Trên trang chính, thẻ <b>Sổ pallet · 5 pallet</b> nằm ngay dưới các thẻ lệnh: mỗi ô là một pallet, ô vàng là pallet đang nằm ở dây chuyền. Dòng dưới đếm trống / ở dây chuyền / tắt. Từng lần chèn L1, L2… trên thẻ lệnh cũng hiện viên tên pallet (ví dụ <b>H2</b>) và phép trừ <i>cả pallet − bì = kg hàng</i> đã chốt lúc lấy.</p>
+      <p>Trên trang chính, thẻ <b>Sổ pallet · 5 pallet</b> nằm ngay dưới các thẻ lệnh: mỗi ô là một loại pallet (ô có viền vàng là loại đang có phiếu mở). Dòng dưới ghi tổng số phiếu đang dùng pallet. Từng lần chèn L1, L2… trên thẻ lệnh cũng hiện viên tên pallet (ví dụ <b>H2</b>) và phép trừ <i>cả pallet − bì = kg hàng</i> đã chốt lúc lấy.</p>
       <div class="note info sm">Tem dán pallet: in chữ viết tắt to kèm mã QR nội dung là chính chữ viết tắt (<span class="mono">H1</span>, <span class="mono">H2</span>, <span class="mono">EJ</span>, <span class="mono">H3</span>, <span class="mono">H4</span>). Quét ở màn Lấy (nút <b>Quét tem</b>), hoặc nút máy ảnh của tab <b>Lô NVL</b> — quét tem pallet sẽ nhảy sang Sổ pallet. Mẫu tem in sẽ bổ sung sau.</div>
     </div>
   </div>
@@ -269,7 +269,7 @@
       <ol class="steps">
         <li><b>Ca và tổ</b>: máy tự nhận, sai thì <span class="btn white">Đổi ca</span>; chạm tổ trưởng <b>Ca Vang</b> hoặc <b>Ca Hiền</b>.</li>
         <li><b>Chèn vào đâu</b> (bắt buộc): <b>Chèn bể Slap</b>, <b>Chèn máy Mix</b> hoặc <b>Chèn băng tải</b>. Máy nhớ lựa chọn lần trước.</li>
-        <li><b>Pallet nào?</b>: chạm ô có chữ viết tắt ghi trên pallet (H1, H2, EJ, H3, H4; trên nút có ghi sẵn số kg) hoặc bấm <span class="btn white">Quét tem</span>. Ô vàng là pallet đang ở dây chuyền, chạm vào máy nhắc trả phiếu đó trước; ô nét đứt là chưa khai số kg, báo thủ kho. Dòng xanh dưới lưới hiện bì của pallet vừa chọn.</li>
+        <li><b>Loại pallet nào?</b>: chạm ô có chữ viết tắt ghi trên pallet (H1, H2, EJ, H3, H4; trên nút có ghi sẵn số kg) hoặc bấm <span class="btn white">Quét tem</span>. Loại nào cũng chạm được nhiều lần trong ca, kể cả khi các lần trước chưa trả; ô nét đứt là chưa khai số kg, báo thủ kho. Dòng xanh dưới lưới hiện bì của loại vừa chọn.</li>
         <li><b>Số đọc trên cân</b> (lần cân duy nhất lúc lấy): gõ đúng số trên màn hình cân, cả pallet, không trừ gì. Máy hiện ngay phép trừ, ví dụ <span class="mono">612,0 − bì H2 14,5 = 597,5 kg</span>; đó là kg lấy, chốt luôn. Băng tải thì không chọn pallet, gõ <b>số bành</b>, máy nhân kg mỗi bành. Hàng cân rời không pallet: bấm <span class="btn white">Không pallet · gõ kg</span>.</li>
         <li><b>Số bành</b>: máy ước trên kg hàng đã trừ bì (35 kg/bành), đếm khác thì bấm <span class="kbd">−</span> <span class="kbd">+</span>. Ô xám bên dưới báo lô còn lại bao nhiêu trong kho.</li>
         <li><b>Chèn vào lệnh</b>: một lệnh thì tự gắn; nhiều lệnh song song thì chạm chip lệnh.</li>
@@ -289,8 +289,8 @@
         <li><span class="btn white">Dùng hết</span>: một chạm. Trả 0 kg, tiêu hao = kg lấy, không phải cân gì. Chụp <b>1 ảnh</b> toàn cảnh pallet rỗng.</li>
         <li><span class="btn white">Còn dư</span>: đặt pallet còn hàng lên cân, gõ đúng số trên cân (hàng còn + pallet). Máy trừ bì: <span class="mono">263,0 − bì H2 14,5 = trả 248,5 kg</span>, tiêu hao = kg lấy − kg trả. Chụp <b>2 ảnh</b> phần trả.</li>
         <li><b>Số bành còn</b>: máy tự tính, đếm khác thì bấm <span class="kbd">−</span> <span class="kbd">+</span>.</li>
-        <li>Phần dư để lại dây chuyền cho ca sau: tick <b>Để … lại dây chuyền cho ca sau</b>. Pallet vẫn ghi "ở dây chuyền"; máy tự mở phiếu cho ca kế (cùng pallet, cùng bì) khi thủ kho nhận.</li>
-        <li>Bấm <span class="btn">Ghi trả và ký bên giao</span>: một chạm vừa ghi kg trả vừa ký bước 1. Pallet về "trống" trong Sổ pallet. Lấy nhầm thì bấm <span class="btn red">Lấy nhầm? Hủy phiếu</span>.</li>
+        <li>Phần dư để lại dây chuyền cho ca sau: tick <b>Để … lại dây chuyền cho ca sau</b>. Máy tự mở phiếu cho ca kế (cùng loại pallet, cùng bì) khi thủ kho nhận.</li>
+        <li>Bấm <span class="btn">Ghi trả và ký bên giao</span>: một chạm vừa ghi kg trả vừa ký bước 1. Lấy nhầm thì bấm <span class="btn red">Lấy nhầm? Hủy phiếu</span>.</li>
       </ol>
       <div class="note warn sm">Gõ nhầm cân lúc lấy? Trên màn này có nút <b>Sửa cân lúc lấy</b>, dùng được tới khi QS ký xong bước 1; máy trừ lại bì của pallet đó. Thấy bì sai thì báo thủ kho cân lại trong Sổ pallet; phiếu đang mở vẫn giữ bì lúc lấy.</div>
       <div class="note info sm"><b>Phiếu không chọn pallet</b> (hàng cân rời, phiếu lập trước 10/11; chèn băng tải thì không cân, tính theo bành): màn trả giữ cách cũ, cân tối đa ba lần — cân 1 lúc lấy, cân 2 hàng trả + pallet (dùng hết thì bỏ), cân 3 pallet rỗng để khai bì (ô cân 3 máy điền sẵn <b>27,5 kg</b> chỉ là số TẠM của đường cũ — hãy cân pallet rỗng thật rồi gõ số đó) — và 2 ảnh kể cả dùng hết. Muốn chỉ cân 1–2 lần: chọn pallet trong Sổ pallet ngay lúc lấy.</div>

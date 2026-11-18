@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Hướng dẫn: Đơn mua tiếp &amp; Người nhận hàng</title>
+<style>
+  :root { --brand:#1B4D3E; --soft:#E3F1EA; --line:#D9E1DC; --ink:#16201B; --muted:#56655E; --warn:#FBF1DF; }
+  * { box-sizing:border-box; }
+  body { font:15px/1.65 "Be Vietnam Pro","Segoe UI",system-ui,sans-serif; color:var(--ink); background:#F4F6F4; margin:0; padding:24px 16px 64px; }
+  .wrap { max-width:860px; margin:0 auto; display:flex; flex-direction:column; gap:28px; }
+  h1 { font-size:28px; margin:0; color:var(--brand); }
+  h2 { font-size:20px; margin:0 0 8px; color:var(--brand); border-bottom:2px solid var(--line); padding-bottom:6px; }
+  h3 { font-size:16px; margin:14px 0 4px; }
+  p, ul, ol { margin:6px 0; }
+  li { margin:3px 0; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
+  .tip { background:var(--soft); border-radius:8px; padding:10px 14px; margin:10px 0; }
+  .warn { background:var(--warn); border-radius:8px; padding:10px 14px; margin:10px 0; }
+  code, .k { font-family:Consolas,monospace; background:#EEF2EF; padding:1px 6px; border-radius:4px; font-size:13.5px; }
+  table { border-collapse:collapse; width:100%; font-size:14px; display:block; overflow-x:auto; }
+  th, td { border:1px solid var(--line); padding:6px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--soft); }
+  .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div style="display:inline-block;background:#FBF1DF;color:#8A5A00;border:1px solid #E8C97A;border-radius:6px;padding:3px 10px;font-size:13px;font-weight:600;margin-bottom:8px">TÀI LIỆU NỘI BỘ — Cao su Huy Anh · không phát hành ra ngoài công ty</div>
+  <h1>Đơn mua tiếp &amp; Người nhận hàng</h1>
+  <p class="muted">Hướng dẫn cho Sale, XNK, Kế toán và BGĐ · Module Đơn hàng bán · cập nhật 18/11/2026</p>
+</header>
+
+<section class="card">
+  <h2>1. Có gì mới (tóm tắt)</h2>
+  <ul>
+    <li><b>Đơn mua tiếp:</b> khách mua thêm theo hợp đồng (HĐ) đã ký thì bấm <b>“Tạo đơn mua tiếp”</b> trên đơn cũ. Hệ thống tạo một <b>đơn mới</b> gắn vào HĐ gốc. <b>Không phải bịa số HĐ, không ký lại.</b></li>
+    <li><b>Người mua ≠ Người nhận hàng:</b> mỗi đơn ghi riêng người mua (đứng tên HĐ, trả tiền, công nợ) và người nhận hàng (nơi hàng đến). Ví dụ: <b>Harmonytide</b> mua, <b>Qingdao Jintong</b> nhận.</li>
+    <li>Kanban, Sổ đơn, chi tiết đơn và trang khách đều hiện quan hệ này; chứng từ in đúng người nhận và số HĐ gốc.</li>
+    <li><b>Tiền, lô, công nợ không đổi cách tính</b>: mỗi đợt là một đơn riêng, có khoản phải thu riêng.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2>2. Khi nào dùng cái nào?</h2>
+  <table>
+    <tr><th>Tình huống</th><th>Làm gì</th></tr>
+    <tr><td>Khách ký HĐ mới</td><td>Tạo đơn bình thường (“Tạo đơn hàng”).</td></tr>
+    <tr><td>Khách mua thêm số lượng mới, theo HĐ đã ký, không ký HĐ mới</td><td><b>Tạo đơn mua tiếp</b> từ đơn/HĐ gốc.</td></tr>
+    <tr><td>Hàng giao cho công ty khác với người mua (qua trung gian)</td><td>Giữ <b>Người mua</b> = bên đứng tên HĐ; điền công ty kia vào ô <b>Người nhận hàng</b>.</td></tr>
+    <tr><td>Đổi người mua hoặc đổi đồng tiền</td><td>Là HĐ mới, không dùng mua tiếp.</td></tr>
+  </table>
+  <div class="warn">Không tạo đơn “giả lập” hay bịa số HĐ để lách nữa. Nếu chưa chắc là mua tiếp hay HĐ mới, hỏi XNK/BGĐ trước.</div>
+</section>
+
+<section class="card">
+  <h2>3. Tạo đơn mua tiếp — từng bước</h2>
+  <h3>Mở form từ đâu (chọn một)</h3>
+  <ul>
+    <li><b>Chi tiết đơn</b> (đơn gốc hoặc một đợt bất kỳ): nút <b>“Tạo đơn mua tiếp”</b> cạnh nút Sửa (trong drawer/Chia đôi: menu Hành động).</li>
+    <li><b>Tab Hợp đồng</b> của đơn: cạnh “Tạo phụ lục”.</li>
+    <li><b>Kanban</b>: nút <b>Tạo đơn hàng ▾</b> → “Mua tiếp theo HĐ đã ký…” → gõ số HĐ hoặc tên người mua, chọn HĐ gốc.</li>
+    <li><b>Trang khách</b> → tab Đơn hàng: “Mua tiếp theo HĐ…” hoặc nút “Mua tiếp” trên từng dòng đơn.</li>
+  </ul>
+  <h3>Trong form</h3>
+  <ol>
+    <li>Đầu form có khung xanh: “Mua tiếp theo HĐ … — sẽ là đợt n”. Kiểm tra đúng HĐ gốc.</li>
+    <li><b>Đã điền sẵn và khoá:</b> người mua, đồng tiền, ngày HĐ (theo HĐ gốc). <b>Chép sẵn:</b> loại hàng, quy cách bành/cont, đóng gói, điều kiện giao, cảng, điều khoản thanh toán, shipping marks, ngân hàng, tỉ lệ hoa hồng.</li>
+    <li><b>Người nhận hàng:</b> được chép từ đơn trước và tô nổi — <b>xác nhận hoặc đổi</b> cho đợt này.</li>
+    <li><b>Số đơn:</b> hệ thống gợi ý <code>HA20260302-D3</code>. Giữ nguyên, hoặc bấm <b>Đổi số</b> nếu khách cấp PI/L/C số riêng.</li>
+    <li><b>Phải nhập mới:</b> số lượng (tấn), đơn giá, ETD, PO khách (nếu có). Đơn giá chỉ hiện gợi ý “đợt trước $x”, không tự điền.</li>
+    <li>Nếu hiện cảnh báo <b>“Có thể trùng lô hàng”</b>: đọc kỹ — có thể bạn đang nhập lại đơn đã có. Chọn “Xem lại” hoặc “Vẫn tạo”.</li>
+    <li>Bấm <b>Tạo đơn mua tiếp</b>. Đơn mới ở trạng thái <b>Nháp</b>, rồi đi tiếp Xác nhận → các bộ phận như đơn thường.</li>
+    <li>Sau khi lưu, nên đính <b>PI khách ký / phụ lục / email xác nhận</b> ở tab Hợp đồng của đợt (khuyến nghị, không bắt buộc).</li>
+  </ol>
+</section>
+
+<section class="card">
+  <h2>4. Ghi người nhận khi tạo HĐ mới</h2>
+  <ul>
+    <li>Ô <b>Người mua</b> = bên đứng tên HĐ và trả tiền. Ngay dưới là ô <b>Người nhận hàng</b>: “Chính người mua” (mặc định), chọn một khách có sẵn, hoặc <b>+ Thêm người nhận mới</b> (điền tên, nước, địa chỉ — lưu thành hồ sơ khách để thống kê đúng).</li>
+    <li>Nếu người mua từng giao cho một người nhận, hệ thống gợi ý <b>“dùng lại?”</b> — bấm 1 lần.</li>
+    <li>Nếu bạn chọn một công ty từng nhận hàng qua trung gian làm Người mua, hệ thống nhắc: nếu bên trung gian mới ký và trả tiền thì đổi lại (nút “Đổi giúp tôi”).</li>
+  </ul>
+  <div class="tip">Lỗi hay gặp: chọn <b>người nhận</b> làm <b>người mua</b> → HĐ, công nợ và chứng từ đứng sai tên.</div>
+</section>
+
+<section class="card">
+  <h2>5. Xem trên màn hình</h2>
+  <h3>Kanban</h3>
+  <ul>
+    <li>Thẻ hiện <b>NGƯỜI MUA → người nhận</b> (khi có người nhận riêng).</li>
+    <li>Dòng <b>⧉ Đợt 2 · HĐ HA20260302</b> hoặc <b>⧉ HĐ gốc · 2 đợt</b>. Bấm vào dòng này = <b>Soi HĐ</b>: các đợt cùng HĐ sáng lên ở mọi cột, thẻ khác mờ đi; băng trên đầu cho tổng tấn/giá trị (cộng các đơn, <u>không phải</u> mẫu số công nợ). Nhấn Esc hoặc “Bỏ soi” để thoát.</li>
+    <li>Nút <b>⧉ HĐ có mua tiếp</b> lọc chỉ các thẻ thuộc HĐ có nhiều đợt. Ô tìm gõ số HĐ gốc ra cả họ; gõ tên người nhận ra cả đơn mua thẳng lẫn đơn nhận qua trung gian.</li>
+  </ul>
+  <h3>Sổ đơn</h3>
+  <ul>
+    <li>Cột Số HĐ có dòng phụ “Đợt n · HĐ …” hoặc “⧉ n đợt”; bấm “⧉ n đợt” để lọc cả HĐ (chip “HĐ gốc: …”).</li>
+    <li>Cột Người mua có dòng “→ người nhận”. Có thêm 3 cột ẩn mặc định: Người nhận hàng, HĐ gốc, Đợt (bật ở “Tuỳ chỉnh cột”; có trong Excel).</li>
+    <li>Bộ lọc mới: Loại đơn (HĐ mới / mua tiếp), và vai của ô Khách (Người mua / Người nhận / Cả hai).</li>
+    <li>Cột “Số LOT” nay tên là <b>“PO khách”</b> (đúng nghĩa của nó). Excel đổi tiêu đề “Khách hàng” → “Người mua”.</li>
+  </ul>
+  <h3>Chi tiết đơn</h3>
+  <ul>
+    <li>Chip trên đầu: “Mua tiếp · Đợt 2 · HĐ …” (bấm để mở đơn gốc).</li>
+    <li>Tab Thông tin tách <b>3 số</b>: <b>Mã đơn (nội bộ)</b> SO-…; <b>Số đơn · Đợt n/N</b> (gốc số PKL/WL…); <b>Số HĐ ký</b> (in ở ô CONTRACT NO., khai hải quan).</li>
+    <li>Khối <b>“Các đợt cùng HĐ”</b> liệt kê gốc và mọi đợt (số cộng chỉ để xem).</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2>6. Thẻ “Các bên của đơn” và chốt ô Consignee (XNK)</h2>
+  <ul>
+    <li>Thẻ hiện Người mua, Người nhận, và chữ sẽ in ở ô <b>Consignee / Notify</b> kèm nguồn (L/C, người nhận, hồ sơ khách…).</li>
+    <li>Đơn có người nhận mà chưa chốt Consignee hiện khung vàng <b>“XNK chốt ô Consignee”</b> với các nút: <b>Tên người nhận</b> · <b>TO ORDER</b> · <b>TO THE ORDER OF &lt;ngân hàng&gt;</b> · <b>Gõ tay…</b>.</li>
+    <li>Gợi ý theo cách thanh toán: <b>D/P</b> → TO ORDER, Notify = người nhận · <b>L/C</b> → theo ngân hàng, Notify = người nhận · <b>T/T</b> → tên người nhận.</li>
+    <li>Ai sửa được: XNK/Admin bất kỳ lúc nào; Sale khi đơn còn Nháp.</li>
+    <li>Cần chữ khác hồ sơ (forwarder, tên/địa chỉ riêng): gõ ở phần “Chữ in trên chứng từ”.</li>
+  </ul>
+  <div class="warn">Với đơn D/P, in thẳng tên người nhận có thể khiến họ lấy hàng khi bên mua chưa trả tiền. XNK cân nhắc trước khi chốt.</div>
+</section>
+
+<section class="card">
+  <h2>7. Chứng từ</h2>
+  <ul>
+    <li>Ô <b>CONTRACT NO. / ngày HĐ</b> in <b>số HĐ gốc</b> của đợt mua tiếp. Số chứng từ PKL, WL, BC, NW… vẫn theo <b>số đơn</b> của đợt (HA20260302-D3/PL…).</li>
+    <li><b>BUYER</b> luôn là người mua. <b>Consignee/Notify</b> theo thẻ Các bên. Đơn mua thẳng in <b>y như trước</b>.</li>
+    <li>Hối phiếu và đơn chiết khấu: tên ngân hàng lấy từ L/C hoặc “TO THE ORDER OF …”; <b>không bao giờ</b> in tên người nhận làm ngân hàng.</li>
+    <li>Hồ sơ chứng từ của người mua có công tắc <b>“Chứng từ trung tính”</b>: bật thì Invoice/PKL không in khối người nhận (WL và Non-Wood vẫn in).</li>
+    <li>Bảng kiểm chứng từ nhắc: chưa chốt Consignee, đợt mua tiếp cần Ngày PI, đơn có người nhận cần xem ô “Third-party invoicing” của C/O Form E, đơn L/C kiểm Notify theo 46A/47A.</li>
+    <li>Tab Hợp đồng của đợt có công tắc “Ô CONTRACT NO.: số HĐ gốc / số của đơn này”. Đơn cũ nối vào họ (HA20260301, ATC LOT 4) để “số của đơn này” nhằm in lại y như đã phát; <b>đổi công tắc sẽ làm đổi chữ khi in lại</b>, hệ thống có hỏi xác nhận.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2>8. Trang khách — “Hàng về tay”</h2>
+  <ul>
+    <li>Tab Thống kê: <b>Hàng về tay khách này</b> = mua thẳng + nhận qua trung gian (tấn đặt / tấn đã giao). Ví dụ Qingdao Jintong: 546 t mua thẳng + 1.239 t qua Harmonytide.</li>
+    <li>Tab Đơn hàng tách “Đứng tên mua” và “Nhận qua trung gian”.</li>
+    <li><b>Công nợ, doanh thu, hạn mức chỉ tính đơn khách đứng tên mua.</b> Đơn nhận qua trung gian không bao giờ cộng vào công nợ của người nhận.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2>9. Quy tắc &amp; giới hạn cần nhớ</h2>
+  <ul>
+    <li>Đợt mua tiếp <b>bắt buộc cùng người mua và cùng đồng tiền</b> với HĐ gốc (hệ thống chặn).</li>
+    <li>HĐ gốc phải <b>có số HĐ</b> và chưa huỷ mới tạo được đợt.</li>
+    <li>HĐ gốc còn đợt chưa huỷ thì <b>không huỷ/xoá/đổi người mua</b> được — huỷ các đợt trước.</li>
+    <li>Số đơn phải <b>duy nhất</b> (hệ thống chặn trùng, không phân biệt hoa/thường và khoảng trắng thừa).</li>
+    <li>Đổi số HĐ gốc: số của các đợt giữ nguyên; ô CONTRACT NO. của đợt tự theo số gốc mới (hệ thống hỏi xác nhận).</li>
+    <li>Một đơn chỉ có <b>một</b> người nhận. Giao cho nhiều người nhận khác nhau thì tách thành các đợt.</li>
+    <li>Cần số HĐ bán lại của bên trung gian (vd HMT20260302)? Ghi vào <b>ghi chú nội bộ</b>, không ghi vào PO khách.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2>10. Hỏi nhanh</h2>
+  <h3>Tôi tìm HA20260302 mà không thấy HA20260301?</h3>
+  <p>HA20260301 là đợt mua tiếp mang số riêng. Ở Sổ đơn, bấm “⧉ 2 đợt” trên dòng HA20260302 để lọc cả họ; Kanban thì tìm là ra cả hai.</p>
+  <h3>Nút “Tạo đơn mua tiếp” bị mờ?</h3>
+  <p>HĐ gốc chưa có số HĐ hoặc đã huỷ. Điền số HĐ cho đơn gốc trước.</p>
+  <h3>Tạo nhầm đợt?</h3>
+  <p>Đơn còn Nháp thì xoá hoặc huỷ bình thường; số đợt đã cấp không bị cấp lại.</p>
+  <h3>Người nhận chưa có trong danh sách?</h3>
+  <p>Ở ô Người nhận hàng chọn “+ Thêm người nhận mới…”, điền tên, nước, địa chỉ.</p>
+  <h3>Đã chạy dữ liệu cũ chưa?</h3>
+  <p>Đã nối: HA20260301 = đợt 2 của HA20260302; ATC LOT 4 = đợt 2 của LOT 3; 8 đơn Harmonytide đi Qingdao đã gán người nhận Jintong. Còn chờ Sale xác nhận: HA20260307, HA20260303 (YOUPU), HA20260310 và giá HA20260301.</p>
+</section>
+
+</div>
+</body>
+</html>

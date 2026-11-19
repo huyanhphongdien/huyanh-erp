@@ -74,7 +74,7 @@
     <div class="meta">
       <span class="pill">Máy tính: huyanhrubber.vn → menu VẬN TẢI</span>
       <span class="pill">4 mục: Lệnh điều động · Sổ chi phí đội xe · Đội xe · Tài xế</span>
-      <span class="pill">Ảnh chụp từ hệ thống 10/11/2026</span>
+      <span class="pill">Cập nhật và chụp lại ảnh 19/11/2026</span>
     </div>
   </div>
 
@@ -111,13 +111,14 @@
     <div class="r"><b>Kế toán</b>Soát khoản chi và chứng từ, bấm Duyệt và khoá, duyệt đề nghị thanh toán, đánh dấu đã chi.</div>
     <div class="r"><b>Ban Giám đốc</b>Xem sổ chi phí theo tài xế, theo xe, theo loại chi; ký duyệt khi cần.</div>
   </div>
-  <p class="sm muted">Vào được menu Vận tải: Ban Giám đốc, Hành chính tổng hợp, QC, Logistics và admin. Duyệt và chi trên đề nghị thanh toán chỉ kế toán, Ban Giám đốc, admin.</p>
+  <p class="sm muted">Vào được menu Vận tải: Ban Giám đốc, Hành chính tổng hợp, QC, Logistics và admin. Duyệt và chi trên đề nghị thanh toán, cũng như <b>Kế toán duyệt và khoá</b> / <b>Mở lại</b> chi phí từng chuyến, chỉ kế toán, Ban Giám đốc, admin bấm được; Hành chính tổng hợp nhập liệu sẽ thấy các nút này bị mờ.</p>
 
   <h2 id="s2">2 · Danh sách lệnh điều động</h2>
-  <div class="desk"><img src="van-tai/01-danh-sach-lenh.jpeg" alt="Danh sách lệnh điều động"><div class="cap">Vận tải → Lệnh điều động</div></div>
+  <div class="desk"><img src="van-tai/01-danh-sach-lenh.jpeg" alt="Danh sách lệnh điều động"><div class="cap">Vận tải → Lệnh điều động: thanh trạng thái, ô lọc nhóm xe, khoảng ngày điều động; dải vàng báo khi đã chạm 200 lệnh</div></div>
   <ul class="tight">
-    <li>Ô tìm theo mã lệnh, biển số, tài xế, khách. Thanh chọn trạng thái để lọc.</li>
-    <li>Cột: Mã lệnh (LDD-năm tháng-số thứ tự), Ngày, Loại chuyến, Xe / Tài xế, Khách / Điểm đến, số Cont hay Pallet, KL kế hoạch, Trạng thái.</li>
+    <li>Ô tìm theo mã lệnh, biển số, tài xế, khách. Ba cách lọc: thanh chọn <b>trạng thái</b>; ô <b>Mọi nhóm xe</b> (🚛 Xe cont · 🚚 Xe tải · 🚗 Xe con · 🗂️ Khác); và khoảng <b>Từ ngày điều động – Đến ngày</b>.</li>
+    <li>Cột: Mã lệnh (LDD-năm tháng-số thứ tự), Ngày, Loại chuyến (ghi nhóm xe và loại chở, ví dụ 🚛 Đi cảng, 🚚 Chở mủ), Xe / Tài xế, Khách / Điểm đến, số Cont hay Pallet, KL kế hoạch, Trạng thái.</li>
+    <li>Sổ hiện tối đa 200 lệnh gần nhất theo bộ lọc; chạm trần thì có dòng vàng báo phía trên bảng, hãy lọc theo ngày để xem lệnh cũ hơn. Tải lỗi thì hiện nút <b>Thử lại</b>, không hiện bảng trống.</li>
     <li>Chạm một dòng để mở chi tiết. Nút <span class="btn">Tạo lệnh điều động</span> ở góc phải.</li>
   </ul>
   <div class="card">
@@ -125,7 +126,7 @@
     <div class="status" style="margin-top:8px">
       <span class="tag grey">Nháp</span><span class="arrow">→</span>
       <span class="tag blue">Đã điều xe</span><span class="arrow">→</span>
-      <span class="tag gold">Đang đi</span><span class="arrow">→</span>
+      <span class="tag gold">Đang vận chuyển</span><span class="arrow">→</span>
       <span class="tag green">Hoàn tất</span>
       <span class="muted sm" style="margin-left:8px">(<span class="tag red">Đã huỷ</span> ở bất kỳ bước nào; lệnh huỷ có thể trả về Nháp)</span>
     </div>
@@ -133,25 +134,26 @@
   </div>
 
   <h2 id="s3">3 · Tạo lệnh điều động</h2>
-  <div class="desk"><img src="van-tai/02-tao-lenh.jpeg" alt="Form tạo lệnh điều động"><div class="cap">Lệnh điều động → Tạo lệnh điều động</div></div>
+  <div class="desk"><img src="van-tai/02-tao-lenh.jpeg" alt="Form tạo lệnh điều động"><div class="cap">Lệnh điều động → Tạo lệnh: lưới thẻ Loại chuyến theo nhóm xe ở trên cùng, thanh Lưu lệnh dính đáy trang</div></div>
   <div class="two">
     <div>
       <ol class="steps">
-        <li><b>Ngày điều động</b> và <b>Loại chuyến</b>: Xuất hàng đi cảng, Hàng thương mại, Đi lấy mủ, Đi Lào, Nội bộ, Khác. Loại chuyến quyết định bảng hàng bên dưới là container hay dòng tự do.</li>
+        <li><b>Loại chuyến</b>: chạm một thẻ, các thẻ xếp theo nhóm xe — 🚛 <b>Xe cont (đầu kéo)</b>: Đi cảng · Hàng thương mại · Đi lấy mủ (NM khác) · Đi Lào; 🚚 <b>Xe tải</b>: Chở mủ · Chở hàng hoá; 🚗 <b>Xe con</b>: Chở cán bộ NV; 🗂️ <b>Khác</b>: Nội bộ / việc khác · Khác. Dòng "đang chọn" phía trên nhắc thẻ đang dùng. Thẻ quyết định bảng hàng bên dưới là container hay dòng tự do. Sau đó chọn <b>Ngày điều động</b>.</li>
         <li><b>Phương tiện và tài xế</b>: chọn Đầu kéo, máy tự điền tài xế mặc định của xe đó. Chọn Rơ-moóc theo chuyến (moóc đổi liên tục nên không gắn cứng). Xe thuê ngoài thì bật thuê ngoài, gõ nhà xe, tên tài xế, số điện thoại, cước thuê.</li>
         <li><b>Thông tin chuyến</b>: khách hàng, điểm giao hoặc cảng, điểm bốc hàng (bỏ trống là kho Huy Anh), liên hệ tại điểm bốc, căn cứ hợp đồng hoặc booking, người nhận, lý do, ghi chú.</li>
-        <li><b>Hàng trên xe</b>: bấm <span class="btn white">Tạo từ Đơn hàng bán</span> → chọn đơn → tick đúng container và seal đi chuyến này (có nút chọn cả lô). Một xe chở container của nhiều đơn, nhiều khách thì gắn thêm đơn, mỗi đơn là một thẻ. Chuyến không có container thì <span class="btn white">Thêm dòng container</span> và gõ tay.</li>
-        <li>Bấm <span class="btn">Lưu lệnh</span>. Lệnh mới ở trạng thái Nháp.</li>
+        <li><b>Hàng trên xe</b>: bấm <span class="btn white">Tạo từ Đơn hàng bán</span> → chọn đơn → tick đúng container và seal đi chuyến này (có nút chọn cả lô). Bảng chọn đơn ghi <i>người mua → người nhận hàng</i> khi hai bên khác nhau, và dòng <i>⧉ Đợt n · HĐ gốc</i> cho đơn mua tiếp theo hợp đồng đã ký. Một xe chở container của nhiều đơn, nhiều khách thì gắn thêm đơn, mỗi đơn là một thẻ. Chuyến không có container thì <span class="btn white">Thêm dòng container</span> và gõ tay.</li>
+        <li>Bấm <span class="btn">Lưu lệnh</span> trên thanh dính đáy trang (kèm tổng số container và tổng kg đang nhập, nhập xong dòng cuối không phải cuộn lên). Lệnh mới ở trạng thái Nháp. Bấm Quay lại, đóng tab hoặc F5 khi chưa lưu thì máy hỏi "Rời trang khi lệnh chưa lưu?".</li>
       </ol>
     </div>
     <div class="card" style="margin-top:0">
       <b>Chuyến đi lấy mủ</b>
-      <p class="sm">Loại "Đi lấy mủ" có thêm ô loại mủ dự kiến, mã lô dự kiến, số pallet nhựa và sắt mang đi. App cân điền sẵn các số này khi chọn lệnh, và chi tiết lệnh hiện bảng đối chiếu bốn lần cân (hai ở Tân Lâm, hai ở Phong Điền).</p>
+      <p class="sm">Thẻ "Đi lấy mủ (NM khác)" có thêm ô loại mủ dự kiến, mã lô dự kiến, số pallet nhựa và sắt mang đi. App cân điền sẵn các số này khi chọn lệnh, và chi tiết lệnh hiện bảng đối chiếu bốn lần cân (hai ở nhà máy lấy mủ — Tân Lâm hoặc Lào, hai ở Phong Điền).</p>
       <b>Mẹo</b>
       <ul class="tight sm">
         <li>Đầu kéo gắn tài xế cố định ở danh mục Đội xe, nên chọn xe là xong phần tài xế.</li>
         <li>Mỗi dòng là một container với seal riêng. Một xe hai container thì hai dòng.</li>
         <li>Lệnh đã Hoàn tất không sửa được bảng hàng. Cần sửa thì đổi về Đã điều xe trước.</li>
+        <li>Mở lệnh cũ để sửa mà máy báo lỗi tải thì có nút Thử lại; form không hiện trống, kẻo lưu đè lên lệnh thật.</li>
       </ul>
     </div>
   </div>
@@ -159,12 +161,12 @@
   <h2 id="s4">4 · Chi tiết lệnh, đổi trạng thái, in</h2>
   <div class="desk"><img src="van-tai/03-chi-tiet-lenh.jpeg" alt="Chi tiết lệnh điều động"><div class="cap">Chi tiết lệnh LDD-2611-001: thông tin, container đã cân, khối Hành trình và chi phí chuyến</div></div>
   <ul class="tight">
-    <li>Hàng nút trên cùng: <span class="btn white">In lệnh điều động</span>, <span class="btn white">In biên bản bàn giao</span>, <span class="btn white">Sửa</span>, <span class="btn">Đổi trạng thái</span>, thùng rác để xoá lệnh nháp. Lệnh đi cảng có thêm <span class="btn white">Đánh dấu đã cân</span> khi trạm cân không chọn lệnh được.</li>
+    <li>Hàng nút trên cùng: <span class="btn white">In lệnh điều động</span>, <span class="btn white">In biên bản bàn giao</span>, <span class="btn white">Sửa</span>, <span class="btn">Đổi trạng thái</span>, thùng rác xoá hẳn lệnh. Thùng rác chỉ hiện với lệnh <b>Nháp</b> hoặc <b>Đã huỷ</b> và xoá luôn dòng hàng cùng chi phí chuyến đã nhập; lệnh đã phát hành muốn bỏ thì <b>Đổi trạng thái → Đã huỷ</b> (ngày điều động của lệnh là mốc giao hàng và tuổi nợ phải thu). Lệnh đi cảng có thêm <span class="btn white">Đánh dấu đã cân</span> khi trạm cân không chọn lệnh được.</li>
     <li>Bảng container: số container, seal, số kiện, KL net kế hoạch, GW, cột Cân hàng hiện "Đã cân" kèm số cân thật khi trạm cân đã cân.</li>
     <li>Phía dưới là khối <b>Hành trình và chi phí chuyến</b> (mục 7).</li>
   </ul>
   <div class="desk"><img src="van-tai/07-in-lenh.jpeg" alt="Bản in lệnh điều động xe"><div class="cap">Bản in A4 Lệnh điều động xe: số lệnh, lái xe, biển số, khách, cảng, bảng container, ô bảo vệ ghi giờ và km, bốn chữ ký</div></div>
-  <p class="sm">Bản in Biên bản bàn giao vận chuyển dùng cùng số liệu, thêm cột khách hàng khi một xe chở hàng của hai khách trở lên. Bấm <span class="btn gold">In</span> ở góc phải, trình duyệt chỉ in tờ phiếu.</p>
+  <p class="sm">Bản in Biên bản bàn giao vận chuyển dùng cùng số liệu, thêm cột khách hàng khi một xe chở hàng của hai khách trở lên. Dòng loại chuyến trên bản in ghi "nhóm xe — loại chở", ví dụ <i>Xe cont (đầu kéo) — Đi cảng</i>. Bấm <span class="btn gold">In</span> ở góc phải, trình duyệt chỉ in tờ phiếu.</p>
 
   <h2 id="s5">5 · Nối với trạm cân và đơn hàng bán</h2>
   <div class="card">
@@ -191,7 +193,7 @@
   </ul>
 
   <h2 id="s7">7 · Chi phí chuyến trên lệnh <small>khối "Hành trình và chi phí chuyến" trong chi tiết lệnh</small></h2>
-  <p>Xe về, Hành chính tổng hợp mở lệnh rồi nhập ba thứ: hành trình và km, từng khoản chi theo phiếu tài xế nộp, tạm ứng đã đưa. Kế toán xem xong bấm duyệt và khoá.</p>
+  <p>Xe về, Hành chính tổng hợp mở lệnh rồi nhập ba thứ: hành trình và km, từng khoản chi theo phiếu tài xế nộp, tạm ứng đã đưa. Kế toán (hoặc Ban Giám đốc) xem xong bấm duyệt và khoá.</p>
   <div class="desk"><img src="van-tai/17-khoi-chi-phi.jpeg" alt="Khối Hành trình và chi phí chuyến với ba nút nhập"><div class="cap">Ba nút nhập: <b>Nhập ngày về &amp; km</b> (tô vàng khi chuyến chưa có ngày về), <b>Thêm một khoản</b> (một khoản kèm ảnh), <b>Nhập nhanh cả phiếu</b> (chép cả phiếu tài xế một lần — đường chính).</div></div>
   <h3>Nhập ngày về và km</h3>
   <div class="desk"><img src="van-tai/05-sua-hanh-trinh.jpeg" alt="Hộp Hành trình và km của chuyến"></div>
@@ -217,24 +219,27 @@
     <li><b>Loại chi</b> và <b>Ngày chi</b> (mặc định ngày điều động). <b>Nội dung</b> ngắn gọn, ví dụ "Petrolimex Phong Điền 95 lít".</li>
     <li><b>Số tiền</b> và <b>đồng tiền</b> VND hoặc LAK. Chọn LAK thì nhập tỷ giá 1 LAK bằng bao nhiêu đồng, máy điền sẵn tỷ giá gần nhất và tự quy đổi.</li>
     <li><b>Khoản chi theo quy định (được tính)</b>: bật khi nằm trong danh mục chi phí công ty đã quy định, máy tính vào chuyến và vào đề nghị thanh toán. Tắt khi <b>chưa được thông qua</b> (ngoài quy định, chưa có quyết định): ghi vì sao, khoản nằm ở cột "Chưa thông qua" chờ Ban Giám đốc hoặc kế toán quyết, đồng ý thì bật lại. Tắt <b>không</b> có nghĩa là tài xế phải chịu.</li>
-    <li><b>Ảnh hoá đơn</b>: kéo thả hoặc chọn nhiều ảnh, nhận cả PDF, ảnh tự nén. Không bắt buộc nhưng sổ sẽ đếm khoản thiếu chứng từ.</li>
+    <li><b>Ảnh hoá đơn</b>: kéo thả hoặc chọn nhiều ảnh, nhận cả PDF, ảnh tự nén. Không bắt buộc nhưng sổ sẽ đếm khoản thiếu chứng từ. Nếu có ảnh tải lỗi, máy báo vàng "N chứng từ tải lỗi": khoản chi vẫn đã lưu, chỉ cần tải lại ảnh ở cột Chứng từ.</li>
     <li><span class="btn">Lưu</span> hoặc <span class="btn white">Lưu và thêm tiếp</span> để nhập khoản kế.</li>
   </ol>
   <h3>Bảng khoản chi, tạm ứng gắn chuyến, duyệt và khoá</h3>
   <ul class="tight">
     <li>Mỗi khoản một dòng: loại, nội dung, ngày, số tiền (LAK hiện kèm số quy đổi), công tắc Được tính (tắt là chưa thông qua, chờ quyết định), ảnh chứng từ (chạm xem to, nút tải thêm), người nhập. Khoản được tính mà chưa có ảnh gắn nhãn "thiếu CT".</li>
+    <li>Góc trên khối có nhãn trạng thái chi phí của chuyến: <span class="tag grey">Chưa nhập chi phí</span> → <span class="tag gold">Chờ kế toán duyệt</span> → <span class="tag green">Đã duyệt</span> (có ổ khoá và giờ duyệt). Sổ chi phí đội xe dùng đúng ba nhãn này.</li>
     <li>Cước thuê xe ngoài đã khai trên lệnh hiện thành một dòng màu tím, không nhập lại.</li>
     <li>Bốn ô tổng: <b>Tổng chi chuyến</b> (được tính + chưa thông qua, quy đổi VNĐ), Chi được tính, Chưa thông qua, Chứng từ đủ hay thiếu.</li>
-    <li><span class="btn white">Gắn tạm ứng</span>: ghi tạm ứng đã đưa cho tài xế trước chuyến. Dòng dưới hiện còn lại sau chuyến.</li>
-    <li><span class="btn gold">Kế toán duyệt và khoá</span>: sau khi khoá không sửa hay xoá khoản chi và chứng từ được nữa. Muốn sửa bấm <span class="btn white">Mở lại</span>.</li>
+    <li><span class="btn white">Gắn tạm ứng</span>: ghi tạm ứng đã đưa cho tài xế trước chuyến. Dòng dưới hiện còn lại sau chuyến. Bấm dấu × trên thẻ tạm ứng thì máy hỏi lại và nêu số tiền, vì xoá là mất hẳn khỏi sổ tạm ứng; tạm ứng đã vào đề nghị thanh toán thì không có dấu ×.</li>
+    <li><span class="btn gold">Kế toán duyệt và khoá</span>: sau khi khoá không sửa hay xoá khoản chi và chứng từ được nữa. Muốn sửa bấm <span class="btn white">Mở lại</span>. Hai nút này chỉ kế toán, Ban Giám đốc, admin bấm được (người khác thấy mờ, rê chuột có lời nhắc). Nút duyệt còn mờ khi chuyến chưa có khoản chi nào, kể cả cước thuê xe ngoài.</li>
   </ul>
   <div class="note warn sm">Chuyến đã gom vào đề nghị thanh toán cũng bị khoá sửa khoản chi. Muốn sửa phải bỏ chuyến khỏi phiếu nháp trước.</div>
+  <div class="note red sm"><b>Khối chi phí hiện nút Thử lại hoặc băng lỗi đỏ</b>: máy chưa tải được số liệu. Bấm Thử lại và <b>đừng nhập thêm khoản chi</b> khi chưa tải được, kẻo nhập trùng. Băng đỏ phía trên khối nghĩa là số đang xem là của lần tải trước, có thể chưa gồm khoản vừa lưu.</div>
   <h2 id="s8">8 · Sổ chi phí đội xe <small>Vận tải → Sổ chi phí đội xe</small></h2>
   <div class="desk"><img src="van-tai/10-so-chi-phi-theo-tai-xe.jpeg" alt="Sổ chi phí đội xe, tab theo tài xế"><div class="cap">Lọc tháng 11/2026, tài xế Bùi Văn Nghĩa. Bảng trên là đối soát theo tài xế, bảng dưới mỗi dòng một chuyến theo đúng bố cục form theo dõi chi phí tài xế</div></div>
   <ul class="tight">
-    <li><b>Bộ lọc</b>: tháng, tài xế, đầu kéo. Nút tải lại, <span class="btn white">Xuất Excel</span> ra file đúng 26 cột của form, một sheet mỗi tài xế. Nút <span class="btn gold">Lập đề nghị thanh toán</span> sáng khi đã chọn tài xế.</li>
+    <li><b>Bộ lọc</b>: tháng, tài xế, đầu kéo. Nút tải lại, <span class="btn white">Xuất Excel</span> ra file đúng 26 cột của form, một sheet mỗi tài xế; hai cột cờ ghi "Được tính" và "Chưa thông qua". Nút Xuất Excel mờ khi đang tải hoặc tải lỗi (tránh xuất file mang tên tháng này nhưng số của tháng khác). Nút <span class="btn gold">Lập đề nghị thanh toán</span> chỉ bấm được khi đã chọn tài xế (chưa chọn thì bị khoá, rê chuột vào nút có lời nhắc).</li>
+    <li>Tải lỗi thì cả sổ hiện lỗi kèm nút <b>Thử lại</b>, không hiện các ô 0 ₫ giả. Chạm mã lệnh hoặc nút <span class="btn white">Mở lệnh</span> thì lệnh mở ở tab mới, sổ vẫn giữ nguyên bên cạnh.</li>
     <li><b>Bảy ô số</b>: chuyến, chi được tính, chưa thông qua, tạm ứng, còn lại, đồng trên km, chờ xử lý.</li>
-    <li><b>Theo tài xế</b>: bảng đối soát tạm ứng − chi được tính = còn lại (dương là tài xế hoàn, âm là chi thêm), chạm tên để lọc; bảng chuyến bên dưới có ngày đi về, xe, km, hành trình, ngày chuẩn, vượt, nội dung, tạm ứng, chi được tính, chưa thông qua, trạng thái và mã đề nghị thanh toán.</li>
+    <li><b>Theo tài xế</b>: bảng đối soát tạm ứng − chi được tính = còn lại (dương là tài xế hoàn, âm là chi thêm), chạm tên để lọc; bảng chuyến bên dưới có ngày đi về, xe, km, hành trình, ngày chuẩn, vượt, nội dung, tạm ứng, chi được tính, chưa thông qua, trạng thái chi phí (Chưa nhập chi phí / Chờ kế toán duyệt / Đã duyệt) và mã đề nghị thanh toán.</li>
   </ul>
   <div class="two">
     <div class="desk"><img src="van-tai/11-theo-xe.jpeg" alt="Tab theo xe"><div class="cap">Theo xe: mỗi đầu kéo một dòng, chi theo từng loại, tổng quy đổi, đồng trên km</div></div>
@@ -246,7 +251,7 @@
   <div class="desk"><img src="van-tai/12-chi-tam-ung.jpeg" alt="Hộp Chi tạm ứng cho tài xế"><div class="cap">Tab Tạm ứng → Chi tạm ứng</div></div>
   <ul class="tight">
     <li>Chọn tài xế, ngày chi, số tiền, VND hoặc LAK (LAK cần tỷ giá để sau này khấu trừ), gắn chuyến nếu biết, người chi tiền, ghi chú. Mã phiếu TU-năm tháng-số tự sinh.</li>
-    <li>Tab Tạm ứng liệt kê phiếu trong tháng, cột Đối soát cho biết phiếu đã vào đề nghị thanh toán chưa. Phiếu chưa đối soát mới xoá được.</li>
+    <li>Tab Tạm ứng liệt kê phiếu trong tháng, cột Đối soát cho biết phiếu đã vào đề nghị thanh toán chưa. Phiếu chưa đối soát mới xoá được; bấm xoá thì máy hỏi lại và nêu số tiền (xoá hẳn, không khôi phục).</li>
     <li>Số dư từng tài xế xem ở tab Theo tài xế. Tạm ứng chưa đối soát được mang sang kỳ sau cho đến khi khấu trừ.</li>
   </ul>
 
@@ -257,7 +262,7 @@
     <li>Ở Sổ chi phí chọn tháng và tài xế → bấm <span class="btn gold">Lập đề nghị thanh toán</span>.</li>
     <li>Tick các chuyến có chi phí chưa gom và các tạm ứng chưa đối soát (gồm cả phiếu kỳ trước). Bỏ tick phiếu tạm ứng nào muốn giữ sang kỳ sau. Chọn ngày phiếu, hình thức nhận tiền, tài khoản nếu chuyển khoản.</li>
     <li>Bấm <span class="btn">Tạo phiếu nháp</span>. Máy sinh mã TTDX-năm tháng-số và mở trang chi tiết phiếu.</li>
-    <li>Ở trang phiếu: sửa thông tin, thêm khoản tay, bỏ dòng (chuyến hay tạm ứng được nhả ra), xem ba ô tổng. Xong bấm <span class="btn gold">Gửi duyệt</span>.</li>
+    <li>Ở trang phiếu: sửa thông tin, thêm khoản tay, bỏ dòng (chuyến hay tạm ứng được nhả ra), xem ba ô tổng; chạm "mở lệnh LDD-…" ở dòng chuyến để xem lệnh ở tab mới. Phiếu nháp xoá hẳn được bằng thùng rác, chuyến và tạm ứng trong phiếu được nhả. Xong bấm <span class="btn gold">Gửi duyệt</span>.</li>
     <li>Kế toán hoặc Ban Giám đốc bấm <span class="btn blue">Duyệt</span>: chi phí các chuyến trong phiếu bị khoá. Chi tiền xong bấm <span class="btn ok">Đánh dấu đã chi</span>.</li>
     <li>Cần sửa thì <span class="btn white">Trả về nháp</span>. Lập nhầm thì <span class="btn red">Huỷ</span>, chuyến và tạm ứng được nhả để gom phiếu khác.</li>
     <li><span class="btn white">In phiếu</span>: tờ A4 "Đề nghị thanh toán" như bên mủ, có kính gửi, người đề nghị, lý do, ô tick hình thức nhận tiền, bảng STT, nội dung, ĐVT, SL, đơn giá, thành tiền, ghi chú, số tiền bằng chữ, ba chữ ký.</li>
@@ -295,17 +300,19 @@
     <thead><tr><th style="width:38%">Tình huống</th><th>Làm gì</th></tr></thead>
     <tbody>
       <tr><td>App cân không thấy lệnh</td><td>Lệnh đang Hoàn tất, Đã huỷ hoặc còn Nháp. Đổi về Đã điều xe.</td></tr>
-      <tr><td>Nút "Lập đề nghị thanh toán" mờ</td><td>Chưa chọn tài xế ở bộ lọc. Chọn tài xế rồi bấm lại.</td></tr>
+      <tr><td>Nút "Lập đề nghị thanh toán" không bấm được</td><td>Chưa chọn tài xế ở bộ lọc (rê chuột vào nút sẽ hiện "Chọn một tài xế trước"). Chọn tài xế rồi bấm lại.</td></tr>
       <tr><td>"Không có chuyến có chi phí hay tạm ứng nào chưa gom"</td><td>Chuyến trong kỳ chưa có khoản chi, hoặc đã nằm trong phiếu khác. Xem cột trạng thái ở tab Theo tài xế.</td></tr>
       <tr><td>"Lệnh đã duyệt chi phí (khoá)"</td><td>Kế toán đã khoá. Bấm Mở lại trên lệnh, hoặc nếu chuyến đang trong đề nghị thanh toán thì bỏ chuyến khỏi phiếu nháp.</td></tr>
       <tr><td>Tài xế có khoản chi lạ, chưa biết công ty có chấp nhận không</td><td>Vẫn nhập, tắt Được tính và ghi vì sao. Khoản hiện ở cột Chưa thông qua, không vào đề nghị thanh toán. Khi có quyết định đồng ý, bật lại Được tính.</td></tr>
       <tr><td>"Khoản chi bằng LAK cần tỷ giá"</td><td>Nhập ô 1 LAK bằng bao nhiêu đồng. Tạm ứng LAK cũng cần tỷ giá mới khấu trừ được.</td></tr>
-      <tr><td>Nút Duyệt hoặc Đánh dấu đã chi mờ</td><td>Chỉ kế toán, Ban Giám đốc, admin bấm được.</td></tr>
+      <tr><td>Nút Duyệt, Đánh dấu đã chi, Kế toán duyệt và khoá hoặc Mở lại mờ</td><td>Chỉ kế toán, Ban Giám đốc, admin bấm được. Riêng nút duyệt chi phí chuyến còn mờ khi chuyến chưa có khoản chi nào.</td></tr>
+      <tr><td>Không thấy thùng rác xoá lệnh</td><td>Chỉ lệnh Nháp hoặc Đã huỷ mới xoá hẳn được. Lệnh đã phát hành thì Đổi trạng thái → Đã huỷ.</td></tr>
+      <tr><td>Màn hiện nút Thử lại / băng lỗi đỏ thay cho dữ liệu</td><td>Máy chưa tải được số liệu (mạng hoặc máy chủ). Bấm Thử lại; chưa tải được thì đừng nhập khoản chi hay tạm ứng mới, kẻo trùng.</td></tr>
       <tr><td>Khoản chi thuộc chuyến xe thuê ngoài</td><td>Nhập như thường, nhưng tiền trả cho nhà xe đi luồng riêng, không lập đề nghị thanh toán tài xế.</td></tr>
     </tbody>
   </table>
 
-  <footer>Tài liệu nội bộ Cao su Huy Anh · Huy Anh ERP · Ảnh chụp từ hệ thống thật ngày 10/11/2026 (số liệu chi phí tháng 11 chưa nhập nên các ô số đang bằng 0).</footer>
+  <footer>Tài liệu nội bộ Cao su Huy Anh · Huy Anh ERP · Nội dung cập nhật 19/11/2026 theo bản hệ thống ngày 18/11. Ảnh chụp từ hệ thống thật ngày 19/11/2026 (số liệu chi phí tháng 11 chưa nhập nên các ô số đang bằng 0); riêng ảnh Thêm một khoản, Sửa hành trình, Nhập nhanh, Đội xe và Tài xế chụp ngày 10/11/2026, giao diện chỉ khác chi tiết nhỏ.</footer>
 </div>
 </body>
 </html>
